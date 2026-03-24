@@ -5,11 +5,11 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Backend
     environment: str = "development"
-    port: int = 8000
+    port: int = 8001
     internal_api_key: str = ""
 
     # Database
-    database_url: str = "postgresql+asyncpg://finance:password@localhost:5432/finance_db"
+    database_url: str = "postgresql+asyncpg://finance:password@localhost:5433/finance_db"
 
     # LLM APIs
     deepseek_api_key: str = ""
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     owner_telegram_id: str = ""
 
     # OpenClaw Skills
-    finance_api_url: str = "http://localhost:8000/api/v1"
+    finance_api_url: str = "http://localhost:8001/api/v1"
     finance_api_key: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
