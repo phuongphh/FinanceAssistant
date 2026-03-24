@@ -11,13 +11,22 @@ from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 async def create_expense(
     db: AsyncSession, user_id: uuid.UUID, data: ExpenseCreate
 ) -> Expense:
+    # Auto-categorize if category is needs_review and we have context
+    category = data.category
+    if category == "needs_review" and (data.merchant or data.note):
+        from backend.services.llm_service import categorize_expense
+        category = await categorize_expense(
+            merchant=data.merchant, description=data.note,
+            amount=data.amount, db=db,
+        )
+
     month_key = data.expense_date.strftime("%Y-%m")
     expense = Expense(
         user_id=user_id,
         amount=data.amount,
         currency=data.currency,
         merchant=data.merchant,
-        category=data.category,
+        category=category,
         source=data.source,
         expense_date=data.expense_date,
         month_key=month_key,
