@@ -1,15 +1,12 @@
 ---
 name: finance-goals
-description: Quản lý mục tiêu tài chính — tạo, xem, cập nhật tiến độ
-triggers:
-  - tôi muốn tiết kiệm
-  - mục tiêu
-  - cập nhật tiến độ
-  - thu nhập tháng này
-  - tiến độ
-env:
-  - FINANCE_API_URL
-  - FINANCE_API_KEY
+description: >
+  Quản lý mục tiêu tài chính — tạo, xem, cập nhật tiến độ.
+  Khai báo thu nhập hàng tháng.
+metadata:
+  openclaw:
+    requires:
+      bins: ["python3"]
 ---
 
 # Finance Goals Skill
@@ -24,20 +21,20 @@ env:
 
 ### Tạo mục tiêu
 1. Parse: goal_name, target_amount, deadline
-2. Gọi `POST {FINANCE_API_URL}/goals?user_id={user_id}`
-3. Confirm cho user
+2. Chạy: `python3 scripts/goals_cli.py create "<name>" <target_amount> [YYYY-MM-DD]`
 
 ### Xem mục tiêu
-1. Gọi `GET {FINANCE_API_URL}/goals?user_id={user_id}`
-2. Format danh sách với progress bar
+1. Chạy: `python3 scripts/goals_cli.py list`
+
+### Cập nhật tiến độ
+1. Chạy: `python3 scripts/goals_cli.py progress <goal_id> <current_amount>`
 
 ### Cập nhật thu nhập
-1. Parse amount
-2. Gọi `POST {FINANCE_API_URL}/users/income?user_id={user_id}`
+1. Chạy: `python3 scripts/goals_cli.py income <amount>`
 
 ## Output format
 ```
-🎯 Mục tiêu: Mua xe
+Mục tiêu: Mua xe
    Tiến độ: 10,000,000₫ / 50,000,000₫ (20%)
    ████░░░░░░░░░░░░░░░░ 20%
    Deadline: 01/09/2026
