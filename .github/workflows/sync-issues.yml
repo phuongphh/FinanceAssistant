@@ -1,0 +1,41 @@
+name: Sync Issues to Markdown
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export issue to markdown
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          mkdir -p docs/issues
+          FILE="docs/issues/issue-${ISSUE_NUMBER}.md"
+          {
+            echo "# Issue #${ISSUE_NUMBER}"
+            echo ""
+            echo "${ISSUE_TITLE}"
+            echo ""
+            echo "${ISSUE_BODY}"
+          } > "$FILE"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "sync: export issue #${{ github.event.issue.number }}"
+          branch: sync/issue-${{ github.event.issue.number }}
+          title: "sync: export issue #${{ github.event.issue.number }}"
+          body: |
+            Auto-sync issue #${{ github.event.issue.number }} to `docs/issues/`.
+          labels: sync
