@@ -41,7 +41,7 @@ jobs:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             const issueNumber = parseInt('${{ steps.extract.outputs.issue_number }}');
-            const projectNumber = 2;
+            const projectNumber = 4;
             const owner = context.repo.owner;
 
             // Bước 2a: Lấy Project ID và field Status ID
