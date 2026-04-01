@@ -1,0 +1,183 @@
+name: Auto Create PR
+
+on:
+  push:
+    branches:
+      - "claude/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # BƯỚC 1: Lấy issue number từ tên branch
+      # Branch có dạng: claude/implement-issue-4-T49ZM
+      # Regex bắt số sau "issue-"
+      # -------------------------------------------------------
+      - name: Extract issue number from branch
+        id: extract
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          ISSUE_NUMBER=$(echo "$BRANCH" | grep -oP '(?<=issue-)\d+' || echo "")
+          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "Found issue number: ${ISSUE_NUMBER:-none}"
+
+      # -------------------------------------------------------
+      # BƯỚC 2: Chuyển Issue sang "In Progress" trên Project board
+      # Dùng GraphQL API vì Project V2 không có REST API
+      # PROJECT_NUMBER = 2 (từ URL github.com/users/phuongphh/projects/2)
+      # -------------------------------------------------------
+      - name: Move issue to In Progress
+        if: steps.extract.outputs.issue_number != ''
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const issueNumber = parseInt('${{ steps.extract.outputs.issue_number }}');
+            const projectNumber = 2;
+            const owner = context.repo.owner;
+
+            // Bước 2a: Lấy Project ID và field Status ID
+            const projectQuery = await github.graphql(`
+              query($owner: String!, $number: Int!) {
+                user(login: $owner) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, number: projectNumber });
+
+            const project = projectQuery.user.projectV2;
+            const projectId = project.id;
+
+            // Tìm field "Status" và option "In Progress"
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            const inProgressOption = statusField?.options?.find(o => o.name === 'In Progress');
+
+            if (!statusField || !inProgressOption) {
+              console.log('Could not find Status field or In Progress option');
+              return;
+            }
+
+            // Bước 2b: Lấy item ID của issue trong project
+            const issueQuery = await github.graphql(`
+              query($owner: String!, $repo: String!, $issue: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $issue) {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, repo: context.repo.repo, issue: issueNumber });
+
+            const projectItem = issueQuery.repository.issue.projectItems.nodes
+              .find(item => item.project.id === projectId);
+
+            if (!projectItem) {
+              console.log('Issue not found in project');
+              return;
+            }
+
+            // Bước 2c: Cập nhật status thành "In Progress"
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) {
+                  projectV2Item { id }
+                }
+              }
+            `, {
+              projectId,
+              itemId: projectItem.id,
+              fieldId: statusField.id,
+              optionId: inProgressOption.id
+            });
+
+            console.log(`✅ Issue #${issueNumber} moved to In Progress`);
+
+      # -------------------------------------------------------
+      # BƯỚC 3: Tạo PR với "Closes #N" trong body
+      # Dùng gh CLI thay vì peter-evans/create-pull-request
+      # vì action đó chỉ output PR number khi tạo mới,
+      # không output khi PR đã tồn tại → step link bị skip
+      # -------------------------------------------------------
+      - name: Create or update Pull Request
+        if: steps.extract.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
+
+          # Kiểm tra PR đã tồn tại cho branch này chưa
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists, updating body to link issue..."
+            gh pr edit "$EXISTING_PR" \
+              --body "AI generated implementation
+
+          Closes #${ISSUE_NUMBER}"
+            echo "✅ Updated PR #$EXISTING_PR with Closes #${ISSUE_NUMBER}"
+          else
+            echo "Creating new PR..."
+            NEW_PR=$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "Auto PR from Claude — Issue #${ISSUE_NUMBER}" \
+              --body "AI generated implementation
+
+          Closes #${ISSUE_NUMBER}")
+            echo "✅ Created PR: $NEW_PR"
+          fi
+
+      # Fallback: branch không chứa issue number → tạo PR không link
+      - name: Create Pull Request (no issue link)
+        if: steps.extract.outputs.issue_number == ''
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "Auto PR from Claude" \
+              --body "AI generated implementation"
+            echo "✅ Created PR without issue link"
+          else
+            echo "PR #$EXISTING_PR already exists, skipping"
+          fi

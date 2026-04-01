@@ -1,0 +1,137 @@
+name: Move Issue to Done on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  move-to-done:
+    # Chỉ chạy khi PR được merge (không phải close thường)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------------
+      # BƯỚC 1: Tìm issue number từ PR body (Closes #N) hoặc branch name
+      # -------------------------------------------------------
+      - name: Extract linked issue number
+        id: extract
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const branch = context.payload.pull_request.head.ref || '';
+
+            // Tìm từ PR body: "Closes #N", "Fixes #N", "Resolves #N"
+            const bodyMatch = body.match(/(?:closes|fixes|resolves)\s+#(\d+)/i);
+
+            // Fallback: tìm từ branch name: claude/implement-issue-4-T49ZM
+            const branchMatch = branch.match(/issue-(\d+)/);
+
+            const issueNumber = bodyMatch?.[1] || branchMatch?.[1] || '';
+
+            core.setOutput('issue_number', issueNumber);
+
+            if (issueNumber) {
+              console.log(`Found issue #${issueNumber} linked to PR #${context.payload.pull_request.number}`);
+            } else {
+              console.log('No linked issue found — skipping');
+            }
+
+      # -------------------------------------------------------
+      # BƯỚC 2: Chuyển Issue sang "Done" trên Project board
+      # -------------------------------------------------------
+      - name: Move issue to Done
+        if: steps.extract.outputs.issue_number != ''
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const issueNumber = parseInt('${{ steps.extract.outputs.issue_number }}');
+            const projectNumber = 2;
+            const owner = context.repo.owner;
+
+            // Lấy Project ID và field Status
+            const projectQuery = await github.graphql(`
+              query($owner: String!, $number: Int!) {
+                user(login: $owner) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, number: projectNumber });
+
+            const project = projectQuery.user.projectV2;
+            const projectId = project.id;
+
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            const doneOption = statusField?.options?.find(o => o.name === 'Done');
+
+            if (!statusField || !doneOption) {
+              core.warning('Could not find Status field or Done option on project board');
+              return;
+            }
+
+            // Lấy item ID của issue trong project
+            const issueQuery = await github.graphql(`
+              query($owner: String!, $repo: String!, $issue: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $issue) {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, repo: context.repo.repo, issue: issueNumber });
+
+            const projectItem = issueQuery.repository.issue.projectItems.nodes
+              .find(item => item.project.id === projectId);
+
+            if (!projectItem) {
+              core.warning(`Issue #${issueNumber} not found in project #${projectNumber}`);
+              return;
+            }
+
+            // Cập nhật status → Done
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) {
+                  projectV2Item { id }
+                }
+              }
+            `, {
+              projectId,
+              itemId: projectItem.id,
+              fieldId: statusField.id,
+              optionId: doneOption.id
+            });
+
+            console.log(`✅ Issue #${issueNumber} moved to Done`);
