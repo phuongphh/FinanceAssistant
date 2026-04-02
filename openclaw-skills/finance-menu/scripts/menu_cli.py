@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
 """OpenClaw Skill CLI: finance-menu
-Display the main menu with all available features.
+Thin wrapper — fetch menu from backend API.
 """
+import os
+import sys
 
-MENU_TEXT = """🏦 Finance Assistant — Menu
+import requests
 
-Chọn tính năng bạn muốn sử dụng:
+API_URL = os.environ.get("FINANCE_API_URL", "http://localhost:8001/api/v1")
+API_KEY = os.environ.get("FINANCE_API_KEY", "")
 
-📧 Quét hóa đơn Gmail — "quét gmail" hoặc "scan gmail"
-📸 Nhận diện hóa đơn — Gửi ảnh hóa đơn/receipt trực tiếp
-✍️ Thêm chi tiêu — "thêm chi tiêu 150k ăn trưa"
-📊 Báo cáo chi tiêu — "báo cáo tháng này"
-📈 Thông tin thị trường — "thị trường hôm nay?"
-🎯 Mục tiêu tài chính — "mục tiêu" hoặc "tiến độ"
-💰 Cập nhật thu nhập — "thu nhập tháng này 20tr"
-💡 Gợi ý đầu tư — "nên đầu tư gì?"
 
-Nhập lệnh hoặc mô tả nhu cầu bằng tiếng Việt tự nhiên."""
+def _headers() -> dict:
+    return {"X-API-Key": API_KEY}
+
+
+def show_menu():
+    resp = requests.get(
+        f"{API_URL}/telegram/menu",
+        headers=_headers(),
+        timeout=10,
+    )
+    if resp.status_code == 200:
+        data = resp.json()
+        print(data["data"]["text"])
+    else:
+        print(f"Lỗi: {resp.status_code}", file=sys.stderr)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    print(MENU_TEXT)
+    show_menu()
