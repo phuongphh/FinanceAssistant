@@ -1,7 +1,7 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ReportResponse(BaseModel):
@@ -17,20 +17,5 @@ class ReportResponse(BaseModel):
     goal_progress: dict | None
     report_text: str | None
     generated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class MarketSnapshotResponse(BaseModel):
-    id: uuid.UUID
-    snapshot_date: date
-    asset_code: str
-    asset_type: str
-    asset_name: str | None
-    price: float | None
-    change_1d_pct: float | None
-    change_1w_pct: float | None
-    change_1m_pct: float | None
-    extra_data: dict | None
 
     model_config = {"from_attributes": True}

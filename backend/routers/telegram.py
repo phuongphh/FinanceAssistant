@@ -6,11 +6,9 @@ all menu data lives in menu_service.
 import hmac
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from backend.config import get_settings
-from backend.database import get_db
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
     answer_callback,
@@ -40,7 +38,7 @@ def _verify_webhook_request(request: Request) -> None:
 
 
 @router.post("/webhook")
-async def telegram_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+async def telegram_webhook(request: Request):
     _verify_webhook_request(request)
 
     data = await request.json()

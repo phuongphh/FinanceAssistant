@@ -174,10 +174,13 @@ async def generate_investment_advice(
     snapshots = await get_latest_snapshots(db)
     market_data = []
     for s in snapshots:
-        market_data.append(f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f} "
-                          f"[1d: {s.change_1d_pct:+.2f}%]" if s.change_1d_pct else
-                          f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f}" if s.price else
-                          f"  • {s.asset_code}: N/A")
+        if s.change_1d_pct is not None and s.price is not None:
+            market_data.append(f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f} "
+                              f"[1d: {s.change_1d_pct:+.2f}%]")
+        elif s.price is not None:
+            market_data.append(f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f}")
+        else:
+            market_data.append(f"  • {s.asset_code}: N/A")
 
     # User financial context
     today = date.today()
