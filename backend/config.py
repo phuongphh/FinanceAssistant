@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     internal_api_key: str = ""
 
     # Database
-    database_url: str = "postgresql+asyncpg://finance:password@localhost:5433/finance_db"
+    database_url: str = ""  # Set via DATABASE_URL env var
 
     # LLM APIs
     deepseek_api_key: str = ""
