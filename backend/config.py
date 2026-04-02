@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""  # Validates webhook requests from Telegram
     owner_telegram_id: str = ""
 
     # OpenClaw Skills
