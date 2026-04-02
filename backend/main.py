@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from backend.config import get_settings
-from backend.routers import expenses, goals, ingestion, market, reports
+from backend.routers import expenses, goals, ingestion, market, reports, telegram
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -50,6 +50,7 @@ app.include_router(goals.income_router, prefix="/api/v1")
 app.include_router(ingestion.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(market.router, prefix="/api/v1")
+app.include_router(telegram.router, prefix="/api/v1")
 
 
 @app.get("/health")

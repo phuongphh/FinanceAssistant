@@ -1,5 +1,11 @@
-# Environment
+# Environment & Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+token.json
 
 # Python
 __pycache__/

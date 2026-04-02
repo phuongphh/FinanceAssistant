@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: finance-postgres
     environment:
-      POSTGRES_USER: finance
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: finance_db
+      POSTGRES_USER: ${POSTGRES_USER:-finance}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-finance_db}
     ports:
       - "5433:5432"
     volumes:
