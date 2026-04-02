@@ -5,9 +5,22 @@ import sys
 
 import requests
 
-API_URL = os.environ.get("FINANCE_API_URL", "http://localhost:8001/api/v1")
+API_URL = os.environ.get("FINANCE_API_URL", "")
 API_KEY = os.environ.get("FINANCE_API_KEY", "")
 USER_ID = os.environ.get("FINANCE_USER_ID", "")
+
+
+def _validate_env():
+    missing = []
+    if not API_URL:
+        missing.append("FINANCE_API_URL")
+    if not API_KEY:
+        missing.append("FINANCE_API_KEY")
+    if not USER_ID:
+        missing.append("FINANCE_USER_ID")
+    if missing:
+        print(f"Error: missing required env vars: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _headers() -> dict:
@@ -64,6 +77,7 @@ def advice():
 
 
 if __name__ == "__main__":
+    _validate_env()
     if len(sys.argv) < 2:
         print("Usage: market_cli.py <snapshot|history|advice> [args...]")
         sys.exit(1)

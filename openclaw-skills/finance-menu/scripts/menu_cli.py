@@ -7,8 +7,19 @@ import sys
 
 import requests
 
-API_URL = os.environ.get("FINANCE_API_URL", "http://localhost:8001/api/v1")
+API_URL = os.environ.get("FINANCE_API_URL", "")
 API_KEY = os.environ.get("FINANCE_API_KEY", "")
+
+
+def _validate_env():
+    missing = []
+    if not API_URL:
+        missing.append("FINANCE_API_URL")
+    if not API_KEY:
+        missing.append("FINANCE_API_KEY")
+    if missing:
+        print(f"Error: missing required env vars: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _headers() -> dict:
@@ -30,4 +41,5 @@ def show_menu():
 
 
 if __name__ == "__main__":
+    _validate_env()
     show_menu()
