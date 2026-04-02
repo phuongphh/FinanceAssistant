@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     # Gmail OAuth2
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
-    gmail_refresh_token: str = ""
     gmail_redirect_uri: str = "http://localhost:8000/auth/gmail/callback"
 
     # Notion

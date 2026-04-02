@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import os
 import re
 from datetime import date
 
@@ -51,9 +52,11 @@ async def _get_gmail_service(user_id):
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
 
+        # Phase 0: read refresh token from env; Phase 1+: per-user from DB
+        refresh_token = os.environ.get("GMAIL_REFRESH_TOKEN", "")
         creds = Credentials(
             token=None,
-            refresh_token=settings.gmail_refresh_token,
+            refresh_token=refresh_token,
             client_id=settings.gmail_client_id,
             client_secret=settings.gmail_client_secret,
             token_uri="https://oauth2.googleapis.com/token",
