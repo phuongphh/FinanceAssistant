@@ -1,5 +1,7 @@
 import base64
+import json
 import logging
+import os
 import re
 from datetime import date
 
@@ -50,9 +52,11 @@ async def _get_gmail_service(user_id):
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
 
+        # Phase 0: read refresh token from env; Phase 1+: per-user from DB
+        refresh_token = os.environ.get("GMAIL_REFRESH_TOKEN", "")
         creds = Credentials(
             token=None,
-            refresh_token=settings.gmail_refresh_token if hasattr(settings, 'gmail_refresh_token') else "",
+            refresh_token=refresh_token,
             client_id=settings.gmail_client_id,
             client_secret=settings.gmail_client_secret,
             token_uri="https://oauth2.googleapis.com/token",
@@ -142,7 +146,6 @@ async def sync_new_receipts(db: AsyncSession, user_id) -> list[Expense]:
             prompt = PARSE_EMAIL_PROMPT.format(email_text=body[:3000])
             result_text = await call_llm(prompt, task_type="parse_email", db=db, use_cache=False)
 
-            import json
             if result_text.startswith("```"):
                 lines = result_text.split("\n")
                 lines = [l for l in lines if not l.startswith("```")]

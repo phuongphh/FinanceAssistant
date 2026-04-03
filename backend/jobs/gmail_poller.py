@@ -1,6 +1,6 @@
 import logging
 
-from backend.database import async_session_factory
+from backend.database import get_session_factory
 from backend.models.user import User
 from sqlalchemy import select
 
@@ -11,7 +11,7 @@ async def poll_gmail():
     """Poll Gmail for new receipts for all active users."""
     from backend.services.gmail_service import sync_new_receipts
 
-    async with async_session_factory() as db:
+    async with get_session_factory()() as db:
         try:
             users = (await db.execute(
                 select(User).where(User.is_active.is_(True), User.deleted_at.is_(None))

@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date
 
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.schemas.expense import ExpenseCreate, ExpenseResponse
 from backend.services import expense_service
+from backend.services.gmail_service import sync_new_receipts
+from backend.services.llm_service import call_llm
 from backend.services.ocr_service import parse_receipt_image
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
@@ -50,8 +53,6 @@ async def manual_ingestion(
     db: AsyncSession = Depends(get_db),
 ):
     """Parse free-text expense input and save. For now, expects structured data."""
-    from backend.services.llm_service import call_llm
-
     prompt = f"""Parse chi tiêu từ text sau và trả về JSON:
 "{data.text}"
 
@@ -63,7 +64,6 @@ Chỉ trả về JSON, không giải thích."""
 
     try:
         result_text = await call_llm(prompt, task_type="parse_manual", db=db, use_cache=False)
-        import json
         # Strip markdown fences
         if result_text.startswith("```"):
             lines = result_text.split("\n")
@@ -92,7 +92,6 @@ async def trigger_gmail_sync(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        from backend.services.gmail_service import sync_new_receipts
         expenses = await sync_new_receipts(db, user_id)
         return {
             "data": {"synced_count": len(expenses), "expenses": [str(e.id) for e in expenses]},

@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy import select
 
-from backend.database import async_session_factory
+from backend.database import get_session_factory
 from backend.models.user import User
 from backend.services.notion_sync import sync_report_to_notion
 from backend.services.report_service import generate_monthly_report
@@ -22,7 +22,7 @@ async def generate_all_monthly_reports():
     """Generate monthly reports for all active users (previous month)."""
     month_key = _prev_month_key()
 
-    async with async_session_factory() as db:
+    async with get_session_factory()() as db:
         try:
             users = (await db.execute(
                 select(User).where(User.is_active.is_(True), User.deleted_at.is_(None))

@@ -3,28 +3,56 @@ from sqlalchemy.orm import DeclarativeBase
 
 from backend.config import get_settings
 
-settings = get_settings()
-
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.environment == "development",
-    pool_size=5,
-    max_overflow=10,
-)
-
-async_session_factory = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
 
 class Base(DeclarativeBase):
     pass
 
 
+def _create_engine():
+    settings = get_settings()
+    if not settings.database_url:
+        raise ValueError(
+            "DATABASE_URL is not configured. "
+            "Set it in .env or as an environment variable."
+        )
+    return create_async_engine(
+        settings.database_url,
+        echo=settings.environment == "development",
+        pool_size=5,
+        max_overflow=10,
+    )
+
+
+def _create_session_factory(engine):
+    return async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+
+# Lazy initialization — created on first use, not at import time
+_engine = None
+_async_session_factory = None
+
+
+def get_engine():
+    global _engine
+    if _engine is None:
+        _engine = _create_engine()
+    return _engine
+
+
+def get_session_factory():
+    global _async_session_factory
+    if _async_session_factory is None:
+        _async_session_factory = _create_session_factory(get_engine())
+    return _async_session_factory
+
+
 async def get_db() -> AsyncSession:
-    async with async_session_factory() as session:
+    session_factory = get_session_factory()
+    async with session_factory() as session:
         try:
             yield session
             await session.commit()
