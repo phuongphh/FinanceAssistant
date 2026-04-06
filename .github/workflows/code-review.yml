@@ -24,11 +24,43 @@ jobs:
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
           echo "Diff size: $(wc -l < pr_diff.txt) lines"
 
+      - name: Check if only markdown files changed
+        id: check_md
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check if ALL changed files are .md files
+          NON_MD=$(echo "$CHANGED_FILES" | grep -v '\.md$' || true)
+          if [ -z "$NON_MD" ]; then
+            echo "md_only=true" >> $GITHUB_OUTPUT
+            echo "All changes are markdown files — skipping code review"
+          else
+            echo "md_only=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-approve markdown-only PR
+        if: steps.check_md.outputs.md_only == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -s -X POST \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"body":"## Code Review Result\n\n```\nPASS — Markdown-only changes, auto-approved.\n```"}'
+
       - name: Install dependencies
+        if: steps.check_md.outputs.md_only != 'true'
         run: |
           pip install -r requirements.txt
 
       - name: Run Code Review
+        if: steps.check_md.outputs.md_only != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

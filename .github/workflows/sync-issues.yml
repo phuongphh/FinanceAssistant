@@ -31,6 +31,7 @@ jobs:
           } > "$FILE"
 
       - name: Create Pull Request
+        id: create-pr
         uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "sync: export issue #${{ github.event.issue.number }}"
@@ -39,3 +40,12 @@ jobs:
           body: |
             Auto-sync issue #${{ github.event.issue.number }} to `docs/issues/`.
           labels: sync
+
+      - name: Auto-merge sync PR
+        if: steps.create-pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ steps.create-pr.outputs.pull-request-number }}" \
+            --merge --auto \
+            --repo "${{ github.repository }}"
