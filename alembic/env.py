@@ -11,6 +11,7 @@ from backend.database import Base
 from backend.models import (  # noqa: F401 — ensure all models are registered
     User, Expense, Goal, MonthlyReport,
     MarketSnapshot, InvestmentLog, LLMCache,
+    PortfolioAsset, IncomeRecord,
 )
 
 config = context.config
