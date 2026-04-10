@@ -34,12 +34,52 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
         return None
 
 
-async def send_message(chat_id: int, text: str, parse_mode: str = "Markdown") -> dict | None:
-    return await send_telegram("sendMessage", {
+async def send_message(
+    chat_id: int,
+    text: str,
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> dict | None:
+    payload: dict = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": parse_mode,
-    })
+    }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    return await send_telegram("sendMessage", payload)
+
+
+async def send_photo(
+    chat_id: int,
+    photo_bytes: bytes,
+    caption: str = "",
+    filename: str = "chart.png",
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> dict | None:
+    """Send a photo via Telegram Bot API using multipart upload."""
+    if not settings.telegram_bot_token:
+        logger.warning("TELEGRAM_BOT_TOKEN not configured")
+        return None
+
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendPhoto"
+    data: dict = {"chat_id": str(chat_id)}
+    if caption:
+        data["caption"] = caption
+        data["parse_mode"] = parse_mode
+    if reply_markup:
+        import json
+        data["reply_markup"] = json.dumps(reply_markup)
+
+    files = {"photo": (filename, photo_bytes, "image/png")}
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, data=data, files=files, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()
+        logger.error("Telegram sendPhoto error: %s %s", resp.status_code, resp.text)
+        return None
 
 
 async def send_menu(chat_id: int) -> dict | None:
