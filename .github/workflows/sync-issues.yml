@@ -6,13 +6,14 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   export:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Export issue to markdown
         uses: actions/github-script@v6
@@ -34,22 +35,28 @@ jobs:
 
             console.log(`Exported issue #${number} to ${filePath}`);
 
-      - name: Create Pull Request
-        id: create-pr
-        uses: peter-evans/create-pull-request@v7
-        with:
-          commit-message: "sync: export issue #${{ github.event.issue.number }}"
-          branch: sync/issue-${{ github.event.issue.number }}
-          title: "sync: export issue #${{ github.event.issue.number }}"
-          body: |
-            Auto-sync issue #${{ github.event.issue.number }} to `docs/issues/`.
-          labels: sync
+      - name: Commit and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/issues/
+          if git diff --cached --quiet; then
+            echo "No changes to commit — file already up to date"
+          else
+            git commit -m "sync: export issue #${{ github.event.issue.number }}"
+            git push origin main
+          fi
 
-      - name: Auto-merge sync PR
-        if: steps.create-pr.outputs.pull-request-number
+      - name: Clean up stale sync branch
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge "${{ steps.create-pr.outputs.pull-request-number }}" \
-            --merge --auto \
-            --repo "${{ github.repository }}"
+          BRANCH="sync/issue-${{ github.event.issue.number }}"
+          # Close any open PR from the old sync branch
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr close "$PR_NUMBER" --repo "${{ github.repository }}" --comment "Superseded by direct push to main." || true
+          fi
+          # Delete the stale remote branch
+          git push origin --delete "$BRANCH" 2>/dev/null || true
