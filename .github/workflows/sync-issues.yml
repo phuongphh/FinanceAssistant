@@ -15,20 +15,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Export issue to markdown
-        env:
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-        run: |
-          mkdir -p docs/issues
-          FILE="docs/issues/issue-${ISSUE_NUMBER}.md"
-          {
-            echo "# Issue #${ISSUE_NUMBER}"
-            echo ""
-            echo "${ISSUE_TITLE}"
-            echo ""
-            echo "${ISSUE_BODY}"
-          } > "$FILE"
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const number = context.payload.issue.number;
+            const title = context.payload.issue.title || '';
+            const body = context.payload.issue.body || '';
+
+            const dir = 'docs/issues';
+            fs.mkdirSync(dir, { recursive: true });
+
+            const content = `# Issue #${number}\n\n${title}\n\n${body}\n`;
+            const filePath = path.join(dir, `issue-${number}.md`);
+            fs.writeFileSync(filePath, content);
+
+            console.log(`Exported issue #${number} to ${filePath}`);
 
       - name: Create Pull Request
         id: create-pr
