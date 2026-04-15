@@ -22,10 +22,16 @@ async def lifespan(app: FastAPI):
     from backend.jobs.gmail_poller import poll_gmail
     from backend.jobs.market_poller import poll_market
     from backend.jobs.monthly_report import generate_all_monthly_reports
+    from backend.jobs.morning_report_job import send_all_morning_reports
 
     scheduler.add_job(poll_gmail, "cron", minute="*/30", id="gmail_sync")
     scheduler.add_job(poll_market, "cron", hour=8, minute=0, id="market_snapshot")
     scheduler.add_job(generate_all_monthly_reports, "cron", day=1, hour=9, minute=0, id="monthly_report")
+    scheduler.add_job(
+        send_all_morning_reports, "cron",
+        hour=7, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="morning_report",
+    )
 
     scheduler.start()
     logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
