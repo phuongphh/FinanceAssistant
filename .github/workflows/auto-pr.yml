@@ -21,11 +21,30 @@ jobs:
       # Branch có dạng: claude/implement-issue-4-T49ZM
       # Regex bắt số sau "issue-"
       # -------------------------------------------------------
-      - name: Extract issue number from branch
+      - name: Extract issue number from branch or commits
         id: extract
         run: |
           BRANCH="${{ github.ref_name }}"
+
+          # Thử 1: Lấy từ branch name (pattern: issue-<number>)
           ISSUE_NUMBER=$(echo "$BRANCH" | grep -oP '(?<=issue-)\d+' || echo "")
+
+          # Thử 2: Fallback — tìm trong commit messages trên branch
+          # Pattern: "issue #17", "(#17)", "Closes #17", "Fixes #17"
+          if [ -z "$ISSUE_NUMBER" ]; then
+            git fetch origin main --depth=50 2>/dev/null || true
+            ISSUE_NUMBER=$(git log origin/main..HEAD --format='%s %b' \
+              | grep -oP '(?i)(?:issue\s*#|closes\s*#|fixes\s*#|resolves\s*#)\K\d+' \
+              | head -1 || echo "")
+          fi
+
+          # Thử 3: Fallback — tìm pattern (#<number>) trong commit messages
+          if [ -z "$ISSUE_NUMBER" ]; then
+            ISSUE_NUMBER=$(git log origin/main..HEAD --format='%s %b' \
+              | grep -oP '\(#\K\d+(?=\))' \
+              | head -1 || echo "")
+          fi
+
           echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
           echo "Found issue number: ${ISSUE_NUMBER:-none}"
 
