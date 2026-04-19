@@ -8,6 +8,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from backend.bot.formatters.templates import format_welcome_message
 from backend.config import get_settings
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
@@ -15,6 +16,7 @@ from backend.services.telegram_service import (
     handle_menu_callback,
     register_bot_commands,
     send_menu,
+    send_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,13 +45,20 @@ async def telegram_webhook(request: Request):
 
     data = await request.json()
 
-    # Handle /menu command
+    # Handle /menu and /start commands
     message = data.get("message")
     if message:
         text = message.get("text", "")
         chat_id = message["chat"]["id"]
+        command = text.strip().lower()
 
-        if text.strip().lower() in ("/menu", "/start", "menu"):
+        if command == "/start":
+            display_name = (message.get("from") or {}).get("first_name")
+            await send_message(chat_id, format_welcome_message(display_name))
+            await send_menu(chat_id)
+            return {"ok": True}
+
+        if command in ("/menu", "menu"):
             await send_menu(chat_id)
             return {"ok": True}
 

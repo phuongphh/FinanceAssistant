@@ -5,9 +5,19 @@ Thin wrapper — parse args → call backend API → format response.
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
+from pathlib import Path
 
 import requests
+
+# Allow importing backend.* formatters from anywhere the script is launched.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from backend.bot.formatters.money import format_money_full
+from backend.bot.formatters.templates import format_transaction_confirmation
+from backend.config.categories import get_category
 
 API_URL = os.environ.get("FINANCE_API_URL", "")
 API_KEY = os.environ.get("FINANCE_API_KEY", "")
@@ -32,7 +42,20 @@ def _headers() -> dict:
 
 
 def _format_vnd(amount: float) -> str:
-    return f"{amount:,.0f}₫"
+    return format_money_full(amount)
+
+
+# Legacy backend category codes (food_drink) → new shared codes (food).
+_CATEGORY_CODE_ALIASES = {
+    "food_drink": "food",
+    "utilities": "utility",
+}
+
+
+def _normalize_category(code: str | None) -> str:
+    if not code:
+        return "other"
+    return _CATEGORY_CODE_ALIASES.get(code, code)
 
 
 def add_expense(amount: float, note: str | None = None, merchant: str | None = None):
@@ -52,11 +75,15 @@ def add_expense(amount: float, note: str | None = None, merchant: str | None = N
     )
     if resp.status_code == 201:
         data = resp.json()
+        category_code = _normalize_category(data.get("category"))
+        merchant_label = data.get("merchant") or data.get("note") or "Giao dịch"
         print(
-            f"Đã ghi: {_format_vnd(data['amount'])} — "
-            f"{data.get('merchant') or data.get('note') or 'N/A'} "
-            f"({data['category']})\n"
-            f"{data['expense_date']}"
+            format_transaction_confirmation(
+                merchant=merchant_label,
+                amount=float(data["amount"]),
+                category_code=category_code,
+                time=datetime.now(),
+            )
         )
     else:
         print(f"Lỗi: {resp.status_code} — {resp.text}", file=sys.stderr)
@@ -76,13 +103,14 @@ def list_expenses(month: str | None = None):
     if resp.status_code == 200:
         expenses = resp.json()
         if not expenses:
-            print("Không có chi tiêu nào.")
+            print("Chưa có giao dịch nào 🌱")
             return
         for e in expenses:
+            cat = get_category(_normalize_category(e.get("category")))
+            merchant_label = e.get("merchant") or e.get("note") or "Giao dịch"
             print(
-                f"• {_format_vnd(e['amount'])} — "
-                f"{e.get('merchant') or e.get('note') or 'N/A'} "
-                f"({e['category']}) [{e['expense_date']}]"
+                f"{cat.emoji} {merchant_label} — {_format_vnd(e['amount'])}  "
+                f"[{e['expense_date']}]"
             )
     else:
         print(f"Lỗi: {resp.status_code}", file=sys.stderr)
@@ -99,12 +127,13 @@ def get_summary(month: str | None = None):
     )
     if resp.status_code == 200:
         data = resp.json()
-        print(f"Tổng chi tiêu tháng {data['month_key']}: {_format_vnd(data['total'])}")
+        print(f"📊 Tổng chi tháng {data['month_key']}: {_format_vnd(data['total'])}")
         print(f"Số giao dịch: {data['count']}")
         if data["by_category"]:
             print("\nTheo danh mục:")
-            for cat, amt in sorted(data["by_category"].items(), key=lambda x: -x[1]):
-                print(f"  • {cat}: {_format_vnd(amt)}")
+            for cat_code, amt in sorted(data["by_category"].items(), key=lambda x: -x[1]):
+                cat = get_category(_normalize_category(cat_code))
+                print(f"  {cat.emoji} {cat.name_vi}: {_format_vnd(amt)}")
     else:
         print(f"Lỗi: {resp.status_code}", file=sys.stderr)
 

@@ -1,5 +1,15 @@
-from pydantic_settings import BaseSettings
+"""Application configuration — settings + shared constants.
+
+Importing `backend.config` yields the Settings loader (preserving the pre-split
+`from backend.config import get_settings, Settings` entry points). Domain
+constants such as categories / emoji maps live in submodules:
+
+    from backend.config.categories import get_category, get_all_categories
+    from backend.config.emoji_map import EMOJI_MAP
+"""
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -44,3 +54,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+__all__ = ["Settings", "get_settings"]
