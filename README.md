@@ -47,6 +47,17 @@ alembic upgrade head
 uvicorn backend.main:app --reload --port 8000
 ```
 
+### 6. Chạy scheduler (process riêng)
+
+Các job cron (morning report 7h, gmail poll, market snapshot, monthly report)
+chạy ở process riêng để tránh duplicate khi có nhiều uvicorn worker:
+
+```bash
+python -m backend.scheduler
+```
+
+Chỉ chạy **một** instance. Phase 1 sẽ thay bằng Celery worker.
+
 ## Cấu trúc dự án
 
 ```
