@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <link rel="stylesheet" href="/miniapp/static/css/style.css">
+</head>
+<body>
+    <main id="app">
+        <section id="loading" class="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p>Đang tải dashboard…</p>
+        </section>
+
+        <section id="error" class="error" hidden>
+            <p id="error-message">Không tải được dữ liệu.</p>
+            <button id="retry-btn" type="button">Thử lại</button>
+        </section>
+
+        <section id="content" hidden>
+            <header class="card card-primary">
+                <div class="card-label">Chi tiêu tháng này</div>
+                <div class="card-amount" id="total-spent">—</div>
+                <div class="card-meta">
+                    <span id="transaction-count">0</span> giao dịch ·
+                    <span id="month-label">—</span>
+                </div>
+            </header>
+
+            <section class="section">
+                <h2>Theo danh mục</h2>
+                <div class="chart-container">
+                    <canvas id="category-chart" role="img" aria-label="Biểu đồ danh mục chi tiêu"></canvas>
+                </div>
+                <div id="category-list"></div>
+            </section>
+
+            <section class="section">
+                <h2>Xu hướng 30 ngày</h2>
+                <div class="chart-container">
+                    <canvas id="trend-chart" role="img" aria-label="Biểu đồ chi tiêu theo ngày"></canvas>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script src="/miniapp/static/js/dashboard.js" defer></script>
+</body>
+</html>

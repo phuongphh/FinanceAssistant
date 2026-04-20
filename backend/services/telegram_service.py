@@ -92,8 +92,45 @@ async def send_menu(chat_id: int) -> dict | None:
     })
 
 
-async def answer_callback(callback_id: str) -> dict | None:
-    return await send_telegram("answerCallbackQuery", {"callback_query_id": callback_id})
+async def answer_callback(
+    callback_id: str,
+    text: str | None = None,
+    show_alert: bool = False,
+) -> dict | None:
+    payload: dict = {"callback_query_id": callback_id}
+    if text:
+        payload["text"] = text
+        payload["show_alert"] = show_alert
+    return await send_telegram("answerCallbackQuery", payload)
+
+
+async def edit_message_text(
+    chat_id: int,
+    message_id: int,
+    text: str,
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> dict | None:
+    payload: dict = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": parse_mode,
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    return await send_telegram("editMessageText", payload)
+
+
+async def edit_message_reply_markup(
+    chat_id: int,
+    message_id: int,
+    reply_markup: dict | None,
+) -> dict | None:
+    payload: dict = {"chat_id": chat_id, "message_id": message_id}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    return await send_telegram("editMessageReplyMarkup", payload)
 
 
 async def handle_menu_callback(chat_id: int, callback_data: str) -> dict | None:
