@@ -6,10 +6,13 @@ all menu data lives in menu_service.
 import hmac
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.templates import format_welcome_message
+from backend.bot.handlers.callbacks import handle_transaction_callback
 from backend.config import get_settings
+from backend.database import get_db
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
     answer_callback,
@@ -40,7 +43,10 @@ def _verify_webhook_request(request: Request) -> None:
 
 
 @router.post("/webhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     _verify_webhook_request(request)
 
     data = await request.json()
@@ -68,6 +74,11 @@ async def telegram_webhook(request: Request):
         callback_data = callback_query.get("data", "")
         chat_id = callback_query["message"]["chat"]["id"]
         callback_id = callback_query["id"]
+
+        # Transaction callbacks (edit/delete/change category/undo) handle
+        # their own answerCallbackQuery so users get richer feedback.
+        if await handle_transaction_callback(db, callback_query):
+            return {"ok": True}
 
         await answer_callback(callback_id)
         await handle_menu_callback(chat_id, callback_data)
