@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend import analytics
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 
@@ -38,6 +39,17 @@ async def create_expense(
     db.add(expense)
     await db.flush()
     await db.refresh(expense)
+
+    analytics.track(
+        analytics.EventType.TRANSACTION_CREATED,
+        user_id=user_id,
+        properties={
+            "source": data.source,
+            "category": category,
+            "needs_review": bool(data.needs_review),
+            "auto_categorized": data.category == "needs_review",
+        },
+    )
     return expense
 
 
@@ -99,6 +111,11 @@ async def delete_expense(
         return False
     expense.deleted_at = datetime.utcnow()
     await db.flush()
+    analytics.track(
+        analytics.EventType.TRANSACTION_DELETED,
+        user_id=user_id,
+        properties={"via": "api", "source": expense.source},
+    )
     return True
 
 

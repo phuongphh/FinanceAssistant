@@ -168,7 +168,7 @@ async def generate_investment_advice(
     # Get user info
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
-        return "Không tìm thấy thông tin user."
+        return "Chưa thấy bạn trong danh sách — thử gõ /start để đăng ký nhé 🌱"
 
     # Market context
     snapshots = await get_latest_snapshots(db)

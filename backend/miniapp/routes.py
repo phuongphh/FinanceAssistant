@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend import analytics
 from backend.database import get_db
 from backend.miniapp.auth import require_miniapp_auth
 from backend.services import dashboard_service
@@ -39,7 +40,33 @@ async def dashboard_page():
     html_path = _TEMPLATES_DIR / "dashboard.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Dashboard page missing")
+    # `miniapp_opened` here fires before the JS verifies user via initData, so
+    # we don't have a user_id yet — the per-user dimension arrives via the
+    # `miniapp_loaded` beacon once the dashboard finishes loading.
+    analytics.track(analytics.EventType.MINIAPP_OPENED)
     return FileResponse(html_path, media_type="text/html; charset=utf-8")
+
+
+@router.post("/api/events/loaded")
+async def record_loaded(
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Beacon from dashboard.js after first render. Records perf + user."""
+    user = await _resolve_user(auth, db)
+    load_time_ms = payload.get("load_time_ms") if isinstance(payload, dict) else None
+    try:
+        load_time_ms = float(load_time_ms) if load_time_ms is not None else None
+    except (TypeError, ValueError):
+        load_time_ms = None
+
+    analytics.track(
+        analytics.EventType.MINIAPP_LOADED,
+        user_id=user.id,
+        properties={"load_time_ms": load_time_ms} if load_time_ms is not None else {},
+    )
+    return {"data": {"ok": True}, "error": None}
 
 
 async def _resolve_user(

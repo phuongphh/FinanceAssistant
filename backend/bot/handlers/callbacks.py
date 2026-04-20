@@ -24,6 +24,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend import analytics
 from backend.bot.formatters.templates import format_transaction_confirmation
 from backend.bot.handlers.transaction import (
     _normalize_category,
@@ -114,8 +115,18 @@ async def handle_transaction_callback(
     message_id = message.get("message_id")
 
     user = await _get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+
+    analytics.track(
+        analytics.EventType.BUTTON_TAPPED,
+        user_id=user.id if user else None,
+        properties={"button": prefix, "has_args": bool(args)},
+    )
     if not user:
-        await answer_callback(callback_id, text="Chưa đăng ký tài khoản", show_alert=True)
+        await answer_callback(
+            callback_id,
+            text="Chưa thấy bạn trong danh sách — gõ /start để mình chào nhé 🌱",
+            show_alert=True,
+        )
         return True
 
     try:
@@ -129,7 +140,11 @@ async def handle_transaction_callback(
         )
     except Exception:
         logger.exception("callback handler failed for %s", data)
-        await answer_callback(callback_id, text="Có lỗi xảy ra, thử lại nhé", show_alert=True)
+        await answer_callback(
+            callback_id,
+            text="Có gì đó không ổn — bạn thử lại giúp mình?",
+            show_alert=True,
+        )
     return True
 
 
@@ -138,12 +153,12 @@ async def _handle_change_category(
 ):
     """2-step flow: show picker → update DB + re-render message."""
     if not args:
-        await answer_callback(callback_id, text="Thiếu thông tin giao dịch", show_alert=True)
+        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Không tìm thấy giao dịch", show_alert=True)
+        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
         return
 
     if len(args) == 1:
@@ -156,24 +171,30 @@ async def _handle_change_category(
         return
 
     new_code = args[1]
+    old_code = expense.category
     expense.category = new_code
     await db.flush()
     await db.refresh(expense)
 
     await _rerender_transaction_message(chat_id, message_id, expense)
-    await answer_callback(callback_id, text="Đã cập nhật danh mục ✅")
+    await answer_callback(callback_id, text="Đổi danh mục xong 👌")
+    analytics.track(
+        analytics.EventType.CATEGORY_CHANGED,
+        user_id=user.id,
+        properties={"from": old_code, "to": new_code},
+    )
 
 
 async def _handle_delete_transaction(
     *, db, user, args, callback_id, chat_id, message_id
 ):
     if not args:
-        await answer_callback(callback_id, text="Thiếu thông tin giao dịch", show_alert=True)
+        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Không tìm thấy giao dịch", show_alert=True)
+        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
         return
 
     await edit_message_reply_markup(
@@ -198,7 +219,7 @@ async def _handle_confirm_action(
 
     expense = await resolve_transaction_by_callback_id(db, user.id, resource_id)
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch đã biến mất", show_alert=True)
+        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
         return
 
     await expense_service.delete_expense(db, user.id, expense.id)
@@ -210,6 +231,11 @@ async def _handle_confirm_action(
         reply_markup={"inline_keyboard": []},
     )
     await answer_callback(callback_id, text="Đã xóa ✅")
+    analytics.track(
+        analytics.EventType.TRANSACTION_DELETED,
+        user_id=user.id,
+        properties={"via": "confirm_dialog"},
+    )
 
 
 async def _handle_cancel_action(
@@ -237,12 +263,12 @@ async def _handle_undo_transaction(
 ):
     """Undo chỉ trong UNDO_WINDOW_SECONDS đầu tiên sau khi tạo expense."""
     if not args:
-        await answer_callback(callback_id, text="Thiếu thông tin giao dịch", show_alert=True)
+        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch đã biến mất", show_alert=True)
+        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
         return
 
     created_at = expense.created_at
@@ -268,6 +294,11 @@ async def _handle_undo_transaction(
         reply_markup={"inline_keyboard": []},
     )
     await answer_callback(callback_id, text="Đã hủy ✅")
+    analytics.track(
+        analytics.EventType.TRANSACTION_DELETED,
+        user_id=user.id,
+        properties={"via": "undo", "age_seconds": round(age, 2)},
+    )
 
 
 async def _handle_edit_transaction(
