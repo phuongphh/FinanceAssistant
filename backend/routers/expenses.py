@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.bot.handlers.transaction import send_transaction_confirmation
 from backend.database import get_db
 from backend.schemas.expense import (
     ExpenseCreate,
@@ -19,9 +20,19 @@ router = APIRouter(prefix="/expenses", tags=["expenses"])
 async def create_expense(
     data: ExpenseCreate,
     user_id: uuid.UUID = Query(..., description="User ID"),
+    push_confirmation: bool = Query(
+        False,
+        description=(
+            "Nếu true, backend sẽ push rich confirmation (kèm inline "
+            "keyboard) tới Telegram chat của user. Mặc định false để "
+            "tránh double-message khi caller (OpenClaw skill) đã tự gửi."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     expense = await expense_service.create_expense(db, user_id, data)
+    if push_confirmation:
+        await send_transaction_confirmation(db, expense)
     return expense
 
 

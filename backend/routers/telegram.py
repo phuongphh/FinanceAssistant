@@ -9,6 +9,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend import analytics
 from backend.bot.formatters.templates import format_welcome_message
 from backend.bot.handlers.callbacks import handle_transaction_callback
 from backend.config import get_settings
@@ -62,6 +63,10 @@ async def telegram_webhook(
             display_name = (message.get("from") or {}).get("first_name")
             await send_message(chat_id, format_welcome_message(display_name))
             await send_menu(chat_id)
+            analytics.track(
+                analytics.EventType.BOT_STARTED,
+                properties={"has_display_name": bool(display_name)},
+            )
             return {"ok": True}
 
         if command in ("/menu", "menu"):

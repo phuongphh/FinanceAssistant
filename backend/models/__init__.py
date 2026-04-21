@@ -7,6 +7,7 @@ from backend.models.investment_log import InvestmentLog
 from backend.models.llm_cache import LLMCache
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.income_record import IncomeRecord
+from backend.models.event import Event
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "LLMCache",
     "PortfolioAsset",
     "IncomeRecord",
+    "Event",
 ]

@@ -25,6 +25,8 @@
 
     let categoryChart = null;
     let trendChart = null;
+    const pageStartedAt = performance.now();
+    let loadBeaconSent = false;
 
     els.retryBtn.addEventListener('click', renderDashboard);
 
@@ -83,12 +85,27 @@
             renderCategoryList(data.top_categories || []);
             renderTrendChart(data.daily_trend || []);
             showState('content');
+            reportLoaded();
         } catch (err) {
             console.error(err);
             els.errorMessage.textContent = buildErrorMessage(err);
             showState('error');
             if (tg && tg.showAlert) tg.showAlert('Không tải được dữ liệu, thử lại nhé.');
         }
+    }
+
+    function reportLoaded() {
+        if (loadBeaconSent) return;
+        loadBeaconSent = true;
+        const loadTimeMs = Math.round(performance.now() - pageStartedAt);
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        fetch('/miniapp/api/events/loaded', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ load_time_ms: loadTimeMs }),
+            keepalive: true,
+        }).catch(() => { /* analytics best-effort */ });
     }
 
     function showState(state) {
