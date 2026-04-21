@@ -148,7 +148,7 @@ Khi chốt xong, cập nhật:
 
 ## Bot profile (điền khi chốt tên)
 
-- **Tên**: _(TBD)_
+- **Tên**: Bé Tiền
 - **Bio (`/setdescription`)**: "Trợ lý tài chính cá nhân thông minh — ghi chép nhanh, hiểu bạn sâu 💚"
 - **About (`/setabouttext`)**: "Ghi chi tiêu bằng text / ảnh / voice. Báo cáo mỗi sáng. Mini App dashboard ngay trong Telegram."
 - **Profile picture**: 512×512, nền trắng, logo mascot.
