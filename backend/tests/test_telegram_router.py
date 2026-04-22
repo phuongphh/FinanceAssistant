@@ -58,17 +58,36 @@ class TestWebhookMenuCommand:
         assert resp.status_code == 200
         mock_send.assert_called_once_with(123)
 
-    @patch("backend.routers.telegram.send_menu", new_callable=AsyncMock)
+    @patch(
+        "backend.routers.telegram.onboarding_handlers.resume_or_start",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "backend.routers.telegram.dashboard_service.get_or_create_user",
+        new_callable=AsyncMock,
+    )
     @patch("backend.routers.telegram.settings")
-    def test_start_command(self, mock_settings, mock_send):
+    def test_start_command_routes_to_onboarding(
+        self, mock_settings, mock_get_or_create, mock_resume
+    ):
         mock_settings.telegram_webhook_secret = ""
-        mock_send.return_value = {"ok": True}
+        # get_or_create_user returns (user, created)
+        from unittest.mock import MagicMock
+        fake_user = MagicMock(is_onboarded=False)
+        mock_get_or_create.return_value = (fake_user, True)
         resp = client.post(
             "/api/v1/telegram/webhook",
-            json={"message": {"text": "/start", "chat": {"id": 123}}},
+            json={
+                "message": {
+                    "text": "/start",
+                    "chat": {"id": 123},
+                    "from": {"id": 999, "username": "phuong"},
+                }
+            },
         )
         assert resp.status_code == 200
-        mock_send.assert_called_once_with(123)
+        mock_get_or_create.assert_called_once()
+        mock_resume.assert_called_once()
 
 
 class TestWebhookCallback:

@@ -1,0 +1,195 @@
+# Milestone celebration messages — Vietnamese.
+#
+# This file is the SINGLE SOURCE OF TRUTH for milestone copy.
+# Do not hardcode celebration strings in Python.
+#
+# Keys match `MilestoneType` codes (backend/models/user_milestone.py).
+# Each entry is a list of 2-3 variations; the milestone service picks
+# one at random to keep messages feeling fresh.
+#
+# Placeholders (rendered via str.format):
+#   {name}          — user.get_greeting_name() — falls back to "bạn"
+#   {days}          — days since user.created_at
+#   {count}         — number of transactions recorded
+#   {amount}        — pre-formatted currency string
+#   {goal_progress} — short progress sentence (optional)
+#
+# Tone: warm, never sycophantic, never judgmental.
+# See docs/tone_guide.md for the full rubric.
+
+# ---------- Time-based ----------------------------------------------
+
+first_transaction:
+  - |-
+    🎉 Giao dịch đầu tiên!
+
+    Chào mừng {name} đến với hành trình hiểu chi tiêu của mình.
+    Mỗi giao dịch bạn ghi là một mảnh ghép giúp bức tranh tài chính rõ hơn 🌱
+  - |-
+    ✨ Ghi xong cái đầu tiên rồi đấy {name}!
+
+    Từ hôm nay trở đi, mỗi khoản nhỏ đều góp phần kể câu chuyện tài chính của bạn.
+    Mình sẽ đi cùng bạn nhé 💚
+
+days_7:
+  - |-
+    ✨ Một tuần rồi nhỉ {name}!
+
+    Bạn đã ghi {count} giao dịch trong 7 ngày qua — con số này cho thấy bạn thật sự nghiêm túc với tài chính của mình. Đừng xem thường điều đó 💪
+
+    Bây giờ mình đã bắt đầu hiểu được vài điều về bạn rồi đấy.
+  - |-
+    🌱 7 ngày!
+
+    {name} biết không, chỉ 30% người mới bắt đầu vượt qua được mốc này.
+    Bạn đang làm tốt hơn bạn tưởng nhiều 💚
+
+days_30:
+  - |-
+    🎊 Tròn 1 tháng rồi {name}!
+
+    Cùng nhìn lại nhé:
+    • {count} giao dịch được ghi
+    • {amount} tổng chi tiêu
+
+    80% người bỏ cuộc trong 30 ngày đầu — bạn đã vượt qua. Đây là bước ngoặt đó 🚀
+  - |-
+    🌟 30 ngày {name}!
+
+    Đây không phải là "mới dùng app" nữa — đây là thói quen.
+    {count} giao dịch, đều đặn. Tuyệt thật sự 🙌
+
+days_100:
+  - |-
+    💯 MỘT TRĂM NGÀY {name}!
+
+    Thật sự... không nhiều người đi được đến đây.
+    Bạn đã thay đổi mối quan hệ với tiền của mình.
+
+    Mình ở đây, vẫn theo dõi, vẫn học hỏi cùng bạn 🌳
+  - |-
+    🏔 100 ngày rồi đấy!
+
+    {name} ơi, đây là cột mốc của kỷ luật — không phải may mắn.
+    Mỗi ngày bạn chọn quay lại, là một ngày bạn chọn chính mình.
+
+days_365:
+  - |-
+    🎂 Tròn 1 năm rồi {name}!
+
+    Một hành trình dài, và mình là người chứng kiến.
+    Cảm ơn bạn đã tin tưởng mình 💚
+
+    Cuối tuần mình gửi báo cáo năm đặc biệt cho bạn nhé?
+  - |-
+    🌕 365 ngày {name}!
+
+    Nhìn lại đi — bạn của hôm nay không còn giống bạn của 365 ngày trước về cách hiểu tiền.
+    Đó là thành quả thật.
+
+# ---------- Savings (financial) -------------------------------------
+
+save_10_percent_monthly:
+  - |-
+    🌟 Lần đầu tiên {name} tiết kiệm được 10% thu nhập trong tháng!
+
+    Đây là con số mà các chuyên gia tài chính xem là "bắt đầu ổn". Bạn đã qua được ngưỡng khó nhất — ngưỡng "bắt đầu" 🎯
+  - |-
+    ✨ 10% tiết kiệm tháng này {name}!
+
+    Nhỏ mà quý — vì nó chứng minh bạn làm được, không phải do tháng may.
+
+save_20_percent_monthly:
+  - |-
+    🏆 20% tiết kiệm — {name} ơi, đây là "healthy zone"!
+
+    Một tháng giữ được 20% thu nhập là tín hiệu rất tốt. Nếu duy trì đều đặn, 5 năm nữa bức tranh tài chính của bạn sẽ khác nhiều đấy 📈
+
+savings_1m:
+  - |-
+    💰 1 triệu đầu tiên!
+
+    Đừng xem thường {name} ạ. 1 triệu này khác với 1 triệu ở tài khoản lương — đây là 1 triệu bạn chủ động giữ lại. Nó có sức mạnh khác 💪
+  - |-
+    🌱 {name} ơi, vừa cán mốc 1 triệu tiết kiệm!
+
+    Khoản nhỏ, nhưng là khoản đầu tiên. Những khoản tiếp theo sẽ dễ hơn nhiều.
+
+savings_5m:
+  - |-
+    🎯 5 triệu tiết kiệm {name}!
+
+    Bạn đang xây được cái "đệm tài chính" rồi đó. Khi cuộc sống có bất ngờ, 5 triệu này sẽ là chỗ dựa.
+
+savings_10m:
+  - |-
+    🏆 10 triệu tiết kiệm!
+
+    {name} ơi, mốc này đáng để kỷ niệm. Nếu để yên ở tài khoản tiết kiệm lãi 6%/năm, 10 năm sau bạn sẽ có ~17.9 triệu. Nếu đầu tư tốt hơn... còn nhiều hơn 📈
+
+    Mình sẽ giúp bạn suy nghĩ về bước tiếp theo nhé?
+
+savings_50m:
+  - |-
+    👑 50 triệu {name}!
+
+    Đây không còn là "tiết kiệm" nữa — đây là "vốn". Từ đây, lựa chọn tài chính của bạn mở rộng ra rất nhiều 🌐
+
+# ---------- Behavior-based ------------------------------------------
+
+first_budget_set:
+  - |-
+    🎯 {name} vừa đặt ngân sách đầu tiên!
+
+    Đây là bước chuyển từ "ghi chép" sang "chủ động". Rất quan trọng.
+
+first_category_change:
+  - |-
+    🏷 Sửa danh mục đầu tiên!
+
+    Cảm ơn {name} đã chỉnh — mỗi lần bạn sửa, mình học được một chút về cách bạn nghĩ về tiền 💡
+
+first_voice_input:
+  - |-
+    🎤 Tin nhắn thoại đầu tiên!
+
+    Nhanh và tiện đúng không {name}? Từ giờ cứ voice message nhé, mình hiểu tiếng Việt tốt lắm.
+
+first_photo_input:
+  - |-
+    📸 Ảnh hoá đơn đầu tiên!
+
+    Mình đọc được số tiền, nơi mua, và xếp danh mục luôn. Tiện chưa {name}?
+
+# ---------- Streaks -------------------------------------------------
+
+streak_7:
+  - |-
+    🔥 7 ngày liên tục ghi chép!
+
+    Habit đang hình thành rồi đó {name}. Khoa học nói 21 ngày là bắt đầu tự động. Bạn đã đi 1/3 chặng đường!
+  - |-
+    ⭐ Streak 7 ngày {name}!
+
+    Một tuần đều đặn — đó là tín hiệu tốt nhất cho thấy bạn làm thật, không phải thử.
+
+streak_30:
+  - |-
+    ⚡ 30 ngày streak!
+
+    Bạn biết không {name}, thói quen này giờ đã là một phần của bạn rồi. Tiếp tục nhé 🌟
+  - |-
+    💫 Streak 30 — thói quen đã đóng rễ!
+
+    Từ giờ, ghi chép không còn cần cố gắng nữa. Đó là win lớn {name} 🏆
+
+streak_100:
+  - |-
+    👑 100 NGÀY LIÊN TỤC!
+
+    Mình không biết nói gì ngoài: bạn xuất sắc {name}.
+    Bạn là top 1% users của mình đó 🙌
+  - |-
+    🏔 Streak 100 {name}!
+
+    100 ngày liên tục là thứ mà tiền không mua được — chỉ có kỷ luật của bạn làm được. Tôn trọng 🫡

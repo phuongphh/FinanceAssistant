@@ -14,6 +14,7 @@ import signal
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.gmail_poller import poll_gmail
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
@@ -33,6 +34,11 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         send_all_morning_reports, "cron",
         hour=7, minute=0, timezone="Asia/Ho_Chi_Minh",
         id="morning_report",
+    )
+    scheduler.add_job(
+        run_daily_milestone_check, "cron",
+        hour=8, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="milestone_check",
     )
 
 
