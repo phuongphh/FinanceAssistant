@@ -3,15 +3,13 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.handlers.transaction import send_transaction_confirmation
-from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
-from backend.services import expense_service
+from backend.services import expense_service, report_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message, send_menu
@@ -32,89 +30,28 @@ Quy tắc:
 
 Chỉ trả về JSON, không giải thích."""
 
-# Keywords that signal the user wants a spending report, not to log an expense.
-_REPORT_KEYWORDS = frozenset([
-    "báo cáo", "bao cao",
-    "tổng chi tiêu", "tong chi tieu",
-    "chi tiêu tháng", "chi tieu thang",
-    "xài bao nhiêu", "xai bao nhieu",
-    "tôi xài bao", "toi xai bao",
-    "tôi đã chi", "toi da chi",
-    "spending", "report",
-    "tháng trước tôi", "thang truoc toi",
-])
-
-
-def _looks_like_report_query(text: str) -> bool:
-    lower = text.lower()
-    return any(kw in lower for kw in _REPORT_KEYWORDS)
-
-
-def _extract_month_key(text: str) -> str:
-    """Best-effort month extraction from natural language. Defaults to current month."""
-    today = date.today()
-    lower = text.lower()
-
-    if "tháng trước" in lower or "thang truoc" in lower:
-        m = today.month - 1 or 12
-        y = today.year if today.month > 1 else today.year - 1
-        return f"{y}-{m:02d}"
-
-    # "tháng 3" or "tháng 03"
-    match = re.search(r"tháng\s+(\d{1,2})", lower)
-    if match:
-        month = int(match.group(1))
-        if 1 <= month <= 12:
-            year = today.year if month <= today.month else today.year - 1
-            return f"{year}-{month:02d}"
-
-    # Explicit "2026-03"
-    match = re.search(r"(\d{4})-(\d{2})", text)
-    if match:
-        return f"{match.group(1)}-{match.group(2)}"
-
-    return today.strftime("%Y-%m")
-
-
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
 
-async def handle_report_request(db: AsyncSession, chat_id: int, user: User, text: str) -> None:
-    """Generate and send a monthly spending report."""
-    from backend.services.report_service import generate_monthly_report
-
-    month_key = _extract_month_key(text)
+async def _send_report(db: AsyncSession, chat_id: int, telegram_id: int, text: str = "") -> None:
+    """Ask the service for report text and deliver it to the user."""
     await send_message(chat_id, "⏳ Đang tổng hợp báo cáo...")
-    try:
-        report = await generate_monthly_report(db, user.id, month_key)
-        await send_message(chat_id, report.report_text or "Không có dữ liệu chi tiêu.")
-    except Exception:
-        logger.exception("Report generation failed for user %s month %s", user.id, month_key)
-        await send_message(chat_id, "❌ Không thể tổng hợp báo cáo. Thử lại sau nhé.")
+    result = await report_service.process_report_request(db, telegram_id, text)
+    await send_message(chat_id, result)
 
 
 async def handle_report_command(db: AsyncSession, message: dict) -> None:
-    """Handle /report command — router delegates here, keeping logic out of the router."""
+    """Handle /report command — extracts Telegram data, delegates to service."""
     chat_id = message["chat"]["id"]
-    from_data = message.get("from") or {}
-    telegram_id = from_data.get("id", chat_id)
-    user = await get_user_by_telegram_id(db, telegram_id)
-    if not user:
-        await send_message(chat_id, _NOT_REGISTERED)
-        return
-    await handle_report_request(db, chat_id, user, "")
+    telegram_id = (message.get("from") or {}).get("id", chat_id)
+    await _send_report(db, chat_id, telegram_id)
 
 
 async def handle_report_callback(db: AsyncSession, callback_query: dict) -> None:
-    """Handle menu:report callback — router delegates here, keeping logic out of the router."""
+    """Handle menu:report callback — extracts Telegram data, delegates to service."""
     chat_id = callback_query["message"]["chat"]["id"]
-    from_data = callback_query.get("from") or {}
-    telegram_id = from_data.get("id", chat_id)
-    user = await get_user_by_telegram_id(db, telegram_id)
-    if not user:
-        await send_message(chat_id, _NOT_REGISTERED)
-        return
-    await handle_report_request(db, chat_id, user, "")
+    telegram_id = (callback_query.get("from") or {}).get("id", chat_id)
+    await _send_report(db, chat_id, telegram_id)
 
 
 async def handle_text_message(db: AsyncSession, message: dict) -> bool:
@@ -131,14 +68,14 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     from_data = message.get("from") or {}
     telegram_id = from_data.get("id", chat_id)
 
+    # Fast-path: report intent — service handles all orchestration.
+    if report_service.is_report_query(text):
+        await _send_report(db, chat_id, telegram_id, text)
+        return True
+
     user = await get_user_by_telegram_id(db, telegram_id)
     if not user:
         await send_message(chat_id, _NOT_REGISTERED)
-        return True
-
-    # Fast-path: report intent detected without an LLM call.
-    if _looks_like_report_query(text):
-        await handle_report_request(db, chat_id, user, text)
         return True
 
     try:

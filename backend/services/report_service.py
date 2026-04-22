@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import date, datetime
 
@@ -9,10 +10,81 @@ from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.report import MonthlyReport
 from backend.models.user import User
+from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Intent detection + month parsing (consumed by the bot handler layer)
+# ---------------------------------------------------------------------------
+
+_REPORT_KEYWORDS = frozenset([
+    "báo cáo", "bao cao",
+    "tổng chi tiêu", "tong chi tieu",
+    "chi tiêu tháng", "chi tieu thang",
+    "xài bao nhiêu", "xai bao nhieu",
+    "tôi xài bao", "toi xai bao",
+    "tôi đã chi", "toi da chi",
+    "spending", "report",
+    "tháng trước tôi", "thang truoc toi",
+])
+
+
+def is_report_query(text: str) -> bool:
+    """Return True when text looks like a spending-report request, not an expense entry."""
+    lower = text.lower()
+    return any(kw in lower for kw in _REPORT_KEYWORDS)
+
+
+def extract_month_key(text: str) -> str:
+    """Best-effort month extraction from natural language. Defaults to current month."""
+    today = date.today()
+    lower = text.lower()
+
+    if "tháng trước" in lower or "thang truoc" in lower:
+        m = today.month - 1 or 12
+        y = today.year if today.month > 1 else today.year - 1
+        return f"{y}-{m:02d}"
+
+    # "tháng 3" or "tháng 03"
+    match = re.search(r"tháng\s+(\d{1,2})", lower)
+    if match:
+        month = int(match.group(1))
+        if 1 <= month <= 12:
+            year = today.year if month <= today.month else today.year - 1
+            return f"{year}-{month:02d}"
+
+    # Explicit "2026-03"
+    match = re.search(r"(\d{4})-(\d{2})", text)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}"
+
+    return today.strftime("%Y-%m")
+
+
+async def process_report_request(db: AsyncSession, telegram_id: int, text: str) -> str:
+    """Full orchestration: user lookup → month parsing → report generation → text.
+
+    Returns a ready-to-send Telegram message string in all cases (including
+    errors and unregistered users), so callers never need to catch exceptions.
+    """
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if not user:
+        return "Bạn chưa đăng ký. Gửi /start để bắt đầu."
+
+    month_key = extract_month_key(text)
+    try:
+        report = await generate_monthly_report(db, user.id, month_key)
+        return report.report_text or "Không có dữ liệu chi tiêu."
+    except Exception:
+        logger.exception("Report generation failed for user %s month %s", user.id, month_key)
+        return "❌ Không thể tổng hợp báo cáo. Thử lại sau nhé."
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 def _prev_month_key(month_key: str) -> str:
     year, month = int(month_key[:4]), int(month_key[5:7])
