@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date
 
 from sqlalchemy import select
@@ -31,6 +32,63 @@ Quy tắc:
 
 Chỉ trả về JSON, không giải thích."""
 
+# Keywords that signal the user wants a spending report, not to log an expense.
+_REPORT_KEYWORDS = frozenset([
+    "báo cáo", "bao cao",
+    "tổng chi tiêu", "tong chi tieu",
+    "chi tiêu tháng", "chi tieu thang",
+    "xài bao nhiêu", "xai bao nhieu",
+    "tôi xài bao", "toi xai bao",
+    "tôi đã chi", "toi da chi",
+    "spending", "report",
+    "tháng trước tôi", "thang truoc toi",
+])
+
+
+def _looks_like_report_query(text: str) -> bool:
+    lower = text.lower()
+    return any(kw in lower for kw in _REPORT_KEYWORDS)
+
+
+def _extract_month_key(text: str) -> str:
+    """Best-effort month extraction from natural language. Defaults to current month."""
+    today = date.today()
+    lower = text.lower()
+
+    if "tháng trước" in lower or "thang truoc" in lower:
+        m = today.month - 1 or 12
+        y = today.year if today.month > 1 else today.year - 1
+        return f"{y}-{m:02d}"
+
+    # "tháng 3" or "tháng 03"
+    match = re.search(r"tháng\s+(\d{1,2})", lower)
+    if match:
+        month = int(match.group(1))
+        if 1 <= month <= 12:
+            year = today.year if month <= today.month else today.year - 1
+            return f"{year}-{month:02d}"
+
+    # Explicit "2026-03"
+    match = re.search(r"(\d{4})-(\d{2})", text)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}"
+
+    return today.strftime("%Y-%m")
+
+
+async def handle_report_request(db: AsyncSession, chat_id: int, user: User, text: str) -> None:
+    """Generate and send a monthly spending report."""
+    from backend.services.report_service import generate_monthly_report
+
+    month_key = _extract_month_key(text)
+    await send_message(chat_id, "⏳ Đang tổng hợp báo cáo...")
+    try:
+        report = await generate_monthly_report(db, user.id, month_key)
+        await send_message(chat_id, report.report_text or "Không có dữ liệu chi tiêu.")
+    except Exception:
+        logger.exception("Report generation failed for user %s month %s", user.id, month_key)
+        await send_message(chat_id, "❌ Không thể tổng hợp báo cáo. Thử lại sau nhé.")
+
 
 async def _get_user(db: AsyncSession, telegram_id: int) -> User | None:
     stmt = select(User).where(
@@ -57,6 +115,11 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     user = await _get_user(db, telegram_id)
     if not user:
         await send_message(chat_id, "Bạn chưa đăng ký. Gửi /start để bắt đầu.")
+        return True
+
+    # Fast-path: report intent detected without an LLM call.
+    if _looks_like_report_query(text):
+        await handle_report_request(db, chat_id, user, text)
         return True
 
     try:
