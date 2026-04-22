@@ -77,14 +77,24 @@ async def _process_user(user: User) -> None:
     sent_this_run = 0
 
     async with session_factory() as db:
-        new_rows: list[UserMilestone] = await milestone_service.detect_and_record(
+        # 1. Detect and persist any newly-achieved milestones.
+        await milestone_service.detect_and_record(db, user.id)
+
+        # 2. Iterate over every uncelebrated row — both the ones we
+        #    just inserted and stragglers from previous runs that
+        #    were skipped by the daily cap or left un-marked after a
+        #    failed Telegram send. Oldest first so mis-delivered rows
+        #    drain before new ones.
+        pending: list[UserMilestone] = await milestone_service.get_uncelebrated(
             db, user.id
         )
 
-        for milestone in new_rows:
+        for milestone in pending:
             if sent_this_run >= MAX_MESSAGES_PER_USER_PER_DAY:
                 logger.debug(
-                    "milestone-check: reached per-user cap for %s", user.id
+                    "milestone-check: reached per-user cap for %s; "
+                    "%d pending left for next run",
+                    user.id, len(pending) - sent_this_run,
                 )
                 break
 
@@ -96,11 +106,22 @@ async def _process_user(user: User) -> None:
             if not user.telegram_id:
                 continue
 
-            await send_message(
+            result = await send_message(
                 chat_id=user.telegram_id,
                 text=message,
                 parse_mode="HTML",
             )
+            # `send_message` returns None on API errors without
+            # raising — treat a missing result as a failed delivery
+            # and leave `celebrated_at` NULL so the next run retries.
+            if result is None:
+                logger.warning(
+                    "milestone-check: send failed for user=%s type=%s — "
+                    "will retry next run",
+                    user.id, milestone.milestone_type,
+                )
+                continue
+
             await milestone_service.mark_celebrated(db, milestone.id)
             sent_this_run += 1
 

@@ -232,7 +232,9 @@ async def step_5_aha_moment(
     """Step 5 — celebrate the first transaction, introduce 3 input modes.
 
     Called from the transaction handler AFTER the expense has been
-    saved successfully.
+    saved successfully. Marks onboarding complete so logging another
+    expense before the user taps 🚀 doesn't re-fire this message or
+    duplicate the analytics events.
     """
     name = user.get_greeting_name()
     text = (
@@ -254,6 +256,27 @@ async def step_5_aha_moment(
     analytics.track(OnboardingEvent.STEP_4_FIRST_TX_LOGGED, user_id=user.id)
     analytics.track(OnboardingEvent.STEP_5_AHA_SHOWN, user_id=user.id)
 
+    # Transition out of FIRST_TRANSACTION so subsequent expenses don't
+    # retrigger this handler or duplicate the funnel events. The 🚀
+    # button is now a purely ceremonial acknowledgement.
+    await onboarding_service.mark_completed(db, user.id)
+
+    duration_seconds: float | None = None
+    if user.created_at:
+        created = user.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        duration_seconds = (datetime.now(timezone.utc) - created).total_seconds()
+    analytics.track(
+        OnboardingEvent.COMPLETED,
+        user_id=user.id,
+        properties=(
+            {"duration_seconds": int(duration_seconds)}
+            if duration_seconds is not None else {}
+        ),
+    )
+    user.onboarding_completed_at = datetime.now(timezone.utc)
+
 
 # ---------- Completion & skip ----------------------------------------
 
@@ -264,25 +287,31 @@ async def complete_onboarding(
     callback_id: str,
     user: User,
 ) -> None:
-    """User taps 🚀 Bắt đầu on the final step."""
-    await onboarding_service.mark_completed(db, user.id)
+    """User taps 🚀 Bắt đầu on the final step.
 
-    duration_seconds: float | None = None
-    if user.created_at:
-        now = datetime.now(timezone.utc)
-        created = user.created_at
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-        duration_seconds = (now - created).total_seconds()
-
-    analytics.track(
-        OnboardingEvent.COMPLETED,
-        user_id=user.id,
-        properties=(
-            {"duration_seconds": int(duration_seconds)}
-            if duration_seconds is not None else {}
-        ),
-    )
+    Ceremonial: step 5 already marked the user complete + fired the
+    COMPLETED event, so this path only re-stamps if needed (covers
+    users who somehow reach the button without the transaction hook
+    having run) and never duplicates analytics.
+    """
+    was_already_complete = user.onboarding_completed_at is not None
+    if not was_already_complete:
+        await onboarding_service.mark_completed(db, user.id)
+        duration_seconds: float | None = None
+        if user.created_at:
+            now = datetime.now(timezone.utc)
+            created = user.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            duration_seconds = (now - created).total_seconds()
+        analytics.track(
+            OnboardingEvent.COMPLETED,
+            user_id=user.id,
+            properties=(
+                {"duration_seconds": int(duration_seconds)}
+                if duration_seconds is not None else {}
+            ),
+        )
 
     await answer_callback(callback_id, text="🎊 Chào mừng!")
     name = user.get_greeting_name()

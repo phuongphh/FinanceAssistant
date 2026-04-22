@@ -281,3 +281,24 @@ async def mark_celebrated(
         return
     row.celebrated_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+async def get_uncelebrated(
+    db: AsyncSession, user_id: uuid.UUID
+) -> list[UserMilestone]:
+    """All milestones for a user that haven't been celebrated yet.
+
+    Includes both rows created in the current run and stragglers from
+    previous runs (e.g. skipped by the per-user daily cap or left
+    un-marked after a failed Telegram send). Ordered by ``achieved_at``
+    so the oldest misses get priority when the cap triggers again.
+    """
+    stmt = (
+        select(UserMilestone)
+        .where(
+            UserMilestone.user_id == user_id,
+            UserMilestone.celebrated_at.is_(None),
+        )
+        .order_by(UserMilestone.achieved_at.asc())
+    )
+    return list((await db.execute(stmt)).scalars())

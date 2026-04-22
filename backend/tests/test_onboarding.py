@@ -113,6 +113,34 @@ class TestKeyboards:
 # ----- Callback routing -----------------------------------------------
 
 @pytest.mark.asyncio
+class TestStep5AhaAdvancesState:
+    """After step 5 fires, the user must no longer be in
+    FIRST_TRANSACTION so a second expense does not re-trigger the
+    aha moment or duplicate funnel events.
+    """
+
+    @patch(
+        "backend.bot.handlers.onboarding.onboarding_service.mark_completed",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "backend.bot.handlers.onboarding.send_message",
+        new_callable=AsyncMock,
+    )
+    async def test_step_5_marks_user_completed(self, _send, mark_completed):
+        from backend.bot.handlers.onboarding import step_5_aha_moment
+        from datetime import datetime, timezone
+        user = MagicMock()
+        user.id = "uuid-placeholder"
+        user.get_greeting_name.return_value = "Minh"
+        user.created_at = datetime.now(timezone.utc)
+        user.onboarding_completed_at = None
+
+        await step_5_aha_moment(db=MagicMock(), chat_id=111, user=user)
+        mark_completed.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 class TestOnboardingCallbackRouting:
     @patch("backend.bot.handlers.onboarding.answer_callback", new_callable=AsyncMock)
     async def test_ignores_non_onboarding_callback(self, _):
