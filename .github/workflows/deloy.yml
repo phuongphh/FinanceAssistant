@@ -1,0 +1,35 @@
+name: Tự động Deploy lên VPS từ PROD
+
+on:
+  push:
+    branches: [ prod ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Cập nhật lên v4 cho mới nhất
+
+      - name: Deploy lên VPS qua SSH
+        uses: appleboy/ssh-action@v1.0.3 # Dùng version cụ thể cho ổn định
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Vào thư mục dự án (nhớ check lại tên folder FinanceAssistant hay TaxAssistant)
+            cd ~/FinanceAssistant 
+            
+            # 2. Cập nhật code
+            git fetch origin prod
+            git checkout prod
+            git pull origin prod
+            
+            # 3. Build và chạy lại, loại bỏ container thừa
+            docker compose down
+            docker compose up -d --build --remove-orphans
+            
+            # 4. Dọn dẹp tài nguyên thừa
+            docker image prune -f
+            echo "✅ Hệ thống đã được cập nhật từ nhánh PROD tại $(date)!"
