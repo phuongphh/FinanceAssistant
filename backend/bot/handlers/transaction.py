@@ -60,6 +60,23 @@ async def send_transaction_confirmation(
         reply_markup=keyboard,
     )
 
+    # Onboarding hook: if this is the user's first transaction during
+    # the onboarding flow, follow the confirmation with the aha-moment
+    # message. Imported locally to avoid a circular import via
+    # personality → services → handlers.
+    from backend.bot.handlers.onboarding import step_5_aha_moment
+    from backend.services import onboarding_service as _onb
+
+    try:
+        if await _onb.is_in_first_transaction_step(db, user.id):
+            await step_5_aha_moment(db, user.telegram_id, user)
+    except Exception:
+        # Aha-moment is decorative — never block a confirmed transaction.
+        import logging
+        logging.getLogger(__name__).warning(
+            "step_5_aha_moment failed", exc_info=True
+        )
+
 
 async def resolve_transaction_by_callback_id(
     db: AsyncSession,

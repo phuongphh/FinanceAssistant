@@ -10,17 +10,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
-from backend.bot.formatters.templates import format_welcome_message
+from backend.bot.handlers import onboarding as onboarding_handlers
 from backend.bot.handlers.callbacks import handle_transaction_callback
+from backend.bot.personality.onboarding_flow import OnboardingStep
 from backend.config import get_settings
 from backend.database import get_db
+from backend.services import onboarding_service
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
     answer_callback,
     handle_menu_callback,
     register_bot_commands,
     send_menu,
-    send_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,20 +59,43 @@ async def telegram_webhook(
         text = message.get("text", "")
         chat_id = message["chat"]["id"]
         command = text.strip().lower()
+        from_user = message.get("from") or {}
+        telegram_id = from_user.get("id")
+        telegram_handle = from_user.get("username")
 
         if command == "/start":
-            display_name = (message.get("from") or {}).get("first_name")
-            await send_message(chat_id, format_welcome_message(display_name))
-            await send_menu(chat_id)
+            if telegram_id is None:
+                return {"ok": True}
+            user, created = await onboarding_service.get_or_create_user(
+                db, telegram_id=telegram_id, telegram_handle=telegram_handle
+            )
             analytics.track(
                 analytics.EventType.BOT_STARTED,
-                properties={"has_display_name": bool(display_name)},
+                user_id=user.id,
+                properties={
+                    "is_new_user": created,
+                    "is_onboarded": user.is_onboarded,
+                },
             )
+            await onboarding_handlers.resume_or_start(db, chat_id, user)
             return {"ok": True}
 
         if command in ("/menu", "menu"):
             await send_menu(chat_id)
             return {"ok": True}
+
+        # Plain text during onboarding name step — consume before any
+        # transaction-text parser further down the pipeline.
+        if text and telegram_id is not None and not command.startswith("/"):
+            user = await onboarding_service.get_user_by_telegram_id(
+                db, telegram_id
+            )
+            if user and user.onboarding_step == int(OnboardingStep.ASKING_NAME):
+                consumed = await onboarding_handlers.handle_name_input(
+                    db, chat_id, user, text
+                )
+                if consumed:
+                    return {"ok": True}
 
     # Handle inline keyboard callbacks
     callback_query = data.get("callback_query")
@@ -79,6 +103,11 @@ async def telegram_webhook(
         callback_data = callback_query.get("data", "")
         chat_id = callback_query["message"]["chat"]["id"]
         callback_id = callback_query["id"]
+
+        # Onboarding callbacks first — otherwise the menu-callback
+        # handler would swallow them.
+        if await onboarding_handlers.handle_onboarding_callback(db, callback_query):
+            return {"ok": True}
 
         # Transaction callbacks (edit/delete/change category/undo) handle
         # their own answerCallbackQuery so users get richer feedback.
