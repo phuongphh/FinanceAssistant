@@ -6,13 +6,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-finance}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-finance_db}
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U finance -d finance_db"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance} -d ${POSTGRES_DB:-finance_db}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,11 +18,42 @@ services:
   redis:
     image: redis:7-alpine
     container_name: finance-redis
-    ports:
-      - "6380:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: finance-api
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: finance-scheduler
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    depends_on:
+      - api
+    command: python -m backend.scheduler
 
 volumes:
   postgres_data:

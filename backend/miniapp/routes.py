@@ -25,13 +25,6 @@ _STATIC_DIR = _HERE / "static"
 
 router = APIRouter(prefix="/miniapp", tags=["miniapp"])
 
-# Static assets — CSS + JS
-if _STATIC_DIR.exists():
-    router.mount(
-        "/static",
-        StaticFiles(directory=str(_STATIC_DIR)),
-        name="miniapp-static",
-    )
 
 
 @router.get("/dashboard", include_in_schema=False)

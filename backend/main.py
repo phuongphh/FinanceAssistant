@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 from backend.config import get_settings
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
-
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -28,7 +29,11 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
+app.mount(
+    "/miniapp/static",
+    StaticFiles(directory=str(Path(__file__).parent / "miniapp" / "static")),
+    name="miniapp-static",
+)
 
 app.include_router(expenses.router, prefix="/api/v1")
 app.include_router(goals.router, prefix="/api/v1")
