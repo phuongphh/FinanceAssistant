@@ -3,6 +3,10 @@
 Handlers call into this module for every state change so tests and
 analytics have a single choke point. All DB writes go through here;
 handlers stay focused on shaping messages.
+
+User lookup / creation lives in `dashboard_service` (the canonical
+single source of truth) — this module deliberately does not duplicate
+those helpers.
 """
 from __future__ import annotations
 
@@ -10,7 +14,6 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.personality.onboarding_flow import OnboardingStep, PRIMARY_GOALS
@@ -24,36 +27,6 @@ MIN_DISPLAY_NAME_LEN = 1
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await db.get(User, user_id)
-
-
-async def get_user_by_telegram_id(
-    db: AsyncSession, telegram_id: int
-) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
-
-
-async def get_or_create_user(
-    db: AsyncSession,
-    telegram_id: int,
-    telegram_handle: str | None = None,
-) -> tuple[User, bool]:
-    """Return (user, created). Creates a row if telegram_id is new."""
-    user = await get_user_by_telegram_id(db, telegram_id)
-    if user:
-        return user, False
-
-    user = User(
-        telegram_id=telegram_id,
-        telegram_handle=telegram_handle,
-    )
-    db.add(user)
-    await db.flush()
-    await db.commit()
-    return user, True
 
 
 async def set_step(

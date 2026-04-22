@@ -60,17 +60,23 @@
     }
 
     async function fetchAPI(endpoint) {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 12000);
         const headers = { 'Content-Type': 'application/json' };
         if (tg && tg.initData) {
             headers['X-Telegram-Init-Data'] = tg.initData;
         }
-        const response = await fetch('/miniapp/api' + endpoint, { headers });
-        if (!response.ok) {
-            throw new Error('API ' + response.status);
+        try {
+            const response = await fetch('/miniapp/api' + endpoint, { headers, signal: controller.signal });
+            if (!response.ok) {
+                throw new Error('API ' + response.status);
+            }
+            const payload = await response.json();
+            if (payload.error) throw new Error(payload.error.message || 'API error');
+            return payload.data;
+        } finally {
+            clearTimeout(tid);
         }
-        const payload = await response.json();
-        if (payload.error) throw new Error(payload.error.message || 'API error');
-        return payload.data;
     }
 
     async function renderDashboard() {
@@ -121,6 +127,7 @@
     }
 
     function buildErrorMessage(err) {
+        if (err && err.name === 'AbortError') return 'Kết nối quá chậm — thử lại nhé.';
         if (err && err.message === 'API 401') return 'Phiên đăng nhập Telegram không hợp lệ.';
         if (err && err.message === 'API 404') return 'Chưa có dữ liệu — hãy ghi giao dịch đầu tiên.';
         return 'Không tải được dữ liệu, thử lại nhé.';

@@ -151,7 +151,7 @@ class TestOnboardingCallbackRouting:
         assert handled is False
 
     @patch(
-        "backend.bot.handlers.onboarding.onboarding_service.get_user_by_telegram_id",
+        "backend.bot.handlers.onboarding.dashboard_service.get_user_by_telegram_id",
         new_callable=AsyncMock,
     )
     @patch("backend.bot.handlers.onboarding.answer_callback", new_callable=AsyncMock)

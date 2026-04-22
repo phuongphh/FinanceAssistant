@@ -21,10 +21,11 @@ from backend.bot.personality.onboarding_flow import (
     OnboardingStep,
 )
 from backend.models.user import User
-from backend.services import onboarding_service
+from backend.services import dashboard_service, onboarding_service
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
+    send_menu,
     send_message,
 )
 
@@ -392,14 +393,20 @@ async def resume_or_start(
 
 
 async def send_welcome_back(chat_id: int, user: User) -> None:
-    """Short, friendly re-entry message for users already past onboarding."""
+    """Short, friendly re-entry message for users already past onboarding.
+
+    Also shows the main feature menu so behaviour matches the existing
+    `/start` UX for pre-Phase-2 users (PR #46) — we don't want the bot
+    to feel emptier just because they're past onboarding.
+    """
     name = user.get_greeting_name()
     text = (
         f"Chào lại {name}! 👋\n\n"
-        "Mình vẫn ở đây. Gõ giao dịch, gửi ảnh hoá đơn, hoặc /menu "
-        "để xem hướng dẫn."
+        "Mình vẫn ở đây. Gõ giao dịch, gửi ảnh hoá đơn, hoặc chọn một "
+        "mục bên dưới."
     )
     await send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+    await send_menu(chat_id)
 
 
 async def handle_onboarding_callback(
@@ -421,7 +428,7 @@ async def handle_onboarding_callback(
         logger.warning("onboarding callback missing chat/telegram id: %s", data)
         return False
 
-    user = await onboarding_service.get_user_by_telegram_id(db, telegram_id)
+    user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
     if not user:
         await answer_callback(callback_id, text="Người dùng không tìm thấy")
         return True
