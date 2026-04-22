@@ -6,13 +6,13 @@ import logging
 import re
 from datetime import date
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.handlers.transaction import send_transaction_confirmation
 from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
+from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message, send_menu
 
@@ -76,6 +76,9 @@ def _extract_month_key(text: str) -> str:
     return today.strftime("%Y-%m")
 
 
+_NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
+
+
 async def handle_report_request(db: AsyncSession, chat_id: int, user: User, text: str) -> None:
     """Generate and send a monthly spending report."""
     from backend.services.report_service import generate_monthly_report
@@ -90,12 +93,28 @@ async def handle_report_request(db: AsyncSession, chat_id: int, user: User, text
         await send_message(chat_id, "❌ Không thể tổng hợp báo cáo. Thử lại sau nhé.")
 
 
-async def _get_user(db: AsyncSession, telegram_id: int) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
+async def handle_report_command(db: AsyncSession, message: dict) -> None:
+    """Handle /report command — router delegates here, keeping logic out of the router."""
+    chat_id = message["chat"]["id"]
+    from_data = message.get("from") or {}
+    telegram_id = from_data.get("id", chat_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if not user:
+        await send_message(chat_id, _NOT_REGISTERED)
+        return
+    await handle_report_request(db, chat_id, user, "")
+
+
+async def handle_report_callback(db: AsyncSession, callback_query: dict) -> None:
+    """Handle menu:report callback — router delegates here, keeping logic out of the router."""
+    chat_id = callback_query["message"]["chat"]["id"]
+    from_data = callback_query.get("from") or {}
+    telegram_id = from_data.get("id", chat_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if not user:
+        await send_message(chat_id, _NOT_REGISTERED)
+        return
+    await handle_report_request(db, chat_id, user, "")
 
 
 async def handle_text_message(db: AsyncSession, message: dict) -> bool:
@@ -112,9 +131,9 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     from_data = message.get("from") or {}
     telegram_id = from_data.get("id", chat_id)
 
-    user = await _get_user(db, telegram_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
     if not user:
-        await send_message(chat_id, "Bạn chưa đăng ký. Gửi /start để bắt đầu.")
+        await send_message(chat_id, _NOT_REGISTERED)
         return True
 
     # Fast-path: report intent detected without an LLM call.

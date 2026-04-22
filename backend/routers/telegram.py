@@ -7,16 +7,18 @@ import hmac
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.bot.formatters.templates import format_welcome_message
 from backend.bot.handlers.callbacks import handle_transaction_callback
-from backend.bot.handlers.message import handle_report_request, handle_text_message
+from backend.bot.handlers.message import (
+    handle_report_callback,
+    handle_report_command,
+    handle_text_message,
+)
 from backend.config import get_settings
 from backend.database import get_db
-from backend.models.user import User
 from backend.services import dashboard_service
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
@@ -31,14 +33,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
-
-
-async def _get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 def _verify_webhook_request(request: Request) -> None:
@@ -102,13 +96,7 @@ async def telegram_webhook(
             return {"ok": True}
 
         if command == "/report":
-            from_user = message.get("from") or {}
-            telegram_id = from_user.get("id", chat_id)
-            user = await _get_user_by_telegram_id(db, telegram_id)
-            if user:
-                await handle_report_request(db, chat_id, user, "")
-            else:
-                await send_message(chat_id, "Bạn chưa đăng ký. Gửi /start để bắt đầu.")
+            await handle_report_command(db, message)
             return {"ok": True}
 
         # Natural language message — try to parse as expense
@@ -131,13 +119,7 @@ async def telegram_webhook(
 
         # "Báo cáo" button → generate report immediately instead of showing help text.
         if callback_data == "menu:report":
-            from_user = callback_query.get("from") or {}
-            telegram_id = from_user.get("id", chat_id)
-            user = await _get_user_by_telegram_id(db, telegram_id)
-            if user:
-                await handle_report_request(db, chat_id, user, "")
-            else:
-                await send_message(chat_id, "Bạn chưa đăng ký. Gửi /start để bắt đầu.")
+            await handle_report_callback(db, callback_query)
             return {"ok": True}
 
         await handle_menu_callback(chat_id, callback_data)
