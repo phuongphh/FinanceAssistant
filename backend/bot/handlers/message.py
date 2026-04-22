@@ -5,13 +5,12 @@ import json
 import logging
 from datetime import date
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.handlers.transaction import send_transaction_confirmation
-from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
-from backend.services import expense_service
+from backend.services import expense_service, report_service
+from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message, send_menu
 
@@ -31,13 +30,28 @@ Quy tắc:
 
 Chỉ trả về JSON, không giải thích."""
 
+_NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
-async def _get_user(db: AsyncSession, telegram_id: int) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
+
+async def _send_report(db: AsyncSession, chat_id: int, telegram_id: int, text: str = "") -> None:
+    """Ask the service for report text and deliver it to the user."""
+    await send_message(chat_id, "⏳ Đang tổng hợp báo cáo...")
+    result = await report_service.process_report_request(db, telegram_id, text)
+    await send_message(chat_id, result)
+
+
+async def handle_report_command(db: AsyncSession, message: dict) -> None:
+    """Handle /report command — extracts Telegram data, delegates to service."""
+    chat_id = message["chat"]["id"]
+    telegram_id = (message.get("from") or {}).get("id", chat_id)
+    await _send_report(db, chat_id, telegram_id)
+
+
+async def handle_report_callback(db: AsyncSession, callback_query: dict) -> None:
+    """Handle menu:report callback — extracts Telegram data, delegates to service."""
+    chat_id = callback_query["message"]["chat"]["id"]
+    telegram_id = (callback_query.get("from") or {}).get("id", chat_id)
+    await _send_report(db, chat_id, telegram_id)
 
 
 async def handle_text_message(db: AsyncSession, message: dict) -> bool:
@@ -54,9 +68,14 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     from_data = message.get("from") or {}
     telegram_id = from_data.get("id", chat_id)
 
-    user = await _get_user(db, telegram_id)
+    # Fast-path: report intent — service handles all orchestration.
+    if report_service.is_report_query(text):
+        await _send_report(db, chat_id, telegram_id, text)
+        return True
+
+    user = await get_user_by_telegram_id(db, telegram_id)
     if not user:
-        await send_message(chat_id, "Bạn chưa đăng ký. Gửi /start để bắt đầu.")
+        await send_message(chat_id, _NOT_REGISTERED)
         return True
 
     try:

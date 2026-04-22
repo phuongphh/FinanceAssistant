@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.bot.formatters.templates import format_welcome_message
 from backend.bot.handlers.callbacks import handle_transaction_callback
-from backend.bot.handlers.message import handle_text_message
+from backend.bot.handlers.message import (
+    handle_report_callback,
+    handle_report_command,
+    handle_text_message,
+)
 from backend.config import get_settings
 from backend.database import get_db
 from backend.services import dashboard_service
@@ -91,6 +95,10 @@ async def telegram_webhook(
             await send_menu(chat_id)
             return {"ok": True}
 
+        if command == "/report":
+            await handle_report_command(db, message)
+            return {"ok": True}
+
         # Natural language message — try to parse as expense
         await handle_text_message(db, message)
         return {"ok": True}
@@ -108,6 +116,12 @@ async def telegram_webhook(
             return {"ok": True}
 
         await answer_callback(callback_id)
+
+        # "Báo cáo" button → generate report immediately instead of showing help text.
+        if callback_data == "menu:report":
+            await handle_report_callback(db, callback_query)
+            return {"ok": True}
+
         await handle_menu_callback(chat_id, callback_data)
         return {"ok": True}
 

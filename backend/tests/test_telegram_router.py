@@ -75,7 +75,7 @@ class TestWebhookCallback:
     @patch("backend.routers.telegram.handle_menu_callback", new_callable=AsyncMock)
     @patch("backend.routers.telegram.answer_callback", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
-    def test_callback_query(self, mock_settings, mock_answer, mock_handle):
+    def test_generic_callback_query(self, mock_settings, mock_answer, mock_handle):
         mock_settings.telegram_webhook_secret = ""
         mock_handle.return_value = {"ok": True}
         resp = client.post(
@@ -83,14 +83,33 @@ class TestWebhookCallback:
             json={
                 "callback_query": {
                     "id": "cb-123",
-                    "data": "menu:report",
+                    "data": "menu:market",
                     "message": {"chat": {"id": 456}},
                 },
             },
         )
         assert resp.status_code == 200
         mock_answer.assert_called_once_with("cb-123")
-        mock_handle.assert_called_once_with(456, "menu:report")
+        mock_handle.assert_called_once_with(456, "menu:market")
+
+    @patch("backend.routers.telegram.handle_report_callback", new_callable=AsyncMock)
+    @patch("backend.routers.telegram.answer_callback", new_callable=AsyncMock)
+    @patch("backend.routers.telegram.settings")
+    def test_report_callback_delegates_to_handler(self, mock_settings, mock_answer, mock_report):
+        mock_settings.telegram_webhook_secret = ""
+        mock_report.return_value = None
+        payload = {
+            "callback_query": {
+                "id": "cb-456",
+                "data": "menu:report",
+                "from": {"id": 999},
+                "message": {"chat": {"id": 456}},
+            },
+        }
+        resp = client.post("/api/v1/telegram/webhook", json=payload)
+        assert resp.status_code == 200
+        mock_answer.assert_called_once_with("cb-456")
+        mock_report.assert_called_once()
 
 
 class TestMenuEndpoint:
