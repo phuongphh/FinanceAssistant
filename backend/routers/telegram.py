@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.bot.formatters.templates import format_welcome_message
 from backend.bot.handlers.callbacks import handle_transaction_callback
+from backend.bot.handlers.message import handle_text_message
 from backend.config import get_settings
 from backend.database import get_db
+from backend.services import dashboard_service
 from backend.services.menu_service import get_features_json, get_menu_text
 from backend.services.telegram_service import (
     answer_callback,
@@ -60,18 +62,38 @@ async def telegram_webhook(
         command = text.strip().lower()
 
         if command == "/start":
-            display_name = (message.get("from") or {}).get("first_name")
+            from_user = message.get("from") or {}
+            display_name = from_user.get("first_name")
+            telegram_id = from_user.get("id")
+            if telegram_id:
+                user, created = await dashboard_service.get_or_create_user(
+                    db,
+                    telegram_id,
+                    first_name=from_user.get("first_name"),
+                    last_name=from_user.get("last_name"),
+                    username=from_user.get("username"),
+                )
+                analytics.track(
+                    analytics.EventType.BOT_STARTED,
+                    user_id=user.id,
+                    properties={"has_display_name": bool(display_name), "new_user": created},
+                )
+            else:
+                analytics.track(
+                    analytics.EventType.BOT_STARTED,
+                    properties={"has_display_name": bool(display_name), "new_user": False},
+                )
             await send_message(chat_id, format_welcome_message(display_name))
             await send_menu(chat_id)
-            analytics.track(
-                analytics.EventType.BOT_STARTED,
-                properties={"has_display_name": bool(display_name)},
-            )
             return {"ok": True}
 
         if command in ("/menu", "menu"):
             await send_menu(chat_id)
             return {"ok": True}
+
+        # Natural language message — try to parse as expense
+        await handle_text_message(db, message)
+        return {"ok": True}
 
     # Handle inline keyboard callbacks
     callback_query = data.get("callback_query")

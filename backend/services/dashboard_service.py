@@ -44,6 +44,29 @@ async def get_user_by_telegram_id(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def get_or_create_user(
+    db: AsyncSession,
+    telegram_id: int,
+    *,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    username: str | None = None,
+) -> tuple[User, bool]:
+    """Return (user, created). Creates a DB record on first encounter."""
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user:
+        return user, False
+    user = User(
+        telegram_id=telegram_id,
+        telegram_handle=username,
+        display_name=first_name or last_name,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user, True
+
+
 async def get_month_total(
     db: AsyncSession, user_id: uuid.UUID, month_key: str | None = None
 ) -> float:
