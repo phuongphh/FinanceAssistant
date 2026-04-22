@@ -39,3 +39,9 @@ htmlcov/
 
 # Alembic
 alembic/versions/__pycache__/
+
+# Cloudflare Tunnel — credentials contain secret tunnel token
+.cloudflared/*.json
+.cloudflared/config.yml
+# Keep template and hostname hint
+!.cloudflared/config.yml.template

@@ -75,9 +75,14 @@ async def _resolve_user(
     telegram_id = auth.get("user_id")
     if not telegram_id:
         raise HTTPException(status_code=401, detail="Missing Telegram user id")
-    user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not registered")
+    # Safety net: user should already exist from /start, but create if missing.
+    user, _ = await dashboard_service.get_or_create_user(
+        db,
+        telegram_id,
+        first_name=auth.get("first_name"),
+        last_name=auth.get("last_name"),
+        username=auth.get("username"),
+    )
     return user
 
 
