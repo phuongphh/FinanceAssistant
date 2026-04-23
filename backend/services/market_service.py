@@ -222,7 +222,10 @@ Yêu cầu output:
 
 Viết ngắn gọn, thân thiện, dùng emoji phù hợp."""
 
-    advice = await call_llm(prompt, task_type="investment_advice", db=db, use_cache=False)
+    advice = await call_llm(
+        prompt, task_type="investment_advice",
+        db=db, user_id=user_id, use_cache=False,
+    )
 
     # Log the advice
     log = InvestmentLog(
