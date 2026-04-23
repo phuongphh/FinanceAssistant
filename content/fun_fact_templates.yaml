@@ -1,0 +1,99 @@
+# Weekly Fun Facts — Vietnamese.
+#
+# Sent every Sunday at 19:00 Asia/Ho_Chi_Minh. Each fact is computed
+# from the user's own data (last 7 or 30 days as noted) — NEVER
+# hardcoded examples. The goal: make the user feel "wait, it knows
+# me" — worth screenshotting and sharing (strategy.md §2.4).
+#
+# Placeholders (str.format):
+#   {name}                     — user's preferred name (falls back "bạn")
+#   {amount}                   — pre-formatted VND (e.g. "1,250,000đ")
+#   {count}                    — integer count
+#   {coffee_count}             — integer (cups of coffee)
+#   {saving}                   — pre-formatted VND (hypothetical saving)
+#   {avg}                      — pre-formatted VND per event
+#   {weekend_avg}              — pre-formatted VND/day
+#   {weekday_avg}              — pre-formatted VND/day
+#   {ratio}                    — string like "1.8"
+#   {category}                 — Vietnamese category label
+#   {category_insight}         — short 1-sentence hook for biggest-category
+#   {merchant}                 — merchant name
+#   {monthly_saving}           — pre-formatted VND
+#   {year_projection}          — pre-formatted VND (12 months × saving)
+#   {five_year_projection}     — pre-formatted VND (compound @ 6%/yr)
+#   {percentage}               — string like "38"
+#
+# Tone: light, playful, never moralising. No "đừng", "lãng phí", "sai".
+
+coffee_equivalent:
+  condition: "Coffee spend > 500,000đ in the last 30 days"
+  template: |-
+    ☕ {name} biết không, tháng này bạn đã dành {amount} cho café — bằng khoảng {coffee_count} ly Highlands đó 😄
+
+    Nếu pha ở nhà, có thể tiết kiệm được ~{saving}. Nhưng nếu cà phê quán là "thuốc" giữ tỉnh táo của bạn, thì cứ dùng thôi 🤷
+
+grab_count:
+  condition: ">= 5 Grab rides in the last 30 days"
+  template: |-
+    🚗 Tháng này {name} đi Grab {count} lần, tổng {amount}.
+
+    Trung bình {avg}/chuyến — pattern đi lại của bạn khá đều. Nếu thường đi cùng hướng, có thể thử Grab Group hoặc tuyến bus/metro song hành để tiết kiệm.
+
+food_delivery_count:
+  condition: ">= 10 food-delivery orders (GrabFood/ShopeeFood/BeFood) in the last 30 days"
+  template: |-
+    🍱 {count} lần gọi đồ ăn tháng này {name}! Tổng {amount}.
+
+    Mình không phán xét đâu — tiện lợi cũng đáng giá 🫡 Nếu tự nấu thêm 1-2 bữa/tuần thôi, có thể tiết kiệm ~{saving}.
+
+weekend_vs_weekday:
+  condition: "weekend_avg > 1.5 × weekday_avg over the last 30 days"
+  template: |-
+    📅 Fun fact: {name} chi cuối tuần trung bình {weekend_avg}/ngày — nhiều hơn {ratio}× so với ngày thường ({weekday_avg}/ngày).
+
+    Weekend warrior! 🎉 Pattern này khá rõ đó.
+
+biggest_category:
+  condition: "Always-applicable fallback — top category of the past 7 days"
+  template: |-
+    📊 Tuần này {name} chi nhiều nhất cho {category} ({amount}) — chiếm {percentage}% tổng chi.
+
+    {category_insight}
+
+new_merchant:
+  condition: "Merchant recorded for the first time ever in the last 7 days"
+  template: |-
+    🆕 Địa chỉ mới: {merchant}!
+
+    Đây là lần đầu {name} ghi chỗ này. Có đáng giá không nhỉ? Nếu có, chỉ đường cho mình với 😄
+
+saving_projection:
+  condition: "Positive saving for at least 2 of the last 3 months"
+  template: |-
+    💡 Với tốc độ tiết kiệm hiện tại ({monthly_saving}/tháng), sau 1 năm {name} sẽ có ~{year_projection}.
+
+    Nếu gửi tiết kiệm lãi 6%/năm trong 5 năm: ~{five_year_projection}. Nhỏ mà lớn đó 📈
+
+day_of_month_pattern:
+  condition: "Clear concentration of spending in a specific weekday across last 30 days"
+  template: |-
+    🔍 Mình để ý bạn thường chi nhiều nhất vào {category} ({amount}).
+
+    Pattern thú vị đó — nếu biết trước, ngân sách tuần có thể chia lại cho khớp thực tế hơn.
+
+# Category-insight seeds — mapped in fun_facts.py. Keep human-friendly,
+# not lecturing. These are one-liners injected into biggest_category.
+category_insights:
+  food: "Bữa ngon là một niềm vui — miễn là biết nó là bao nhiêu 😌"
+  transport: "Đi lại là cost of living — nếu thấy cao, thử gom tuyến cho gọn hơn."
+  shopping: "Tháng này có vẻ hứng mua sắm 😊 Nếu vui thì cứ tận hưởng, chỉ cần biết là được."
+  entertainment: "Giải trí mà — không có thì mệt lắm 🎉"
+  health: "Sức khỏe là khoản đáng đầu tư nhất — không có chi tiêu nào hiệu quả hơn."
+  education: "Đầu tư vào mình thì không bao giờ lỗ 📚"
+  utility: "Tiện ích cố định thường khó cắt — biết trước để plan ngân sách thôi."
+  housing: "Nhà cửa là khoản lớn nhất ở hầu hết các hộ gia đình — ổn định là tốt rồi."
+  saving: "Oh, top category là Tiết kiệm — {name} đang làm rất tốt 🌟"
+  investment: "Đầu tư chiếm top — dấu hiệu tài chính trưởng thành đó 📊"
+  gift: "Tặng quà nhiều — ghi nhận một người biết chăm sóc 💚"
+  transfer: "Chuyển khoản nội bộ chiếm top — mình không coi là chi tiêu thật sự."
+  other: "Tuần này hơi tản mạn — nếu muốn, mình giúp phân loại lại cho rõ hơn."

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
+
+logger = logging.getLogger(__name__)
 
 
 async def create_expense(
@@ -50,6 +53,28 @@ async def create_expense(
             "auto_categorized": data.category == "needs_review",
         },
     )
+
+    # Phase 2 — streak tracking. Wrapped in a SAVEPOINT so a DB error
+    # inside the streak path (missing table, transient failure) doesn't
+    # leave the outer transaction in an errored state — if the savepoint
+    # rolls back, the caller's subsequent commit still lands the expense.
+    # This preserves the intended "streak blip must never roll back a
+    # receipt" semantics that a bare try/except does NOT provide with
+    # SQLAlchemy's async transaction state model.
+    from backend.services import streak_service
+    try:
+        async with db.begin_nested():
+            result = await streak_service.record_activity(db, user_id)
+    except Exception:
+        logger.warning("streak record_activity failed", exc_info=True)
+    else:
+        if result.is_milestone:
+            analytics.track(
+                analytics.EventType.STREAK_MILESTONE_HIT,
+                user_id=user_id,
+                properties={"streak": result.current},
+            )
+
     return expense
 
 

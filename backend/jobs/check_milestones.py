@@ -14,14 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import distinct, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.database import get_session_factory
-from backend.models.expense import Expense
+from backend.jobs._active_users import get_active_users
 from backend.models.user import User
 from backend.models.user_milestone import UserMilestone
 from backend.services import milestone_service
@@ -34,31 +30,14 @@ INTER_USER_DELAY_SECONDS = 1.0
 ACTIVE_WINDOW_DAYS = 30
 
 
-async def _active_user_ids(
-    db: AsyncSession, since: datetime
-) -> list[User]:
-    """Users with at least one non-deleted expense in the window."""
-    active_ids_stmt = select(distinct(Expense.user_id)).where(
-        Expense.created_at >= since,
-        Expense.deleted_at.is_(None),
-    )
-    user_ids = [r[0] for r in (await db.execute(active_ids_stmt)).all()]
-    if not user_ids:
-        return []
-    users_stmt = select(User).where(
-        User.id.in_(user_ids),
-        User.deleted_at.is_(None),
-        User.is_active.is_(True),
-    )
-    return list((await db.execute(users_stmt)).scalars())
-
-
 async def run_daily_milestone_check() -> None:
     session_factory = get_session_factory()
-    since = datetime.now(timezone.utc) - timedelta(days=ACTIVE_WINDOW_DAYS)
 
     async with session_factory() as db:
-        users = await _active_user_ids(db, since)
+        users = await get_active_users(
+            db, days=ACTIVE_WINDOW_DAYS,
+            require_telegram_id=False,  # milestone job tolerates missing tg_id
+        )
 
     logger.info("milestone-check: scanning %d active users", len(users))
 
@@ -135,7 +114,7 @@ async def _process_user(user: User) -> None:
             sent_this_run += 1
 
             analytics.track(
-                "milestone_celebrated",
+                analytics.EventType.MILESTONE_CELEBRATED,
                 user_id=user.id,
                 properties={"type": milestone.milestone_type},
             )

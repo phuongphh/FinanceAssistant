@@ -14,11 +14,15 @@ import signal
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.gmail_poller import poll_gmail
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
 from backend.jobs.morning_report_job import send_all_morning_reports
+from backend.jobs.seasonal_notifier import run_seasonal_check
+from backend.jobs.weekly_fun_facts import run_weekly_fun_facts
+from backend.jobs.weekly_goal_reminder import run_weekly_goal_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,35 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         run_daily_milestone_check, "cron",
         hour=8, minute=0, timezone="Asia/Ho_Chi_Minh",
         id="milestone_check",
+    )
+    # Phase 2 — Empathy Engine (Issue #40).
+    # Runs hourly; the job itself bails out during quiet hours (22-07)
+    # so we don't need to list each allowed hour here — keeps the
+    # config close to the behaviour it enforces.
+    scheduler.add_job(
+        run_hourly_empathy_check, "cron",
+        minute=5, timezone="Asia/Ho_Chi_Minh",
+        id="empathy_check",
+    )
+    # Phase 2 — Seasonal notifier (Issue #43). 08:00 every day.
+    scheduler.add_job(
+        run_seasonal_check, "cron",
+        hour=8, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="seasonal_notifier",
+    )
+    # Phase 2 — Weekly fun facts (Issue #42). Sunday 19:00.
+    scheduler.add_job(
+        run_weekly_fun_facts, "cron",
+        day_of_week="sun", hour=19, minute=0,
+        timezone="Asia/Ho_Chi_Minh",
+        id="weekly_fun_facts",
+    )
+    # Phase 2 — Weekly goal reminder (Issue #44). Monday 08:30.
+    scheduler.add_job(
+        run_weekly_goal_reminder, "cron",
+        day_of_week="mon", hour=8, minute=30,
+        timezone="Asia/Ho_Chi_Minh",
+        id="weekly_goal_reminder",
     )
 
 
