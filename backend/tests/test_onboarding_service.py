@@ -1,9 +1,13 @@
 """Unit tests for onboarding_service DB-touching methods.
 
-These setters are thin — they fetch the User, mutate one attribute,
-and commit — but they are the only write path for onboarding state
-transitions so regressions here break the whole flow. Tests mock
-`AsyncSession` to keep them fast and DB-free.
+These setters are thin — they fetch the User and mutate one attribute
+— but they are the only write path for onboarding state transitions
+so regressions here break the whole flow. Tests mock ``AsyncSession``
+to keep them fast and DB-free.
+
+Post Phase B1: services flush-only; the worker/router owns commit.
+Tests assert the boundary by checking ``flush`` was called and
+``commit`` was NOT.
 """
 from __future__ import annotations
 
@@ -31,11 +35,19 @@ def _fake_user(**overrides) -> User:
 
 
 def _mock_session(user: User | None) -> MagicMock:
-    """An AsyncSession stub whose .get returns the user, .commit is awaitable."""
+    """An AsyncSession stub whose .get returns the user; flush and
+    commit are awaitable so we can assert the boundary."""
     session = MagicMock()
     session.get = AsyncMock(return_value=user)
+    session.flush = AsyncMock()
     session.commit = AsyncMock()
     return session
+
+
+def _assert_service_owned_flush(db: MagicMock) -> None:
+    """Service flushes, caller commits — service must never commit."""
+    db.flush.assert_awaited_once()
+    db.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -45,14 +57,15 @@ class TestSetStep:
         db = _mock_session(user)
         await onboarding_service.set_step(db, user.id, OnboardingStep.ASKING_NAME)
         assert user.onboarding_step == int(OnboardingStep.ASKING_NAME)
-        db.commit.assert_awaited_once()
+        _assert_service_owned_flush(db)
 
     async def test_no_op_when_user_missing(self):
         db = _mock_session(None)
         await onboarding_service.set_step(
             db, uuid.uuid4(), OnboardingStep.WELCOME
         )
-        # commit must NOT fire if there's no user to mutate.
+        # flush must NOT fire if there's no user to mutate.
+        db.flush.assert_not_awaited()
         db.commit.assert_not_awaited()
 
 
@@ -63,11 +76,12 @@ class TestSetDisplayName:
         db = _mock_session(user)
         await onboarding_service.set_display_name(db, user.id, "Minh")
         assert user.display_name == "Minh"
-        db.commit.assert_awaited_once()
+        _assert_service_owned_flush(db)
 
     async def test_no_op_when_user_missing(self):
         db = _mock_session(None)
         await onboarding_service.set_display_name(db, uuid.uuid4(), "Minh")
+        db.flush.assert_not_awaited()
         db.commit.assert_not_awaited()
 
 
@@ -78,7 +92,7 @@ class TestSetPrimaryGoal:
         db = _mock_session(user)
         await onboarding_service.set_primary_goal(db, user.id, "save_more")
         assert user.primary_goal == "save_more"
-        db.commit.assert_awaited_once()
+        _assert_service_owned_flush(db)
 
 
 @pytest.mark.asyncio
@@ -94,7 +108,7 @@ class TestMarkCompleted:
         assert user.onboarding_completed_at is not None
         assert before <= user.onboarding_completed_at <= after
         assert user.onboarding_completed_at.tzinfo is not None  # tz-aware
-        db.commit.assert_awaited_once()
+        _assert_service_owned_flush(db)
 
 
 @pytest.mark.asyncio
@@ -104,7 +118,7 @@ class TestMarkSkipped:
         db = _mock_session(user)
         await onboarding_service.mark_skipped(db, user.id)
         assert user.onboarding_skipped is True
-        db.commit.assert_awaited_once()
+        _assert_service_owned_flush(db)
 
 
 @pytest.mark.asyncio

@@ -83,6 +83,7 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
             _PARSE_PROMPT.format(text=text),
             task_type="parse_manual",
             db=db,
+            user_id=user.id,
             use_cache=False,
         )
         # Strip markdown code fences if present

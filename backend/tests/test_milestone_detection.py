@@ -19,7 +19,6 @@ from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 from backend.models.user_milestone import MilestoneType
 from backend.services import milestone_service
@@ -43,15 +42,19 @@ def _fake_streak(current: int, longest: int):
 
 
 def _fake_execute_rows(rows: list[tuple]):
-    """Build a mock result where .all() returns the given rows."""
+    """Build a mock result supporting both SELECT ``.all()`` and the
+    INSERT ``.rowcount`` check used by ``_create_if_missing`` (so one
+    mock fits both call sites in the same test)."""
     result = MagicMock()
     result.all.return_value = rows
+    result.rowcount = 1  # Default: assume inserts succeed
     return result
 
 
 def _fake_execute_scalar(value):
     result = MagicMock()
     result.scalar_one.return_value = value
+    result.rowcount = 1
     return result
 
 
@@ -240,36 +243,61 @@ class TestCheckStreakMilestones:
         }
 
 
-# -- concurrency / IntegrityError ------------------------------------
+# -- concurrency / ON CONFLICT semantics -----------------------------
 
 @pytest.mark.asyncio
 class TestCreateIfMissing:
-    async def test_integrity_error_does_not_raise(self):
-        """Concurrent workers: DB unique constraint wins, we rollback
-        and return None instead of propagating the error."""
+    async def test_successful_insert_returns_row(self):
+        """rowcount == 1 → the row is ours; return a representation
+        the caller can use (milestone_type + user_id)."""
         db = MagicMock()
-        db.add = MagicMock()
-        db.commit = AsyncMock(
-            side_effect=IntegrityError("stmt", {}, Exception("dup"))
+        result = MagicMock()
+        result.rowcount = 1
+        db.execute = AsyncMock(return_value=result)
+
+        user_id = uuid.uuid4()
+        out = await milestone_service._create_if_missing(
+            db, user_id, MilestoneType.DAYS_7,
         )
-        db.rollback = AsyncMock()
-        db.refresh = AsyncMock()
+        assert out is not None
+        assert out.milestone_type == MilestoneType.DAYS_7
+        assert out.user_id == user_id
+
+    async def test_conflict_returns_none(self):
+        """rowcount == 0 → another worker won (or an earlier pass in
+        this run). Don't raise, don't duplicate — just signal ``None``
+        so the orchestrator skips this milestone."""
+        db = MagicMock()
+        result = MagicMock()
+        result.rowcount = 0
+        db.execute = AsyncMock(return_value=result)
 
         out = await milestone_service._create_if_missing(
             db, uuid.uuid4(), MilestoneType.DAYS_7,
         )
         assert out is None
-        db.rollback.assert_awaited_once()
 
     async def test_existing_set_shortcircuits_without_db_write(self):
         db = MagicMock()
-        db.add = MagicMock()
-        db.commit = AsyncMock()
+        db.execute = AsyncMock()
         existing = {MilestoneType.DAYS_7}
 
         out = await milestone_service._create_if_missing(
             db, uuid.uuid4(), MilestoneType.DAYS_7, existing=existing,
         )
         assert out is None
-        db.add.assert_not_called()
-        db.commit.assert_not_awaited()
+        db.execute.assert_not_awaited()
+
+    async def test_successful_insert_adds_to_existing_set(self):
+        """The local ``existing`` cache must reflect our insert so the
+        same orchestration pass doesn't try the same type twice."""
+        db = MagicMock()
+        result = MagicMock()
+        result.rowcount = 1
+        db.execute = AsyncMock(return_value=result)
+        existing: set[str] = set()
+
+        await milestone_service._create_if_missing(
+            db, uuid.uuid4(), MilestoneType.DAYS_30, existing=existing,
+        )
+        assert MilestoneType.DAYS_30 in existing

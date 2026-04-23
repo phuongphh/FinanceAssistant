@@ -62,7 +62,9 @@ async def get_or_create_user(
         display_name=first_name or last_name,
     )
     db.add(user)
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    # flush() populates user.id from the DB default without ending the tx.
+    await db.flush()
     await db.refresh(user)
     return user, True
 

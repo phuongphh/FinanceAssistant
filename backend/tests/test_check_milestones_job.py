@@ -52,6 +52,8 @@ async def test_cap_leaves_extra_milestones_for_next_run():
     mark_celebrated_mock = AsyncMock()
 
     class _FakeSession:
+        # Job now owns the commit boundary (Phase B1) — stub it out.
+        def __init__(self): self.commit = AsyncMock()
         async def __aenter__(self): return self
         async def __aexit__(self, *a): pass
 
@@ -93,6 +95,8 @@ async def test_failed_send_leaves_milestone_uncelebrated():
     mark_celebrated_mock = AsyncMock()
 
     class _FakeSession:
+        # Job now owns the commit boundary (Phase B1) — stub it out.
+        def __init__(self): self.commit = AsyncMock()
         async def __aenter__(self): return self
         async def __aexit__(self, *a): pass
 
@@ -131,6 +135,8 @@ async def test_successful_send_marks_celebrated():
     mark_celebrated_mock = AsyncMock()
 
     class _FakeSession:
+        # Job now owns the commit boundary (Phase B1) — stub it out.
+        def __init__(self): self.commit = AsyncMock()
         async def __aenter__(self): return self
         async def __aexit__(self, *a): pass
 

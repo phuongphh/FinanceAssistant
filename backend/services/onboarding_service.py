@@ -36,7 +36,8 @@ async def set_step(
     if not user:
         return
     user.onboarding_step = int(step)
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    await db.flush()
 
 
 async def set_display_name(
@@ -46,7 +47,8 @@ async def set_display_name(
     if not user:
         return
     user.display_name = name
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    await db.flush()
 
 
 async def set_primary_goal(
@@ -56,7 +58,8 @@ async def set_primary_goal(
     if not user:
         return
     user.primary_goal = goal_code
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    await db.flush()
 
 
 async def mark_completed(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -65,7 +68,8 @@ async def mark_completed(db: AsyncSession, user_id: uuid.UUID) -> None:
         return
     user.onboarding_step = int(OnboardingStep.COMPLETED)
     user.onboarding_completed_at = datetime.now(timezone.utc)
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    await db.flush()
 
 
 async def mark_skipped(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -73,7 +77,8 @@ async def mark_skipped(db: AsyncSession, user_id: uuid.UUID) -> None:
     if not user:
         return
     user.onboarding_skipped = True
-    await db.commit()
+    # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
+    await db.flush()
 
 
 async def is_in_first_transaction_step(

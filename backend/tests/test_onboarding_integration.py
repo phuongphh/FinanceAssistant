@@ -50,6 +50,10 @@ def _fake_session():
     session.__aexit__ = AsyncMock(return_value=False)
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
+    # Post Phase B1: services flush; await-able to avoid MagicMock
+    # auto-creating a non-coroutine attribute if a handler calls into
+    # a real service under these mocks.
+    session.flush = AsyncMock()
     # route_update issues UPDATE telegram_updates SET user_id = ?
     # before committing — execute must be awaitable.
     session.execute = AsyncMock(return_value=MagicMock(rowcount=0))

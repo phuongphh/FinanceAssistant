@@ -21,7 +21,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -37,8 +36,8 @@ from backend.bot.keyboards.transaction_keyboard import (
     transaction_actions_keyboard,
 )
 from backend.models.expense import Expense
-from backend.models.user import User
 from backend.services import expense_service
+from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_reply_markup,
@@ -48,16 +47,6 @@ from backend.services.telegram_service import (
 logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
-
-
-async def _get_user_by_telegram_id(
-    db: AsyncSession, telegram_id: int
-) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def _rerender_transaction_message(
@@ -114,7 +103,7 @@ async def handle_transaction_callback(
     chat_id = message.get("chat", {}).get("id")
     message_id = message.get("message_id")
 
-    user = await _get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+    user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
 
     analytics.track(
         analytics.EventType.BUTTON_TAPPED,

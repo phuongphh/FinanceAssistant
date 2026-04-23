@@ -28,7 +28,7 @@ from pathlib import Path
 
 import yaml
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_full
@@ -114,25 +114,48 @@ async def _create_if_missing(
     extra: dict | None = None,
     existing: set[str] | None = None,
 ) -> UserMilestone | None:
+    """Insert one milestone if we haven't recorded this type yet.
+
+    Uses Postgres ``INSERT ... ON CONFLICT (user_id, milestone_type)
+    DO NOTHING`` with ``RETURNING`` — atomic dedup against concurrent
+    inserts from another worker without needing a per-row commit.
+    Returns the row we inserted, or ``None`` if another worker won.
+
+    TRANSACTION_OWNED_BY_CALLER — the scheduler/job commits once at the
+    end of its unit of work. Previously this service committed per row
+    so a later IntegrityError wouldn't roll back earlier milestones;
+    with ON CONFLICT that class of error disappears entirely.
+    """
     if existing is not None and milestone_type in existing:
         return None
-    row = UserMilestone(
-        user_id=user_id,
-        milestone_type=milestone_type,
-        achieved_at=datetime.now(timezone.utc),
-        extra=extra or {},
+
+    values = {
+        "user_id": user_id,
+        "milestone_type": milestone_type,
+        "achieved_at": datetime.now(timezone.utc),
+        "extra": extra or {},
+    }
+    stmt = (
+        pg_insert(UserMilestone)
+        .values(**values)
+        .on_conflict_do_nothing(index_elements=["user_id", "milestone_type"])
     )
-    db.add(row)
-    try:
-        await db.commit()
-        await db.refresh(row)
-    except IntegrityError:
-        # Race with another worker — someone else already recorded it.
-        await db.rollback()
+    result = await db.execute(stmt)
+    if result.rowcount == 0:
+        # Conflict — another worker (or an earlier pass in this run)
+        # already persisted this milestone type.
         return None
     if existing is not None:
         existing.add(milestone_type)
-    return row
+    # Return a representation of what we inserted. Not attached to the
+    # session — the caller (check_milestones job) re-queries via
+    # ``get_uncelebrated`` before sending, so it reads the persisted
+    # row with all server-side defaults (id, achieved_at).
+    return UserMilestone(
+        user_id=user_id,
+        milestone_type=milestone_type,
+        extra=extra or {},
+    )
 
 
 async def _check_time_milestones(
@@ -276,11 +299,14 @@ def _render_context(milestone: UserMilestone, user: User) -> dict:
 async def mark_celebrated(
     db: AsyncSession, milestone_id: uuid.UUID
 ) -> None:
+    """Stamp celebrated_at. TRANSACTION_OWNED_BY_CALLER — caller must
+    commit after each call so a later Telegram-send failure doesn't
+    roll back earlier celebrations."""
     row = await db.get(UserMilestone, milestone_id)
     if not row:
         return
     row.celebrated_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
 
 
 async def get_uncelebrated(

@@ -66,12 +66,14 @@ class TestProcessUpdateSafely:
 # ---------------------------------------------------------------------------
 
 def _make_fake_session() -> MagicMock:
-    """Async-session double that supports commit/rollback/execute."""
+    """Async-session double that supports commit/rollback/execute/flush."""
     session = MagicMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
+    # Services now flush() instead of commit() (Phase B1).
+    session.flush = AsyncMock()
     # route_update issues an UPDATE to stamp user_id before commit —
     # execute must be awaitable.
     session.execute = AsyncMock(return_value=MagicMock(rowcount=0))

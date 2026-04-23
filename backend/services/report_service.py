@@ -181,6 +181,7 @@ Mục tiêu:
             f"Dùng emoji phù hợp. Tóm tắt điểm chính và đưa ra 1-2 lời khuyên.\n\n{report_context}",
             task_type="report_text",
             db=db,
+            user_id=user_id,
             use_cache=False,
         )
     except Exception:
