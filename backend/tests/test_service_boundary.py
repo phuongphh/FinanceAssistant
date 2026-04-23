@@ -61,3 +61,57 @@ def test_services_do_not_commit():
         "id before returning. Offenders:\n  "
         + "\n  ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Services depend on ports, not adapters (Phase B3).
+# ---------------------------------------------------------------------------
+
+FORBIDDEN_SERVICE_IMPORTS = [
+    # Services should use the Notifier port instead of reaching into
+    # the Telegram adapter directly. ``telegram_service`` is a legacy
+    # name for today's Telegram adapter — the guard catches both the
+    # flat module form and the future ``backend.adapters.*`` form.
+    ("backend.services.telegram_service", "Use backend.ports.notifier.get_notifier"),
+    ("backend.adapters.", "Services should depend on ports, not concrete adapters"),
+]
+
+# morning_report_service migrated in B3; others (gmail, ocr) still
+# legitimately wrap third-party SDKs today — leave them for now and
+# shrink the allowlist as each is ported behind its own port.
+SERVICE_IMPORT_ALLOWLIST: set[str] = {
+    # Example if we ever need to allow a legacy file:
+    # "legacy_foo_service.py",
+}
+
+
+def test_services_depend_on_ports_not_adapters():
+    offenders: list[str] = []
+
+    for path in SERVICES_DIR.rglob("*.py"):
+        if path.name in SERVICE_IMPORT_ALLOWLIST:
+            continue
+        # telegram_service.py IS the legacy adapter — skip self-scan.
+        if path.name == "telegram_service.py":
+            continue
+        source = path.read_text()
+        for forbidden, hint in FORBIDDEN_SERVICE_IMPORTS:
+            if forbidden in source:
+                # Only count actual imports, not comments or docstrings.
+                for ln_no, line in enumerate(source.splitlines(), start=1):
+                    stripped = line.strip()
+                    if stripped.startswith("#"):
+                        continue
+                    if forbidden in line and (
+                        stripped.startswith("import ")
+                        or stripped.startswith("from ")
+                    ):
+                        offenders.append(
+                            f"{path.relative_to(SERVICES_DIR.parent)}:{ln_no}  "
+                            f"imports {forbidden!r} — {hint}"
+                        )
+
+    assert not offenders, (
+        "Services must program against abstract ports, not concrete "
+        "adapters. Offenders:\n  " + "\n  ".join(offenders)
+    )

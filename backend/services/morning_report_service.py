@@ -14,7 +14,7 @@ from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
 from backend.services.chart_service import ASSET_TYPE_CONFIG, render_donut_chart
 from backend.services.portfolio_service import _compute_asset_fields, list_assets
-from backend.services.telegram_service import send_message, send_photo
+from backend.ports.notifier import get_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -208,17 +208,24 @@ def _build_no_assets_message() -> str:
 async def send_morning_report(
     db: AsyncSession, user: User
 ) -> bool:
-    """Send the morning report to a single user via Telegram.
+    """Send the morning report to a single user.
 
-    Returns True if sent successfully.
+    Transport is resolved via the :class:`Notifier` port so this
+    service stays testable without mocking HTTP: tests patch
+    ``backend.ports.notifier.get_notifier`` with a fake that just
+    records the outgoing messages.
+
+    Returns True if dispatched (actual delivery status is the
+    adapter's responsibility — we trust it has logged any failure).
     """
+    notifier = get_notifier()
     chat_id = user.telegram_id
 
     chart_bytes, text_summary, has_assets = await build_morning_report(db, user.id)
 
     if not has_assets:
         # Send encouraging message instead of empty chart
-        await send_message(chat_id, _build_no_assets_message())
+        await notifier.send_message(chat_id, _build_no_assets_message())
         return True
 
     greeting = _build_greeting()
@@ -228,15 +235,15 @@ async def send_morning_report(
 
     # Telegram caption limit is 1024 chars; if too long, send separately
     if len(caption) > 1024:
-        await send_message(chat_id, greeting)
-        await send_photo(chat_id, chart_bytes, caption="")
-        await send_message(
+        await notifier.send_message(chat_id, greeting)
+        await notifier.send_photo(chat_id, chart_bytes, caption="")
+        await notifier.send_message(
             chat_id,
             text_summary,
             reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
         )
     else:
-        await send_photo(
+        await notifier.send_photo(
             chat_id,
             chart_bytes,
             caption=caption,
