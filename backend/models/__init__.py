@@ -10,6 +10,12 @@ from backend.models.income_record import IncomeRecord
 from backend.models.event import Event
 from backend.models.user_milestone import MilestoneType, UserMilestone
 from backend.models.streak import UserStreak
+from backend.models.telegram_update import (
+    STATUS_DONE,
+    STATUS_FAILED,
+    STATUS_PROCESSING,
+    TelegramUpdate,
+)
 
 __all__ = [
     "User",
@@ -25,4 +31,8 @@ __all__ = [
     "UserMilestone",
     "MilestoneType",
     "UserStreak",
+    "TelegramUpdate",
+    "STATUS_PROCESSING",
+    "STATUS_DONE",
+    "STATUS_FAILED",
 ]

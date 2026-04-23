@@ -32,6 +32,38 @@ Phase 4:  1,000,000 user (Distributed, multi-region)
 
 ---
 
+## 0.1 Layer contract — ĐỌC TRƯỚC KHI CODE
+
+Đây là kết quả của audit scale tháng 4/2026. Chi tiết ở:
+- `docs/strategy/scaling-refactor-A.md` — 3 critical fix (webhook dedup, pool tuning, LLM ra khỏi hot path)
+- `docs/strategy/scaling-refactor-B.md` — layer boundary cleanup (commit migration, Notifier port, cache key, indexes)
+
+**Runtime path sau Phase A:**
+```
+webhook → claim update_id → asyncio.create_task → worker → handler → service → adapter
+  (≤100ms)    (Postgres dedup)                      (commit)  (logic)  (flush)  (transport)
+```
+
+**Contract mỗi layer — không vi phạm:**
+
+| Layer | ĐƯỢC | KHÔNG ĐƯỢC |
+|---|---|---|
+| `routers/` | Parse HTTP, verify auth, claim `update_id`, enqueue, trả 200 | Business logic, LLM call, Telegram send |
+| `workers/` | Mở session, dispatch, commit **một lần** ở boundary | Business logic |
+| `bot/handlers/` | Route intent, extract Telegram data, gọi service, format response | `db.commit()`, query DB raw (trừ view-only) |
+| `services/` | Business logic thuần, nhận `db`, **flush only**, return domain objects | `db.commit()`, gọi Telegram/LLM trực tiếp, đọc env |
+| `adapters/` | Transport: Telegram, Notion, DeepSeek, Claude | Business logic |
+| `ports/` | Interface (Protocol) cho `Notifier`, `LLM` — cho DI/test | Implementation |
+
+**Hệ quả cho mọi issue mới:**
+- LLM call trong webhook path → phải là background task, không block webhook response.
+- Service **không** gọi `db.commit()` — caller (router/worker) sở hữu transaction boundary.
+- Service **không** import `telegram_service` trực tiếp — dùng `Notifier` port qua `get_notifier()`.
+- Cache LLM: mặc định key kèm `user_id`; chỉ dùng `shared_cache=True` khi prompt không chứa data user.
+- Mọi update Telegram **phải** được dedup qua `telegram_updates.update_id` trước khi xử lý.
+
+---
+
 ## 1. Stack công nghệ
 
 | Layer | Công nghệ | Lý do |

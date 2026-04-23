@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
 
+    # Database connection pool — see docs/strategy/scaling-refactor-A.md §A2.
+    # Defaults target 1K-user Phase 1 VPS; override via env for Mac Mini dev.
+    db_pool_size: int = 20
+    db_max_overflow: int = 30
+    db_pool_timeout: int = 10           # seconds to wait for a connection
+    db_pool_recycle: int = 1800         # recycle after 30 min (avoid stale conns)
+    db_pool_pre_ping: bool = True       # ping before checkout — detect dead conns
+
     # LLM APIs
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
