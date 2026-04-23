@@ -20,18 +20,8 @@ from backend.main import app
 client = TestClient(app)
 
 
-def _close_coro(coro):
-    """Stand-in for ``asyncio.create_task`` in tests.
-
-    Closes the passed coroutine so pytest doesn't warn about
-    "coroutine was never awaited" — we only care that create_task was
-    called, not that the work runs.
-    """
-    try:
-        coro.close()
-    except AttributeError:
-        pass
-    return MagicMock()
+def _noop_enqueue(update_id, data):
+    """Stand-in for ``_enqueue_update`` in tests — does nothing."""
 
 
 # ---------------------------------------------------------------------------
@@ -72,11 +62,11 @@ async def test_claim_update_returns_false_when_duplicate():
 # ---------------------------------------------------------------------------
 
 class TestWebhookDedup:
-    @patch("backend.routers.telegram.asyncio.create_task", side_effect=_close_coro)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
     @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
     def test_first_time_update_is_claimed_and_enqueued(
-        self, mock_settings, mock_claim, mock_create_task
+        self, mock_settings, mock_claim, mock_enqueue
     ):
         mock_settings.telegram_webhook_secret = ""
         mock_claim.return_value = True
@@ -91,13 +81,13 @@ class TestWebhookDedup:
 
         assert resp.status_code == 200
         mock_claim.assert_awaited_once()
-        mock_create_task.assert_called_once()
+        mock_enqueue.assert_called_once()
 
-    @patch("backend.routers.telegram.asyncio.create_task", side_effect=_close_coro)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
     @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
     def test_duplicate_update_is_skipped(
-        self, mock_settings, mock_claim, mock_create_task
+        self, mock_settings, mock_claim, mock_enqueue
     ):
         mock_settings.telegram_webhook_secret = ""
         mock_claim.return_value = False  # Already seen
@@ -113,13 +103,13 @@ class TestWebhookDedup:
         assert resp.status_code == 200
         mock_claim.assert_awaited_once()
         # The whole point: no background work is scheduled for a retry.
-        mock_create_task.assert_not_called()
+        mock_enqueue.assert_not_called()
 
-    @patch("backend.routers.telegram.asyncio.create_task", side_effect=_close_coro)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
     @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
     def test_missing_update_id_is_acked_without_work(
-        self, mock_settings, mock_claim, mock_create_task
+        self, mock_settings, mock_claim, mock_enqueue
     ):
         mock_settings.telegram_webhook_secret = ""
 
@@ -130,4 +120,4 @@ class TestWebhookDedup:
 
         assert resp.status_code == 200
         mock_claim.assert_not_awaited()
-        mock_create_task.assert_not_called()
+        mock_enqueue.assert_not_called()

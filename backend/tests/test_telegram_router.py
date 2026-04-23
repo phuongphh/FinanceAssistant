@@ -6,7 +6,7 @@ directly — see test_telegram_worker.py and test_onboarding_integration.py.
 This file only covers what the HTTP layer itself owns: secret header
 verification and the claim-then-enqueue contract.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -15,16 +15,8 @@ from backend.main import app
 client = TestClient(app)
 
 
-def _close_coro(coro):
-    """Close the coroutine passed to ``asyncio.create_task`` so pytest
-    doesn't warn about unawaited coroutines. We only care that
-    create_task was called, not that the work runs.
-    """
-    try:
-        coro.close()
-    except AttributeError:
-        pass
-    return MagicMock()
+def _noop_enqueue(update_id, data):
+    """Stand-in for ``_enqueue_update`` in tests — does nothing."""
 
 
 class TestWebhookAuth:
@@ -38,7 +30,7 @@ class TestWebhookAuth:
             )
             assert resp.status_code == 403
 
-    @patch("backend.routers.telegram.asyncio.create_task", side_effect=_close_coro)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
     @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
     def test_accepts_valid_secret(self, mock_settings, mock_claim, _mock_task):
@@ -51,7 +43,7 @@ class TestWebhookAuth:
         )
         assert resp.status_code == 200
 
-    @patch("backend.routers.telegram.asyncio.create_task", side_effect=_close_coro)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
     @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
     def test_skips_validation_when_no_secret_configured(

@@ -62,6 +62,14 @@ async def _claim_update(
     return result.rowcount == 1
 
 
+def _enqueue_update(update_id: int, data: dict) -> None:
+    """Thin wrapper around asyncio.create_task so tests can patch this
+    function rather than asyncio.create_task (which is shared with anyio
+    internals and causes failures under Python 3.13 when patched globally).
+    """
+    asyncio.create_task(process_update_safely(update_id, data))
+
+
 @router.post("/webhook")
 async def telegram_webhook(
     request: Request,
@@ -84,7 +92,7 @@ async def telegram_webhook(
     # Fire-and-forget. The task opens its own session, routes the update,
     # and marks the telegram_updates row as done/failed. A crash here
     # leaves the row in 'processing' which the startup hook picks up.
-    asyncio.create_task(process_update_safely(update_id, data))
+    _enqueue_update(update_id, data)
     return {"ok": True}
 
 
