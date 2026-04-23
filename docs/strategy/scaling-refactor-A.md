@@ -27,6 +27,7 @@ Telegram retry khi không nhận 200 trong ~60s hoặc khi mạng chập. Mỗi 
 ```sql
 CREATE TABLE telegram_updates (
     update_id       BIGINT PRIMARY KEY,            -- Telegram's monotonic ID
+    user_id         UUID REFERENCES users(id),     -- Stamped by worker post-resolve
     received_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status          VARCHAR(20) NOT NULL DEFAULT 'processing',
     -- 'processing' | 'done' | 'failed'
@@ -35,14 +36,20 @@ CREATE TABLE telegram_updates (
     payload         JSONB NOT NULL                 -- Full update body, dùng replay/debug
 );
 
-CREATE INDEX idx_telegram_updates_status ON telegram_updates(status)
+CREATE INDEX idx_telegram_updates_processing ON telegram_updates(received_at)
     WHERE status = 'processing';
 CREATE INDEX idx_telegram_updates_received_at ON telegram_updates(received_at);
+CREATE INDEX idx_telegram_updates_user_id ON telegram_updates(user_id);
 ```
 
 **Tại sao PK là `update_id` thô (không UUID):**
 - Dedup là điểm chốt — PK conflict = đã duplicate, không cần query thêm.
 - `INSERT ... ON CONFLICT (update_id) DO NOTHING RETURNING update_id` cho câu trả lời atomic.
+
+**Tại sao `user_id` nullable:**
+- Webhook arrive trước khi user resolved (ví dụ `/start` của user chưa có trong DB).
+- Worker stamp `user_id` bằng `UPDATE telegram_updates SET user_id = ? WHERE update_id = ?` sau khi resolve. Same pattern với bảng `events`.
+- Multi-tenant convention §0 CLAUDE.md — cho phép per-user replay/audit/deletion.
 
 ### Router logic
 ```python
@@ -173,28 +180,33 @@ async def _process_update_safely(update_id: int, data: dict) -> None:
         logger.exception("Background processing crashed for update_id=%s", update_id)
 ```
 
-### Startup recovery (orphan task pickup)
-Khi process restart, các update `status='processing'` > 5 phút chưa xong → mồ côi.
+### Recovery — at startup + on a timer
+
+Khi process restart, các update `status='processing'` > 5 phút chưa xong → mồ côi. Ngoài startup, chạy loop định kỳ 2 phút để bắt được orphans xuất hiện **sau** khi server đã up (worker OOM giữa chừng).
+
 ```python
 # backend/main.py — lifespan
-@asynccontextmanager
 async def lifespan(app):
-    await _recover_orphaned_updates()
-    yield
-
-async def _recover_orphaned_updates() -> None:
-    cutoff = datetime.utcnow() - timedelta(minutes=5)
-    async with get_session_factory()() as db:
-        stmt = select(TelegramUpdate).where(
-            TelegramUpdate.status == "processing",
-            TelegramUpdate.received_at < cutoff,
-        ).limit(100)
-        orphans = (await db.execute(stmt)).scalars().all()
-        for orphan in orphans:
-            asyncio.create_task(_process_update_safely(orphan.update_id, orphan.payload))
-        logger.info("Recovered %d orphaned updates", len(orphans))
+    await recover_orphaned_updates()                 # Startup pickup
+    task = asyncio.create_task(run_recovery_loop())  # Periodic pickup
+    try:
+        yield
+    finally:
+        task.cancel()
 ```
-Cap 100 để tránh overload sau khi down lâu.
+
+**Atomic claim (bắt buộc cho multi-worker):**
+Nhiều uvicorn worker chạy recovery song song sẽ cùng SELECT một orphan row. Để tránh dispatch trùng, mỗi row phải được **claim atomically** trước khi schedule:
+
+```sql
+UPDATE telegram_updates
+SET received_at = NOW()
+WHERE update_id = ? AND status = 'processing' AND received_at < cutoff
+```
+
+`rowcount == 1` → worker này thắng, schedule task. `rowcount == 0` → worker khác đã claim (received_at đã bump), skip. Row-level lock của Postgres serializes các concurrent UPDATE.
+
+Cap 100 candidate/pass để tránh overload sau khi down lâu; interval 2 phút đảm bảo orphan < 5-min cutoff vẫn được bắt trong 1 vòng cutoff.
 
 ### Graceful shutdown
 Uvicorn SIGTERM → FastAPI lifespan `finally` block:

@@ -1,26 +1,30 @@
-"""End-to-end integration tests for the onboarding flow.
+"""Integration tests for the onboarding dispatch flow.
 
-Drives the Telegram webhook with realistic payloads across every
-step of the 5-step state machine and asserts that the correct
-handler fires. DB interactions are stubbed at the service boundary
-so these tests run in CI without Postgres.
+After the Phase A refactor (docs/strategy/scaling-refactor-A.md) the
+webhook route only verifies + claims + enqueues. All dispatch logic
+lives in ``backend.workers.telegram_worker.route_update``. These tests
+drive ``route_update`` directly with realistic Telegram payloads — that
+is both simpler (no HTTP layer) and correct (handler mocks are observed
+synchronously, unlike a background ``asyncio.create_task``).
 
-This complements the unit tests in:
+DB interactions are stubbed at the service boundary so these tests run
+in CI without Postgres.
+
+Complements the unit tests in:
 - test_onboarding.py (pure logic + callback router)
 - test_onboarding_service.py (DB setters)
-- test_telegram_router.py (command routing shape)
+- test_telegram_router.py (auth + enqueue contract)
+- test_telegram_worker.py (worker internals + recovery)
 """
 from __future__ import annotations
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
+import pytest
 
 from backend.bot.personality.onboarding_flow import OnboardingStep
-from backend.main import app
-
-client = TestClient(app)
+from backend.workers import telegram_worker
 
 
 def _fake_user(step: int = 0, is_onboarded: bool = False):
@@ -39,161 +43,162 @@ def _fake_user(step: int = 0, is_onboarded: bool = False):
     return user
 
 
-class TestOnboardingWebhookFlow:
-    """Drive the webhook through each step of the 5-step onboarding."""
+def _fake_session():
+    """Minimal async-session double for route_update to commit against."""
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    # route_update issues UPDATE telegram_updates SET user_id = ?
+    # before committing — execute must be awaitable.
+    session.execute = AsyncMock(return_value=MagicMock(rowcount=0))
+    return session
 
-    @patch("backend.routers.telegram.onboarding_handlers.send_welcome_back", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.onboarding_handlers.step_1_welcome", new_callable=AsyncMock)
-    @patch(
-        "backend.routers.telegram.dashboard_service.get_or_create_user",
-        new_callable=AsyncMock,
-    )
-    @patch("backend.routers.telegram.settings")
-    def test_start_for_new_user_triggers_welcome(
-        self, mock_settings, mock_get_or_create, mock_step_1, mock_welcome_back
+
+class TestOnboardingDispatch:
+    """Drive route_update through each step of the 5-step onboarding."""
+
+    @pytest.mark.asyncio
+    @patch("backend.bot.handlers.onboarding.send_welcome_back", new_callable=AsyncMock)
+    @patch("backend.bot.handlers.onboarding.step_1_welcome", new_callable=AsyncMock)
+    @patch("backend.services.dashboard_service.get_or_create_user", new_callable=AsyncMock)
+    async def test_start_for_new_user_triggers_welcome(
+        self, mock_get_or_create, mock_step_1, mock_welcome_back
     ):
-        mock_settings.telegram_webhook_secret = ""
         user = _fake_user(step=0, is_onboarded=False)
         mock_get_or_create.return_value = (user, True)
 
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
+        sess = _fake_session()
+        with patch.object(
+            telegram_worker, "get_session_factory",
+            return_value=MagicMock(return_value=sess),
+        ):
+            await telegram_worker.route_update({
+                "update_id": 1,
                 "message": {
                     "text": "/start",
                     "chat": {"id": 123},
                     "from": {"id": 999, "username": "minh"},
-                }
-            },
-        )
+                },
+            })
 
-        assert resp.status_code == 200
         mock_step_1.assert_awaited_once()
         mock_welcome_back.assert_not_called()
 
-    @patch("backend.routers.telegram.onboarding_handlers.send_welcome_back", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.onboarding_handlers.step_1_welcome", new_callable=AsyncMock)
-    @patch(
-        "backend.routers.telegram.dashboard_service.get_or_create_user",
-        new_callable=AsyncMock,
-    )
-    @patch("backend.routers.telegram.settings")
-    def test_start_for_already_onboarded_user_skips_onboarding(
-        self, mock_settings, mock_get_or_create, mock_step_1, mock_welcome_back
+    @pytest.mark.asyncio
+    @patch("backend.bot.handlers.onboarding.send_welcome_back", new_callable=AsyncMock)
+    @patch("backend.bot.handlers.onboarding.step_1_welcome", new_callable=AsyncMock)
+    @patch("backend.services.dashboard_service.get_or_create_user", new_callable=AsyncMock)
+    async def test_start_for_already_onboarded_user_skips_onboarding(
+        self, mock_get_or_create, mock_step_1, mock_welcome_back
     ):
-        mock_settings.telegram_webhook_secret = ""
         user = _fake_user(step=5, is_onboarded=True)
         mock_get_or_create.return_value = (user, False)
 
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
+        sess = _fake_session()
+        with patch.object(
+            telegram_worker, "get_session_factory",
+            return_value=MagicMock(return_value=sess),
+        ):
+            await telegram_worker.route_update({
+                "update_id": 2,
                 "message": {
                     "text": "/start",
                     "chat": {"id": 123},
                     "from": {"id": 999},
-                }
-            },
-        )
+                },
+            })
 
-        assert resp.status_code == 200
         mock_welcome_back.assert_awaited_once()
         mock_step_1.assert_not_called()
 
-    @patch("backend.routers.telegram.onboarding_handlers.handle_name_input", new_callable=AsyncMock)
-    @patch(
-        "backend.routers.telegram.dashboard_service.get_user_by_telegram_id",
-        new_callable=AsyncMock,
-    )
-    @patch("backend.routers.telegram.handle_text_message", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.settings")
-    def test_free_text_during_asking_name_routes_to_name_handler(
-        self,
-        mock_settings,
-        mock_text_message,
-        mock_lookup,
-        mock_name_input,
+    @pytest.mark.asyncio
+    @patch("backend.bot.handlers.onboarding.handle_name_input", new_callable=AsyncMock)
+    @patch("backend.services.dashboard_service.get_user_by_telegram_id", new_callable=AsyncMock)
+    @patch("backend.bot.handlers.message.handle_text_message", new_callable=AsyncMock)
+    async def test_free_text_during_asking_name_routes_to_name_handler(
+        self, mock_text_message, mock_lookup, mock_name_input
     ):
-        mock_settings.telegram_webhook_secret = ""
-        mock_lookup.return_value = _fake_user(
-            step=int(OnboardingStep.ASKING_NAME)
-        )
-        mock_name_input.return_value = True  # text was consumed
+        mock_lookup.return_value = _fake_user(step=int(OnboardingStep.ASKING_NAME))
+        mock_name_input.return_value = True  # consumed
 
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
+        sess = _fake_session()
+        with patch.object(
+            telegram_worker, "get_session_factory",
+            return_value=MagicMock(return_value=sess),
+        ):
+            await telegram_worker.route_update({
+                "update_id": 3,
                 "message": {
                     "text": "Minh",
                     "chat": {"id": 123},
                     "from": {"id": 999},
-                }
-            },
-        )
+                },
+            })
 
-        assert resp.status_code == 200
         mock_name_input.assert_awaited_once()
         # NL expense handler must NOT run for onboarding name input.
         mock_text_message.assert_not_called()
 
-    @patch("backend.routers.telegram.onboarding_handlers.handle_name_input", new_callable=AsyncMock)
-    @patch(
-        "backend.routers.telegram.dashboard_service.get_user_by_telegram_id",
-        new_callable=AsyncMock,
-    )
-    @patch("backend.routers.telegram.handle_text_message", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.settings")
-    def test_free_text_outside_onboarding_routes_to_nl_handler(
-        self,
-        mock_settings,
-        mock_text_message,
-        mock_lookup,
-        mock_name_input,
+    @pytest.mark.asyncio
+    @patch("backend.bot.handlers.onboarding.handle_name_input", new_callable=AsyncMock)
+    @patch("backend.services.dashboard_service.get_user_by_telegram_id", new_callable=AsyncMock)
+    @patch("backend.bot.handlers.message.handle_text_message", new_callable=AsyncMock)
+    async def test_free_text_outside_onboarding_routes_to_nl_handler(
+        self, mock_text_message, mock_lookup, mock_name_input
     ):
-        mock_settings.telegram_webhook_secret = ""
-        # User is past onboarding — plain text should be treated as a
-        # natural-language expense.
         mock_lookup.return_value = _fake_user(
             step=int(OnboardingStep.COMPLETED), is_onboarded=True
         )
 
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
+        sess = _fake_session()
+        with patch.object(
+            telegram_worker, "get_session_factory",
+            return_value=MagicMock(return_value=sess),
+        ):
+            await telegram_worker.route_update({
+                "update_id": 4,
                 "message": {
                     "text": "45k phở",
                     "chat": {"id": 123},
                     "from": {"id": 999},
-                }
-            },
-        )
+                },
+            })
 
-        assert resp.status_code == 200
         mock_name_input.assert_not_called()
         mock_text_message.assert_awaited_once()
 
-    @patch("backend.routers.telegram.onboarding_handlers.handle_onboarding_callback", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.settings")
-    def test_goal_callback_routed_to_onboarding_handler(
-        self, mock_settings, mock_onboarding_cb
+    @pytest.mark.asyncio
+    @patch(
+        "backend.services.dashboard_service.get_user_by_telegram_id",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "backend.bot.handlers.onboarding.handle_onboarding_callback",
+        new_callable=AsyncMock,
+    )
+    async def test_goal_callback_routed_to_onboarding_handler(
+        self, mock_onboarding_cb, mock_lookup
     ):
-        mock_settings.telegram_webhook_secret = ""
         mock_onboarding_cb.return_value = True  # handled
+        mock_lookup.return_value = _fake_user(
+            step=int(OnboardingStep.COMPLETED), is_onboarded=True
+        )
 
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
+        sess = _fake_session()
+        with patch.object(
+            telegram_worker, "get_session_factory",
+            return_value=MagicMock(return_value=sess),
+        ):
+            await telegram_worker.route_update({
+                "update_id": 5,
                 "callback_query": {
                     "id": "cb-1",
                     "data": "onboarding:goal:save_more",
                     "from": {"id": 999},
-                    "message": {
-                        "chat": {"id": 123},
-                        "message_id": 42,
-                    },
-                }
-            },
-        )
+                    "message": {"chat": {"id": 123}, "message_id": 42},
+                },
+            })
 
-        assert resp.status_code == 200
         mock_onboarding_cb.assert_awaited_once()
