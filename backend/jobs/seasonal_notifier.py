@@ -24,7 +24,6 @@ import yaml
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend import analytics
 from backend.analytics import EventType
 from backend.bot.formatters.money import format_money_full
 from backend.database import get_session_factory
@@ -305,21 +304,22 @@ async def _deliver(event: dict, user: User, today: date) -> None:
             )
             return
 
+        # Single insert serves both dedup (_already_fired reads this
+        # back by the `key` property) and analytics — writing via
+        # `analytics.track` too would double-count every delivery.
         db.add(
             Event(
                 user_id=user.id,
                 event_type=EventType.SEASONAL_FIRED,
-                properties={"key": _dedup_key(event_name, today.year)},
+                properties={
+                    "key": _dedup_key(event_name, today.year),
+                    "event": event_name,
+                    "year": today.year,
+                },
                 timestamp=datetime.now(timezone.utc),
             )
         )
         await db.commit()
-
-        analytics.track(
-            EventType.SEASONAL_FIRED,
-            user_id=user.id,
-            properties={"event": event_name, "year": today.year},
-        )
 
 
 if __name__ == "__main__":

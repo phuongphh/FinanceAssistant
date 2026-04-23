@@ -16,7 +16,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from backend import analytics
 from backend.analytics import EventType
 from backend.bot.personality import fun_facts
 from backend.database import get_session_factory
@@ -70,8 +69,9 @@ async def _process_user(user: User) -> None:
             )
             return
 
-        # Record in events table so analytics can see which templates
-        # ship. No PII — only the template key.
+        # Single insert serves both dedup/audit and analytics — writing
+        # via `analytics.track` too would double-count every send in the
+        # events table.
         db.add(
             Event(
                 user_id=user.id,
@@ -81,12 +81,6 @@ async def _process_user(user: User) -> None:
             )
         )
         await db.commit()
-
-        analytics.track(
-            EventType.FUN_FACT_SENT,
-            user_id=user.id,
-            properties={"key": fact.key},
-        )
 
 
 if __name__ == "__main__":
