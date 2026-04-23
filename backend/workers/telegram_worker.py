@@ -70,12 +70,14 @@ async def route_update(data: dict) -> None:
     )
     from backend import analytics
 
+    update_id = data.get("update_id")
     session_factory = get_session_factory()
     async with session_factory() as db:
         try:
+            user_id = None
             message = data.get("message")
             if message:
-                await _handle_message(
+                user_id = await _handle_message(
                     db, message,
                     onboarding_handlers=onboarding_handlers,
                     dashboard_service=dashboard_service,
@@ -88,14 +90,25 @@ async def route_update(data: dict) -> None:
             else:
                 callback_query = data.get("callback_query")
                 if callback_query:
-                    await _handle_callback(
+                    user_id = await _handle_callback(
                         db, callback_query,
                         onboarding_handlers=onboarding_handlers,
+                        dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_report_callback=handle_report_callback,
                         handle_menu_callback=handle_menu_callback,
                         answer_callback=answer_callback,
                     )
+
+            # Stamp the resolved user_id on the queue row so we can
+            # replay / audit / delete updates per-user. Best-effort —
+            # rows for unknown Telegram IDs stay with user_id NULL.
+            if update_id is not None and user_id is not None:
+                await db.execute(
+                    sa_update(TelegramUpdate)
+                    .where(TelegramUpdate.update_id == update_id)
+                    .values(user_id=user_id)
+                )
             await db.commit()
         except Exception:
             await db.rollback()
@@ -113,7 +126,11 @@ async def _handle_message(
     send_menu,
     OnboardingStep,
     analytics,
-) -> None:
+):
+    """Dispatch a message update. Returns the resolved internal user_id
+    (or None if the sender isn't yet registered) so ``route_update`` can
+    stamp it on the telegram_updates row.
+    """
     text = message.get("text", "")
     chat_id = message["chat"]["id"]
     command = text.strip().lower()
@@ -126,7 +143,7 @@ async def _handle_message(
                 analytics.EventType.BOT_STARTED,
                 properties={"has_telegram_id": False, "new_user": False},
             )
-            return
+            return None
 
         user, created = await dashboard_service.get_or_create_user(
             db,
@@ -145,30 +162,52 @@ async def _handle_message(
             },
         )
         await onboarding_handlers.resume_or_start(db, chat_id, user)
-        return
+        return user.id
 
     if command in ("/menu", "menu"):
         await send_menu(chat_id)
-        return
+        # Resolve user best-effort so we can stamp the row — missing user
+        # means the menu opened for someone not yet registered, which is
+        # fine (they'll be prompted to /start).
+        if telegram_id is not None:
+            user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            return user.id if user else None
+        return None
 
     if command == "/report":
         await handle_report_command(db, message)
-        return
+        if telegram_id is not None:
+            user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            return user.id if user else None
+        return None
+
+    # Resolve the user once up front for the remaining text-message
+    # paths — all of them need it (either to detect the onboarding step
+    # or to stamp user_id on the queue row).
+    resolved_user = None
+    if telegram_id is not None:
+        resolved_user = await dashboard_service.get_user_by_telegram_id(
+            db, telegram_id
+        )
 
     # Plain text during the onboarding name step must be consumed here —
     # otherwise the NL expense parser would try to parse the user's name
     # as a transaction.
-    if text and telegram_id is not None and not command.startswith("/"):
-        user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
-        if user and user.onboarding_step == int(OnboardingStep.ASKING_NAME):
-            consumed = await onboarding_handlers.handle_name_input(
-                db, chat_id, user, text
-            )
-            if consumed:
-                return
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+        and resolved_user.onboarding_step == int(OnboardingStep.ASKING_NAME)
+    ):
+        consumed = await onboarding_handlers.handle_name_input(
+            db, chat_id, resolved_user, text
+        )
+        if consumed:
+            return resolved_user.id
 
     # Natural-language message → NL expense parser / report intent / menu fallback.
     await handle_text_message(db, message)
+    return resolved_user.id if resolved_user else None
 
 
 async def _handle_callback(
@@ -176,33 +215,47 @@ async def _handle_callback(
     callback_query: dict,
     *,
     onboarding_handlers,
+    dashboard_service,
     handle_transaction_callback,
     handle_report_callback,
     handle_menu_callback,
     answer_callback,
-) -> None:
+):
+    """Dispatch a callback_query update. Returns the resolved internal
+    user_id (or None) so ``route_update`` can stamp it on the
+    telegram_updates row.
+    """
     callback_data = callback_query.get("data", "")
     chat_id = callback_query["message"]["chat"]["id"]
     callback_id = callback_query["id"]
+    from_user = callback_query.get("from") or {}
+    telegram_id = from_user.get("id")
+
+    async def _resolved_user_id():
+        if telegram_id is None:
+            return None
+        user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+        return user.id if user else None
 
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
     if await onboarding_handlers.handle_onboarding_callback(db, callback_query):
-        return
+        return await _resolved_user_id()
 
     # Transaction callbacks handle their own answerCallbackQuery so users
     # get richer feedback.
     if await handle_transaction_callback(db, callback_query):
-        return
+        return await _resolved_user_id()
 
     await answer_callback(callback_id)
 
     # "Báo cáo" button → generate report immediately instead of showing help.
     if callback_data == "menu:report":
         await handle_report_callback(db, callback_query)
-        return
+        return await _resolved_user_id()
 
     await handle_menu_callback(chat_id, callback_data)
+    return await _resolved_user_id()
 
 
 async def process_update_safely(update_id: int, data: dict) -> None:
@@ -243,18 +296,53 @@ async def _mark_status(
             await db.rollback()
 
 
+async def _claim_orphan(db: AsyncSession, update_id: int, cutoff: datetime) -> bool:
+    """Atomically claim one stale 'processing' row for this worker.
+
+    Bumps ``received_at`` to NOW() only if the row is still ``status
+    = 'processing'`` AND older than ``cutoff``. The row-level lock
+    taken during UPDATE serializes concurrent workers — only the first
+    worker's UPDATE hits (rowcount 1), the rest see received_at
+    already past the cutoff and their predicate fails (rowcount 0).
+
+    Returns True if this worker claimed the row and should schedule
+    processing, False if another worker got there first.
+    """
+    stmt = (
+        sa_update(TelegramUpdate)
+        .where(
+            TelegramUpdate.update_id == update_id,
+            TelegramUpdate.status == STATUS_PROCESSING,
+            TelegramUpdate.received_at < cutoff,
+        )
+        .values(received_at=datetime.utcnow())
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    return result.rowcount == 1
+
+
 async def recover_orphaned_updates() -> int:
     """Re-enqueue updates stuck in ``processing`` from a prior run.
 
-    Called from the FastAPI lifespan startup hook. Caps the batch so a
-    long outage doesn't produce a thundering herd on restart. Returns
-    the number of tasks spawned.
+    Runs both at startup and on a recurring timer (see
+    ``run_recovery_loop``) so rows that get stuck after the web server
+    is already up — e.g. a worker OOMs mid-handler — still get picked
+    up without waiting for the next deploy.
+
+    Safe across multiple uvicorn workers: each candidate is atomically
+    claimed via ``_claim_orphan`` before being scheduled, so exactly
+    one worker dispatches each orphan. Caps the batch per pass to
+    avoid thundering-herd scheduling after a long outage. Returns the
+    number of tasks spawned.
     """
     cutoff = datetime.utcnow() - ORPHAN_CUTOFF
     session_factory = get_session_factory()
+
+    spawned = 0
     async with session_factory() as db:
         stmt = (
-            select(TelegramUpdate)
+            select(TelegramUpdate.update_id, TelegramUpdate.payload)
             .where(
                 TelegramUpdate.status == STATUS_PROCESSING,
                 TelegramUpdate.received_at < cutoff,
@@ -262,11 +350,43 @@ async def recover_orphaned_updates() -> int:
             .order_by(TelegramUpdate.received_at.asc())
             .limit(ORPHAN_BATCH_LIMIT)
         )
-        orphans = (await db.execute(stmt)).scalars().all()
+        candidates = (await db.execute(stmt)).all()
 
-    for orphan in orphans:
-        asyncio.create_task(process_update_safely(orphan.update_id, orphan.payload))
+        for update_id, payload in candidates:
+            if await _claim_orphan(db, update_id, cutoff):
+                asyncio.create_task(process_update_safely(update_id, payload))
+                spawned += 1
 
-    if orphans:
-        logger.info("Recovered %d orphaned Telegram updates", len(orphans))
-    return len(orphans)
+    if spawned:
+        logger.info(
+            "Recovered %d orphaned Telegram update(s) (%d candidates inspected)",
+            spawned, len(candidates),
+        )
+    return spawned
+
+
+# How often the in-process recovery loop wakes up. Must be shorter than
+# ORPHAN_CUTOFF so a freshly-stuck row is picked up within one cutoff
+# window regardless of when it became stale. 2 min gives ~2.5x headroom.
+RECOVERY_INTERVAL = 120  # seconds
+
+
+async def run_recovery_loop(interval_seconds: int = RECOVERY_INTERVAL) -> None:
+    """Long-running coroutine that periodically re-enqueues orphans.
+
+    Started from the FastAPI lifespan. Exits cleanly on
+    ``CancelledError`` (raised during shutdown). Any other exception is
+    logged and the loop continues — recovery is advisory, a single bad
+    pass shouldn't kill it.
+    """
+    logger.info("Orphan recovery loop started (interval=%ss)", interval_seconds)
+    try:
+        while True:
+            await asyncio.sleep(interval_seconds)
+            try:
+                await recover_orphaned_updates()
+            except Exception:
+                logger.exception("Orphan recovery pass failed; continuing loop")
+    except asyncio.CancelledError:
+        logger.info("Orphan recovery loop cancelled")
+        raise

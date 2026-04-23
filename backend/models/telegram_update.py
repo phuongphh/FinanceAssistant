@@ -12,10 +12,11 @@ dispatched. Serves two purposes:
 
 See docs/strategy/scaling-refactor-A.md §A1 for the full rationale.
 """
+import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Index, String, Text, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
@@ -32,6 +33,18 @@ class TelegramUpdate(Base):
     __tablename__ = "telegram_updates"
 
     update_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Nullable — the webhook runs before the user is resolved (and /start
+    # fires for users that don't yet exist in our DB). Populated by the
+    # background worker after it resolves the Telegram user. Matches the
+    # `events` table convention. Enables per-user replay / audit /
+    # GDPR-style deletion — satisfies the multi-tenant guarantee in
+    # CLAUDE.md §0.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )

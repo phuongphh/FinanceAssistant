@@ -28,6 +28,11 @@ def upgrade() -> None:
     op.create_table(
         'telegram_updates',
         sa.Column('update_id', sa.BigInteger(), nullable=False),
+        # Nullable because the webhook arrives before the user is resolved
+        # (including /start for users that don't yet exist). Populated by
+        # the worker once the user is known — enables per-user replay /
+        # audit / deletion. See CLAUDE.md §0 multi-tenant rule.
+        sa.Column('user_id', sa.UUID(), nullable=True),
         sa.Column(
             'received_at', sa.DateTime(timezone=True),
             server_default=sa.text('NOW()'), nullable=False,
@@ -39,6 +44,7 @@ def upgrade() -> None:
         sa.Column('processed_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('error_message', sa.Text(), nullable=True),
         sa.Column('payload', postgresql.JSONB(), nullable=False),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
         sa.PrimaryKeyConstraint('update_id'),
     )
     # Partial index — only scans rows still in flight for orphan recovery.
@@ -53,9 +59,15 @@ def upgrade() -> None:
         'telegram_updates',
         ['received_at'],
     )
+    op.create_index(
+        'idx_telegram_updates_user_id',
+        'telegram_updates',
+        ['user_id'],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index('idx_telegram_updates_user_id', table_name='telegram_updates')
     op.drop_index('idx_telegram_updates_received_at', table_name='telegram_updates')
     op.drop_index('idx_telegram_updates_processing', table_name='telegram_updates')
     op.drop_table('telegram_updates')

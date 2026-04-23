@@ -50,6 +50,9 @@ def _fake_session():
     session.__aexit__ = AsyncMock(return_value=False)
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
+    # route_update issues UPDATE telegram_updates SET user_id = ?
+    # before committing — execute must be awaitable.
+    session.execute = AsyncMock(return_value=MagicMock(rowcount=0))
     return session
 
 
@@ -168,11 +171,20 @@ class TestOnboardingDispatch:
 
     @pytest.mark.asyncio
     @patch(
+        "backend.services.dashboard_service.get_user_by_telegram_id",
+        new_callable=AsyncMock,
+    )
+    @patch(
         "backend.bot.handlers.onboarding.handle_onboarding_callback",
         new_callable=AsyncMock,
     )
-    async def test_goal_callback_routed_to_onboarding_handler(self, mock_onboarding_cb):
+    async def test_goal_callback_routed_to_onboarding_handler(
+        self, mock_onboarding_cb, mock_lookup
+    ):
         mock_onboarding_cb.return_value = True  # handled
+        mock_lookup.return_value = _fake_user(
+            step=int(OnboardingStep.COMPLETED), is_onboarded=True
+        )
 
         sess = _fake_session()
         with patch.object(

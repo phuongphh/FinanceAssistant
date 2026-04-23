@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from backend.config import get_settings
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
-from backend.workers.telegram_worker import recover_orphaned_updates
+from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,7 +39,20 @@ async def lifespan(app: FastAPI):
         # advisory and a human can replay from the telegram_updates table.
         logger.exception("Orphan recovery failed at startup; continuing")
 
-    yield
+    # Run recovery on a timer too, not just at boot — a fast restart loop
+    # would otherwise leave rows stuck until the next deploy (the 5-min
+    # cutoff keeps excluding them). Atomic claim inside the loop means
+    # multiple uvicorn workers are safe to run it concurrently.
+    recovery_task = asyncio.create_task(run_recovery_loop())
+
+    try:
+        yield
+    finally:
+        recovery_task.cancel()
+        try:
+            await recovery_task
+        except asyncio.CancelledError:
+            pass
 
     # Graceful shutdown: give in-flight background tasks a bounded window
     # to finish so we don't leave updates half-processed when uvicorn

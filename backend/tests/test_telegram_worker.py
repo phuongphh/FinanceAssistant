@@ -65,15 +65,26 @@ class TestProcessUpdateSafely:
 # route_update — dispatches message / callback via the handler layer.
 # ---------------------------------------------------------------------------
 
+def _make_fake_session() -> MagicMock:
+    """Async-session double that supports commit/rollback/execute."""
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    # route_update issues an UPDATE to stamp user_id before commit —
+    # execute must be awaitable.
+    session.execute = AsyncMock(return_value=MagicMock(rowcount=0))
+    return session
+
+
 class TestRouteUpdate:
     @pytest.mark.asyncio
     async def test_menu_message_calls_send_menu(self):
-        """A plain /menu message should only trigger the menu sender."""
-        fake_session = MagicMock()
-        fake_session.__aenter__ = AsyncMock(return_value=fake_session)
-        fake_session.__aexit__ = AsyncMock(return_value=False)
-        fake_session.commit = AsyncMock()
-        fake_session.rollback = AsyncMock()
+        """A plain /menu message (no ``from``) should only trigger the
+        menu sender — no user lookup happens when we can't resolve a
+        Telegram id."""
+        fake_session = _make_fake_session()
         factory = MagicMock(return_value=fake_session)
 
         with patch.object(
@@ -96,12 +107,51 @@ class TestRouteUpdate:
         fake_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_stamps_resolved_user_id_on_row(self):
+        """After a handler resolves the user, route_update must issue an
+        UPDATE on telegram_updates so the row carries user_id for
+        per-user replay / audit / deletion (CLAUDE.md §0 multi-tenant
+        rule).
+        """
+        import uuid as _uuid
+
+        resolved_uid = _uuid.uuid4()
+        fake_user = MagicMock()
+        fake_user.id = resolved_uid
+        fake_user.is_onboarded = False
+        fake_user.display_name = None
+        fake_user.get_greeting_name.return_value = "bạn"
+
+        fake_session = _make_fake_session()
+        factory = MagicMock(return_value=fake_session)
+
+        with patch.object(
+            telegram_worker, "get_session_factory", return_value=factory
+        ), patch(
+            "backend.services.dashboard_service.get_or_create_user",
+            new_callable=AsyncMock, return_value=(fake_user, True),
+        ), patch(
+            "backend.bot.handlers.onboarding.resume_or_start",
+            new_callable=AsyncMock,
+        ):
+            await telegram_worker.route_update(
+                {
+                    "update_id": 77,
+                    "message": {
+                        "text": "/start",
+                        "chat": {"id": 123},
+                        "from": {"id": 999},
+                    },
+                }
+            )
+
+        # route_update should have issued at least one execute (the UPDATE).
+        assert fake_session.execute.await_count >= 1
+        fake_session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_exception_triggers_rollback(self):
-        fake_session = MagicMock()
-        fake_session.__aenter__ = AsyncMock(return_value=fake_session)
-        fake_session.__aexit__ = AsyncMock(return_value=False)
-        fake_session.commit = AsyncMock()
-        fake_session.rollback = AsyncMock()
+        fake_session = _make_fake_session()
         factory = MagicMock(return_value=fake_session)
 
         with patch.object(
@@ -127,31 +177,48 @@ class TestRouteUpdate:
 # recover_orphaned_updates — picks up stuck rows at startup.
 # ---------------------------------------------------------------------------
 
+def _fake_execute(candidates: list, claim_results: list):
+    """Build an execute side_effect that replays a SELECT + N UPDATEs.
+
+    ``candidates`` is what ``SELECT update_id, payload`` should return
+    (a list of 2-tuples). ``claim_results`` is a list of booleans, one
+    per candidate, indicating whether our worker won the atomic claim
+    for that row.
+    """
+    select_result = MagicMock()
+    select_result.all = MagicMock(return_value=candidates)
+
+    update_results = [MagicMock(rowcount=1 if won else 0) for won in claim_results]
+
+    calls = [select_result, *update_results]
+    it = iter(calls)
+
+    async def side_effect(stmt, *a, **kw):
+        return next(it)
+
+    return side_effect
+
+
 class TestRecoverOrphanedUpdates:
     @pytest.mark.asyncio
-    async def test_spawns_task_per_orphan(self):
-        stale = datetime.utcnow() - timedelta(minutes=10)
-        orphan1 = MagicMock(update_id=101, payload={"update_id": 101}, received_at=stale)
-        orphan2 = MagicMock(update_id=102, payload={"update_id": 102}, received_at=stale)
-
-        # Shape the session/execute/scalars().all() chain just enough
-        # for recover_orphaned_updates to consume.
-        scalars = MagicMock()
-        scalars.all = MagicMock(return_value=[orphan1, orphan2])
-        execute_result = MagicMock()
-        execute_result.scalars = MagicMock(return_value=scalars)
-
+    async def test_claims_and_spawns_task_per_orphan(self):
+        """Happy path: this worker wins every claim and schedules all."""
+        candidates = [
+            (101, {"update_id": 101}),
+            (102, {"update_id": 102}),
+        ]
         fake_session = MagicMock()
         fake_session.__aenter__ = AsyncMock(return_value=fake_session)
         fake_session.__aexit__ = AsyncMock(return_value=False)
-        fake_session.execute = AsyncMock(return_value=execute_result)
+        fake_session.commit = AsyncMock()
+        fake_session.execute = AsyncMock(
+            side_effect=_fake_execute(candidates, [True, True])
+        )
         factory = MagicMock(return_value=fake_session)
 
         spawned: list = []
 
         def fake_create_task(coro):
-            # Immediately close the coroutine so it doesn't warn about
-            # "coroutine was never awaited" — we're just counting calls.
             coro.close()
             spawned.append(True)
             return MagicMock()
@@ -167,16 +234,50 @@ class TestRecoverOrphanedUpdates:
         assert len(spawned) == 2
 
     @pytest.mark.asyncio
-    async def test_no_orphans_returns_zero(self):
-        scalars = MagicMock()
-        scalars.all = MagicMock(return_value=[])
-        execute_result = MagicMock()
-        execute_result.scalars = MagicMock(return_value=scalars)
+    async def test_skips_rows_lost_to_concurrent_worker(self):
+        """Guards the cross-worker duplicate-dispatch bug (Codex P1).
 
+        Two uvicorn workers both scan for orphans; the other worker
+        already claimed row 102. Our atomic UPDATE returns rowcount=0
+        for that row — we must NOT schedule it.
+        """
+        candidates = [
+            (201, {"update_id": 201}),  # we win
+            (202, {"update_id": 202}),  # lost to another worker
+        ]
         fake_session = MagicMock()
         fake_session.__aenter__ = AsyncMock(return_value=fake_session)
         fake_session.__aexit__ = AsyncMock(return_value=False)
-        fake_session.execute = AsyncMock(return_value=execute_result)
+        fake_session.commit = AsyncMock()
+        fake_session.execute = AsyncMock(
+            side_effect=_fake_execute(candidates, [True, False])
+        )
+        factory = MagicMock(return_value=fake_session)
+
+        spawned: list = []
+
+        def fake_create_task(coro):
+            coro.close()
+            spawned.append(True)
+            return MagicMock()
+
+        with patch.object(
+            telegram_worker, "get_session_factory", return_value=factory
+        ), patch.object(
+            telegram_worker.asyncio, "create_task", side_effect=fake_create_task
+        ):
+            count = await telegram_worker.recover_orphaned_updates()
+
+        assert count == 1
+        assert len(spawned) == 1
+
+    @pytest.mark.asyncio
+    async def test_no_orphans_returns_zero(self):
+        fake_session = MagicMock()
+        fake_session.__aenter__ = AsyncMock(return_value=fake_session)
+        fake_session.__aexit__ = AsyncMock(return_value=False)
+        fake_session.commit = AsyncMock()
+        fake_session.execute = AsyncMock(side_effect=_fake_execute([], []))
         factory = MagicMock(return_value=fake_session)
 
         with patch.object(
@@ -185,3 +286,68 @@ class TestRecoverOrphanedUpdates:
             count = await telegram_worker.recover_orphaned_updates()
 
         assert count == 0
+
+
+# ---------------------------------------------------------------------------
+# run_recovery_loop — periodic, cancellable.
+# ---------------------------------------------------------------------------
+
+class TestRecoveryLoop:
+    @pytest.mark.asyncio
+    async def test_loop_invokes_recovery_on_interval_and_exits_on_cancel(self):
+        """The loop should call recover_orphaned_updates at the configured
+        cadence and exit cleanly when cancelled. We use a very short
+        interval and a fake recover that signals progress via an event.
+        """
+        import asyncio as real_asyncio
+
+        calls = real_asyncio.Event()
+        call_count = {"n": 0}
+
+        async def fake_recover():
+            call_count["n"] += 1
+            if call_count["n"] >= 2:
+                calls.set()
+            return 0
+
+        with patch.object(
+            telegram_worker, "recover_orphaned_updates", side_effect=fake_recover
+        ):
+            task = real_asyncio.create_task(
+                telegram_worker.run_recovery_loop(interval_seconds=0)
+            )
+            await real_asyncio.wait_for(calls.wait(), timeout=2.0)
+            task.cancel()
+            with pytest.raises(real_asyncio.CancelledError):
+                await task
+
+        assert call_count["n"] >= 2
+
+    @pytest.mark.asyncio
+    async def test_loop_continues_after_recovery_exception(self):
+        """A single failing pass must not kill the loop."""
+        import asyncio as real_asyncio
+
+        call_count = {"n": 0}
+        done = real_asyncio.Event()
+
+        async def flaky_recover():
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise RuntimeError("db hiccup")
+            if call_count["n"] >= 2:
+                done.set()
+            return 0
+
+        with patch.object(
+            telegram_worker, "recover_orphaned_updates", side_effect=flaky_recover
+        ):
+            task = real_asyncio.create_task(
+                telegram_worker.run_recovery_loop(interval_seconds=0)
+            )
+            await real_asyncio.wait_for(done.wait(), timeout=2.0)
+            task.cancel()
+            with pytest.raises(real_asyncio.CancelledError):
+                await task
+
+        assert call_count["n"] >= 2
