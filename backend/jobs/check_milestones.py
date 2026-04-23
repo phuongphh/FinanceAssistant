@@ -77,8 +77,12 @@ async def _process_user(user: User) -> None:
     sent_this_run = 0
 
     async with session_factory() as db:
-        # 1. Detect and persist any newly-achieved milestones.
+        # 1. Detect and persist any newly-achieved milestones. The
+        #    service flushes but doesn't commit — persist the batch as
+        #    one transaction so either all new milestones land or none
+        #    do. Uses INSERT ... ON CONFLICT so partial re-runs are safe.
         await milestone_service.detect_and_record(db, user.id)
+        await db.commit()
 
         # 2. Iterate over every uncelebrated row — both the ones we
         #    just inserted and stragglers from previous runs that
@@ -123,6 +127,11 @@ async def _process_user(user: User) -> None:
                 continue
 
             await milestone_service.mark_celebrated(db, milestone.id)
+            # Commit per-iteration: the Telegram send above is an
+            # external side effect we can't undo. If the NEXT send
+            # fails, we still want this celebration persisted so the
+            # retry logic doesn't double-deliver.
+            await db.commit()
             sent_this_run += 1
 
             analytics.track(
