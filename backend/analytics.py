@@ -43,6 +43,17 @@ class EventType:
     MINIAPP_OPENED = "miniapp_opened"
     MINIAPP_LOADED = "miniapp_loaded"
 
+    # Phase 2 personality jobs. These also land in the `events` table,
+    # where the empathy engine / seasonal notifier query them to
+    # enforce cooldowns and once-per-year dedup.
+    MILESTONE_CELEBRATED = "milestone_celebrated"
+    STREAK_MILESTONE_HIT = "streak_milestone_hit"
+    EMPATHY_FIRED = "empathy_fired"
+    EMPATHY_SENT = "empathy_sent"
+    FUN_FACT_SENT = "fun_fact_sent"
+    SEASONAL_FIRED = "seasonal_fired"
+    GOAL_REMINDER_SENT = "goal_reminder_sent"
+
 
 # Property keys that would carry PII if ever accepted — strip unconditionally.
 _PII_KEY_PATTERN = re.compile(
