@@ -1,9 +1,11 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
 from backend.miniapp import routes as miniapp_routes
@@ -86,6 +88,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+_MINIAPP_STATIC = Path(__file__).parent / "miniapp" / "static"
+if _MINIAPP_STATIC.exists():
+    app.mount(
+        "/miniapp/static",
+        StaticFiles(directory=str(_MINIAPP_STATIC)),
+        name="miniapp-static",
+    )
 
 app.include_router(expenses.router, prefix="/api/v1")
 app.include_router(goals.router, prefix="/api/v1")

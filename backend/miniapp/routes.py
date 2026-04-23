@@ -11,7 +11,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -24,14 +23,6 @@ _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
 
 router = APIRouter(prefix="/miniapp", tags=["miniapp"])
-
-# Static assets — CSS + JS
-if _STATIC_DIR.exists():
-    router.mount(
-        "/static",
-        StaticFiles(directory=str(_STATIC_DIR)),
-        name="miniapp-static",
-    )
 
 
 @router.get("/dashboard", include_in_schema=False)
