@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  issues: write
 
 jobs:
   move-to-done:
@@ -16,9 +17,12 @@ jobs:
 
     steps:
       # -------------------------------------------------------
-      # BƯỚC 1: Tìm issue number từ PR body (Closes #N) hoặc branch name
+      # BƯỚC 1: Trích xuất TẤT CẢ issue numbers từ PR body và branch name
+      # Hỗ trợ:
+      #   - Body: "Closes #26", "Fixes #26, #27", "Resolves #26 and #27"
+      #   - Branch: "claude/issue-26-...", "claude/implement-issues-26-27-..."
       # -------------------------------------------------------
-      - name: Extract linked issue number
+      - name: Extract linked issue numbers
         id: extract
         uses: actions/github-script@v6
         with:
@@ -26,36 +30,54 @@ jobs:
             const body = context.payload.pull_request.body || '';
             const branch = context.payload.pull_request.head.ref || '';
 
-            // Tìm từ PR body: "Closes #N", "Fixes #N", "Resolves #N"
-            const bodyMatch = body.match(/(?:closes|fixes|resolves)\s+#(\d+)/i);
+            const issueNumbers = new Set();
 
-            // Fallback: tìm từ branch name: claude/implement-issue-4-T49ZM
-            const branchMatch = branch.match(/issue-(\d+)/);
+            // Body: tìm "closes/fixes/resolves" rồi gom tất cả #N theo sau
+            // (cho phép cách nhau bởi dấu phẩy, "and", "&", khoảng trắng)
+            const closeRegex = /(?:closes|fixes|resolves)\b[\s:]*((?:#\d+(?:\s*(?:,|and|&)\s*#?\d+)*))/gi;
+            let m;
+            while ((m = closeRegex.exec(body)) !== null) {
+              const nums = m[1].match(/\d+/g) || [];
+              nums.forEach(n => issueNumbers.add(parseInt(n, 10)));
+            }
 
-            const issueNumber = bodyMatch?.[1] || branchMatch?.[1] || '';
+            // Branch: bắt cả `issue-N` (số ít) và `issues-N-N-...` (số nhiều)
+            const branchRegex = /issues?[-_](\d+(?:[-_]\d+)*)/i;
+            const bm = branch.match(branchRegex);
+            if (bm) {
+              (bm[1].match(/\d+/g) || []).forEach(n => issueNumbers.add(parseInt(n, 10)));
+            }
 
-            core.setOutput('issue_number', issueNumber);
+            const list = [...issueNumbers].sort((a, b) => a - b);
+            core.setOutput('issue_numbers', list.join(','));
 
-            if (issueNumber) {
-              console.log(`Found issue #${issueNumber} linked to PR #${context.payload.pull_request.number}`);
+            if (list.length > 0) {
+              console.log(`Found issues [${list.join(', ')}] linked to PR #${context.payload.pull_request.number}`);
             } else {
               console.log('No linked issue found — skipping');
             }
 
       # -------------------------------------------------------
-      # BƯỚC 2: Chuyển Issue sang "Done" trên Project board
+      # BƯỚC 2: Move TẤT CẢ issue đã link sang Done trên Project board
+      #         + đóng issue trên GitHub nếu chưa đóng (branch-only refs
+      #         không tự đóng issue như "Closes #N" làm)
       # -------------------------------------------------------
-      - name: Move issue to Done
-        if: steps.extract.outputs.issue_number != ''
+      - name: Move issues to Done and close
+        if: steps.extract.outputs.issue_numbers != ''
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
-            const issueNumber = parseInt('${{ steps.extract.outputs.issue_number }}');
+            const issueNumbers = '${{ steps.extract.outputs.issue_numbers }}'
+              .split(',')
+              .map(n => parseInt(n, 10))
+              .filter(n => !Number.isNaN(n));
+
             const projectNumber = 4;
             const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-            // Lấy Project ID và field Status
+            // Lấy Project ID + field Status (chỉ query 1 lần)
             const projectQuery = await github.graphql(`
               query($owner: String!, $number: Int!) {
                 user(login: $owner) {
@@ -66,10 +88,7 @@ jobs:
                         ... on ProjectV2SingleSelectField {
                           id
                           name
-                          options {
-                            id
-                            name
-                          }
+                          options { id name }
                         }
                       }
                     }
@@ -80,7 +99,6 @@ jobs:
 
             const project = projectQuery.user.projectV2;
             const projectId = project.id;
-
             const statusField = project.fields.nodes.find(f => f.name === 'Status');
             const doneOption = statusField?.options?.find(o => o.name === 'Done');
 
@@ -89,49 +107,70 @@ jobs:
               return;
             }
 
-            // Lấy item ID của issue trong project
-            const issueQuery = await github.graphql(`
-              query($owner: String!, $repo: String!, $issue: Int!) {
-                repository(owner: $owner, name: $repo) {
-                  issue(number: $issue) {
-                    projectItems(first: 10) {
-                      nodes {
-                        id
-                        project {
-                          id
+            for (const issueNumber of issueNumbers) {
+              try {
+                // 1) Move trên project board
+                const issueQuery = await github.graphql(`
+                  query($owner: String!, $repo: String!, $issue: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $issue) {
+                        state
+                        projectItems(first: 10) {
+                          nodes {
+                            id
+                            project { id }
+                          }
                         }
                       }
                     }
                   }
+                `, { owner, repo, issue: issueNumber });
+
+                const issue = issueQuery.repository.issue;
+                if (!issue) {
+                  core.warning(`Issue #${issueNumber} not found — skipping`);
+                  continue;
                 }
+
+                const projectItem = issue.projectItems.nodes
+                  .find(item => item.project.id === projectId);
+
+                if (projectItem) {
+                  await github.graphql(`
+                    mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                      updateProjectV2ItemFieldValue(input: {
+                        projectId: $projectId
+                        itemId: $itemId
+                        fieldId: $fieldId
+                        value: { singleSelectOptionId: $optionId }
+                      }) {
+                        projectV2Item { id }
+                      }
+                    }
+                  `, {
+                    projectId,
+                    itemId: projectItem.id,
+                    fieldId: statusField.id,
+                    optionId: doneOption.id
+                  });
+                  console.log(`✅ Issue #${issueNumber} moved to Done`);
+                } else {
+                  core.warning(`Issue #${issueNumber} not on project #${projectNumber} — skipping board move`);
+                }
+
+                // 2) Close issue nếu vẫn OPEN (GitHub chỉ tự đóng khi body có
+                //    "Closes #N"; với branch-only references thì phải đóng tay)
+                if (issue.state === 'OPEN') {
+                  await github.rest.issues.update({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    state: 'closed',
+                    state_reason: 'completed',
+                  });
+                  console.log(`✅ Issue #${issueNumber} closed`);
+                }
+              } catch (err) {
+                core.warning(`Failed to process issue #${issueNumber}: ${err.message}`);
               }
-            `, { owner, repo: context.repo.repo, issue: issueNumber });
-
-            const projectItem = issueQuery.repository.issue.projectItems.nodes
-              .find(item => item.project.id === projectId);
-
-            if (!projectItem) {
-              core.warning(`Issue #${issueNumber} not found in project #${projectNumber}`);
-              return;
             }
-
-            // Cập nhật status → Done
-            await github.graphql(`
-              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-                updateProjectV2ItemFieldValue(input: {
-                  projectId: $projectId
-                  itemId: $itemId
-                  fieldId: $fieldId
-                  value: { singleSelectOptionId: $optionId }
-                }) {
-                  projectV2Item { id }
-                }
-              }
-            `, {
-              projectId,
-              itemId: projectItem.id,
-              fieldId: statusField.id,
-              optionId: doneOption.id
-            });
-
-            console.log(`✅ Issue #${issueNumber} moved to Done`);
