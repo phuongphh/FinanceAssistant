@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
-from backend.services.chart_service import ASSET_TYPE_CONFIG, render_donut_chart
+from backend.services.chart_generator import generate_portfolio_chart
+from backend.services.chart_service import ASSET_TYPE_CONFIG
 from backend.services.portfolio_service import _compute_asset_fields, list_assets
 from backend.ports.notifier import get_notifier
 
@@ -125,15 +126,20 @@ async def build_morning_report(
     now = datetime.now()
     timestamp = now.strftime("%H:%M %d/%m/%Y")
 
-    # Render chart
-    chart_bytes = render_donut_chart(
-        allocation=allocation_pct,
-        allocation_values=allocation_values,
-        total_value=total_value,
-        change_pct=change_pct,
-        net_worth=total_value,  # No liabilities tracking yet
-        timestamp=timestamp,
-    )
+    # Render chart via new generator (fallback to None on failure)
+    assets_data = [
+        {"asset_type": t, "value": v}
+        for t, v in allocation_values.items()
+    ]
+    try:
+        chart_bytes = generate_portfolio_chart(
+            assets_data,
+            change_pct=change_pct,
+            timestamp=timestamp,
+        )
+    except Exception:
+        logger.exception("Chart generation failed for user %s — will send text only", user_id)
+        chart_bytes = None
 
     # Build text summary
     text = _build_text_summary(
@@ -143,7 +149,7 @@ async def build_morning_report(
         change_pct=change_pct,
     )
 
-    return chart_bytes, text, True
+    return chart_bytes, text, True  # chart_bytes may be None if rendering failed
 
 
 def _build_text_summary(
@@ -224,31 +230,37 @@ async def send_morning_report(
     chart_bytes, text_summary, has_assets = await build_morning_report(db, user.id)
 
     if not has_assets:
-        # Send encouraging message instead of empty chart
         await notifier.send_message(chat_id, _build_no_assets_message())
         return True
 
     greeting = _build_greeting()
 
-    # Send chart with greeting as caption
-    caption = f"{greeting}\n\n{text_summary}"
-
-    # Telegram caption limit is 1024 chars; if too long, send separately
-    if len(caption) > 1024:
-        await notifier.send_message(chat_id, greeting)
-        await notifier.send_photo(chat_id, chart_bytes, caption="")
+    if chart_bytes is None:
+        # Chart failed — send text-only fallback
         await notifier.send_message(
             chat_id,
-            text_summary,
+            f"{greeting}\n\n{text_summary}",
             reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
         )
     else:
-        await notifier.send_photo(
-            chat_id,
-            chart_bytes,
-            caption=caption,
-            reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
-        )
+        # Send chart with greeting as caption
+        caption = f"{greeting}\n\n{text_summary}"
+        # Telegram caption limit is 1024 chars; if too long, send separately
+        if len(caption) > 1024:
+            await notifier.send_message(chat_id, greeting)
+            await notifier.send_photo(chat_id, chart_bytes, caption="")
+            await notifier.send_message(
+                chat_id,
+                text_summary,
+                reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
+            )
+        else:
+            await notifier.send_photo(
+                chat_id,
+                chart_bytes,
+                caption=caption,
+                reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
+            )
 
     logger.info("Morning report sent to user %s (telegram: %s)", user.id, chat_id)
     return True

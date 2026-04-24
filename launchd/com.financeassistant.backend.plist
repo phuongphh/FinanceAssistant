@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.financeassistant.backend</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/phanphuong/FinanceAssistant/venv/bin/uvicorn</string>
+        <string>backend.main:app</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>8000</string>
+        <string>--workers</string>
+        <string>1</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/phanphuong/FinanceAssistant</string>
+
+    <!-- Restart automatically if the process exits for any reason -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/phanphuong/FinanceAssistant/backend.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/phanphuong/FinanceAssistant/backend.error.log</string>
+
+    <!-- Throttle restart to avoid a tight crash loop -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>
