@@ -1,36 +1,51 @@
 #!/usr/bin/env bash
-# Installs the Finance Assistant backend as a launchd service.
+# Installs Finance Assistant backend + scheduler as launchd services.
 # Run once after cloning; re-run to update after template changes.
+#
+# Optional env vars:
+#   PROJECT_DIR  — defaults to the repo root (parent of this script)
+#   PORT         — uvicorn port (default: 8000)
 set -euo pipefail
 
-LABEL="com.financeassistant.backend"
 TEMPLATE_DIR="$(cd "$(dirname "$0")/../launchd" && pwd)"
-TEMPLATE="$TEMPLATE_DIR/$LABEL.plist.template"
 AGENTS_DIR="$HOME/Library/LaunchAgents"
-DEST="$AGENTS_DIR/$LABEL.plist"
 
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 PORT="${PORT:-8000}"
 
-if [[ ! -f "$TEMPLATE" ]]; then
-    echo "ERROR: template not found at $TEMPLATE" >&2
-    exit 1
-fi
-
 mkdir -p "$AGENTS_DIR"
 
-sed \
-    -e "s|{{PROJECT_DIR}}|$PROJECT_DIR|g" \
-    -e "s|{{PORT}}|$PORT|g" \
-    "$TEMPLATE" > "$DEST"
+install_service() {
+    local label="$1"
+    local template="$TEMPLATE_DIR/$label.plist.template"
+    local dest="$AGENTS_DIR/$label.plist"
 
-echo "Installed: $DEST"
-echo "  PROJECT_DIR = $PROJECT_DIR"
-echo "  PORT        = $PORT"
+    if [[ ! -f "$template" ]]; then
+        echo "ERROR: template not found at $template" >&2
+        return 1
+    fi
 
-# Reload if already loaded
-if launchctl list "$LABEL" &>/dev/null; then
-    launchctl unload "$DEST"
-fi
-launchctl load "$DEST"
-echo "Loaded: $LABEL"
+    sed \
+        -e "s|{{PROJECT_DIR}}|$PROJECT_DIR|g" \
+        -e "s|{{PORT}}|$PORT|g" \
+        "$template" > "$dest"
+
+    echo "Installed: $dest"
+
+    if launchctl list "$label" &>/dev/null; then
+        launchctl unload "$dest"
+    fi
+    launchctl load "$dest"
+    echo "Loaded:    $label"
+}
+
+echo "PROJECT_DIR = $PROJECT_DIR"
+echo "PORT        = $PORT"
+echo ""
+
+install_service "com.financeassistant.backend"
+install_service "com.financeassistant.scheduler"
+
+echo ""
+echo "Both services are running. Check status with:"
+echo "  launchctl list | grep financeassistant"

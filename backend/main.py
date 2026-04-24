@@ -2,14 +2,12 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from backend.config import get_settings
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
-from backend.scheduler import register_jobs
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
 logger = logging.getLogger(__name__)
@@ -25,14 +23,9 @@ SHUTDOWN_TASK_GRACE_SECONDS = 30
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Embed the scheduler in the app process so there is no separate
-    # process to keep alive. Run uvicorn with a single worker (--workers 1)
-    # to avoid duplicate cron fires; Phase 1 will move to Celery workers.
-    scheduler = AsyncIOScheduler()
-    register_jobs(scheduler)
-    scheduler.start()
-    logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
-
+    # Scheduled jobs run in a separate process — see backend/scheduler.py.
+    # Keeping them out of the web server prevents duplicate cron fires when
+    # more than one uvicorn worker is running.
     logger.info("Finance Assistant API starting up")
 
     # Pick up any telegram_updates that were mid-flight when the previous
@@ -55,7 +48,6 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        scheduler.shutdown(wait=False)
         recovery_task.cancel()
         try:
             await recovery_task

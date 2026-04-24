@@ -137,7 +137,7 @@ async def build_morning_report(
             change_pct=change_pct,
             timestamp=timestamp,
         )
-    except Exception:
+    except (ValueError, RuntimeError, OSError):
         logger.exception("Chart generation failed for user %s — will send text only", user_id)
         chart_bytes = None
 
