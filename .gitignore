@@ -40,6 +40,9 @@ htmlcov/
 # Alembic
 alembic/versions/__pycache__/
 
+# launchd — generated plists are machine-specific; only track the template
+launchd/*.plist
+
 # Cloudflare Tunnel — credentials contain secret tunnel token
 .cloudflared/*.json
 .cloudflared/config.yml

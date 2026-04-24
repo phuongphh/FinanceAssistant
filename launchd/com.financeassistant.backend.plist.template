@@ -7,18 +7,18 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/phanphuong/FinanceAssistant/venv/bin/uvicorn</string>
+        <string>{{PROJECT_DIR}}/venv/bin/uvicorn</string>
         <string>backend.main:app</string>
         <string>--host</string>
         <string>0.0.0.0</string>
         <string>--port</string>
-        <string>8000</string>
+        <string>{{PORT}}</string>
         <string>--workers</string>
         <string>1</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/phanphuong/FinanceAssistant</string>
+    <string>{{PROJECT_DIR}}</string>
 
     <!-- Restart automatically if the process exits for any reason -->
     <key>KeepAlive</key>
@@ -28,10 +28,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/phanphuong/FinanceAssistant/backend.log</string>
+    <string>{{PROJECT_DIR}}/backend.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/phanphuong/FinanceAssistant/backend.error.log</string>
+    <string>{{PROJECT_DIR}}/backend.error.log</string>
 
     <!-- Throttle restart to avoid a tight crash loop -->
     <key>ThrottleInterval</key>
