@@ -52,6 +52,15 @@ docs/
 │   ├── phase-3a-detailed.md               ← Current focus
 │   ├── phase-3a-issues.md                 ← GitHub-ready issues
 │   └── phase-3b-outline.md
+├── issues/                                ← Per-issue snapshots
+│   ├── README.md                          ← Issues index + navigation
+│   ├── active/                            ← Currently open issues
+│   └── closed/
+│       ├── INDEX.md                       ← issue# → phase → title
+│       └── by-phase/
+│           ├── pre-phase/                 ← V1 features
+│           ├── phase-1/                   ← Phase 1 closed issues
+│           └── phase-2/                   ← Phase 2 closed issues
 └── archive/                               ← Historical (don't delete!)
     ├── MIGRATION_NOTES.md
     └── v1-finance-assistant/
