@@ -14,5 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #71 | [P3A-13] Implement daily_snapshot_job.py (23:59 auto-snapshot) | [issue-71.md](issue-71.md) |
 | #73 | [P3A-15] Analytics tracking for morning briefing events | [issue-73.md](issue-73.md) |
 | #75 | [P3A-17] Write & test storytelling LLM prompt (accuracy ≥80%) | [issue-75.md](issue-75.md) |
+| #77 | [P3A-19] Build storytelling confirmation UI with inline actions | [issue-77.md](issue-77.md) |
 
-**Total active:** 10
+**Total active:** 11
