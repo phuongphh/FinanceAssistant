@@ -4,7 +4,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 
 | Issue # | Title | File |
 |---------|-------|------|
-| #62 | [P3A-4] Build NetWorthCalculator | [issue-62.md](issue-62.md) |
 | #64 | [P3A-6] Build Asset Entry Wizard: Cash flow | [issue-64.md](issue-64.md) |
 | #67 | [P3A-9] Integrate first asset step into onboarding | [issue-67.md](issue-67.md) |
 | #68 | [P3A-10] Create briefing_templates.yaml (4 wealth levels) | [issue-68.md](issue-68.md) |
@@ -20,4 +19,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #83 | [P3A-25] User testing protocol — 7 users, 7 days validation | [issue-83.md](issue-83.md) |
 | #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |
 
-**Total active:** 15
+**Total active:** 14

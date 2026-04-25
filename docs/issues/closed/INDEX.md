@@ -28,6 +28,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #59 | Pre-Phase | [P3A-1] Create database migrations for assets, snapshots, income_streams | [pre-phase/issue-59.md](by-phase/pre-phase/issue-59.md) |
 | #60 | Pre-Phase | [P3A-2] Implement Asset + AssetSnapshot + IncomeStream models | [pre-phase/issue-60.md](by-phase/pre-phase/issue-60.md) |
 | #61 | Pre-Phase | [P3A-3] Build AssetService (CRUD + soft delete) | [pre-phase/issue-61.md](by-phase/pre-phase/issue-61.md) |
+| #62 | Pre-Phase | [P3A-4] Build NetWorthCalculator | [pre-phase/issue-62.md](by-phase/pre-phase/issue-62.md) |
 
-**Total:** 24 closed issues
-(7 Phase 1, 9 Phase 2, 8 Pre-Phase)
+**Total:** 25 closed issues
+(7 Phase 1, 9 Phase 2, 9 Pre-Phase)
