@@ -33,6 +33,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #64 | Pre-Phase | [P3A-6] Build Asset Entry Wizard: Cash flow | [pre-phase/issue-64.md](by-phase/pre-phase/issue-64.md) |
 | #65 | Pre-Phase | [P3A-7] Build Asset Entry Wizard: Stock flow | [pre-phase/issue-65.md](by-phase/pre-phase/issue-65.md) |
 | #66 | Pre-Phase | [P3A-8] Build Asset Entry Wizard: Real Estate flow | [pre-phase/issue-66.md](by-phase/pre-phase/issue-66.md) |
+| #67 | Pre-Phase | [P3A-9] Integrate first asset step into onboarding | [pre-phase/issue-67.md](by-phase/pre-phase/issue-67.md) |
 
-**Total:** 29 closed issues
-(7 Phase 1, 9 Phase 2, 13 Pre-Phase)
+**Total:** 30 closed issues
+(7 Phase 1, 9 Phase 2, 14 Pre-Phase)
