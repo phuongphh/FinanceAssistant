@@ -63,12 +63,16 @@ class TestIsValidGoalCode:
 
 class TestOnboardingFlow:
     def test_steps_have_expected_values(self):
+        # Phase 3A added AHA_MOMENT (5) and FIRST_ASSET (6) between
+        # FIRST_TRANSACTION and COMPLETED — see P3A-9.
         assert OnboardingStep.NOT_STARTED == 0
         assert OnboardingStep.WELCOME == 1
         assert OnboardingStep.ASKING_NAME == 2
         assert OnboardingStep.ASKING_GOAL == 3
         assert OnboardingStep.FIRST_TRANSACTION == 4
-        assert OnboardingStep.COMPLETED == 5
+        assert OnboardingStep.AHA_MOMENT == 5
+        assert OnboardingStep.FIRST_ASSET == 6
+        assert OnboardingStep.COMPLETED == 7
 
     def test_each_goal_has_personalised_response(self):
         for code in PRIMARY_GOALS:
@@ -115,19 +119,21 @@ class TestKeyboards:
 @pytest.mark.asyncio
 class TestStep5AhaAdvancesState:
     """After step 5 fires, the user must no longer be in
-    FIRST_TRANSACTION so a second expense does not re-trigger the
-    aha moment or duplicate funnel events.
+    FIRST_TRANSACTION so a second expense does not re-trigger the aha
+    moment or duplicate funnel events. Phase 3A: instead of marking
+    onboarding complete, step 5 parks the user at AHA_MOMENT until they
+    tap 🚀 → step 6 (first asset).
     """
 
     @patch(
-        "backend.bot.handlers.onboarding.onboarding_service.mark_completed",
+        "backend.bot.handlers.onboarding.onboarding_service.set_step",
         new_callable=AsyncMock,
     )
     @patch(
         "backend.bot.handlers.onboarding.send_message",
         new_callable=AsyncMock,
     )
-    async def test_step_5_marks_user_completed(self, _send, mark_completed):
+    async def test_step_5_parks_user_at_aha_moment(self, _send, set_step):
         from backend.bot.handlers.onboarding import step_5_aha_moment
         from datetime import datetime, timezone
         user = MagicMock()
@@ -137,7 +143,8 @@ class TestStep5AhaAdvancesState:
         user.onboarding_completed_at = None
 
         await step_5_aha_moment(db=MagicMock(), chat_id=111, user=user)
-        mark_completed.assert_awaited_once()
+        set_step.assert_awaited_once()
+        assert set_step.await_args.args[2] == OnboardingStep.AHA_MOMENT
 
 
 @pytest.mark.asyncio

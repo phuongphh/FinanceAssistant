@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, Numeric, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, Numeric, String, Time
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
@@ -38,6 +38,26 @@ class User(Base):
     onboarding_skipped: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
+    onboarding_skipped_asset: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
+    # Phase 3A — Wealth foundation
+    primary_currency: Mapped[str] = mapped_column(String(3), default="VND", nullable=False)
+    wealth_level: Mapped[str | None] = mapped_column(String(20))
+    expense_threshold_micro: Mapped[int] = mapped_column(
+        Integer, default=200_000, nullable=False
+    )
+    expense_threshold_major: Mapped[int] = mapped_column(
+        Integer, default=2_000_000, nullable=False
+    )
+    briefing_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    briefing_time: Mapped[time] = mapped_column(
+        Time, default=time(7, 0), nullable=False
+    )
+    # Multi-step wizard scratch space (asset entry etc).
+    # Shape: {"flow": "asset_add_cash", "step": "amount", "draft": {...}}
+    wizard_state: Mapped[dict | None] = mapped_column(JSONB)
 
     @property
     def is_onboarded(self) -> bool:
