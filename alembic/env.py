@@ -14,6 +14,9 @@ from backend.models import (  # noqa: F401 — ensure all models are registered
     PortfolioAsset, IncomeRecord, Event,
     UserMilestone, UserStreak,
 )
+from backend.wealth.models import (  # noqa: F401 — register Phase 3A wealth models
+    Asset, AssetSnapshot, IncomeStream,
+)
 
 config = context.config
 

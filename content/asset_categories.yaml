@@ -1,0 +1,77 @@
+# Asset categories — single source of truth for asset_type, subtypes,
+# icons, and display labels. Loaded by `backend/wealth/asset_types.py`
+# and `backend/bot/keyboards/asset_keyboard.py`.
+#
+# Reference: docs/current/phase-3a-detailed.md § 1.2
+
+asset_types:
+  cash:
+    icon: "💵"
+    label_vi: "Tiền mặt & Tài khoản"
+    color: "#10B981"
+    subtypes:
+      bank_savings: "Tiết kiệm ngân hàng"
+      bank_checking: "Tài khoản thanh toán"
+      cash: "Tiền mặt"
+      e_wallet: "Ví điện tử (MoMo, ZaloPay)"
+    required_fields: [name, initial_value]
+    optional_fields: [bank_name, interest_rate]
+
+  stock:
+    icon: "📈"
+    label_vi: "Chứng khoán"
+    color: "#3B82F6"
+    subtypes:
+      vn_stock: "Cổ phiếu VN (HOSE/HNX)"
+      fund: "Quỹ mở (VCBF, Dragon Capital...)"
+      etf: "ETF (E1VFVN30...)"
+      foreign_stock: "Cổ phiếu nước ngoài"
+    required_fields: [ticker, quantity, avg_price]
+    optional_fields: [broker, exchange]
+
+  real_estate:
+    icon: "🏠"
+    label_vi: "Bất động sản"
+    color: "#F59E0B"
+    subtypes:
+      house_primary: "Nhà ở (không sinh lợi)"
+      land: "Đất (đầu tư)"
+      # Note: rental property (Case B) sẽ được add ở Phase 4
+    required_fields: [name, initial_value, current_value]
+    optional_fields: [address, area_sqm, year_built]
+
+  crypto:
+    icon: "₿"
+    label_vi: "Tiền số"
+    color: "#8B5CF6"
+    subtypes:
+      bitcoin: "BTC"
+      ethereum: "ETH"
+      stablecoin: "USDT/USDC"
+      altcoin: "Coin khác"
+    required_fields: [symbol, quantity]
+    optional_fields: [wallet, exchange]
+
+  gold:
+    icon: "🥇"
+    label_vi: "Vàng"
+    color: "#EAB308"
+    subtypes:
+      sjc: "Vàng SJC"
+      pnj: "Vàng PNJ"
+      nhan: "Vàng nhẫn"
+      trang_suc: "Trang sức"
+    required_fields: [weight_gram, initial_value]
+    optional_fields: [purity]
+
+  other:
+    icon: "📦"
+    label_vi: "Khác"
+    color: "#6B7280"
+    subtypes:
+      vehicle: "Xe cộ"
+      collection: "Đồ sưu tầm"
+      business: "Kinh doanh"
+      other: "Khác"
+    required_fields: [name, initial_value]
+    optional_fields: []
