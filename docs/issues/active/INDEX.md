@@ -9,5 +9,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #64 | [P3A-6] Build Asset Entry Wizard: Cash flow | [issue-64.md](issue-64.md) |
 | #67 | [P3A-9] Integrate first asset step into onboarding | [issue-67.md](issue-67.md) |
 | #68 | [P3A-10] Create briefing_templates.yaml (4 wealth levels) | [issue-68.md](issue-68.md) |
+| #69 | [P3A-11] Build BriefingFormatter (ladder-aware, personalized) | [issue-69.md](issue-69.md) |
 
-**Total active:** 5
+**Total active:** 6
