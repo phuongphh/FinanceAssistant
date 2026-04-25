@@ -25,6 +25,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #43 | Phase 2 | [Phase 2 - Week 3] Seasonal Content — Vietnam Events Calendar | [phase-2/issue-43.md](by-phase/phase-2/issue-43.md) |
 | #44 | Phase 2 | [Phase 2 - Week 3] Weekly Goal Reminder Based on Onboarding Goal | [phase-2/issue-44.md](by-phase/phase-2/issue-44.md) |
 | #45 | Phase 2 | [Phase 2] Exit Criteria Checklist — Gate before Phase 3 | [phase-2/issue-45.md](by-phase/phase-2/issue-45.md) |
+| #59 | Pre-Phase | [P3A-1] Create database migrations for assets, snapshots, income_streams | [pre-phase/issue-59.md](by-phase/pre-phase/issue-59.md) |
 
-**Total:** 21 closed issues
-(7 Phase 1, 9 Phase 2, 5 Pre-Phase)
+**Total:** 22 closed issues
+(7 Phase 1, 9 Phase 2, 6 Pre-Phase)

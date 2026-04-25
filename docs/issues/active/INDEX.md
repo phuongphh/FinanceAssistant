@@ -21,4 +21,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #83 | [P3A-25] User testing protocol — 7 users, 7 days validation | [issue-83.md](issue-83.md) |
 | #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |
 
-**Total active:** 15
+**Total active:** 16
