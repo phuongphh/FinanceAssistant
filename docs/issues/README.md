@@ -9,16 +9,25 @@ Lưu trữ chi tiết các GitHub issues của Personal CFO Assistant theo phase
 ```
 docs/issues/
 ├── README.md                    ← You are here
-├── active/                      ← Currently open issues (work-in-progress)
+├── active/
+│   ├── INDEX.md                 ← Auto-generated list of open issues
+│   └── issue-<N>.md             ← One file per open issue
 └── closed/
-    ├── INDEX.md                 ← Table tổng: issue# → phase → title
+    ├── INDEX.md                 ← Auto-generated: issue# → phase → title
     └── by-phase/
         ├── pre-phase/           ← V1 features (trước khi có cấu trúc phase)
         ├── phase-1/             ← Phase 1: UX Foundation
-        └── phase-2/             ← Phase 2: Personality & Care
+        ├── phase-2/             ← Phase 2: Personality & Care
+        └── phase-3a/            ← Phase 3A: Wealth Foundation (created on first close)
 ```
 
-> **Quy ước:** Khi 1 issue được close trên GitHub, file của nó được move từ `active/` sang `closed/by-phase/<phase>/` và update vào [`closed/INDEX.md`](closed/INDEX.md).
+> **Tự động hoá:** `.github/workflows/issue-lifecycle.yml` sync mọi GitHub issue event:
+> - `opened` / `edited` → ghi `active/issue-<N>.md`
+> - `closed` → move sang `closed/by-phase/<phase>/`
+> - `reopened` → move ngược về `active/`
+> - `labeled` / `unlabeled` → re-check phase, di chuyển file nếu phase thay đổi
+>
+> Cả hai `INDEX.md` được regenerate tự động sau mỗi event.
 
 ---
 
@@ -36,9 +45,18 @@ docs/issues/
 
 ## 🔍 Tìm 1 issue cụ thể
 
-- Theo **số issue**: xem [`closed/INDEX.md`](closed/INDEX.md) — table tra cứu issue# → phase → title.
-- Theo **phase**: vào folder phase tương ứng trong `closed/by-phase/`.
-- **Active** issues: file trong `active/`. Sau khi close, file được move sang `closed/by-phase/<phase>/`.
+- **Open issues:** [`active/INDEX.md`](active/INDEX.md)
+- **Closed issues (theo số):** [`closed/INDEX.md`](closed/INDEX.md) — tra cứu issue# → phase → title
+- **Theo phase:** vào folder phase tương ứng trong `closed/by-phase/`
+
+## 🤖 Phase detection rules
+
+Khi sync, phase được xác định theo thứ tự:
+1. Label `phase-<N>` trên issue (ví dụ `phase-3a`)
+2. Title prefix dạng `[Phase 3A - ...]`
+3. Fallback → `pre-phase`
+
+Nếu bạn muốn override, add label `phase-<N>` vào issue.
 
 ---
 

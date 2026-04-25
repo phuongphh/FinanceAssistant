@@ -1,11 +1,11 @@
 # Closed Issues — Master Index
 
-Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
+Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending. File được auto-sync bởi `.github/workflows/issue-lifecycle.yml`.
 
 | Issue # | Phase | Title | File |
 |---------|-------|-------|------|
-| #7  | Pre-Phase | [Feature] /menu command — Display all available bot commands | [pre-phase/issue-7.md](by-phase/pre-phase/issue-7.md) |
-| #11 | Pre-Phase | [Feature] Automated Gmail Expense Sync — Hourly Auto-Sync & Manual Trigger *(deprecated in V2)* | [pre-phase/issue-11.md](by-phase/pre-phase/issue-11.md) |
+| #7 | Pre-Phase | [Feature] /menu command - Display all available bot commands | [pre-phase/issue-7.md](by-phase/pre-phase/issue-7.md) |
+| #11 | Pre-Phase | [Feature] Automated Gmail Expense Sync — Hourly Auto-Sync & Manual Trigger | [pre-phase/issue-11.md](by-phase/pre-phase/issue-11.md) |
 | #14 | Pre-Phase | [Feature] Investment Portfolio Management & Income Tracking | [pre-phase/issue-14.md](by-phase/pre-phase/issue-14.md) |
 | #17 | Pre-Phase | [Feature] Daily Morning Report — 7AM Asset Portfolio Summary with Pie Chart | [pre-phase/issue-17.md](by-phase/pre-phase/issue-17.md) |
 | #19 | Pre-Phase | [Feature] Persistent Navigation — Back to Main Menu after Every Action | [pre-phase/issue-19.md](by-phase/pre-phase/issue-19.md) |
@@ -26,8 +26,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #44 | Phase 2 | [Phase 2 - Week 3] Weekly Goal Reminder Based on Onboarding Goal | [phase-2/issue-44.md](by-phase/phase-2/issue-44.md) |
 | #45 | Phase 2 | [Phase 2] Exit Criteria Checklist — Gate before Phase 3 | [phase-2/issue-45.md](by-phase/phase-2/issue-45.md) |
 
----
-
-**Total:** 21 closed issues (5 Pre-Phase, 7 Phase 1, 9 Phase 2)
-
-> Khi close 1 issue mới: thêm row vào bảng trên + move file từ `../active/` sang folder phase tương ứng.
+**Total:** 21 closed issues
+(7 Phase 1, 9 Phase 2, 5 Pre-Phase)

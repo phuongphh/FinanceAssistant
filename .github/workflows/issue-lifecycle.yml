@@ -1,0 +1,59 @@
+name: Issue Lifecycle Sync
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-lifecycle-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync issue file and regenerate indexes
+        run: node .github/scripts/issue-lifecycle.js
+
+      - name: Commit and push to main
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ACTION: ${{ github.event.action }}
+          STATE: ${{ github.event.issue.state }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          # Pull latest to avoid non-fast-forward when multiple events fire close together
+          git pull --rebase origin main || true
+
+          git add docs/issues/
+          if git diff --cached --quiet; then
+            echo "No changes to commit — docs/issues already up to date"
+            exit 0
+          fi
+
+          git commit -m "docs(issues): sync #${ISSUE_NUMBER} (${ACTION}, state=${STATE})"
+
+          # Push with retry (network flakiness)
+          for i in 1 2 3 4; do
+            if git push origin main; then
+              exit 0
+            fi
+            echo "Push attempt $i failed, retrying..."
+            git pull --rebase origin main || true
+            sleep $((2 ** i))
+          done
+          echo "Push failed after 4 attempts"
+          exit 1
