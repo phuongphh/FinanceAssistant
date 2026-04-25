@@ -15,5 +15,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #73 | [P3A-15] Analytics tracking for morning briefing events | [issue-73.md](issue-73.md) |
 | #75 | [P3A-17] Write & test storytelling LLM prompt (accuracy ≥80%) | [issue-75.md](issue-75.md) |
 | #77 | [P3A-19] Build storytelling confirmation UI with inline actions | [issue-77.md](issue-77.md) |
+| #78 | [P3A-20] Integrate storytelling with briefing keyboard | [issue-78.md](issue-78.md) |
 
-**Total active:** 11
+**Total active:** 12
