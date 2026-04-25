@@ -29,6 +29,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #60 | Pre-Phase | [P3A-2] Implement Asset + AssetSnapshot + IncomeStream models | [pre-phase/issue-60.md](by-phase/pre-phase/issue-60.md) |
 | #61 | Pre-Phase | [P3A-3] Build AssetService (CRUD + soft delete) | [pre-phase/issue-61.md](by-phase/pre-phase/issue-61.md) |
 | #62 | Pre-Phase | [P3A-4] Build NetWorthCalculator | [pre-phase/issue-62.md](by-phase/pre-phase/issue-62.md) |
+| #63 | Pre-Phase | [P3A-5] Implement Wealth Level detection (Ladder) | [pre-phase/issue-63.md](by-phase/pre-phase/issue-63.md) |
 
-**Total:** 25 closed issues
-(7 Phase 1, 9 Phase 2, 9 Pre-Phase)
+**Total:** 26 closed issues
+(7 Phase 1, 9 Phase 2, 10 Pre-Phase)
