@@ -54,6 +54,7 @@ async def route_update(data: dict) -> None:
     # Imports are local to avoid a module-import cycle with routers/
     # and to keep worker startup cheap (handlers pull in Telegram SDK
     # HTTP clients which open sockets on import).
+    from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
     from backend.bot.handlers.message import (
@@ -80,6 +81,7 @@ async def route_update(data: dict) -> None:
                 user_id = await _handle_message(
                     db, message,
                     onboarding_handlers=onboarding_handlers,
+                    asset_entry_handlers=asset_entry_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
@@ -93,6 +95,7 @@ async def route_update(data: dict) -> None:
                     user_id = await _handle_callback(
                         db, callback_query,
                         onboarding_handlers=onboarding_handlers,
+                        asset_entry_handlers=asset_entry_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_report_callback=handle_report_callback,
@@ -120,6 +123,7 @@ async def _handle_message(
     message: dict,
     *,
     onboarding_handlers,
+    asset_entry_handlers,
     dashboard_service,
     handle_report_command,
     handle_text_message,
@@ -190,6 +194,15 @@ async def _handle_message(
             db, telegram_id
         )
 
+    # /assets — open the asset-entry wizard (Phase 3A).
+    if command in ("/assets", "/asset", "/themtaisan"):
+        if resolved_user is not None:
+            await asset_entry_handlers.start_asset_wizard(
+                db, chat_id, resolved_user
+            )
+            return resolved_user.id
+        return None
+
     # Plain text during the onboarding name step must be consumed here —
     # otherwise the NL expense parser would try to parse the user's name
     # as a transaction.
@@ -205,6 +218,21 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+    # Asset-entry wizard mid-flow text input — must be consumed before
+    # the NL expense parser tries to interpret "VCB 100 triệu" as a
+    # transaction.
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+        and resolved_user.wizard_state
+    ):
+        consumed = await asset_entry_handlers.handle_asset_text_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+
     # Natural-language message → NL expense parser / report intent / menu fallback.
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
@@ -215,6 +243,7 @@ async def _handle_callback(
     callback_query: dict,
     *,
     onboarding_handlers,
+    asset_entry_handlers,
     dashboard_service,
     handle_transaction_callback,
     handle_report_callback,
@@ -240,6 +269,10 @@ async def _handle_callback(
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
     if await onboarding_handlers.handle_onboarding_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Asset-entry wizard callbacks (asset_add:*).
+    if await asset_entry_handlers.handle_asset_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Transaction callbacks handle their own answerCallbackQuery so users

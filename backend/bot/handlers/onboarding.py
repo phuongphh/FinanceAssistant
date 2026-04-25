@@ -43,6 +43,9 @@ class OnboardingEvent:
     STEP_4_FIRST_TX_INVITED = "onboarding_step_4_first_tx_invited"
     STEP_4_FIRST_TX_LOGGED = "onboarding_step_4_completed"
     STEP_5_AHA_SHOWN = "onboarding_step_5_aha_shown"
+    STEP_6_FIRST_ASSET_INVITED = "onboarding_step_6_first_asset_invited"
+    FIRST_ASSET_ADDED = "first_asset_added"
+    FIRST_ASSET_SKIPPED = "first_asset_skipped"
     COMPLETED = "onboarding_completed"
     SKIPPED = "onboarding_skipped"
 
@@ -72,6 +75,36 @@ def _completion_keyboard() -> dict:
         "inline_keyboard": [[
             {"text": "🚀 Bắt đầu", "callback_data": "onboarding:complete"},
         ]]
+    }
+
+
+def _first_asset_keyboard() -> dict:
+    """Step 6 — choose how to add the first asset (or skip).
+
+    Phase 3A: cash is the easiest entry; invest / real-estate route to
+    their wizards directly. Skip is honest — we set
+    ``onboarding_skipped_asset`` and complete the flow so the user is
+    not blocked.
+    """
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "💵 Tiền trong NH (5 giây)",
+                "callback_data": "onboarding:first_asset:cash",
+            }],
+            [{
+                "text": "📈 Tôi có đầu tư",
+                "callback_data": "onboarding:first_asset:stock",
+            }],
+            [{
+                "text": "🏠 Tôi có BĐS",
+                "callback_data": "onboarding:first_asset:real_estate",
+            }],
+            [{
+                "text": "⏭ Skip, thêm sau",
+                "callback_data": "onboarding:first_asset:skip",
+            }],
+        ]
     }
 
 
@@ -233,9 +266,10 @@ async def step_5_aha_moment(
     """Step 5 — celebrate the first transaction, introduce 3 input modes.
 
     Called from the transaction handler AFTER the expense has been
-    saved successfully. Marks onboarding complete so logging another
-    expense before the user taps 🚀 doesn't re-fire this message or
-    duplicate the analytics events.
+    saved successfully. Phase 3A: this is no longer the terminal step —
+    the user proceeds to ``step_6_first_asset`` next. The 🚀 button
+    callback ``onboarding:complete`` now opens that step instead of
+    finishing onboarding.
     """
     name = user.get_greeting_name()
     text = (
@@ -245,8 +279,7 @@ async def step_5_aha_moment(
         "📝 Gõ text: như vừa rồi\n"
         "📸 Gửi ảnh hóa đơn: mình đọc được\n"
         "🎤 Gửi voice: mình hiểu luôn\n\n"
-        "Hoặc tap /menu bất cứ lúc nào để xem mẹo hay.\n"
-        "Sẵn sàng đi cùng mình chưa? 💪"
+        "Sẵn sàng đi tiếp chưa? 💪"
     )
     await send_message(
         chat_id=chat_id,
@@ -257,10 +290,50 @@ async def step_5_aha_moment(
     analytics.track(OnboardingEvent.STEP_4_FIRST_TX_LOGGED, user_id=user.id)
     analytics.track(OnboardingEvent.STEP_5_AHA_SHOWN, user_id=user.id)
 
-    # Transition out of FIRST_TRANSACTION so subsequent expenses don't
-    # retrigger this handler or duplicate the funnel events. The 🚀
-    # button is now a purely ceremonial acknowledgement.
-    await onboarding_service.mark_completed(db, user.id)
+    # Step out of FIRST_TRANSACTION so subsequent expenses don't
+    # retrigger this handler. AHA_MOMENT is the staging state until the
+    # user taps 🚀 and lands on step 6.
+    await onboarding_service.set_step(db, user.id, OnboardingStep.AHA_MOMENT)
+
+
+async def step_6_first_asset(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Step 6 — invite the user to add their first asset (Phase 3A).
+
+    The keyboard offers 3 fast routes (cash / stock / real-estate) plus
+    an honest skip. Skip flips ``onboarding_skipped_asset`` and
+    completes onboarding so the user isn't blocked behind an asset add.
+    """
+    name = user.get_greeting_name()
+    text = (
+        f"💎 <b>Bước cuối quan trọng {name}!</b>\n\n"
+        "Hãy thêm <b>ít nhất 1 tài sản</b> của bạn — không cần đầy đủ.\n\n"
+        "Đơn giản nhất là tiền trong ngân hàng — bao nhiêu trong TK cũng được.\n\n"
+        "Sẵn sàng chưa?"
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=_first_asset_keyboard(),
+    )
+    await onboarding_service.set_step(db, user.id, OnboardingStep.FIRST_ASSET)
+    analytics.track(OnboardingEvent.STEP_6_FIRST_ASSET_INVITED, user_id=user.id)
+
+
+async def _finalise_onboarding(
+    db: AsyncSession, user: User, *, fired_event: bool = False
+) -> None:
+    """Stamp ``onboarding_completed_at`` + fire COMPLETED once.
+
+    Used by both the asset-added bridge and the explicit skip path.
+    """
+    if user.onboarding_completed_at is not None and fired_event:
+        return
+    if user.onboarding_completed_at is None:
+        await onboarding_service.mark_completed(db, user.id)
+        user.onboarding_completed_at = datetime.now(timezone.utc)
 
     duration_seconds: float | None = None
     if user.created_at:
@@ -276,7 +349,20 @@ async def step_5_aha_moment(
             if duration_seconds is not None else {}
         ),
     )
-    user.onboarding_completed_at = datetime.now(timezone.utc)
+
+
+async def note_first_asset_added_if_needed(
+    db: AsyncSession, user: User
+) -> None:
+    """Bridge called by the asset-entry wizard after a successful add.
+
+    Only relevant if the user is on FIRST_ASSET — for everyone else this
+    is a no-op. Fires ``first_asset_added`` and finalises onboarding.
+    """
+    if user.onboarding_step != int(OnboardingStep.FIRST_ASSET):
+        return
+    analytics.track(OnboardingEvent.FIRST_ASSET_ADDED, user_id=user.id)
+    await _finalise_onboarding(db, user)
 
 
 # ---------- Completion & skip ----------------------------------------
@@ -288,47 +374,82 @@ async def complete_onboarding(
     callback_id: str,
     user: User,
 ) -> None:
-    """User taps 🚀 Bắt đầu on the final step.
+    """User taps 🚀 Bắt đầu after step 5.
 
-    Ceremonial: step 5 already marked the user complete + fired the
-    COMPLETED event, so this path only re-stamps if needed (covers
-    users who somehow reach the button without the transaction hook
-    having run) and never duplicates analytics.
+    Phase 3A: this is no longer terminal — it routes into ``step_6_first_asset``.
+    For users who somehow reach this button already past FIRST_ASSET
+    (e.g. they re-tapped the old 🚀), we just acknowledge.
     """
-    was_already_complete = user.onboarding_completed_at is not None
-    if not was_already_complete:
-        await onboarding_service.mark_completed(db, user.id)
-        duration_seconds: float | None = None
-        if user.created_at:
-            now = datetime.now(timezone.utc)
-            created = user.created_at
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
-            duration_seconds = (now - created).total_seconds()
-        analytics.track(
-            OnboardingEvent.COMPLETED,
-            user_id=user.id,
-            properties=(
-                {"duration_seconds": int(duration_seconds)}
-                if duration_seconds is not None else {}
-            ),
-        )
-
-    await answer_callback(callback_id, text="🎊 Chào mừng!")
-    name = user.get_greeting_name()
+    await answer_callback(callback_id, text="Đi tiếp nào ✨")
     try:
         await edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
-            text=(
-                f"Xong rồi! Từ giờ mình luôn ở đây 💚\n\n"
-                f"Ghi giao dịch bất cứ lúc nào bạn muốn, {name}."
-            ),
+            text="✅ Tuyệt!",
             parse_mode="HTML",
             reply_markup={"inline_keyboard": []},
         )
     except Exception:
         logger.debug("edit_message_text on completion failed", exc_info=True)
+
+    if user.onboarding_completed_at is not None:
+        # Already done — don't re-prompt for an asset.
+        return
+
+    await step_6_first_asset(db, chat_id, user)
+
+
+async def handle_first_asset_choice(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int,
+    callback_id: str,
+    user: User,
+    choice: str,
+) -> None:
+    """Step 6 callbacks: cash / stock / real_estate / skip."""
+    await answer_callback(callback_id)
+    try:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text="Đang chuẩn bị… ⏳",
+            parse_mode="HTML",
+            reply_markup={"inline_keyboard": []},
+        )
+    except Exception:
+        logger.debug("edit_message_text on first_asset choice failed", exc_info=True)
+
+    if choice == "skip":
+        user.onboarding_skipped_asset = True
+        # Service mutation goes through the model directly; finalise
+        # also flushes the skipped flag.
+        await _finalise_onboarding(db, user)
+        analytics.track(OnboardingEvent.FIRST_ASSET_SKIPPED, user_id=user.id)
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "Không sao, bạn có thể thêm sau bất cứ lúc nào 🙂\n"
+                "Gõ /menu để xem các tính năng."
+            ),
+        )
+        return
+
+    # Route into the asset-entry wizard for the chosen type.
+    # Lazy import keeps this handler decoupled from the wizard module
+    # (avoids circular import — wizard imports back into onboarding).
+    from backend.bot.handlers import asset_entry
+
+    starters = {
+        "cash": asset_entry._start_cash_subtype_pick,
+        "stock": asset_entry._start_stock_subtype_pick,
+        "real_estate": asset_entry._start_real_estate_subtype_pick,
+    }
+    starter = starters.get(choice)
+    if starter is None:
+        await send_message(chat_id=chat_id, text="Lựa chọn không hợp lệ.")
+        return
+    await starter(db, chat_id, user)
 
 
 async def skip_onboarding(
@@ -388,6 +509,12 @@ async def resume_or_start(
         await step_3_ask_goal(db, chat_id, user)
     elif step == OnboardingStep.FIRST_TRANSACTION:
         await step_4_first_transaction(db, chat_id, user)
+    elif step == OnboardingStep.AHA_MOMENT:
+        # User completed first transaction but hasn't tapped 🚀 yet —
+        # jump straight to step 6 (the 🚀 button is purely a transition).
+        await step_6_first_asset(db, chat_id, user)
+    elif step == OnboardingStep.FIRST_ASSET:
+        await step_6_first_asset(db, chat_id, user)
     else:  # COMPLETED shouldn't reach here (is_onboarded catches it)
         await send_welcome_back(chat_id, user)
 
@@ -464,6 +591,12 @@ async def handle_onboarding_callback(
 
     if action == "complete":
         await complete_onboarding(db, chat_id, message_id, callback_id, user)
+        return True
+
+    if action == "first_asset" and len(parts) == 3:
+        await handle_first_asset_choice(
+            db, chat_id, message_id, callback_id, user, parts[2]
+        )
         return True
 
     await answer_callback(callback_id)

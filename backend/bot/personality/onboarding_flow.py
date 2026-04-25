@@ -14,7 +14,9 @@ class OnboardingStep(IntEnum):
     ASKING_NAME = 2        # waiting for name text
     ASKING_GOAL = 3        # waiting for goal button tap
     FIRST_TRANSACTION = 4  # waiting for first expense
-    COMPLETED = 5
+    AHA_MOMENT = 5         # 3-input-modes intro shown, awaiting first-asset CTA
+    FIRST_ASSET = 6        # waiting for first asset add (Phase 3A)
+    COMPLETED = 7
 
 
 # Goal code → Vietnamese label. Kept short so labels fit inline-button

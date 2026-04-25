@@ -24,10 +24,13 @@ from decimal import Decimal, InvalidOperation
 # Capture: optional leading text, a number, an optional decimal part,
 # an optional VN unit. We allow comma OR dot as decimal separator
 # because Vietnamese keyboards commonly produce both.
+# First alternative requires AT LEAST ONE thousand-separator group so it
+# only fires for "1,000,000"-style numbers — otherwise "45000" would
+# greedy-match the leading "450" and drop the rest.
 _AMOUNT_RE = re.compile(
     r"""
     (?P<head>.*?)                                 # optional label
-    (?P<int>\d{1,3}(?:[.,]\d{3})*|\d+)            # 1,000,000 or 1000000
+    (?P<int>\d{1,3}(?:[.,]\d{3})+|\d+)            # 1,000,000 or 1000000
     (?:[.,](?P<frac>\d+))?                        # optional .5 or ,5
     \s*
     (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
