@@ -32,6 +32,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #63 | Pre-Phase | [P3A-5] Implement Wealth Level detection (Ladder) | [pre-phase/issue-63.md](by-phase/pre-phase/issue-63.md) |
 | #64 | Pre-Phase | [P3A-6] Build Asset Entry Wizard: Cash flow | [pre-phase/issue-64.md](by-phase/pre-phase/issue-64.md) |
 | #65 | Pre-Phase | [P3A-7] Build Asset Entry Wizard: Stock flow | [pre-phase/issue-65.md](by-phase/pre-phase/issue-65.md) |
+| #66 | Pre-Phase | [P3A-8] Build Asset Entry Wizard: Real Estate flow | [pre-phase/issue-66.md](by-phase/pre-phase/issue-66.md) |
 
-**Total:** 28 closed issues
-(7 Phase 1, 9 Phase 2, 12 Pre-Phase)
+**Total:** 29 closed issues
+(7 Phase 1, 9 Phase 2, 13 Pre-Phase)
