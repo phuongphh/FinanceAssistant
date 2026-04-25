@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #78 | [P3A-20] Integrate storytelling with briefing keyboard | [issue-78.md](issue-78.md) |
 | #80 | [P3A-22] Implement /api/wealth/overview endpoint | [issue-80.md](issue-80.md) |
 | #83 | [P3A-25] User testing protocol — 7 users, 7 days validation | [issue-83.md](issue-83.md) |
+| #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |
 
-**Total active:** 14
+**Total active:** 15
