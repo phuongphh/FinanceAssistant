@@ -99,6 +99,53 @@ webhook → claim update_id → asyncio.create_task → worker → handler → s
 
 ---
 
+## 0.2 GitHub Workflow Convention — ĐỌC TRƯỚC KHI TẠO ISSUE / PR
+
+Hệ thống dùng **GitHub native sub-issues** làm source of truth cho hierarchy
+Epic → Sub-issue. Hai workflow `.github/workflows/auto-pr.yml` và
+`project-done.yml` tự expand parent → children qua GraphQL.
+
+### Convention cho Epic (≥2 sub-issues)
+
+1. Tạo **issue cha** (Epic) với title format `[Epic N / Phase X] <name>`
+2. Link các issue con làm sub-issues qua GitHub UI hoặc `sub_issue_write` API
+3. Khi implement: branch `claude/...`, commit cuối có `Closes #<epic-parent>`
+4. `auto-pr.yml` tự expand thành `Closes #parent` + `Closes #child1...#childN`
+   trong PR body
+5. Merge PR → GitHub đóng tất cả → `project-done.yml` move tất cả sang Done
+
+**Đừng** liệt kê tay từng `Closes #N` cho sub-issues — workflow tự làm.
+
+### Convention cho user story đơn lẻ (không thuộc epic)
+
+Vẫn hoạt động như cũ. `auto-pr.yml` extract issue number từ 3 nguồn (priority
+cao → thấp):
+1. Branch name: `claude/issue-N-...` hoặc `claude/issues-N-N-...`
+2. Commit close keyword: `Closes #N`, `Fixes #N`, `Resolves #N`, `Issue #N`
+3. Commit bare reference: `#N` (word-boundary protected)
+
+Issue số đơn lẻ không có sub-issues → expand step skip → behavior như trước.
+
+### Khi nào issue được move sang Done
+
+`project-done.yml` trigger trong 2 case:
+- **PR merged**: parse body+branch để lấy issue list → expand sub-issues →
+  move + close tất cả
+- **Issue closed với reason `completed`**: chính issue đó (+ sub-issues) được
+  move sang Done. Reason `not_planned` → SKIP (không move).
+
+→ Hệ quả: dù close issue qua PR merge hay manual UI, kết quả như nhau.
+
+### File workflow liên quan
+
+- `.github/workflows/auto-pr.yml` — chạy on push to `claude/**` → tạo/update
+  PR với `Closes` lines (đã expand sub-issues)
+- `.github/workflows/project-done.yml` — chạy on PR merge HOẶC issue close →
+  move issues sang Done trên Project Board #4
+- `.github/workflows/issue-lifecycle.yml` — sync issue events → `docs/issues/`
+
+---
+
 ## 1. Stack công nghệ
 
 | Layer | Công nghệ | Lý do |

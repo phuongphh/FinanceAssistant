@@ -1,7 +1,14 @@
-name: Move Issue to Done on PR Merge
+name: Move Issue to Done
 
+# Trigger:
+#   - PR merged → đóng + move các issue trong "Closes #N" body / branch
+#   - Issue closed (completed) → move chính issue đó (+ sub-issues) sang Done
+#
+# Cùng 1 file vì step BƯỚC 2 (move-to-Done logic) là chia sẻ.
 on:
   pull_request:
+    types: [closed]
+  issues:
     types: [closed]
 
 permissions:
@@ -11,48 +18,59 @@ permissions:
 
 jobs:
   move-to-done:
-    # Chỉ chạy khi PR được merge (không phải close thường)
-    if: github.event.pull_request.merged == true
+    # Chạy khi:
+    #   - PR merged (không phải close thường), HOẶC
+    #   - Issue được close với reason "completed" (loại "not_planned" để không
+    #     move trash issues sang Done)
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'issues' && github.event.issue.state_reason == 'completed')
     runs-on: ubuntu-latest
 
     steps:
       # -------------------------------------------------------
-      # BƯỚC 1: Trích xuất TẤT CẢ issue numbers từ PR body và branch name
-      # Hỗ trợ:
-      #   - Body: "Closes #26", "Fixes #26, #27", "Resolves #26 and #27"
-      #   - Branch: "claude/issue-26-...", "claude/implement-issues-26-27-..."
+      # BƯỚC 1: Trích xuất danh sách issue cần xử lý
+      #
+      # PR-merge case: parse body + branch (giữ logic cũ)
+      # Issue-close case: chỉ chính issue đó (sub-issues sẽ expand ở BƯỚC 2)
       # -------------------------------------------------------
       - name: Extract linked issue numbers
         id: extract
         uses: actions/github-script@v6
         with:
           script: |
-            const body = context.payload.pull_request.body || '';
-            const branch = context.payload.pull_request.head.ref || '';
-
             const issueNumbers = new Set();
 
-            // Body: tìm "closes/fixes/resolves" rồi gom tất cả #N theo sau
-            // (cho phép cách nhau bởi dấu phẩy, "and", "&", khoảng trắng)
-            const closeRegex = /(?:closes|fixes|resolves)\b[\s:]*((?:#\d+(?:\s*(?:,|and|&)\s*#?\d+)*))/gi;
-            let m;
-            while ((m = closeRegex.exec(body)) !== null) {
-              const nums = m[1].match(/\d+/g) || [];
-              nums.forEach(n => issueNumbers.add(parseInt(n, 10)));
-            }
+            if (context.eventName === 'issues') {
+              // Issue-close case: chỉ chính issue đó
+              issueNumbers.add(context.payload.issue.number);
+            } else {
+              // PR-merge case: parse body + branch
+              const body = context.payload.pull_request.body || '';
+              const branch = context.payload.pull_request.head.ref || '';
 
-            // Branch: bắt cả `issue-N` (số ít) và `issues-N-N-...` (số nhiều)
-            const branchRegex = /issues?[-_](\d+(?:[-_]\d+)*)/i;
-            const bm = branch.match(branchRegex);
-            if (bm) {
-              (bm[1].match(/\d+/g) || []).forEach(n => issueNumbers.add(parseInt(n, 10)));
+              // Body: tìm "closes/fixes/resolves" rồi gom tất cả #N theo sau
+              // (cho phép cách nhau bởi dấu phẩy, "and", "&", khoảng trắng)
+              const closeRegex = /(?:closes|fixes|resolves)\b[\s:]*((?:#\d+(?:\s*(?:,|and|&)\s*#?\d+)*))/gi;
+              let m;
+              while ((m = closeRegex.exec(body)) !== null) {
+                const nums = m[1].match(/\d+/g) || [];
+                nums.forEach(n => issueNumbers.add(parseInt(n, 10)));
+              }
+
+              // Branch: bắt cả `issue-N` (số ít) và `issues-N-N-...` (số nhiều)
+              const branchRegex = /issues?[-_](\d+(?:[-_]\d+)*)/i;
+              const bm = branch.match(branchRegex);
+              if (bm) {
+                (bm[1].match(/\d+/g) || []).forEach(n => issueNumbers.add(parseInt(n, 10)));
+              }
             }
 
             const list = [...issueNumbers].sort((a, b) => a - b);
             core.setOutput('issue_numbers', list.join(','));
 
             if (list.length > 0) {
-              console.log(`Found issues [${list.join(', ')}] linked to PR #${context.payload.pull_request.number}`);
+              console.log(`Found issues [${list.join(', ')}] (event: ${context.eventName})`);
             } else {
               console.log('No linked issue found — skipping');
             }
@@ -61,6 +79,10 @@ jobs:
       # BƯỚC 2: Move TẤT CẢ issue đã link sang Done trên Project board
       #         + đóng issue trên GitHub nếu chưa đóng (branch-only refs
       #         không tự đóng issue như "Closes #N" làm)
+      #
+      # Nếu issue có sub-issues (GitHub native hierarchy), expand thêm
+      # tất cả children. Mirror logic của auto-pr.yml — bảo đảm khi PR
+      # tạo thủ công với chỉ `Closes #parent`, sub-issues vẫn được xử lý.
       # -------------------------------------------------------
       - name: Move issues to Done and close
         if: steps.extract.outputs.issue_numbers != ''
@@ -68,7 +90,7 @@ jobs:
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
-            const issueNumbers = '${{ steps.extract.outputs.issue_numbers }}'
+            const initial = '${{ steps.extract.outputs.issue_numbers }}'
               .split(',')
               .map(n => parseInt(n, 10))
               .filter(n => !Number.isNaN(n));
@@ -76,6 +98,48 @@ jobs:
             const projectNumber = 4;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // BFS expand parent → sub-issues (cùng logic với auto-pr.yml)
+            const expanded = new Set(initial);
+            const visited = new Set();
+            let frontier = [...initial];
+
+            while (frontier.length > 0) {
+              const next = [];
+              for (const n of frontier) {
+                if (visited.has(n)) continue;
+                visited.add(n);
+                try {
+                  const result = await github.graphql(`
+                    query($owner: String!, $repo: String!, $issue: Int!) {
+                      repository(owner: $owner, name: $repo) {
+                        issue(number: $issue) {
+                          subIssues(first: 100) {
+                            nodes { number }
+                          }
+                        }
+                      }
+                    }
+                  `, { owner, repo, issue: n });
+                  const subs = result.repository?.issue?.subIssues?.nodes || [];
+                  if (subs.length > 0) {
+                    console.log(`Issue #${n} has ${subs.length} sub-issue(s): [${subs.map(s => '#' + s.number).join(', ')}]`);
+                  }
+                  for (const sub of subs) {
+                    if (!expanded.has(sub.number)) {
+                      expanded.add(sub.number);
+                      next.push(sub.number);
+                    }
+                  }
+                } catch (err) {
+                  core.warning(`Could not query sub-issues for #${n}: ${err.message}`);
+                }
+              }
+              frontier = next;
+            }
+
+            const issueNumbers = [...expanded].sort((a, b) => a - b);
+            console.log(`Processing ${issueNumbers.length} issue(s) (initial: ${initial.length}, expanded: ${issueNumbers.length - initial.length})`);
 
             // Lấy Project ID + field Status (chỉ query 1 lần)
             const projectQuery = await github.graphql(`

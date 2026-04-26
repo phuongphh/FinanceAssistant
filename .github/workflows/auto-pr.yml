@@ -73,17 +73,90 @@ jobs:
           rm -f "$COMMITS_FILE" "$CANDIDATES"
 
       # -------------------------------------------------------
-      # BƯỚC 2: Chuyển TẤT CẢ issue đã link sang "In Progress" trên Project board
-      # Dùng GraphQL API vì Project V2 không có REST API
-      # PROJECT_NUMBER = 4 (từ URL github.com/users/phuongphh/projects/4)
+      # BƯỚC 1B: Expand parent issues → bao gồm cả sub-issues
+      #
+      # Nếu issue đã extract có sub-issues (GitHub native sub-issue
+      # hierarchy), thêm tất cả vào danh sách. Cho phép convention:
+      # commit `Closes #parent` → PR auto-close cả parent + children.
+      #
+      # Recursion: chỉ expand 1 level (parent → children). Nếu cần
+      # nested epic-of-epics, mở rộng vòng lặp BFS bên dưới.
       # -------------------------------------------------------
-      - name: Move issues to In Progress
+      - name: Expand parent issues with sub-issues
+        id: expand
         if: steps.extract.outputs.issue_numbers != ''
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
-            const issueNumbers = '${{ steps.extract.outputs.issue_numbers }}'
+            const initial = '${{ steps.extract.outputs.issue_numbers }}'
+              .split(',')
+              .map(n => parseInt(n, 10))
+              .filter(n => !Number.isNaN(n));
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const expanded = new Set(initial);
+
+            // BFS expand: mỗi vòng query sub-issues của các issue mới thêm.
+            // Bảo vệ chống vòng lặp / depth quá lớn bằng `visited`.
+            const visited = new Set();
+            let frontier = [...initial];
+
+            while (frontier.length > 0) {
+              const next = [];
+              for (const issueNumber of frontier) {
+                if (visited.has(issueNumber)) continue;
+                visited.add(issueNumber);
+                try {
+                  const result = await github.graphql(`
+                    query($owner: String!, $repo: String!, $issue: Int!) {
+                      repository(owner: $owner, name: $repo) {
+                        issue(number: $issue) {
+                          subIssues(first: 100) {
+                            nodes { number }
+                          }
+                        }
+                      }
+                    }
+                  `, { owner, repo, issue: issueNumber });
+
+                  const subs = result.repository?.issue?.subIssues?.nodes || [];
+                  if (subs.length > 0) {
+                    console.log(`Issue #${issueNumber} has ${subs.length} sub-issue(s): [${subs.map(s => '#' + s.number).join(', ')}]`);
+                  }
+                  for (const sub of subs) {
+                    if (!expanded.has(sub.number)) {
+                      expanded.add(sub.number);
+                      next.push(sub.number);
+                    }
+                  }
+                } catch (err) {
+                  // Sub-issues field có thể chưa available trên repo cũ —
+                  // fail-soft, dùng list không expand.
+                  core.warning(`Could not query sub-issues for #${issueNumber}: ${err.message}`);
+                }
+              }
+              frontier = next;
+            }
+
+            const list = [...expanded].sort((a, b) => a - b);
+            core.setOutput('issue_numbers', list.join(','));
+            core.setOutput('first_issue', list.length > 0 ? String(list[0]) : '');
+            console.log(`Final issue list (${list.length}): [${list.join(', ')}]`);
+
+      # -------------------------------------------------------
+      # BƯỚC 2: Chuyển TẤT CẢ issue đã link sang "In Progress" trên Project board
+      # Dùng GraphQL API vì Project V2 không có REST API
+      # PROJECT_NUMBER = 4 (từ URL github.com/users/phuongphh/projects/4)
+      # -------------------------------------------------------
+      - name: Move issues to In Progress
+        if: steps.expand.outputs.issue_numbers != ''
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const issueNumbers = '${{ steps.expand.outputs.issue_numbers }}'
               .split(',')
               .map(n => parseInt(n, 10))
               .filter(n => !Number.isNaN(n));
@@ -183,11 +256,11 @@ jobs:
       # không output khi PR đã tồn tại → step link bị skip
       # -------------------------------------------------------
       - name: Create or update Pull Request
-        if: steps.extract.outputs.issue_numbers != ''
+        if: steps.expand.outputs.issue_numbers != ''
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-          ISSUE_NUMBERS: ${{ steps.extract.outputs.issue_numbers }}
-          FIRST_ISSUE: ${{ steps.extract.outputs.first_issue }}
+          ISSUE_NUMBERS: ${{ steps.expand.outputs.issue_numbers }}
+          FIRST_ISSUE: ${{ steps.expand.outputs.first_issue }}
         run: |
           BRANCH="${{ github.ref_name }}"
 
@@ -228,7 +301,7 @@ jobs:
 
       # Fallback: branch + commits không chứa issue number → tạo PR không link
       - name: Create Pull Request (no issue link)
-        if: steps.extract.outputs.issue_numbers == ''
+        if: steps.extract.outputs.issue_numbers == '' || steps.expand.outputs.issue_numbers == ''
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
