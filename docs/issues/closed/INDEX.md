@@ -34,6 +34,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #65 | Pre-Phase | [P3A-7] Build Asset Entry Wizard: Stock flow | [pre-phase/issue-65.md](by-phase/pre-phase/issue-65.md) |
 | #66 | Pre-Phase | [P3A-8] Build Asset Entry Wizard: Real Estate flow | [pre-phase/issue-66.md](by-phase/pre-phase/issue-66.md) |
 | #67 | Pre-Phase | [P3A-9] Integrate first asset step into onboarding | [pre-phase/issue-67.md](by-phase/pre-phase/issue-67.md) |
+| #68 | Pre-Phase | [P3A-10] Create briefing_templates.yaml (4 wealth levels) | [pre-phase/issue-68.md](by-phase/pre-phase/issue-68.md) |
 
-**Total:** 30 closed issues
-(7 Phase 1, 9 Phase 2, 14 Pre-Phase)
+**Total:** 31 closed issues
+(7 Phase 1, 9 Phase 2, 15 Pre-Phase)

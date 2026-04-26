@@ -4,7 +4,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 
 | Issue # | Title | File |
 |---------|-------|------|
-| #68 | [P3A-10] Create briefing_templates.yaml (4 wealth levels) | [issue-68.md](issue-68.md) |
 | #69 | [P3A-11] Build BriefingFormatter (ladder-aware, personalized) | [issue-69.md](issue-69.md) |
 | #70 | [P3A-12] Implement morning_briefing_job.py (scheduled, timezone-aware) | [issue-70.md](issue-70.md) |
 | #71 | [P3A-13] Implement daily_snapshot_job.py (23:59 auto-snapshot) | [issue-71.md](issue-71.md) |
@@ -21,4 +20,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 
-**Total active:** 16
+**Total active:** 15
