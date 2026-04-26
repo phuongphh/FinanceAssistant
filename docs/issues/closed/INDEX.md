@@ -39,6 +39,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #72 | Pre-Phase | [P3A-14] Build briefing inline keyboard (4 action buttons) | [pre-phase/issue-72.md](by-phase/pre-phase/issue-72.md) |
 | #74 | Pre-Phase | [P3A-16] Implement threshold_service.py (income-based expense thresholds) | [pre-phase/issue-74.md](by-phase/pre-phase/issue-74.md) |
 | #76 | Pre-Phase | [P3A-18] Build storytelling handler (text + voice input) | [pre-phase/issue-76.md](by-phase/pre-phase/issue-76.md) |
+| #77 | Pre-Phase | [P3A-19] Build storytelling confirmation UI with inline actions | [pre-phase/issue-77.md](by-phase/pre-phase/issue-77.md) |
 
-**Total:** 35 closed issues
-(7 Phase 1, 9 Phase 2, 19 Pre-Phase)
+**Total:** 36 closed issues
+(7 Phase 1, 9 Phase 2, 20 Pre-Phase)
