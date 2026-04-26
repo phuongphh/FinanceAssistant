@@ -143,3 +143,31 @@ async def handle_menu_callback(chat_id: int, callback_data: str) -> dict | None:
 
 async def register_bot_commands() -> dict | None:
     return await send_telegram("setMyCommands", {"commands": BOT_COMMANDS})
+
+
+async def download_file(file_id: str) -> bytes | None:
+    """Download a Telegram file (voice, photo, document) by file_id.
+
+    Two-step API: ``getFile`` returns a relative ``file_path``, which
+    we then fetch from the Telegram CDN. Returns ``None`` if the bot
+    isn't configured or either step fails — callers should treat that
+    as "audio unavailable" and fall back gracefully.
+    """
+    if not settings.telegram_bot_token:
+        logger.warning("TELEGRAM_BOT_TOKEN not configured")
+        return None
+
+    info = await send_telegram("getFile", {"file_id": file_id})
+    if not info or not info.get("ok"):
+        return None
+    file_path = (info.get("result") or {}).get("file_path")
+    if not file_path:
+        return None
+
+    url = f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, timeout=30)
+        if resp.status_code != 200:
+            logger.error("Telegram file download error: %s", resp.status_code)
+            return None
+        return resp.content
