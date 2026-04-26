@@ -57,6 +57,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
+    from backend.bot.handlers import storytelling as storytelling_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
     from backend.bot.handlers.message import (
         handle_report_callback,
@@ -83,6 +84,7 @@ async def route_update(data: dict) -> None:
                     db, message,
                     onboarding_handlers=onboarding_handlers,
                     asset_entry_handlers=asset_entry_handlers,
+                    storytelling_handlers=storytelling_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
@@ -126,6 +128,7 @@ async def _handle_message(
     *,
     onboarding_handlers,
     asset_entry_handlers,
+    storytelling_handlers,
     dashboard_service,
     handle_report_command,
     handle_text_message,
@@ -205,6 +208,41 @@ async def _handle_message(
             return resolved_user.id
         return None
 
+    # /story or /kechuyen — open storytelling mode (Phase 3A Epic 3).
+    if command in ("/story", "/kechuyen", "/kể_chuyện"):
+        if resolved_user is not None:
+            await storytelling_handlers.handle_storytelling_command(
+                db, chat_id, resolved_user
+            )
+            return resolved_user.id
+        return None
+
+    # /huy or /cancel — drop the storytelling mode if active. Doesn't
+    # touch the asset wizard (it has its own cancel button) — only here
+    # because storytelling mode otherwise blocks NL expense parsing.
+    if command in ("/huy", "/cancel"):
+        if resolved_user is not None:
+            await storytelling_handlers.cancel_storytelling(
+                db, chat_id, resolved_user
+            )
+            return resolved_user.id
+        return None
+
+    # Storytelling voice input — only meaningful while in storytelling
+    # mode. Routed BEFORE the asset wizard text dispatch because voice
+    # messages have no ``text`` field and would fall through otherwise.
+    if (
+        message.get("voice")
+        and resolved_user is not None
+        and (resolved_user.wizard_state or {}).get("flow")
+        == storytelling_handlers.FLOW_STORYTELLING
+    ):
+        consumed = await storytelling_handlers.handle_storytelling_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+
     # Plain text during the onboarding name step must be consumed here —
     # otherwise the NL expense parser would try to parse the user's name
     # as a transaction.
@@ -216,6 +254,22 @@ async def _handle_message(
     ):
         consumed = await onboarding_handlers.handle_name_input(
             db, chat_id, resolved_user, text
+        )
+        if consumed:
+            return resolved_user.id
+
+    # Storytelling text input — runs before the asset wizard dispatch
+    # because ``wizard_state`` is shared between flows; checking the
+    # flow name keeps the two from stomping on each other.
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+        and (resolved_user.wizard_state or {}).get("flow")
+        == storytelling_handlers.FLOW_STORYTELLING
+    ):
+        consumed = await storytelling_handlers.handle_storytelling_input(
+            db, message
         )
         if consumed:
             return resolved_user.id
