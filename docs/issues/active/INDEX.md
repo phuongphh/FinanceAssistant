@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #91 | [Epic 3 / Phase 3A] Storytelling Expense | [issue-91.md](issue-91.md) |
+| #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 
-**Total active:** 14
+**Total active:** 15
