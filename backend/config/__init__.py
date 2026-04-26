@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     anthropic_api_key: str = ""
+    # OpenAI key — currently used only for Whisper voice transcription.
+    # Empty in dev/CI is fine; the voice path falls back to a friendly
+    # "tính năng voice chưa bật" message.
+    openai_api_key: str = ""
 
     # Gmail OAuth2
     gmail_client_id: str = ""
