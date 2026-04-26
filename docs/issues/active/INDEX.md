@@ -16,5 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #82 | [P3A-24] Milestone progress display for Starter level | [issue-82.md](issue-82.md) |
 | #83 | [P3A-25] User testing protocol — 7 users, 7 days validation | [issue-83.md](issue-83.md) |
 | #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |
+| #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 
-**Total active:** 12
+**Total active:** 13
