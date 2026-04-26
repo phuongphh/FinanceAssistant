@@ -55,6 +55,7 @@ async def route_update(data: dict) -> None:
     # and to keep worker startup cheap (handlers pull in Telegram SDK
     # HTTP clients which open sockets on import).
     from backend.bot.handlers import asset_entry as asset_entry_handlers
+    from backend.bot.handlers import briefing as briefing_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
     from backend.bot.handlers.message import (
@@ -96,6 +97,7 @@ async def route_update(data: dict) -> None:
                         db, callback_query,
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
+                        briefing_handlers=briefing_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_report_callback=handle_report_callback,
@@ -244,6 +246,7 @@ async def _handle_callback(
     *,
     onboarding_handlers,
     asset_entry_handlers,
+    briefing_handlers,
     dashboard_service,
     handle_transaction_callback,
     handle_report_callback,
@@ -273,6 +276,12 @@ async def _handle_callback(
 
     # Asset-entry wizard callbacks (asset_add:*).
     if await asset_entry_handlers.handle_asset_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Morning-briefing button taps (briefing:*). Handled before the
+    # transaction router because the briefing keyboard sits on its own
+    # message thread and never overlaps with transaction prefixes.
+    if await briefing_handlers.handle_briefing_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Transaction callbacks handle their own answerCallbackQuery so users
