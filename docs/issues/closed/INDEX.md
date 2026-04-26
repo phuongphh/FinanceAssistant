@@ -36,6 +36,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #67 | Pre-Phase | [P3A-9] Integrate first asset step into onboarding | [pre-phase/issue-67.md](by-phase/pre-phase/issue-67.md) |
 | #68 | Pre-Phase | [P3A-10] Create briefing_templates.yaml (4 wealth levels) | [pre-phase/issue-68.md](by-phase/pre-phase/issue-68.md) |
 | #71 | Pre-Phase | [P3A-13] Implement daily_snapshot_job.py (23:59 auto-snapshot) | [pre-phase/issue-71.md](by-phase/pre-phase/issue-71.md) |
+| #72 | Pre-Phase | [P3A-14] Build briefing inline keyboard (4 action buttons) | [pre-phase/issue-72.md](by-phase/pre-phase/issue-72.md) |
 
-**Total:** 32 closed issues
-(7 Phase 1, 9 Phase 2, 16 Pre-Phase)
+**Total:** 33 closed issues
+(7 Phase 1, 9 Phase 2, 17 Pre-Phase)
