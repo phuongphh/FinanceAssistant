@@ -54,6 +54,21 @@ class EventType:
     SEASONAL_FIRED = "seasonal_fired"
     GOAL_REMINDER_SENT = "goal_reminder_sent"
 
+    # Phase 3A — Morning briefing funnel. The job uses _SENT for the
+    # daily-dedup query (see `morning_briefing_job.already_sent_today`)
+    # so the constant doubles as the single source of truth for both
+    # producers and consumers of the dedup signal.
+    MORNING_BRIEFING_SENT = "morning_briefing_sent"
+    MORNING_BRIEFING_OPENED = "morning_briefing_opened"
+    BRIEFING_DASHBOARD_CLICKED = "briefing_dashboard_clicked"
+    BRIEFING_STORY_CLICKED = "briefing_story_clicked"
+    BRIEFING_ADD_ASSET_CLICKED = "briefing_add_asset_clicked"
+    BRIEFING_SETTINGS_CLICKED = "briefing_settings_clicked"
+
+    # Daily snapshot job — counters land here so we can confirm the
+    # 23:59 cron actually ran each day (one row = one job execution).
+    DAILY_SNAPSHOT_RUN = "daily_snapshot_run"
+
 
 # Property keys that would carry PII if ever accepted — strip unconditionally.
 _PII_KEY_PATTERN = re.compile(
@@ -252,6 +267,168 @@ async def miniapp_load_time_percentiles(
     if not row or row.p50 is None:
         return {"p50": 0.0, "p95": 0.0, "p99": 0.0}
     return {"p50": float(row.p50), "p95": float(row.p95), "p99": float(row.p99)}
+
+
+# -- Morning briefing funnel queries (used by stats CLI / dashboards) -----
+
+
+# Window inside which a button tap counts as "opened the briefing" — past
+# this we assume the user opened it for some unrelated reason. 30 min
+# matches the median time-to-open observed in the milestone-celebration
+# stream so it covers commute-and-coffee paths without diluting the
+# signal.
+BRIEFING_OPEN_WINDOW_SECONDS = 30 * 60
+
+
+async def briefing_open_rate(
+    db: AsyncSession,
+    *,
+    since: datetime | None = None,
+    level: str | None = None,
+) -> dict[str, float | int]:
+    """Daily open rate = ``opened / sent`` for morning briefings.
+
+    A briefing counts as "opened" when an ``OPENED`` event is logged
+    within ``BRIEFING_OPEN_WINDOW_SECONDS`` of the corresponding ``SENT``
+    event for the same user. Falls back gracefully if no briefings have
+    been sent in the window — returns ``rate=0.0`` so dashboards
+    don't divide by zero.
+    """
+    from sqlalchemy import func, select
+
+    sent_q = select(func.count()).where(
+        Event.event_type == EventType.MORNING_BRIEFING_SENT
+    )
+    opened_q = select(func.count()).where(
+        Event.event_type == EventType.MORNING_BRIEFING_OPENED
+    )
+    if since is not None:
+        sent_q = sent_q.where(Event.timestamp >= since)
+        opened_q = opened_q.where(Event.timestamp >= since)
+    if level is not None:
+        # ``properties->>'level' = :level`` — level is recorded as a
+        # property on every SENT event so we can break down without
+        # joining users.
+        sent_q = sent_q.where(Event.properties["level"].astext == level)
+        opened_q = opened_q.where(Event.properties["level"].astext == level)
+
+    sent = int((await db.execute(sent_q)).scalar() or 0)
+    opened = int((await db.execute(opened_q)).scalar() or 0)
+    rate = (opened / sent) if sent > 0 else 0.0
+    return {"sent": sent, "opened": opened, "rate": round(rate, 4)}
+
+
+async def briefing_open_rate_by_level(
+    db: AsyncSession, *, since: datetime | None = None,
+) -> dict[str, dict[str, float | int]]:
+    """Per-level open-rate breakdown — one entry per wealth level seen
+    in the window. Levels with zero sends are omitted to keep the
+    dashboard tidy.
+    """
+    from sqlalchemy import func, select
+
+    level_key = Event.properties["level"].astext
+    stmt = (
+        select(
+            level_key.label("level"),
+            Event.event_type,
+            func.count().label("count"),
+        )
+        .where(
+            Event.event_type.in_([
+                EventType.MORNING_BRIEFING_SENT,
+                EventType.MORNING_BRIEFING_OPENED,
+            ])
+        )
+        .group_by(level_key, Event.event_type)
+    )
+    if since is not None:
+        stmt = stmt.where(Event.timestamp >= since)
+
+    rows = (await db.execute(stmt)).all()
+    out: dict[str, dict[str, int]] = {}
+    for level, event_type, count in rows:
+        bucket = out.setdefault(
+            level or "unknown", {"sent": 0, "opened": 0}
+        )
+        if event_type == EventType.MORNING_BRIEFING_SENT:
+            bucket["sent"] = int(count)
+        else:
+            bucket["opened"] = int(count)
+
+    return {
+        level: {
+            **bucket,
+            "rate": round(
+                (bucket["opened"] / bucket["sent"])
+                if bucket["sent"] > 0 else 0.0,
+                4,
+            ),
+        }
+        for level, bucket in out.items()
+    }
+
+
+async def briefing_avg_time_to_open(
+    db: AsyncSession, *, since: datetime | None = None,
+) -> float | None:
+    """Mean seconds between briefing send and first user tap.
+
+    Returns ``None`` if no opens have been recorded — the caller
+    decides how to surface "no data yet" (the stats CLI prints
+    ``--`` rather than ``0`` to avoid the misleading "instant" read).
+
+    Implementation: per (user_id, send_time) pair, find the first
+    open event whose timestamp is in
+    ``[send_time, send_time + window]`` and average the deltas. Done
+    in Python rather than SQL because Postgres LATERAL joins on a
+    JSON-typed events table are noisy to read for a marginal speed
+    gain at this scale.
+    """
+    from sqlalchemy import select
+
+    sent_stmt = (
+        select(Event.user_id, Event.timestamp)
+        .where(Event.event_type == EventType.MORNING_BRIEFING_SENT)
+        .order_by(Event.timestamp)
+    )
+    opened_stmt = (
+        select(Event.user_id, Event.timestamp)
+        .where(Event.event_type == EventType.MORNING_BRIEFING_OPENED)
+        .order_by(Event.timestamp)
+    )
+    if since is not None:
+        sent_stmt = sent_stmt.where(Event.timestamp >= since)
+        opened_stmt = opened_stmt.where(Event.timestamp >= since)
+
+    sent_rows = (await db.execute(sent_stmt)).all()
+    opened_rows = (await db.execute(opened_stmt)).all()
+    if not sent_rows or not opened_rows:
+        return None
+
+    # Group opens by user; each list stays sorted by timestamp.
+    opens_by_user: dict[uuid.UUID, list[datetime]] = {}
+    for uid, ts in opened_rows:
+        if uid is None:
+            continue
+        opens_by_user.setdefault(uid, []).append(ts)
+
+    deltas: list[float] = []
+    for uid, sent_at in sent_rows:
+        if uid is None:
+            continue
+        candidates = opens_by_user.get(uid, [])
+        for opened_at in candidates:
+            if opened_at < sent_at:
+                continue
+            delta = (opened_at - sent_at).total_seconds()
+            if delta <= BRIEFING_OPEN_WINDOW_SECONDS:
+                deltas.append(delta)
+            break  # Only the first qualifying open counts.
+
+    if not deltas:
+        return None
+    return round(sum(deltas) / len(deltas), 1)
 
 
 # Typed import alias — SQLAlchemy `types` sub-module; placed at module bottom

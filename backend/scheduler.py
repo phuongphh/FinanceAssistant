@@ -16,9 +16,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
+from backend.jobs.daily_snapshot_job import create_daily_snapshots
 from backend.jobs.gmail_poller import poll_gmail
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
+from backend.jobs.morning_briefing_job import run_morning_briefing_job
 from backend.jobs.morning_report_job import send_all_morning_reports
 from backend.jobs.seasonal_notifier import run_seasonal_check
 from backend.jobs.weekly_fun_facts import run_weekly_fun_facts
@@ -72,6 +74,24 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         day_of_week="mon", hour=8, minute=30,
         timezone="Asia/Ho_Chi_Minh",
         id="weekly_goal_reminder",
+    )
+    # Phase 3A — Morning briefing (Issue #70). Runs every 15 min so
+    # users with custom briefing_time (06:30, 08:15, ...) all get a
+    # window. The job itself filters to users whose target time falls
+    # in the next 15 minutes and dedups by event log.
+    scheduler.add_job(
+        run_morning_briefing_job, "interval",
+        minutes=15, timezone="Asia/Ho_Chi_Minh",
+        id="morning_briefing",
+    )
+    # Phase 3A — Daily asset snapshot (Issue #71). 23:59 every day so
+    # tomorrow's morning briefing has a yesterday-baseline to compare
+    # against. ``ON CONFLICT DO NOTHING`` in the job makes it safe
+    # against scheduler retries.
+    scheduler.add_job(
+        create_daily_snapshots, "cron",
+        hour=23, minute=59, timezone="Asia/Ho_Chi_Minh",
+        id="daily_asset_snapshot",
     )
 
 

@@ -1,0 +1,202 @@
+# Morning briefing templates — ladder-aware, personalized.
+#
+# Loaded by `backend/bot/formatters/briefing_formatter.py`.
+# Single source of truth: edit content here, không hardcode trong Python.
+#
+# Tone: xưng "mình", gọi user bằng "bạn"; ấm áp, không phán xét, không sến.
+# Ref: docs/current/tone_guide.md, docs/current/phase-3a-detailed.md § 2.1
+#
+# Placeholder convention (substituted by str.format):
+#   {name}              — display_name của user, fallback "bạn"
+#   {net_worth}         — full money string (e.g. "1,200,000đ")
+#   {net_worth_short}   — short money string (e.g. "1.2tr")
+#   {change}            — signed money short (e.g. "+50k", "-1.2tr")
+#   {pct}               — signed percentage (e.g. "+1.2", "-0.5")
+#   {period}            — "hôm qua" / "tuần trước" / ...
+#   {change_emoji}      — 📈 / 📉 / ➖
+#   {breakdown_lines}   — multi-line asset-type breakdown
+#   {next_milestone}    — formatted next target (e.g. "30,000,000đ")
+#   {remaining}         — gap until next milestone
+#   {eta_date}          — projection (e.g. "07/2027")
+#   {threshold}         — expense_threshold_micro short (e.g. "200k")
+
+# ─────────────────────────────────────────────────────────────
+# Starter — 0..30tr
+# Tone: khích lệ, không nói tiền nhỏ; tập trung vào "bắt đầu"
+# ─────────────────────────────────────────────────────────────
+starter:
+  greeting:
+    - "🌅 Chào buổi sáng, {name}!"
+    - "🌅 Sáng rồi {name} ơi!"
+    - "☀️ Chào {name} một ngày mới."
+
+  net_worth_display:
+    template: |
+      💰 Tài sản hôm nay: {net_worth_short}
+      {change_emoji} {change} ({pct}%) so với {period}
+    no_change: |
+      💰 Tài sản hôm nay: {net_worth_short}
+      Chưa thay đổi so với {period}.
+
+  progress_context:
+    template: |
+      🎯 Mốc tiếp theo: {next_milestone}
+      Còn {remaining} nữa — với đà này, bạn chạm vào khoảng {eta_date}.
+
+  educational_tips:
+    - |
+      💡 Lãi kép — Einstein gọi là "kỳ diệu thứ 8 của thế giới".
+      100k tiết kiệm hôm nay (lãi 6%/năm) ≈ 180k sau 10 năm. Ngồi không thôi.
+    - |
+      💡 3 khoản ai cũng nên có:
+      1. Quỹ khẩn cấp (3-6 tháng chi tiêu)
+      2. Bảo hiểm y tế cơ bản
+      3. Tiết kiệm dài hạn
+    - |
+      💡 Quy tắc 50/30/20:
+      50% chi thiết yếu · 30% chi muốn · 20% tiết kiệm + đầu tư.
+    - |
+      💡 "Trả cho mình trước" — đặt lệnh chuyển tự động sang
+      tài khoản tiết kiệm ngày lương về. Đỡ phải nhớ.
+    - |
+      💡 Cứ 10 năm chậm tiết kiệm,
+      số tiền bạn cần dành mỗi tháng (cùng mục tiêu) sẽ gấp đôi.
+      Bắt đầu sớm = lợi thế lớn nhất.
+
+# ─────────────────────────────────────────────────────────────
+# Young Professional — 30tr..200tr
+# Tone: giao tiếp ngang vai, gợi ý hành động cụ thể
+# ─────────────────────────────────────────────────────────────
+young_prof:
+  greeting:
+    - "🌅 Chào {name}!"
+    - "🌅 Sáng {name} ơi."
+    - "☀️ Chào buổi sáng {name}."
+
+  net_worth_display:
+    template: |
+      💰 Net worth: {net_worth_short}
+      {change_emoji} {change} ({pct}%) so với {period}
+
+      📊 Phân bổ:
+      {breakdown_lines}
+    no_change: |
+      💰 Net worth: {net_worth_short}
+      Chưa đổi so với {period}.
+
+      📊 Phân bổ:
+      {breakdown_lines}
+
+  action_prompts:
+    - |
+      💡 Phần lớn tài sản đang ở tiền mặt.
+      Muốn xem qua 1-2 quỹ mở ETF để đa dạng hoá không?
+    - |
+      💡 Tỷ trọng cổ phiếu của bạn đã trên 50%.
+      Lúc nào tiện, mình tóm tắt lại danh mục giúp bạn nhé.
+    - |
+      💡 Quỹ khẩn cấp ổn rồi.
+      Bước tiếp theo có thể là 1 khoản đầu tư định kỳ — bạn nghĩ sao?
+
+# ─────────────────────────────────────────────────────────────
+# Mass Affluent — 200tr..1 tỷ
+# Tone: chuyên nghiệp hơn nhưng vẫn thân mật, dữ liệu chi tiết
+# ─────────────────────────────────────────────────────────────
+mass_affluent:
+  greeting:
+    - "🌅 Chào {name}!"
+    - "🌅 Sáng {name} ơi."
+    - "☀️ Chào buổi sáng {name}."
+
+  net_worth_display:
+    template: |
+      💰 Giá trị ròng: {net_worth_short}
+      {change_emoji} {change} ({pct}%) so với {period}
+
+      📊 Phân bổ tài sản:
+      {breakdown_lines}
+    no_change: |
+      💰 Giá trị ròng: {net_worth_short}
+      Chưa đổi so với {period}.
+
+      📊 Phân bổ tài sản:
+      {breakdown_lines}
+
+  cashflow:
+    template: |
+      💸 Dòng tiền tháng này:
+      Thu {income_month} · Chi {expense_month}
+      Tiết kiệm: {saving_rate}% {saving_emoji}
+
+  market_intelligence:
+    # Phase 3B sẽ fill data thật. Hiện chỉ đặt placeholder để briefing
+    # vẫn render được mà không lỗi.
+    template: |
+      📰 Tin đáng chú ý:
+      {market_news}
+
+      🎯 Ảnh hưởng tới danh mục:
+      {portfolio_impact}
+    placeholder: "📰 Tin thị trường — sắp ra mắt ở Phase 3B."
+
+# ─────────────────────────────────────────────────────────────
+# High Net Worth — 1 tỷ+
+# Tone: full CFO, dữ liệu performance
+# ─────────────────────────────────────────────────────────────
+hnw:
+  greeting:
+    - "🌅 Chào buổi sáng, {name}."
+    - "🌅 Good morning {name}."
+
+  net_worth_display:
+    template: |
+      💰 Tổng giá trị ròng: {net_worth}
+      {change_emoji} Biến động: {change} ({pct}%) {period}
+
+      📊 Phân bổ:
+      {breakdown_lines}
+    no_change: |
+      💰 Tổng giá trị ròng: {net_worth}
+      Chưa đổi so với {period}.
+
+      📊 Phân bổ:
+      {breakdown_lines}
+
+  detailed_breakdown:
+    template: |
+      📈 Performance:
+      • YTD return: {ytd_return}
+      • Volatility: {volatility}
+      • Diversification: {div_score}
+    placeholder: "📈 Performance metrics — sắp ra mắt ở Phase 3B."
+
+# ─────────────────────────────────────────────────────────────
+# Common — không phụ thuộc level
+# ─────────────────────────────────────────────────────────────
+
+# Briefing cho user mới chưa có asset nào — không có net worth để hiển thị
+empty_state:
+  greeting:
+    - "🌅 Chào buổi sáng {name}!"
+    - "☀️ Sáng rồi {name} ơi."
+  body: |
+    Mình chưa có tài sản nào của bạn cả.
+    Thêm khoản tiền mặt đầu tiên để mở số dư nhé — chỉ mất 30 giây thôi.
+
+# Gắn cuối briefing nếu hôm qua chi nhiều
+spending_reminder:
+  high_spend_yesterday: |
+    💸 Hôm qua chi: {yesterday_total} ({pct}% cao hơn trung bình).
+    Tap [Xem chi tiết] nếu muốn review.
+
+# Storytelling prompt — gắn cuối mỗi briefing
+storytelling_prompt:
+  - |
+    💭 Hôm qua bạn có chi gì đáng kể không?
+    (Chi nhỏ dưới {threshold} không cần ghi — mình lo.)
+  - |
+    💭 Có khoản chi nào trên {threshold} hôm qua không?
+    Kể nhanh để mình tổng hợp giúp.
+  - |
+    💭 Hôm qua có gì lớn cần ghi không?
+    Chi vặt mình bỏ qua, chỉ lưu khoản trên {threshold} thôi.
