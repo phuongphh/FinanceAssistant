@@ -38,6 +38,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #71 | Pre-Phase | [P3A-13] Implement daily_snapshot_job.py (23:59 auto-snapshot) | [pre-phase/issue-71.md](by-phase/pre-phase/issue-71.md) |
 | #72 | Pre-Phase | [P3A-14] Build briefing inline keyboard (4 action buttons) | [pre-phase/issue-72.md](by-phase/pre-phase/issue-72.md) |
 | #74 | Pre-Phase | [P3A-16] Implement threshold_service.py (income-based expense thresholds) | [pre-phase/issue-74.md](by-phase/pre-phase/issue-74.md) |
+| #76 | Pre-Phase | [P3A-18] Build storytelling handler (text + voice input) | [pre-phase/issue-76.md](by-phase/pre-phase/issue-76.md) |
 
-**Total:** 34 closed issues
-(7 Phase 1, 9 Phase 2, 18 Pre-Phase)
+**Total:** 35 closed issues
+(7 Phase 1, 9 Phase 2, 19 Pre-Phase)
