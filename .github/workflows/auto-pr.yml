@@ -17,53 +17,82 @@ jobs:
       - uses: actions/checkout@v4
 
       # -------------------------------------------------------
-      # BƯỚC 1: Lấy issue number từ tên branch
-      # Branch có dạng: claude/implement-issue-4-T49ZM
-      # Regex bắt số sau "issue-"
+      # BƯỚC 1: Lấy TẤT CẢ issue numbers từ branch và commits
+      #
+      # 3 nguồn (priority cao → thấp):
+      #   - Branch name : `issue-N`, `issues-N-N-...`, `issues_N`
+      #   - Commits     : keyword close-style — "Closes #N", "Fixes #N",
+      #                   "Resolves #N", "Issue #N" (case-insensitive)
+      #   - Commits     : bare `#N` reference (word-boundary để né `#FFAA00`,
+      #                   `cache#abc`, v.v.)
+      #
+      # Output: comma-separated list (e.g. "59,60,61"). Một issue/multi-
+      # issue PR đều dùng cùng format. Empty string nếu không tìm thấy.
       # -------------------------------------------------------
-      - name: Extract issue number from branch or commits
+      - name: Extract issue numbers from branch + commits
         id: extract
         run: |
           BRANCH="${{ github.ref_name }}"
+          git fetch origin main --depth=50 2>/dev/null || true
 
-          # Thử 1: Lấy từ branch name (pattern: issue-<number>)
-          ISSUE_NUMBER=$(echo "$BRANCH" | grep -oP '(?<=issue-)\d+' || echo "")
+          # Dump commit messages 1 lần, các grep đọc lại từ file để tránh
+          # subshell quirks và để dễ debug nếu có gì sai.
+          COMMITS_FILE=$(mktemp)
+          git log origin/main..HEAD --format='%s%n%b' > "$COMMITS_FILE"
 
-          # Thử 2: Fallback — tìm trong commit messages trên branch
-          # Pattern: "issue #17", "(#17)", "Closes #17", "Fixes #17"
-          if [ -z "$ISSUE_NUMBER" ]; then
-            git fetch origin main --depth=50 2>/dev/null || true
-            ISSUE_NUMBER=$(git log origin/main..HEAD --format='%s %b' \
-              | grep -oP '(?i)(?:issue\s*#|closes\s*#|fixes\s*#|resolves\s*#)\K\d+' \
-              | head -1 || echo "")
-          fi
+          CANDIDATES=$(mktemp)
 
-          # Thử 3: Fallback — tìm pattern (#<number>) trong commit messages
-          if [ -z "$ISSUE_NUMBER" ]; then
-            ISSUE_NUMBER=$(git log origin/main..HEAD --format='%s %b' \
-              | grep -oP '\(#\K\d+(?=\))' \
-              | head -1 || echo "")
-          fi
+          # Nguồn 1: branch name
+          # Bắt cả `issue-26` và `issues-26-27-28` (multi-issue branch)
+          echo "$BRANCH" \
+            | grep -oP '(?:^|[^A-Za-z0-9_])issues?[-_]\K\d+(?:[-_]\d+)*' \
+            | tr '_-' '\n' \
+            | grep -oP '\d+' \
+            >> "$CANDIDATES" || true
 
-          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
-          echo "Found issue number: ${ISSUE_NUMBER:-none}"
+          # Nguồn 2: commit messages — explicit close keywords
+          # ("Closes #N", "Fixes #N", "Resolves #N", "Issue #N", v.v.)
+          grep -oiP '(?:issue|closes?|fixes|fixed|resolves|resolved)\s*:?\s*#\K\d+' \
+            "$COMMITS_FILE" >> "$CANDIDATES" || true
+
+          # Nguồn 3: commit messages — bare #N references
+          # `(?<![A-Za-z0-9_])` né hex color (#FFAA00), cache key (cache#abc123),
+          # v.v. Pattern `(?:^|[^A-Za-z0-9_])` xài thay lookbehind cho grep -P.
+          grep -oP '(?:^|[^A-Za-z0-9_])#\K\d+(?![A-Za-z0-9_])' \
+            "$COMMITS_FILE" >> "$CANDIDATES" || true
+
+          # Dedup numerical ascending, join bằng dấu phẩy
+          ISSUE_NUMBERS=$(grep -v '^$' "$CANDIDATES" | sort -un | paste -sd ',' -)
+
+          echo "issue_numbers=$ISSUE_NUMBERS" >> $GITHUB_OUTPUT
+          # Lấy issue đầu cho các step cần single value (project board, title)
+          FIRST_ISSUE=$(echo "$ISSUE_NUMBERS" | cut -d',' -f1)
+          echo "first_issue=$FIRST_ISSUE" >> $GITHUB_OUTPUT
+          echo "Found issues: ${ISSUE_NUMBERS:-(none)}"
+
+          rm -f "$COMMITS_FILE" "$CANDIDATES"
 
       # -------------------------------------------------------
-      # BƯỚC 2: Chuyển Issue sang "In Progress" trên Project board
+      # BƯỚC 2: Chuyển TẤT CẢ issue đã link sang "In Progress" trên Project board
       # Dùng GraphQL API vì Project V2 không có REST API
-      # PROJECT_NUMBER = 2 (từ URL github.com/users/phuongphh/projects/2)
+      # PROJECT_NUMBER = 4 (từ URL github.com/users/phuongphh/projects/4)
       # -------------------------------------------------------
-      - name: Move issue to In Progress
-        if: steps.extract.outputs.issue_number != ''
+      - name: Move issues to In Progress
+        if: steps.extract.outputs.issue_numbers != ''
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
-            const issueNumber = parseInt('${{ steps.extract.outputs.issue_number }}');
+            const issueNumbers = '${{ steps.extract.outputs.issue_numbers }}'
+              .split(',')
+              .map(n => parseInt(n, 10))
+              .filter(n => !Number.isNaN(n));
+
             const projectNumber = 4;
             const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-            // Bước 2a: Lấy Project ID và field Status ID
+            // Lấy Project ID + field Status (1 lần cho tất cả issues)
             const projectQuery = await github.graphql(`
               query($owner: String!, $number: Int!) {
                 user(login: $owner) {
@@ -74,10 +103,7 @@ jobs:
                         ... on ProjectV2SingleSelectField {
                           id
                           name
-                          options {
-                            id
-                            name
-                          }
+                          options { id name }
                         }
                       }
                     }
@@ -88,102 +114,121 @@ jobs:
 
             const project = projectQuery.user.projectV2;
             const projectId = project.id;
-
-            // Tìm field "Status" và option "In Progress"
             const statusField = project.fields.nodes.find(f => f.name === 'Status');
             const inProgressOption = statusField?.options?.find(o => o.name === 'In Progress');
 
             if (!statusField || !inProgressOption) {
-              console.log('Could not find Status field or In Progress option');
+              core.warning('Could not find Status field or In Progress option on project board');
               return;
             }
 
-            // Bước 2b: Lấy item ID của issue trong project
-            const issueQuery = await github.graphql(`
-              query($owner: String!, $repo: String!, $issue: Int!) {
-                repository(owner: $owner, name: $repo) {
-                  issue(number: $issue) {
-                    projectItems(first: 10) {
-                      nodes {
-                        id
-                        project {
-                          id
+            for (const issueNumber of issueNumbers) {
+              try {
+                const issueQuery = await github.graphql(`
+                  query($owner: String!, $repo: String!, $issue: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $issue) {
+                        projectItems(first: 10) {
+                          nodes {
+                            id
+                            project { id }
+                          }
                         }
                       }
                     }
                   }
+                `, { owner, repo, issue: issueNumber });
+
+                const issue = issueQuery.repository.issue;
+                if (!issue) {
+                  core.warning(`Issue #${issueNumber} not found — skipping`);
+                  continue;
                 }
+
+                const projectItem = issue.projectItems.nodes
+                  .find(item => item.project.id === projectId);
+
+                if (!projectItem) {
+                  core.warning(`Issue #${issueNumber} not on project #${projectNumber} — skipping board move`);
+                  continue;
+                }
+
+                await github.graphql(`
+                  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: { singleSelectOptionId: $optionId }
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }
+                `, {
+                  projectId,
+                  itemId: projectItem.id,
+                  fieldId: statusField.id,
+                  optionId: inProgressOption.id
+                });
+                console.log(`✅ Issue #${issueNumber} moved to In Progress`);
+              } catch (err) {
+                core.warning(`Failed to move issue #${issueNumber}: ${err.message}`);
               }
-            `, { owner, repo: context.repo.repo, issue: issueNumber });
-
-            const projectItem = issueQuery.repository.issue.projectItems.nodes
-              .find(item => item.project.id === projectId);
-
-            if (!projectItem) {
-              console.log('Issue not found in project');
-              return;
             }
 
-            // Bước 2c: Cập nhật status thành "In Progress"
-            await github.graphql(`
-              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-                updateProjectV2ItemFieldValue(input: {
-                  projectId: $projectId
-                  itemId: $itemId
-                  fieldId: $fieldId
-                  value: { singleSelectOptionId: $optionId }
-                }) {
-                  projectV2Item { id }
-                }
-              }
-            `, {
-              projectId,
-              itemId: projectItem.id,
-              fieldId: statusField.id,
-              optionId: inProgressOption.id
-            });
-
-            console.log(`✅ Issue #${issueNumber} moved to In Progress`);
-
       # -------------------------------------------------------
-      # BƯỚC 3: Tạo PR với "Closes #N" trong body
+      # BƯỚC 3: Tạo PR với "Closes #N" cho TỪNG issue đã link
       # Dùng gh CLI thay vì peter-evans/create-pull-request
       # vì action đó chỉ output PR number khi tạo mới,
       # không output khi PR đã tồn tại → step link bị skip
       # -------------------------------------------------------
       - name: Create or update Pull Request
-        if: steps.extract.outputs.issue_number != ''
+        if: steps.extract.outputs.issue_numbers != ''
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBERS: ${{ steps.extract.outputs.issue_numbers }}
+          FIRST_ISSUE: ${{ steps.extract.outputs.first_issue }}
         run: |
           BRANCH="${{ github.ref_name }}"
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
 
-          # Kiểm tra PR đã tồn tại cho branch này chưa
+          # Build PR title: "#N" cho 1 issue, "#N1, #N2, ..." cho nhiều
+          NUM_COUNT=$(echo "$ISSUE_NUMBERS" | tr ',' '\n' | wc -l)
+          if [ "$NUM_COUNT" -eq 1 ]; then
+            PR_TITLE="Auto PR from Claude — Issue #${FIRST_ISSUE}"
+          else
+            ISSUE_TAGS=$(echo "$ISSUE_NUMBERS" | sed 's/,/, #/g')
+            PR_TITLE="Auto PR from Claude — Issues #${ISSUE_TAGS}"
+            # Cap title length to ~70 chars để không bị cắt trên GitHub UI
+            if [ ${#PR_TITLE} -gt 70 ]; then
+              PR_TITLE="Auto PR from Claude — Issue #${FIRST_ISSUE} (+$((NUM_COUNT - 1)) more)"
+            fi
+          fi
+
+          # Build PR body: 1 dòng "Closes #N" cho mỗi issue.
+          # GitHub recognise multiple Closes lines → đóng tất cả khi merge.
+          CLOSES_LINES=$(echo "$ISSUE_NUMBERS" | tr ',' '\n' | sed 's/^/Closes #/')
+          PR_BODY=$(printf 'AI generated implementation\n\n%s\n' "$CLOSES_LINES")
+
+          # Check PR đã tồn tại chưa
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
 
           if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists, updating body to link issue..."
-            gh pr edit "$EXISTING_PR" \
-              --body "AI generated implementation
-
-          Closes #${ISSUE_NUMBER}"
-            echo "✅ Updated PR #$EXISTING_PR with Closes #${ISSUE_NUMBER}"
+            echo "PR #$EXISTING_PR already exists, updating title + body..."
+            gh pr edit "$EXISTING_PR" --title "$PR_TITLE" --body "$PR_BODY"
+            echo "✅ Updated PR #$EXISTING_PR with $NUM_COUNT Closes line(s)"
           else
             echo "Creating new PR..."
             NEW_PR=$(gh pr create \
               --base main \
               --head "$BRANCH" \
-              --title "Auto PR from Claude — Issue #${ISSUE_NUMBER}" \
-              --body "AI generated implementation
-
-          Closes #${ISSUE_NUMBER}")
-            echo "✅ Created PR: $NEW_PR"
+              --title "$PR_TITLE" \
+              --body "$PR_BODY")
+            echo "✅ Created PR: $NEW_PR (linking $NUM_COUNT issue(s))"
           fi
 
-      # Fallback: branch không chứa issue number → tạo PR không link
+      # Fallback: branch + commits không chứa issue number → tạo PR không link
       - name: Create Pull Request (no issue link)
-        if: steps.extract.outputs.issue_number == ''
+        if: steps.extract.outputs.issue_numbers == ''
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
