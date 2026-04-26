@@ -1,0 +1,329 @@
+/* Wealth dashboard — Phase 3A (P3A-21).
+ *
+ * Layered on top of style.css so the legacy expense dashboard isn't
+ * affected. All selectors are scoped under .wealth-page or to wealth-only
+ * components (.hero-card, .breakdown-list, .milestone-bar) to keep the
+ * blast radius contained.
+ */
+
+.wealth-page {
+    padding-bottom: 24px;
+}
+
+/* --- Hero (net worth) --------------------------------------------- */
+
+.hero-card {
+    background: linear-gradient(135deg, #4ECDC4 0%, #3B82F6 100%);
+    color: #ffffff;
+    border-radius: 20px;
+    padding: 24px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
+}
+
+.hero-label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+    letter-spacing: 0.2px;
+}
+
+.hero-amount {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    line-height: 1.1;
+}
+
+.hero-change {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    opacity: 0.95;
+}
+
+.hero-change .change-period {
+    opacity: 0.8;
+}
+
+.hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    font-size: 12px;
+    opacity: 0.95;
+}
+
+.level-pill {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-weight: 600;
+}
+
+.asset-count {
+    opacity: 0.85;
+}
+
+/* --- Breakdown ---------------------------------------------------- */
+
+.breakdown-list {
+    margin-top: 8px;
+}
+
+.breakdown-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.breakdown-row:last-child {
+    border-bottom: none;
+}
+
+.breakdown-icon {
+    font-size: 20px;
+}
+
+.breakdown-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.breakdown-value {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.breakdown-pct {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 36px;
+    text-align: right;
+}
+
+/* --- Trend / period selector -------------------------------------- */
+
+.period-selector {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.period-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.period-btn.active {
+    background: var(--primary);
+    color: var(--primary-text);
+    border-color: var(--primary);
+}
+
+.period-btn:active {
+    opacity: 0.85;
+}
+
+/* --- Milestone (Starter) ------------------------------------------ */
+
+.milestone-section {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    color: #78350F;
+}
+
+.milestone-section h2 {
+    color: #78350F;
+}
+
+.milestone-bar {
+    height: 14px;
+    background: rgba(120, 53, 15, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.milestone-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #F59E0B, #EF4444);
+    border-radius: 8px;
+    transition: width 0.5s ease;
+}
+
+.milestone-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.milestone-info .muted {
+    opacity: 0.6;
+    font-weight: 400;
+}
+
+.milestone-cheer {
+    margin-top: 8px;
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+/* --- Assets list -------------------------------------------------- */
+
+.asset-card {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.02);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.asset-card:active {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.asset-card .asset-icon {
+    font-size: 22px;
+    text-align: center;
+}
+
+.asset-card .asset-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 2px;
+    color: var(--text-color);
+}
+
+.asset-card .asset-type {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.asset-card .asset-value {
+    text-align: right;
+}
+
+.asset-card .asset-current {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+.asset-card .asset-change {
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.asset-card .asset-change.positive {
+    color: #10B981;
+}
+
+.asset-card .asset-change.negative {
+    color: #EF4444;
+}
+
+/* --- Buttons & empty state ---------------------------------------- */
+
+.add-btn,
+.primary-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px dashed rgba(78, 205, 196, 0.5);
+    background: rgba(78, 205, 196, 0.08);
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.primary-btn {
+    background: var(--primary);
+    color: var(--primary-text);
+    border: none;
+}
+
+.add-btn:active,
+.primary-btn:active {
+    opacity: 0.9;
+}
+
+.empty-card {
+    text-align: center;
+    padding: 32px 20px;
+}
+
+.empty-card .empty-emoji {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.empty-card h2 {
+    margin-bottom: 8px;
+}
+
+.empty-card p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+/* --- Confetti overlay --------------------------------------------- */
+
+#confetti-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* --- Dark mode ---------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+    .breakdown-row {
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+    .asset-card {
+        background: rgba(255, 255, 255, 0.04);
+    }
+    .asset-card:active {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    .period-btn {
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+    .milestone-section {
+        background: linear-gradient(135deg, #422006 0%, #78350F 100%);
+        color: #FEF3C7;
+    }
+    .milestone-section h2 {
+        color: #FEF3C7;
+    }
+}

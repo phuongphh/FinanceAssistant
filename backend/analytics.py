@@ -69,6 +69,15 @@ class EventType:
     # 23:59 cron actually ran each day (one row = one job execution).
     DAILY_SNAPSHOT_RUN = "daily_snapshot_run"
 
+    # Phase 3A — wealth dashboard funnel. ``WEALTH_DASHBOARD_VIEWED`` is
+    # logged on every successful overview API hit; the property ``from``
+    # tells us where the open came from (``briefing``, ``menu``, ``deep_link``)
+    # so the user-testing scoreboard can attribute opens to morning briefings
+    # vs organic discovery.
+    WEALTH_DASHBOARD_VIEWED = "wealth_dashboard_viewed"
+    WEALTH_TREND_VIEWED = "wealth_trend_viewed"
+    WEALTH_LEVEL_UP = "wealth_level_up"
+
 
 # Property keys that would carry PII if ever accepted — strip unconditionally.
 _PII_KEY_PATTERN = re.compile(

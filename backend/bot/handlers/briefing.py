@@ -36,6 +36,7 @@ from backend.bot.keyboards.briefing_keyboard import (
     CB_BRIEFING,
 )
 from backend.bot.keyboards.common import parse_callback
+from backend.config import get_settings
 from backend.models.event import Event
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import answer_callback, send_message
@@ -56,16 +57,31 @@ _ACTION_TO_EVENT = {
 # User-facing text per action — kept short, follows tone guide. The
 # ``add_asset`` and ``story`` actions do NOT live here because they
 # forward into real handlers rather than showing a placeholder.
+# ``dashboard`` shows a placeholder only when ``miniapp_base_url`` is
+# unset (dev / CI); production sends an inline web_app button instead.
 _ACTION_PLACEHOLDER = {
     BRIEFING_ACTION_DASHBOARD: (
-        "📊 Dashboard sắp ra mắt — mình đang hoàn thiện ở "
-        "P3A-21. Tạm thời gõ /baocao để xem báo cáo nhé."
+        "📊 Dashboard chỉ khả dụng khi cấu hình MINIAPP_BASE_URL. "
+        "Tạm thời gõ /baocao để xem báo cáo nhé."
     ),
     BRIEFING_ACTION_SETTINGS: (
         "⚙️ Mặc định mình gửi briefing lúc 7:00. "
         "Tính năng đổi giờ sẽ có ở bản tới."
     ),
 }
+
+
+def _wealth_dashboard_url() -> str | None:
+    """Return the public Mini App URL for the wealth dashboard, or None.
+
+    Append ``?source=briefing`` so the dashboard's analytics know the
+    open came from this funnel — matches the JS-side query-string
+    handling in ``wealth_dashboard.js``.
+    """
+    base = (get_settings().miniapp_base_url or "").rstrip("/")
+    if not base:
+        return None
+    return f"{base}/miniapp/wealth?source=briefing"
 
 
 async def _record_open_if_first(
@@ -159,6 +175,23 @@ async def handle_briefing_callback(
         from backend.bot.handlers.asset_entry import start_asset_wizard
         await start_asset_wizard(db, chat_id, user)
         return True
+
+    if action == BRIEFING_ACTION_DASHBOARD:
+        url = _wealth_dashboard_url()
+        if url:
+            # Send a single inline web_app button — Telegram opens the
+            # Mini App in-place, so the user never leaves the chat.
+            await send_message(
+                chat_id=chat_id,
+                text="📊 Mở dashboard tài sản:",
+                reply_markup={
+                    "inline_keyboard": [[
+                        {"text": "Mở Dashboard", "web_app": {"url": url}},
+                    ]],
+                },
+            )
+            return True
+        # Fall through to the placeholder when MINIAPP_BASE_URL is unset.
 
     if action == BRIEFING_ACTION_STORY:
         # Forward into storytelling, tagging the source as "from
