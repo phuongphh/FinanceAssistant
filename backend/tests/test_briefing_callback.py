@@ -281,6 +281,100 @@ async def test_story_tap_forwards_to_storytelling_with_briefing_source():
 
 
 @pytest.mark.asyncio
+async def test_dashboard_tap_sends_web_app_button_when_url_configured():
+    """P3A-21+P3A-22: when MINIAPP_BASE_URL is configured, the dashboard
+    button replies with a web_app inline button that opens the wealth
+    dashboard in-place. ``?source=briefing`` lets the dashboard
+    attribute the open."""
+    db = MagicMock()
+    user = _make_user()
+
+    sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    sent_result = MagicMock()
+    sent_result.scalar_one_or_none.return_value = sent_at
+    opened_result = MagicMock()
+    opened_result.first.return_value = ("already-opened",)
+    db.execute = AsyncMock(side_effect=[sent_result, opened_result])
+
+    send_mock = AsyncMock()
+    settings = MagicMock()
+    settings.miniapp_base_url = "https://app.example.com"
+
+    with patch(
+        "backend.bot.handlers.briefing.get_user_by_telegram_id",
+        new=AsyncMock(return_value=user),
+    ), patch(
+        "backend.bot.handlers.briefing.answer_callback",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.atrack",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.track",
+        MagicMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.send_message", send_mock,
+    ), patch(
+        "backend.bot.handlers.briefing.get_settings", return_value=settings,
+    ):
+        handled = await h.handle_briefing_callback(db, _callback("dashboard"))
+
+    assert handled is True
+    send_mock.assert_awaited_once()
+    _args, kwargs = send_mock.await_args
+    keyboard = kwargs["reply_markup"]["inline_keyboard"]
+    # One row, one web_app button pointing to /miniapp/wealth.
+    assert len(keyboard) == 1 and len(keyboard[0]) == 1
+    button = keyboard[0][0]
+    assert button["web_app"]["url"].startswith("https://app.example.com/miniapp/wealth")
+    assert "source=briefing" in button["web_app"]["url"]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_tap_falls_back_to_placeholder_without_url():
+    """When MINIAPP_BASE_URL is unset, the handler shouldn't try to
+    build a web_app URL; the user gets the placeholder copy instead."""
+    db = MagicMock()
+    user = _make_user()
+
+    sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    sent_result = MagicMock()
+    sent_result.scalar_one_or_none.return_value = sent_at
+    opened_result = MagicMock()
+    opened_result.first.return_value = ("already-opened",)
+    db.execute = AsyncMock(side_effect=[sent_result, opened_result])
+
+    send_mock = AsyncMock()
+    settings = MagicMock()
+    settings.miniapp_base_url = ""
+
+    with patch(
+        "backend.bot.handlers.briefing.get_user_by_telegram_id",
+        new=AsyncMock(return_value=user),
+    ), patch(
+        "backend.bot.handlers.briefing.answer_callback",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.atrack",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.track",
+        MagicMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.send_message", send_mock,
+    ), patch(
+        "backend.bot.handlers.briefing.get_settings", return_value=settings,
+    ):
+        await h.handle_briefing_callback(db, _callback("dashboard"))
+
+    send_mock.assert_awaited_once()
+    args, kwargs = send_mock.await_args
+    # Placeholder text — no inline keyboard with a web_app button.
+    assert "MINIAPP_BASE_URL" in kwargs.get("text", "")
+    assert "reply_markup" not in kwargs
+
+
+@pytest.mark.asyncio
 async def test_unregistered_user_gets_friendly_alert():
     db = MagicMock()
     answer_mock = AsyncMock()

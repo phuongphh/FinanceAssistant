@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tài sản của tôi</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <link rel="stylesheet" href="/miniapp/static/css/style.css">
+    <link rel="stylesheet" href="/miniapp/static/css/wealth.css">
+</head>
+<body class="wealth-page">
+    <main id="app">
+        <section id="loading" class="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p>Đang tải tài sản…</p>
+        </section>
+
+        <section id="error" class="error" hidden>
+            <p id="error-message">Không tải được dữ liệu.</p>
+            <button id="retry-btn" type="button">Thử lại</button>
+        </section>
+
+        <section id="content" hidden>
+            <header class="hero-card" aria-label="Giá trị ròng">
+                <div class="hero-label">💎 Giá trị ròng</div>
+                <div class="hero-amount" id="net-worth">—</div>
+                <div class="hero-change">
+                    <span id="change-icon" aria-hidden="true">📈</span>
+                    <span id="change-amount">—</span>
+                    <span class="change-period" id="change-period">so với tháng trước</span>
+                </div>
+                <div class="hero-meta">
+                    <span class="level-pill" id="level-pill">—</span>
+                    <span class="asset-count" id="asset-count">0 tài sản</span>
+                </div>
+            </header>
+
+            <section id="empty-state" class="section empty-card" hidden>
+                <div class="empty-emoji">🌱</div>
+                <h2>Chưa có tài sản nào</h2>
+                <p>Hãy thêm tài sản đầu tiên — tiền mặt, cổ phiếu, vàng… để theo dõi tài sản ròng mỗi ngày.</p>
+                <button class="primary-btn" id="add-first-asset-btn" type="button">+ Thêm tài sản</button>
+            </section>
+
+            <section class="section" id="breakdown-section">
+                <h2>Phân bổ tài sản</h2>
+                <div class="chart-container">
+                    <canvas id="pie-chart" role="img" aria-label="Biểu đồ phân bổ tài sản"></canvas>
+                </div>
+                <div id="breakdown-list" class="breakdown-list"></div>
+            </section>
+
+            <section class="section" id="trend-section">
+                <h2 id="trend-heading">Xu hướng 90 ngày</h2>
+                <div class="chart-container">
+                    <canvas id="trend-chart" role="img" aria-label="Biểu đồ xu hướng tài sản"></canvas>
+                </div>
+                <div class="period-selector" role="tablist">
+                    <button class="period-btn" data-days="30" type="button" role="tab">30 ngày</button>
+                    <button class="period-btn active" data-days="90" type="button" role="tab" aria-selected="true">90 ngày</button>
+                    <button class="period-btn" data-days="365" type="button" role="tab">1 năm</button>
+                </div>
+            </section>
+
+            <section class="section milestone-section" id="milestone-section" hidden>
+                <h2>🎯 Mục tiêu tiếp theo</h2>
+                <div class="milestone-bar" aria-hidden="true">
+                    <div class="milestone-fill" id="milestone-fill"></div>
+                </div>
+                <div class="milestone-info">
+                    <span id="milestone-current">—</span>
+                    <span class="muted">/</span>
+                    <span id="milestone-target">—</span>
+                </div>
+                <p class="milestone-cheer" id="milestone-cheer">Bạn đang đi đúng hướng — tiếp tục thêm tài sản để leo lên cấp tiếp theo!</p>
+            </section>
+
+            <section class="section" id="assets-section">
+                <h2>📦 Tài sản của bạn</h2>
+                <div id="assets-list"></div>
+                <button class="add-btn" id="add-asset-btn" type="button">+ Thêm tài sản</button>
+            </section>
+        </section>
+    </main>
+
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+    <script src="/miniapp/static/js/wealth_dashboard.js" defer></script>
+</body>
+</html>

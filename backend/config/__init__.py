@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     finance_api_url: str = "http://localhost:8001/api/v1"
     finance_api_key: str = ""
 
+    # Telegram Mini App — public HTTPS base for the wealth dashboard.
+    # Telegram requires a valid HTTPS URL for ``web_app`` inline buttons,
+    # so production must override this; dev/CI leaves it empty and the
+    # briefing handler falls back to a placeholder message.
+    miniapp_base_url: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
