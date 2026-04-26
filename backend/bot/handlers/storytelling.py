@@ -37,18 +37,24 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import date
+
 from backend import analytics
 from backend.bot.formatters.money import format_money_short
+from backend.bot.keyboards.common import parse_callback
 from backend.bot.personality.storytelling_prompt import (
     StorytellingResult,
     extract_transactions_from_story,
 )
 from backend.config.categories import get_category
 from backend.models.user import User
-from backend.services import wizard_service
+from backend.schemas.expense import ExpenseCreate
+from backend.services import expense_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
+    answer_callback,
     download_file,
+    edit_message_reply_markup,
     edit_message_text,
     send_message,
 )
@@ -94,6 +100,9 @@ class StorytellingEvent:
     LLM_FAILED = "storytelling_llm_failed"
     TIMED_OUT = "storytelling_timed_out"
     CANCELED = "storytelling_canceled"
+    CONFIRMED_ALL = "storytelling_confirmed_all"
+    DISCARDED = "storytelling_discarded"
+    EDIT_REQUESTED = "storytelling_edit_requested"
 
 
 # ---------- Public API ------------------------------------------------
@@ -313,21 +322,21 @@ async def _handle_voice_input(
     # would be clumsy (no message_id, edit failed, etc.)
     transcript_msg = f"🎤 Mình nghe: <i>{_escape_html(transcript)}</i>"
     edited = False
-    if processing_msg and processing_msg.get("ok"):
-        result = processing_msg.get("result") or {}
-        msg_id = result.get("message_id")
-        if msg_id:
-            try:
-                await edit_message_text(
-                    chat_id=chat_id,
-                    message_id=msg_id,
-                    text=transcript_msg,
-                    parse_mode="HTML",
-                    reply_markup=None,
-                )
-                edited = True
-            except Exception:
-                logger.debug("storytelling: edit transcript message failed", exc_info=True)
+    msg_id = _extract_message_id(processing_msg)
+    if msg_id:
+        try:
+            await edit_message_text(
+                chat_id=chat_id,
+                message_id=msg_id,
+                text=transcript_msg,
+                parse_mode="HTML",
+                reply_markup=None,
+            )
+            edited = True
+        except Exception:
+            logger.debug(
+                "storytelling: edit transcript message failed", exc_info=True,
+            )
     if not edited:
         await send_message(
             chat_id=chat_id, text=transcript_msg, parse_mode="HTML",
@@ -356,9 +365,7 @@ async def _process_story_text(
     processing = await send_message(
         chat_id=chat_id, text="🔍 Đang tìm giao dịch...",
     )
-    proc_msg_id = None
-    if processing and processing.get("ok"):
-        proc_msg_id = (processing.get("result") or {}).get("message_id")
+    proc_msg_id = _extract_message_id(processing)
 
     result = await extract_transactions_from_story(
         story, threshold=threshold, db=db, user_id=user.id,
@@ -470,6 +477,25 @@ def format_pending_confirmation(
     return "\n".join(lines)
 
 
+def _extract_message_id(send_response: object) -> int | None:
+    """Pull ``message_id`` from a Telegram sendMessage response, defensively.
+
+    Real responses are dicts shaped like
+    ``{"ok": true, "result": {"message_id": 5, ...}}``. Mocks may
+    return ``None`` or non-dict objects — we only accept the real
+    shape and treat anything else as "no message_id available".
+    """
+    if not isinstance(send_response, dict):
+        return None
+    if not send_response.get("ok"):
+        return None
+    result = send_response.get("result")
+    if not isinstance(result, dict):
+        return None
+    msg_id = result.get("message_id")
+    return msg_id if isinstance(msg_id, int) else None
+
+
 def _escape_html(s: str) -> str:
     """Minimal HTML escape for Telegram parse_mode=HTML.
 
@@ -481,3 +507,246 @@ def _escape_html(s: str) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+# ---------- P3A-19 Confirmation callback ------------------------------
+
+
+async def handle_storytelling_callback(
+    db: AsyncSession, callback_query: dict,
+) -> bool:
+    """Route any ``story:*`` callback. Returns True if handled.
+
+    Lives in this module (not its own ``story_callbacks.py``) because
+    every action mutates the same ``wizard_state`` and references the
+    same ``pending`` draft — splitting them would force every callback
+    to re-implement the lookup boilerplate.
+    """
+    from backend.bot.keyboards.storytelling_keyboard import (
+        CB_STORY,
+        STORY_ACTION_CANCEL,
+        STORY_ACTION_CONFIRM_ALL,
+        STORY_ACTION_EDIT,
+    )
+
+    data: str = callback_query.get("data") or ""
+    if not data.startswith(f"{CB_STORY}:"):
+        return False
+
+    callback_id = callback_query["id"]
+    message = callback_query.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    message_id = message.get("message_id")
+    telegram_id = (callback_query.get("from") or {}).get("id")
+
+    if chat_id is None or telegram_id is None:
+        await answer_callback(callback_id)
+        return True
+
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        await answer_callback(
+            callback_id,
+            text="Bạn cần /start trước nhé.",
+            show_alert=True,
+        )
+        return True
+
+    _, parts = parse_callback(data)
+    # Expected shape: story:confirm:<action>
+    if len(parts) < 2 or parts[0] != "confirm":
+        await answer_callback(callback_id)
+        return True
+    action = parts[1]
+
+    state = user.wizard_state or {}
+    if state.get("flow") != FLOW_STORYTELLING or state.get("step") != STEP_CONFIRM_PENDING:
+        # Stale tap — wizard already cleared (e.g. timeout). Acknowledge
+        # silently and remove the keyboard so the user doesn't try again.
+        await answer_callback(
+            callback_id, text="Phiên này đã hết hạn rồi 😅",
+        )
+        if message_id is not None:
+            try:
+                await edit_message_reply_markup(
+                    chat_id=chat_id, message_id=message_id, reply_markup=None,
+                )
+            except Exception:
+                logger.debug("storytelling: clear stale keyboard failed", exc_info=True)
+        return True
+
+    pending = (state.get("draft") or {}).get("pending") or []
+
+    await answer_callback(callback_id)
+
+    if action == STORY_ACTION_CONFIRM_ALL:
+        await _confirm_all(db, chat_id, message_id, user, pending)
+        return True
+
+    if action == STORY_ACTION_CANCEL:
+        await _discard_all(db, chat_id, message_id, user)
+        return True
+
+    if action == STORY_ACTION_EDIT:
+        await _edit_request(db, chat_id, message_id, user, pending)
+        return True
+
+    return True  # consumed any story:* payload
+
+
+async def _confirm_all(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    pending: list[dict],
+) -> None:
+    """Save every pending transaction and clear the storytelling state.
+
+    Sets ``source="storytelling"`` and ``needs_review=False`` on each
+    expense so the dashboard treats them as user-verified (the LLM
+    extracted, the user confirmed — no human review needed).
+
+    Failures save what they can: a single bad row doesn't roll back
+    the rest. We log the failure, surface a partial-success summary,
+    and keep going. The transaction boundary is owned by the worker —
+    flushing here is enough; commit happens at the end of route_update.
+    """
+    saved: list[dict] = []
+    failed = 0
+    for tx in pending:
+        try:
+            expense = await expense_service.create_expense(
+                db, user.id,
+                ExpenseCreate(
+                    amount=float(tx["amount"]),
+                    currency="VND",
+                    merchant=str(tx.get("merchant") or "Chi tiêu")[:500],
+                    category=str(tx.get("category") or "other"),
+                    source="storytelling",
+                    expense_date=date.today(),
+                    note=str(tx.get("context") or ""),
+                    needs_review=False,
+                ),
+            )
+            saved.append({
+                "id": str(expense.id),
+                "amount": float(expense.amount),
+                "category": expense.category,
+            })
+        except Exception:
+            logger.exception(
+                "storytelling: failed to save tx for user=%s", user.id,
+            )
+            failed += 1
+
+    await wizard_service.clear(db, user.id)
+
+    total = sum(t["amount"] for t in saved)
+    text = _format_save_summary(saved_count=len(saved), total=total, failed=failed)
+
+    await _replace_or_send(
+        chat_id=chat_id, message_id=message_id, text=text,
+    )
+
+    analytics.track(
+        StorytellingEvent.CONFIRMED_ALL, user_id=user.id,
+        properties={
+            "saved_count": len(saved),
+            "failed_count": failed,
+            "total_amount": int(total),
+        },
+    )
+
+
+async def _discard_all(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+) -> None:
+    """User tapped "❌ Bỏ hết" — drop everything, no DB writes."""
+    await wizard_service.clear(db, user.id)
+    text = (
+        "❌ Đã bỏ qua. Không lưu gì cả.\n\n"
+        "<i>Khi nào sẵn sàng kể lại, gõ /story nhé.</i>"
+    )
+    await _replace_or_send(chat_id=chat_id, message_id=message_id, text=text)
+    analytics.track(StorytellingEvent.DISCARDED, user_id=user.id)
+
+
+async def _edit_request(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    pending: list[dict],
+) -> None:
+    """User tapped "✏️ Sửa".
+
+    Phase 3A keeps this minimal: drop the pending list and ask the
+    user to re-tell more precisely. A full per-item edit UI (amount /
+    merchant / category) is a stretch goal — issue P3A-19 spec lists
+    it but the protocol survives as long as edit triggers a re-tell
+    rather than silently ignoring the tap.
+    """
+    await wizard_service.clear(db, user.id)
+    text = (
+        "✏️ Bỏ qua list hiện tại — bạn kể lại rõ hơn nhé.\n\n"
+        "<i>Mẹo: nói rõ tên (ăn ở đâu/mua gì), số tiền, "
+        "mình sẽ phân loại đúng hơn.</i>\n\n"
+        "Gõ /story khi sẵn sàng."
+    )
+    await _replace_or_send(chat_id=chat_id, message_id=message_id, text=text)
+    analytics.track(
+        StorytellingEvent.EDIT_REQUESTED,
+        user_id=user.id,
+        properties={"pending_count": len(pending)},
+    )
+
+
+def _format_save_summary(
+    *, saved_count: int, total: float, failed: int,
+) -> str:
+    """Warm 'Đã lưu xong!' message after save."""
+    if saved_count == 0:
+        return (
+            "Hmm, mình chưa lưu được giao dịch nào 😔\n"
+            "Bạn thử /story lại nhé, mình sẽ chú ý hơn."
+        )
+    lines = [
+        f"✅ <b>Đã lưu {saved_count} giao dịch!</b>",
+        f"Tổng: <b>{format_money_short(total)}</b>",
+    ]
+    if failed:
+        lines.append(
+            f"\n<i>(Có {failed} khoản không lưu được — mình đã ghi log để debug.)</i>"
+        )
+    lines.append("")
+    lines.append("Cảm ơn bạn kể chuyện 💚")
+    return "\n".join(lines)
+
+
+async def _replace_or_send(
+    *, chat_id: int, message_id: int | None, text: str,
+) -> None:
+    """Edit the original confirmation message in-place when possible.
+
+    Falls back to a fresh send if the edit fails (Telegram rejects
+    edits older than 48 hours — shouldn't happen here but defending
+    against the corner case keeps the UX intact when it does).
+    """
+    if message_id is not None:
+        try:
+            await edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=None,
+            )
+            return
+        except Exception:
+            logger.debug("storytelling: edit confirmation message failed", exc_info=True)
+
+    await send_message(chat_id=chat_id, text=text, parse_mode="HTML")

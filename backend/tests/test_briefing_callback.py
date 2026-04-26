@@ -109,6 +109,7 @@ async def test_second_tap_within_window_does_not_re_record_open():
     atrack_mock = AsyncMock()
     track_mock = MagicMock()
 
+    storytelling_mock = AsyncMock()
     with patch(
         "backend.bot.handlers.briefing.get_user_by_telegram_id",
         new=AsyncMock(return_value=user),
@@ -124,14 +125,19 @@ async def test_second_tap_within_window_does_not_re_record_open():
     ), patch(
         "backend.bot.handlers.briefing.analytics.track",
         track_mock,
+    ), patch(
+        "backend.bot.handlers.storytelling.start_storytelling",
+        storytelling_mock,
     ):
         await h.handle_briefing_callback(db, _callback("story"))
 
     atrack_mock.assert_not_awaited()
-    # Click still fires
-    track_mock.assert_called_once()
+    # Click event still fires (briefing's own funnel attribution)
+    assert track_mock.call_count == 1
     args, kwargs = track_mock.call_args
     assert args[0] == analytics.EventType.BRIEFING_STORY_CLICKED
+    # And the briefing forwarded the user into storytelling mode.
+    storytelling_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -224,6 +230,54 @@ async def test_unknown_callback_data_returns_false():
          "message": {"chat": {"id": 2}}},
     )
     assert handled is False
+
+
+@pytest.mark.asyncio
+async def test_story_tap_forwards_to_storytelling_with_briefing_source():
+    """P3A-20: 'Kể chuyện' button must launch storytelling with the
+    ``from_briefing`` attribution so the funnel split survives."""
+    db = MagicMock()
+    user = _make_user()
+
+    sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    sent_result = MagicMock()
+    sent_result.scalar_one_or_none.return_value = sent_at
+    opened_result = MagicMock()
+    opened_result.first.return_value = ("already-opened",)
+    db.execute = AsyncMock(side_effect=[sent_result, opened_result])
+
+    track_mock = MagicMock()
+    storytelling_mock = AsyncMock()
+
+    with patch(
+        "backend.bot.handlers.briefing.get_user_by_telegram_id",
+        new=AsyncMock(return_value=user),
+    ), patch(
+        "backend.bot.handlers.briefing.answer_callback",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.atrack",
+        new=AsyncMock(),
+    ), patch(
+        "backend.bot.handlers.briefing.analytics.track",
+        track_mock,
+    ), patch(
+        "backend.bot.handlers.storytelling.start_storytelling",
+        storytelling_mock,
+    ):
+        handled = await h.handle_briefing_callback(db, _callback("story"))
+
+    assert handled is True
+    storytelling_mock.assert_awaited_once()
+    # The third positional/kwarg value tells us how storytelling was invoked.
+    _args, kwargs = storytelling_mock.await_args
+    # source kwarg is the funnel attribution
+    from backend.bot.handlers.storytelling import SOURCE_FROM_BRIEFING
+
+    assert kwargs.get("source") == SOURCE_FROM_BRIEFING
+    # And the briefing-side click event was recorded.
+    events = [c.args[0] for c in track_mock.call_args_list]
+    assert analytics.EventType.BRIEFING_STORY_CLICKED in events
 
 
 @pytest.mark.asyncio

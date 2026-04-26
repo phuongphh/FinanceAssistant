@@ -100,6 +100,7 @@ async def route_update(data: dict) -> None:
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
                         briefing_handlers=briefing_handlers,
+                        storytelling_handlers=storytelling_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_report_callback=handle_report_callback,
@@ -301,6 +302,7 @@ async def _handle_callback(
     onboarding_handlers,
     asset_entry_handlers,
     briefing_handlers,
+    storytelling_handlers,
     dashboard_service,
     handle_transaction_callback,
     handle_report_callback,
@@ -336,6 +338,12 @@ async def _handle_callback(
     # transaction router because the briefing keyboard sits on its own
     # message thread and never overlaps with transaction prefixes.
     if await briefing_handlers.handle_briefing_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Storytelling confirmation taps (story:*). Routed before the
+    # transaction router so the "story:" prefix doesn't collide with
+    # generic per-transaction edit/delete callbacks.
+    if await storytelling_handlers.handle_storytelling_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Transaction callbacks handle their own answerCallbackQuery so users

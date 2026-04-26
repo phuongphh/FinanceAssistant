@@ -54,16 +54,12 @@ _ACTION_TO_EVENT = {
 }
 
 # User-facing text per action — kept short, follows tone guide. The
-# ``add_asset`` action does NOT live here because it forwards into the
-# real asset-entry wizard rather than showing a placeholder.
+# ``add_asset`` and ``story`` actions do NOT live here because they
+# forward into real handlers rather than showing a placeholder.
 _ACTION_PLACEHOLDER = {
     BRIEFING_ACTION_DASHBOARD: (
         "📊 Dashboard sắp ra mắt — mình đang hoàn thiện ở "
         "P3A-21. Tạm thời gõ /baocao để xem báo cáo nhé."
-    ),
-    BRIEFING_ACTION_STORY: (
-        "💬 Mình đang chuẩn bị tính năng kể chuyện chi tiêu — "
-        "ra mắt trong tuần này nhé."
     ),
     BRIEFING_ACTION_SETTINGS: (
         "⚙️ Mặc định mình gửi briefing lúc 7:00. "
@@ -162,6 +158,19 @@ async def handle_briefing_callback(
         # neighbours otherwise.
         from backend.bot.handlers.asset_entry import start_asset_wizard
         await start_asset_wizard(db, chat_id, user)
+        return True
+
+    if action == BRIEFING_ACTION_STORY:
+        # Forward into storytelling, tagging the source as "from
+        # briefing" so the analytics funnel can separate
+        # ``storytelling_from_briefing`` (intentional retention path)
+        # from ``storytelling_direct`` (power-user typed /story).
+        # Local import to mirror the asset-entry pattern above.
+        from backend.bot.handlers.storytelling import (
+            SOURCE_FROM_BRIEFING,
+            start_storytelling,
+        )
+        await start_storytelling(db, chat_id, user, source=SOURCE_FROM_BRIEFING)
         return True
 
     placeholder = _ACTION_PLACEHOLDER.get(action)
