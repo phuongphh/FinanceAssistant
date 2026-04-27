@@ -266,4 +266,276 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
 
 ---
 
-> **DỪNG TẠI ĐÂY** — Các issue P3A-3 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
+# P3A-3 — AssetService (CRUD + soft delete)
+
+**Maps to AC:** create_asset, update_current_value, get_user_assets, get_asset_by_id, soft_delete, edge cases (current_value=None, multiple updates same day).
+
+## Happy Path
+
+### TC-1.3.H1 — `create_asset()` tạo asset + snapshot đầu tiên cùng lúc
+- **Mục tiêu:** Verify một call duy nhất sinh ra cả Asset row và AssetSnapshot row.
+- **Bước:**
+  ```python
+  svc = AssetService()
+  asset = await svc.create_asset(
+      user_id=USER_ID, asset_type='cash', subtype='bank_savings',
+      name='VCB', initial_value=Decimal('100000000'),
+  )
+  snapshots = await session.execute(
+      select(AssetSnapshot).where(AssetSnapshot.asset_id == asset.id)
+  )
+  ```
+- **Kết quả mong đợi:**
+  - `asset.id` là UUID, `asset.current_value == Decimal('100000000')`.
+  - Có **đúng 1** AssetSnapshot với `snapshot_date = today`, `value = 100000000`, `source = 'user_input'` (hoặc theo spec).
+
+### TC-1.3.H2 — `update_current_value()` create snapshot mới cho ngày khác
+- **Bước:**
+  1. Hôm nay: tạo asset 100tr (auto snapshot ngày 1).
+  2. Mock `date.today()` → ngày 2 (hoặc backdate snapshot ngày 1).
+  3. Gọi `svc.update_current_value(asset.id, USER_ID, Decimal('110000000'))`.
+- **Kết quả mong đợi:**
+  - `asset.current_value == 110000000`.
+  - Có 2 snapshot: ngày 1 (100tr), ngày 2 (110tr).
+  - `asset.last_valued_at` được update.
+
+### TC-1.3.H3 — `get_user_assets()` mặc định chỉ trả active
+- **Bước:** Tạo 3 asset (2 active, 1 đã `is_active=False`). Gọi `await svc.get_user_assets(USER_ID)`.
+- **Kết quả mong đợi:** Trả về 2 asset, không chứa cái inactive.
+
+### TC-1.3.H4 — `get_user_assets(include_inactive=True)` trả tất
+- **Bước:** Như trên, thêm `include_inactive=True`.
+- **Kết quả mong đợi:** Trả về cả 3 asset.
+
+### TC-1.3.H5 — `get_asset_by_id()` happy path
+- **Bước:** `await svc.get_asset_by_id(asset.id, USER_ID)`.
+- **Kết quả mong đợi:** Trả về Asset object, đúng id.
+
+### TC-1.3.H6 — `soft_delete()` không xóa cứng + giữ snapshots
+- **Bước:**
+  1. Tạo asset, có 3 snapshots.
+  2. `await svc.soft_delete(asset.id, USER_ID, sold_value=Decimal('120000000'))`.
+  3. Query lại bằng SQL trực tiếp.
+- **Kết quả mong đợi:**
+  - Asset row vẫn còn trong DB, `is_active=False`, `sold_at=today`, `sold_value=120000000`.
+  - 3 snapshots cũ vẫn còn (KHÔNG bị cascade delete).
+
+### TC-1.3.H7 — Service KHÔNG tự commit (theo layer contract)
+- **Mục tiêu:** Verify service chỉ flush, caller sở hữu transaction (CLAUDE.md §0.1).
+- **Bước:** Trong test, dùng session với `expire_on_commit=False`, không commit; rollback sau call. Verify không có row sót lại trong DB sau rollback.
+- **Kết quả mong đợi:** Asset KHÔNG xuất hiện sau rollback → chứng tỏ service không tự gọi `db.commit()`.
+
+## Corner Cases
+
+### TC-1.3.C1 — `create_asset()` với `current_value=None` → default = `initial_value`
+- **Bước:** `await svc.create_asset(..., initial_value=Decimal('50000000'), current_value=None)`.
+- **Kết quả mong đợi:** `asset.current_value == Decimal('50000000')`. Snapshot đầu tiên cũng có `value = 50000000`.
+
+### TC-1.3.C2 — Update value 2 lần cùng ngày → KHÔNG duplicate snapshot
+- **Bước:**
+  1. `create_asset(initial_value=100tr)` (auto snapshot today, value=100tr).
+  2. Cùng ngày: `update_current_value(asset.id, USER_ID, 105tr)`.
+  3. Cùng ngày: `update_current_value(asset.id, USER_ID, 110tr)`.
+- **Kết quả mong đợi:**
+  - Chỉ có **1** snapshot cho today.
+  - Snapshot value = `110000000` (giá trị cuối cùng), KHÔNG phải 100tr hay 105tr.
+  - UNIQUE(asset_id, snapshot_date) không raise conflict.
+
+### TC-1.3.C3 — `get_asset_by_id()` cross-user → reject (security)
+- **Bước:** User A tạo asset. User B gọi `get_asset_by_id(asset_id_of_A, USER_B_ID)`.
+- **Kết quả mong đợi:** Raise `ValueError` (hoặc trả `None` rõ ràng — document chọn behavior nào). **KHÔNG** trả về Asset của user A. **Critical security test.**
+
+### TC-1.3.C4 — `update_current_value()` cross-user → reject
+- **Bước:** User A tạo asset. User B gọi update.
+- **Kết quả mong đợi:** Raise `ValueError`. Asset của A KHÔNG bị thay đổi.
+
+### TC-1.3.C5 — `soft_delete()` cross-user → reject
+- **Bước:** User A tạo asset. User B gọi soft_delete.
+- **Kết quả mong đợi:** Raise `ValueError`. Asset của A vẫn `is_active=True`.
+
+### TC-1.3.C6 — `soft_delete()` asset đã inactive
+- **Bước:** Soft-delete asset đã `is_active=False`.
+- **Kết quả mong đợi:** Idempotent — không lỗi, hoặc raise rõ ràng "already deleted". Document chọn behavior nào.
+
+### TC-1.3.C7 — `update_current_value()` với value âm
+- **Bước:** `update_current_value(asset.id, USER_ID, Decimal('-1000000'))`.
+- **Kết quả mong đợi:** Raise `ValueError("current_value must be >= 0")`. **Service phải validate** (DB không có CHECK — xem TC-1.1.C9).
+
+### TC-1.3.C8 — `update_current_value()` với value = 0
+- **Bước:** `update_current_value(asset.id, USER_ID, Decimal('0'))`.
+- **Kết quả mong đợi:** Cho phép (asset mất giá hoàn toàn, hoặc TK rút sạch). Snapshot value=0.
+
+### TC-1.3.C9 — `create_asset()` với `initial_value` âm hoặc 0
+- **Bước:** `initial_value=Decimal('-100')` và `initial_value=Decimal('0')`.
+- **Kết quả mong đợi:**
+  - Âm: raise `ValueError`.
+  - Zero: cho phép (edge case rare, nhưng không nên crash).
+
+### TC-1.3.C10 — `get_user_assets()` với user không có asset nào
+- **Bước:** User mới tạo, chưa có asset. `await svc.get_user_assets(NEW_USER_ID)`.
+- **Kết quả mong đợi:** Trả về `[]` (empty list), KHÔNG raise, KHÔNG trả `None`.
+
+### TC-1.3.C11 — `create_asset()` với `acquired_at` future date
+- **Bước:** `acquired_at = date.today() + timedelta(days=30)`.
+- **Kết quả mong đợi:** Document behavior — hoặc reject, hoặc cho phép (user kế hoạch). Nếu cho phép, snapshot vẫn ở `today`, không ở future.
+
+### TC-1.3.C12 — `create_asset()` với metadata None vs empty dict
+- **Bước:** Tạo asset với `metadata=None` và `metadata={}`. Đọc lại.
+- **Kết quả mong đợi:** Cả 2 đều OK; service nên normalize về `{}` (theo spec line 411).
+
+### TC-1.3.C13 — Concurrent update cùng asset cùng ngày (race condition)
+- **Bước:** Async chạy 2 `update_current_value()` song song trên cùng asset.
+- **Kết quả mong đợi:** Không raise UNIQUE violation; cuối cùng snapshot value = một trong 2 giá trị (last-write-wins acceptable). KHÔNG có 2 row cho cùng (asset_id, today).
+
+### TC-1.3.C14 — `get_asset_by_id()` với UUID không tồn tại
+- **Bước:** `get_asset_by_id(uuid4(), USER_ID)` (random UUID).
+- **Kết quả mong đợi:** Trả về `None` hoặc raise `NotFoundError` rõ ràng. KHÔNG return một asset random.
+
+### TC-1.3.C15 — Decimal precision không bị mất qua service
+- **Bước:** `create_asset(initial_value=Decimal('123456789.99'))`. Đọc lại.
+- **Kết quả mong đợi:** `asset.current_value == Decimal('123456789.99')` exact.
+
+---
+
+# P3A-4 — NetWorthCalculator
+
+**Maps to AC:** `NetWorthBreakdown` + `NetWorthChange` dataclasses, `calculate()`, `calculate_historical()`, `calculate_change()`, edge cases (0 assets, no snapshots, just-created user), Decimal not float, DISTINCT ON performance.
+
+## Happy Path
+
+### TC-1.4.H1 — `calculate()` cộng đúng tổng + group by type
+- **Bước:** Setup user có:
+  - 2 cash: 50tr + 30tr = 80tr
+  - 1 stock: 100tr
+  - 1 gold: 20tr
+- Gọi `await NetWorthCalculator().calculate(USER_ID)`.
+- **Kết quả mong đợi:**
+  - `result.total == Decimal('200000000')`.
+  - `result.by_type == {'cash': Decimal('80000000'), 'stock': Decimal('100000000'), 'gold': Decimal('20000000')}`.
+  - `result.asset_count == 4`.
+  - `result.largest_asset` là asset stock 100tr.
+
+### TC-1.4.H2 — `calculate()` chỉ tính active assets
+- **Bước:** Setup 3 active (tổng 100tr) + 1 inactive (50tr). Gọi calculate.
+- **Kết quả mong đợi:** `total == 100000000`. Asset inactive KHÔNG được cộng.
+
+### TC-1.4.H3 — `calculate_historical()` lấy snapshot gần nhất ≤ target_date
+- **Bước:** Asset có snapshots:
+  - 2026-04-01: 100tr
+  - 2026-04-15: 110tr
+  - 2026-04-25: 120tr
+- Gọi `calculate_historical(USER_ID, date(2026, 4, 20))`.
+- **Kết quả mong đợi:** Trả về `Decimal('110000000')` (snapshot 04-15, là cái gần nhất ≤ 04-20).
+
+### TC-1.4.H4 — `calculate_change(period='day')` đúng
+- **Bước:** Net worth hôm qua 100tr, hôm nay 110tr. Gọi `calculate_change(USER_ID, 'day')`.
+- **Kết quả mong đợi:**
+  - `current == 110000000`, `previous == 100000000`.
+  - `change_absolute == 10000000`.
+  - `change_percentage == Decimal('10.00')` (10%, format theo spec).
+  - `period_label == 'day'` (hoặc tương đương).
+
+### TC-1.4.H5 — `calculate_change(period='week'|'month'|'year')` đều support
+- **Bước:** Lần lượt gọi với 4 period values: `'day'`, `'week'`, `'month'`, `'year'`.
+- **Kết quả mong đợi:** Cả 4 đều return `NetWorthChange` dataclass valid, KHÔNG raise.
+
+### TC-1.4.H6 — `NetWorthBreakdown` là dataclass với đủ field
+- **Bước:** Inspect type của result.
+- **Kết quả mong đợi:** Có exact attrs: `total`, `by_type`, `asset_count`, `largest_asset`. Tất cả money là `Decimal`.
+
+### TC-1.4.H7 — `NetWorthChange` là dataclass với đủ field
+- **Bước:** Inspect.
+- **Kết quả mong đợi:** Có `current`, `previous`, `change_absolute`, `change_percentage`, `period_label`. Money fields là `Decimal`.
+
+## Corner Cases
+
+### TC-1.4.C1 — User 0 assets → total=0, không crash
+- **Bước:** User mới, chưa có asset. Gọi `calculate(USER_ID)`.
+- **Kết quả mong đợi:**
+  - `result.total == Decimal('0')`.
+  - `result.by_type == {}`.
+  - `result.asset_count == 0`.
+  - `result.largest_asset is None`.
+  - **KHÔNG raise**, KHÔNG ZeroDivisionError.
+
+### TC-1.4.C2 — User 0 assets → `calculate_change()` không crash
+- **Bước:** Gọi `calculate_change(USER_ID, 'month')`.
+- **Kết quả mong đợi:**
+  - `current == 0`, `previous == 0`, `change_absolute == 0`.
+  - `change_percentage == 0` (KHÔNG ZeroDivisionError, KHÔNG NaN, KHÔNG `inf`).
+
+### TC-1.4.C3 — User vừa tạo (chưa có snapshot lịch sử) → previous=0
+- **Bước:** User tạo asset hôm nay. Hôm nay gọi `calculate_change(USER_ID, 'month')`.
+- **Kết quả mong đợi:** `previous == 0` (không có snapshot 1 tháng trước), `change_absolute == current`. KHÔNG raise.
+
+### TC-1.4.C4 — Tất cả money là `Decimal`, KHÔNG `float`
+- **Bước:**
+  ```python
+  result = await calc.calculate(USER_ID)
+  assert isinstance(result.total, Decimal)
+  for v in result.by_type.values(): assert isinstance(v, Decimal)
+  ```
+- **Kết quả mong đợi:** Pass. **CRITICAL** theo CLAUDE.md §13.
+
+### TC-1.4.C5 — `calculate_historical()` với date trước mọi snapshot
+- **Bước:** Snapshots sớm nhất 2026-04-01. Query với `date(2026, 1, 1)`.
+- **Kết quả mong đợi:** Trả về `Decimal('0')` (không có snapshot ≤ date này), KHÔNG raise.
+
+### TC-1.4.C6 — `calculate_historical()` với date trong tương lai
+- **Bước:** Query với `date.today() + timedelta(days=30)`.
+- **Kết quả mong đợi:** Trả về snapshot mới nhất hiện tại (= current). Document behavior nếu khác.
+
+### TC-1.4.C7 — `calculate_change(period='invalid')` 
+- **Bước:** `calculate_change(USER_ID, 'decade')` hoặc `''`.
+- **Kết quả mong đợi:** Raise `ValueError('unsupported period')` hoặc tương đương rõ ràng. KHÔNG silent fallback về `'day'`.
+
+### TC-1.4.C8 — Net worth giảm → change âm + emoji 📉 (consumer hint)
+- **Bước:** Hôm qua 100tr, hôm nay 80tr. `calculate_change(USER_ID, 'day')`.
+- **Kết quả mong đợi:** `change_absolute == -20000000`, `change_percentage == Decimal('-20.00')`. Sign giữ đúng (Decimal có dấu).
+
+### TC-1.4.C9 — `calculate_change()` khi `previous == 0` → KHÔNG ZeroDivisionError
+- **Bước:** User mới, asset đầu tiên hôm nay 100tr. Gọi `calculate_change(USER_ID, 'day')`.
+- **Kết quả mong đợi:**
+  - `previous == 0`, `current == 100000000`, `change_absolute == 100000000`.
+  - `change_percentage` xử lý phép chia 0: hoặc trả `0`, hoặc `Decimal('Infinity')` được handle, hoặc `None`. **Document rõ contract** — KHÔNG raise ZeroDivisionError.
+
+### TC-1.4.C10 — DISTINCT ON performance trên dataset lớn
+- **Mục tiêu:** Verify query historical KHÔNG là N+1.
+- **Bước:**
+  1. Setup user với 50 assets, mỗi asset 100 snapshots (=5000 rows).
+  2. Bật log SQL.
+  3. Gọi `calculate_historical(USER_ID, some_date)`.
+- **Kết quả mong đợi:**
+  - **Đúng 1 query** dùng `DISTINCT ON (asset_id) ... ORDER BY asset_id, snapshot_date DESC` (hoặc tương đương 1 query window function).
+  - KHÔNG có 50 query lẻ tẻ.
+  - Wall-clock < 200ms.
+
+### TC-1.4.C11 — Cross-user isolation: user B không thấy asset của user A
+- **Bước:** User A có 5 asset 200tr. User B 0 asset. `calculate(USER_B_ID)`.
+- **Kết quả mong đợi:** `total == 0`. **Critical security test** — query phải có `WHERE user_id = :user_id`.
+
+### TC-1.4.C12 — `largest_asset` khi nhiều asset cùng giá trị max
+- **Bước:** 2 asset đều 100tr (tied for largest).
+- **Kết quả mong đợi:** Trả về 1 trong 2 (deterministic theo `created_at` ASC hoặc id) — document rule rõ. KHÔNG random mỗi call.
+
+### TC-1.4.C13 — `calculate_change()` với asset bị soft-delete giữa kỳ
+- **Bước:**
+  1. Hôm qua: 2 asset (50tr + 50tr = 100tr). Snapshot 2 cái.
+  2. Hôm nay: soft-delete 1 asset. `current` chỉ còn 50tr.
+  3. Gọi `calculate_change(USER_ID, 'day')`.
+- **Kết quả mong đợi:**
+  - `previous == 100000000` (lúc đó cả 2 active).
+  - `current == 50000000` (chỉ còn 1 active).
+  - `change_absolute == -50000000`. **Document:** `calculate_historical()` chỉ filter snapshot, KHÔNG filter is_active của asset hiện tại — có thể dẫn đến confusion. Cần spec rõ semantics.
+
+### TC-1.4.C14 — Multiple snapshots cùng asset cùng ngày → lấy 1 (theo UNIQUE)
+- **Bước:** UNIQUE constraint từ migration đảm bảo chỉ 1 snapshot/ngày/asset. Verify query historical không double-count.
+- **Kết quả mong đợi:** Total của 1 asset trong 1 ngày = đúng 1 lần value của nó.
+
+### TC-1.4.C15 — Round/precision của `change_percentage`
+- **Bước:** previous=300tr, current=333,333,333. Tính %.
+- **Kết quả mong đợi:** Trả về `Decimal` với precision rõ ràng (vd 2 chữ số: `11.11`). KHÔNG float lệch (`11.111111111111`). Document số chữ số thập phân.
+
+---
+
+> **DỪNG TẠI ĐÂY** — Các issue P3A-5 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
