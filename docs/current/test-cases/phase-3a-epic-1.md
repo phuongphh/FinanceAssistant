@@ -538,4 +538,261 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
 
 ---
 
-> **DỪNG TẠI ĐÂY** — Các issue P3A-5 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
+# P3A-5 — Wealth Level Detection (Ladder)
+
+**Maps to AC:** `WealthLevel` enum, `detect_level()` đúng 4 bracket, `next_milestone()` đúng target + level, boundary values (29tr, 30tr, 200tr, 1tỷ), update `user.wealth_level` khi asset thay đổi.
+
+## Happy Path
+
+### TC-1.5.H1 — `WealthLevel` enum đầy đủ 4 values
+- **Bước:** `python -c "from app.wealth.ladder import WealthLevel; print([e.value for e in WealthLevel])"`
+- **Kết quả mong đợi:** Output đúng 4: `['starter', 'young_prof', 'mass_affluent', 'hnw']`.
+
+### TC-1.5.H2 — `detect_level()` cho 4 mid-range values
+- **Bước:**
+  ```python
+  detect_level(Decimal('10_000_000'))      # → STARTER
+  detect_level(Decimal('100_000_000'))     # → YOUNG_PROFESSIONAL
+  detect_level(Decimal('500_000_000'))     # → MASS_AFFLUENT
+  detect_level(Decimal('5_000_000_000'))   # → HIGH_NET_WORTH
+  ```
+- **Kết quả mong đợi:** Trả về đúng enum tương ứng.
+
+### TC-1.5.H3 — `detect_level(Decimal('0'))` → STARTER
+- **Bước:** `detect_level(Decimal('0'))`.
+- **Kết quả mong đợi:** `WealthLevel.STARTER`. User mới 0 đồng vẫn ở Starter.
+
+### TC-1.5.H4 — `next_milestone()` cho user starter
+- **Bước:** `next_milestone(Decimal('15_000_000'))`.
+- **Kết quả mong đợi:** Trả về `(Decimal('30_000_000'), WealthLevel.YOUNG_PROFESSIONAL)`.
+
+### TC-1.5.H5 — `next_milestone()` step trong YOUNG_PROFESSIONAL bracket
+- **Bước:** Theo spec line 656-665 có sub-milestones:
+  - `next_milestone(Decimal('50_000_000'))` → `(100_000_000, YOUNG_PROFESSIONAL)`.
+  - `next_milestone(Decimal('150_000_000'))` → `(200_000_000, MASS_AFFLUENT)`.
+- **Kết quả mong đợi:** Đúng từng step.
+
+### TC-1.5.H6 — `next_milestone()` step trong MASS_AFFLUENT bracket
+- **Bước:**
+  - `next_milestone(Decimal('300_000_000'))` → `(500_000_000, MASS_AFFLUENT)`.
+  - `next_milestone(Decimal('700_000_000'))` → `(1_000_000_000, HIGH_NET_WORTH)`.
+
+### TC-1.5.H7 — Update `user.wealth_level` khi asset thay đổi
+- **Bước:**
+  1. User có 25tr (starter). Verify `user.wealth_level == 'starter'`.
+  2. Tạo thêm asset 10tr (tổng 35tr).
+  3. Reload user từ DB.
+- **Kết quả mong đợi:** `user.wealth_level == 'young_prof'` (auto-recompute trong `create_asset` hoặc trigger sau create).
+
+## Corner Cases
+
+### TC-1.5.C1 — Boundary 30tr — exclusive vs inclusive
+- **Bước:**
+  ```python
+  detect_level(Decimal('29_999_999'))   # → STARTER (still <30tr)
+  detect_level(Decimal('30_000_000'))   # → YOUNG_PROFESSIONAL (theo spec line 644-645: < 30tr STARTER)
+  ```
+- **Kết quả mong đợi:** Đúng 30tr là **YOUNG_PROFESSIONAL** (vì điều kiện `< 30_000_000`). **Quan trọng** — verify off-by-one không xảy ra.
+
+### TC-1.5.C2 — Boundary 200tr
+- **Bước:**
+  - `detect_level(Decimal('199_999_999'))` → YOUNG_PROFESSIONAL.
+  - `detect_level(Decimal('200_000_000'))` → MASS_AFFLUENT.
+- **Kết quả mong đợi:** Đúng theo spec `< 200_000_000`.
+
+### TC-1.5.C3 — Boundary 1 tỷ
+- **Bước:**
+  - `detect_level(Decimal('999_999_999'))` → MASS_AFFLUENT.
+  - `detect_level(Decimal('1_000_000_000'))` → HIGH_NET_WORTH.
+- **Kết quả mong đợi:** Đúng.
+
+### TC-1.5.C4 — `next_milestone()` cho HNW (logic theo tỷ)
+- **Bước:**
+  - `next_milestone(Decimal('1_000_000_000'))` → `(2_000_000_000, HNW)` (tỷ tiếp theo).
+  - `next_milestone(Decimal('2_500_000_000'))` → `(3_000_000_000, HNW)`.
+  - `next_milestone(Decimal('15_700_000_000'))` → `(16_000_000_000, HNW)`.
+- **Kết quả mong đợi:** Tăng dần theo `floor(net_worth / 1tỷ) + 1`.
+
+### TC-1.5.C5 — `detect_level()` với giá trị âm (data corruption)
+- **Bước:** `detect_level(Decimal('-1000'))`.
+- **Kết quả mong đợi:** Trả về `STARTER` (an toàn) hoặc raise `ValueError`. Document chọn behavior nào — KHÔNG crash silently.
+
+### TC-1.5.C6 — `detect_level(Decimal('0.01'))` (precision tí)
+- **Bước:** Net worth = 1 cent.
+- **Kết quả mong đợi:** STARTER. Decimal arithmetic ổn định (không bị float lệch).
+
+### TC-1.5.C7 — `next_milestone()` cho user vừa đạt boundary
+- **Bước:** Net worth = đúng 30tr.
+- **Kết quả mong đợi:** Theo spec line 658: `< 100_000_000` → trả về `(100_000_000, YOUNG_PROFESSIONAL)`. Verify user vừa lên YP được prompt mục tiêu 100tr (chứ không loop về 30tr).
+
+### TC-1.5.C8 — `wealth_level` recompute KHÔNG bị stale khi user soft-delete asset
+- **Bước:**
+  1. User 35tr (young_prof). Soft-delete asset 10tr → còn 25tr.
+  2. Reload user.
+- **Kết quả mong đợi:** `user.wealth_level == 'starter'` (giảm cấp). Verify cả 2 chiều: lên cấp + xuống cấp đều update.
+
+### TC-1.5.C9 — `wealth_level` recompute trigger ở update_current_value()
+- **Bước:** User có 1 asset 25tr. Update giá trị lên 35tr (qua `update_current_value`).
+- **Kết quả mong đợi:** `user.wealth_level` chuyển `starter` → `young_prof`. KHÔNG chỉ trigger ở create.
+
+### TC-1.5.C10 — Boundary với Decimal precision khó (29.99999999tr)
+- **Bước:** `detect_level(Decimal('29999999.99'))`.
+- **Kết quả mong đợi:** STARTER (vẫn `< 30_000_000`).
+
+### TC-1.5.C11 — `next_milestone()` trả về (Decimal, WealthLevel)
+- **Bước:** Inspect type của return.
+- **Kết quả mong đợi:** Tuple `(Decimal, WealthLevel)`. Money là Decimal, KHÔNG int hay float.
+
+### TC-1.5.C12 — Cross-user wealth_level không ảnh hưởng nhau
+- **Bước:** User A 35tr (YP). User B 5tr (Starter). Update A lên 250tr (Mass Affluent).
+- **Kết quả mong đợi:** B vẫn Starter, KHÔNG bị side-effect.
+
+### TC-1.5.C13 — `wealth_level` không bị flicker khi value sát boundary
+- **Bước:** User 30,000,000 đúng (YP). Update value xuống 29,999,999 → lên lại 30,000,001.
+- **Kết quả mong đợi:** Mỗi lần level chuyển đúng (YP → Starter → YP). Không có race / cache stale.
+
+---
+
+# P3A-6 — Asset Entry Wizard: Cash Flow
+
+**Maps to AC:** `start_cash_wizard()`, `handle_cash_subtype()`, `handle_cash_text_input()` parse flexible, save với `source="user_input"`, confirmation + net worth update, "Thêm tài sản khác" button, validation âm/zero, error parse → ask graceful.
+
+> **Setup:** Test qua Telegram bot trên test account, hoặc unit test handler với mock Update/Context.
+
+## Happy Path
+
+### TC-1.6.H1 — `/start` → `start_cash_wizard()` show 4 subtype buttons
+- **Bước:** Trong onboarding hoặc gọi command `/them_tai_san` → chọn "Tiền mặt / TK".
+- **Kết quả mong đợi:**
+  - Bot hiển thị message "💵 Tiền ở đâu?" (theo spec line 749).
+  - 4 inline buttons: "🏦 Tiết kiệm ngân hàng", "💳 Tài khoản thanh toán", "💵 Tiền mặt", "📱 Ví điện tử".
+  - Callback data: `cash_subtype:bank_savings|bank_checking|cash|e_wallet`.
+
+### TC-1.6.H2 — Tap "Tiết kiệm ngân hàng" → ask tên + số tiền
+- **Bước:** Tap button "🏦 Tiết kiệm ngân hàng".
+- **Kết quả mong đợi:**
+  - Bot reply "💬 Tên ngân hàng + số tiền\n\nVí dụ: 'VCB 100 triệu' hoặc 'Techcom 50tr'".
+  - `context.user_data["asset_draft"] == {"asset_type": "cash", "subtype": "bank_savings"}`.
+  - `context.user_data["asset_draft_step"] == "cash_amount"`.
+
+### TC-1.6.H3 — Parse "VCB 100 triệu" → save asset đúng
+- **Bước:** Sau khi chọn bank_savings, gửi message "VCB 100 triệu".
+- **Kết quả mong đợi:**
+  - Asset được tạo: `name='VCB'`, `asset_type='cash'`, `subtype='bank_savings'`, `initial_value=Decimal('100000000')`, `current_value=Decimal('100000000')`.
+  - `source = 'user_input'` (verify qua DB hoặc API).
+  - Bot reply confirmation message + net worth update mới.
+
+### TC-1.6.H4 — Parse "Techcom 50tr" (variant ngắn)
+- **Bước:** Gửi "Techcom 50tr".
+- **Kết quả mong đợi:** `name='Techcom'`, `initial_value=Decimal('50000000')`.
+
+### TC-1.6.H5 — Parse "MoMo 2tr" (e-wallet)
+- **Bước:** Subtype `e_wallet`, gửi "MoMo 2tr".
+- **Kết quả mong đợi:** `name='MoMo'`, `initial_value=Decimal('2000000')`, `subtype='e_wallet'`.
+
+### TC-1.6.H6 — Parse "Tiết kiệm 500 nghìn"
+- **Bước:** Gửi "Tiết kiệm 500 nghìn".
+- **Kết quả mong đợi:** `name='Tiết kiệm'`, `initial_value=Decimal('500000')`.
+
+### TC-1.6.H7 — Sau save: hiển thị confirm + net worth + offer "Thêm tài sản khác"
+- **Bước:** Sau khi parse + save thành công.
+- **Kết quả mong đợi:**
+  - Confirmation message có icon ✅, tên asset, value formatted (vd "100tr").
+  - Net worth mới hiển thị (gọi `NetWorthCalculator`).
+  - Inline keyboard 2 buttons: "➕ Thêm tài sản khác" (callback `asset_add:start`) + "✅ Xong rồi" (callback `asset_add:done`).
+
+### TC-1.6.H8 — `context.user_data["asset_draft"]` clear sau save
+- **Bước:** Inspect `context.user_data` sau khi save xong.
+- **Kết quả mong đợi:** Cả `asset_draft` và `asset_draft_step` bị `pop()` — KHÔNG leak vào flow tiếp theo.
+
+### TC-1.6.H9 — "Tiền mặt" subtype không cần tên ngân hàng
+- **Bước:** Tap "💵 Tiền mặt" → gửi "5 triệu".
+- **Kết quả mong đợi:** Asset name fallback = "Tài khoản" (theo spec line 858) hoặc "Tiền mặt". `initial_value = 5000000`.
+
+## Corner Cases
+
+### TC-1.6.C1 — Parse số âm "VCB -100tr" → reject
+- **Bước:** Gửi "VCB -100 triệu".
+- **Kết quả mong đợi:** Bot reply "Số tiền phải lớn hơn 0 nhé" (hoặc tương đương ấm áp). KHÔNG tạo asset. State giữ nguyên `cash_amount` để user retry.
+
+### TC-1.6.C2 — Parse số 0 "VCB 0" → reject
+- **Bước:** "VCB 0".
+- **Kết quả mong đợi:** Reject với message rõ. Asset KHÔNG được tạo.
+
+### TC-1.6.C3 — Parse fail "abc xyz qwe" → ask graceful
+- **Bước:** Gửi text vô nghĩa.
+- **Kết quả mong đợi:** Bot reply theo spec line 802-805: "Mình chưa hiểu lắm 😅 Bạn thử lại theo format 'Tên + số tiền' nhé?\nVí dụ: 'VCB 100 triệu'". State KHÔNG reset, user có thể retry mà không phải tap lại subtype.
+
+### TC-1.6.C4 — Parse chỉ có số "100tr" (thiếu tên)
+- **Bước:** Gửi "100tr" (không có tên).
+- **Kết quả mong đợi:** Asset được tạo với name fallback (vd "Tài khoản" theo spec line 858). KHÔNG raise.
+
+### TC-1.6.C5 — Parse chỉ có tên "VCB" (thiếu số)
+- **Bước:** Gửi "VCB" (không có amount).
+- **Kết quả mong đợi:** Reject — `parse_cash_input` trả None → bot ask retry.
+
+### TC-1.6.C6 — Số rất lớn "VCB 100 tỷ"
+- **Bước:** "VCB 100 tỷ".
+- **Kết quả mong đợi:** `initial_value = Decimal('100000000000')`. Lưu được, hiển thị format "100 tỷ" hoặc "100,000tr".
+
+### TC-1.6.C7 — Số có dấu phẩy/chấm "VCB 1,500,000"
+- **Bước:** "VCB 1,500,000".
+- **Kết quả mong đợi:** Parse đúng `1_500_000`. Test thêm: "1.500.000" (kiểu VN), "1500000" (raw).
+
+### TC-1.6.C8 — Text input không trong wizard mode → handler trả False
+- **Bước:** User KHÔNG ở step `cash_amount` (vd vừa start, chưa chọn subtype). Gửi text.
+- **Kết quả mong đợi:** `handle_cash_text_input` return `False` (theo spec line 793-794) — message được route cho handler khác. KHÔNG crash, KHÔNG tạo asset nhầm.
+
+### TC-1.6.C9 — User tap subtype 2 lần (race / double click)
+- **Bước:** Tap "bank_savings" → tap "e_wallet" trước khi gửi text.
+- **Kết quả mong đợi:** Subtype cuối cùng (`e_wallet`) được lưu vào draft. Bot show prompt mới cho e_wallet, ghi đè prompt cũ.
+
+### TC-1.6.C10 — User abandon flow giữa chừng (timeout / quên)
+- **Bước:** Tap subtype, đợi 1 giờ, gửi text.
+- **Kết quả mong đợi:** Hoặc:
+  - State vẫn còn (Telegram persistent context) → save normal.
+  - Hoặc state đã expire → bot ask "Bạn đang định thêm gì nhỉ?". Document timeout policy.
+
+### TC-1.6.C11 — Send sticker / photo trong cash_amount step
+- **Bước:** Đang ở step `cash_amount`, gửi sticker thay vì text.
+- **Kết quả mong đợi:** Bot reply "Mình chỉ hiểu text thôi nhé, gửi lại theo format 'Tên + số tiền'". KHÔNG crash.
+
+### TC-1.6.C12 — Tên có dấu tiếng Việt "Vietcombank"
+- **Bước:** "Vietcombank 100tr".
+- **Kết quả mong đợi:** `name='Vietcombank'`. UTF-8 round-trip qua DB không lỗi.
+
+### TC-1.6.C13 — Tên dài bất thường (>200 chars)
+- **Bước:** Gửi name 500 ký tự + số.
+- **Kết quả mong đợi:** Hoặc truncate về 200 (theo `varchar(200)` của DB), hoặc reject với message "Tên ngân hàng quá dài". KHÔNG raise SQLAlchemy lỗi crash bot.
+
+### TC-1.6.C14 — Số tiền cực nhỏ "VCB 1 đồng"
+- **Bước:** Gửi "VCB 1".
+- **Kết quả mong đợi:** Lưu `initial_value=Decimal('1')`. Edge case rare nhưng không crash.
+
+### TC-1.6.C15 — Parse multiline "VCB\n100tr"
+- **Bước:** Text có newline giữa name và amount.
+- **Kết quả mong đợi:** Hoặc parse được (strip whitespace), hoặc reject với message rõ. Document.
+
+### TC-1.6.C16 — Confirmation message format tiền đúng VN style
+- **Bước:** Save asset 1,500,000.
+- **Kết quả mong đợi:** Confirmation hiển thị "1.5tr" hoặc "1,500,000đ" theo `currency_utils.format_money_short` (CLAUDE.md §13). KHÔNG raw "1500000".
+
+### TC-1.6.C17 — Tap "Thêm tài sản khác" → restart wizard sạch
+- **Bước:** Sau save, tap "➕ Thêm tài sản khác".
+- **Kết quả mong đợi:** Quay về `start_asset_entry_wizard()` với 6 buttons. Draft state đã clear. Asset cũ không bị duplicate.
+
+### TC-1.6.C18 — Tap "Xong rồi" → exit về main menu
+- **Bước:** Tap "✅ Xong rồi".
+- **Kết quả mong đợi:** Bot show main menu hoặc summary. KHÔNG còn ở wizard mode.
+
+### TC-1.6.C19 — Cross-user: User A's draft KHÔNG ảnh hưởng User B
+- **Bước:** A đang ở giữa wizard, B cũng start wizard cùng lúc.
+- **Kết quả mong đợi:** Mỗi user có context riêng (Telegram per-user). Asset của A được tạo cho user_id A, B cho B. Không leak.
+
+### TC-1.6.C20 — Wizard cancel command "/cancel" hoặc "/huy"
+- **Bước:** Đang giữa wizard, gửi `/cancel`.
+- **Kết quả mong đợi:** Bot xác nhận hủy, clear draft, về main menu. (Nếu spec không có cancel command, document và đề xuất add.)
+
+---
+
+> **DỪNG TẠI ĐÂY** — Các issue P3A-7 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
