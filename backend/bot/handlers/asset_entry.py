@@ -32,7 +32,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
-from backend.bot.formatters.wealth_formatter import format_asset_added
+from backend.bot.formatters.wealth_formatter import format_asset_added, format_asset_list
 from backend.bot.keyboards.asset_keyboard import (
     add_more_keyboard,
     asset_type_picker_keyboard,
@@ -90,6 +90,18 @@ async def start_asset_wizard(
         reply_markup=asset_type_picker_keyboard(),
     )
     analytics.track(AssetEvent.WIZARD_OPENED, user_id=user.id)
+
+
+async def list_assets(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Handle /taisan — display all active assets for the user."""
+    assets = await asset_service.get_user_assets(db, user.id)
+    await send_message(
+        chat_id=chat_id,
+        text=format_asset_list(assets),
+        parse_mode="HTML",
+    )
 
 
 # ---------- Cash flow -------------------------------------------------
