@@ -162,3 +162,142 @@
   - Confirmation hiển thị tên đúng dấu (UTF-8 không bị mất).
   - Trong dashboard, tên asset cũng giữ đúng dấu.
 
+### TC-1.6.C12 — Tên dài bất thường (>200 chars) → bot xử lý gracefully
+- **Bước:** Gửi tên ~500 ký tự + số (vd "AAAAAAA…AAA 100tr").
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot lưu nhưng tên bị truncate (vd hiển thị 200 ký tự đầu trong confirmation).
+  - Hoặc bot reject với message "Tên ngân hàng quá dài, ngắn lại giúp mình nhé".
+  - **KHÔNG** crash bot (im lặng / không reply trong 5s = fail).
+
+### TC-1.6.C13 — Số tiền cực nhỏ "VCB 1 đồng"
+- **Bước:** Gửi "VCB 1".
+- **Kết quả mong đợi (user thấy):**
+  - Save thành công với value = 1đ.
+  - Confirmation hiển thị "1đ" (hoặc tương đương). Edge case rare nhưng không crash.
+
+### TC-1.6.C14 — Multiline "VCB\n100tr" (newline giữa tên và số)
+- **Bước:** Gửi message 2 dòng: dòng 1 "VCB", dòng 2 "100tr".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot parse được (hiểu newline như space) → save asset "VCB · 100tr".
+  - Hoặc bot reject với hint format "Tên + số tiền cùng 1 dòng".
+  - **KHÔNG** lưu asset có name = "VCB\n100tr" (literal newline trong tên).
+
+### TC-1.6.C15 — Confirmation message format tiền đúng VN style
+- **Bước:** Save asset 1.500.000đ.
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation hiển thị "1.5tr" hoặc "1,500,000đ" — format ngắn/đầy đủ theo style VN.
+  - **KHÔNG** raw "1500000" hay "1500000.00".
+
+### TC-1.6.C16 — Tap "Thêm tài sản khác" → restart wizard từ đầu
+- **Bước:** Sau khi save 1 cash asset, tap "➕ Thêm tài sản khác".
+- **Kết quả mong đợi (user thấy):**
+  - Bot quay về menu chọn loại asset (6 buttons: Cash, Stock, Real Estate, Crypto, Gold, Other).
+  - Asset đã save trước đó **không** bị duplicate khi user chọn lại Cash + nhập asset mới.
+
+### TC-1.6.C17 — Tap "✅ Xong rồi" → exit về main menu
+- **Bước:** Sau khi save, tap "✅ Xong rồi".
+- **Kết quả mong đợi (user thấy):**
+  - Bot show main menu hoặc summary message (vd "Tổng net worth của bạn: …").
+  - Gõ text bất kỳ sau đó bot không còn hiểu là trong wizard mode.
+
+### TC-1.6.C18 — Cross-user: asset User A không lẫn vào User B
+- **Bước:** User A đang giữa cash wizard. User B trên account khác cùng start cash wizard và nhập "BIDV 50tr".
+- **Kết quả mong đợi:**
+  - User B thấy confirmation "BIDV 50tr · Net worth: 50tr" (riêng B, không bao gồm asset của A).
+  - User A khi gõ tiếp text ở wizard của mình, asset save vào account A — KHÔNG xuất hiện trong dashboard B.
+
+### TC-1.6.C19 — Hủy giữa wizard bằng `/huy` hoặc `/cancel`
+- **Bước:** Đang ở step nhập tên/số tiền, gửi `/huy` (hoặc `/cancel` nếu spec dùng).
+- **Kết quả mong đợi (user thấy):**
+  - Bot xác nhận hủy ("Đã hủy thêm tài sản 👌" hoặc tương đương).
+  - Quay về main menu — gõ text sau đó không còn lưu thành asset.
+  - Nếu spec chưa có cancel command, bot reply "Mình chưa hỗ trợ /huy" — document gap nhưng KHÔNG crash.
+
+---
+
+# P3A-7 — Asset Entry Wizard: Stock Flow
+
+**Maps to AC:** `start_stock_wizard()`, `handle_stock_ticker()`, `handle_stock_quantity()`, `handle_stock_price()`, `handle_stock_current_price()` (same/new), metadata `{ticker, quantity, avg_price, exchange}`, support subtypes `vn_stock|fund|etf|foreign_stock`, ticker không tồn tại vẫn lưu (Phase 3B validate), normalize "VNM stocks" → "VNM", `initial_value = quantity * avg_price`, `current_value = quantity * current_price`.
+
+> **Setup:** Onboard xong, gửi `/them_tai_san` → tap "📈 Chứng khoán". Hoặc onboarding step 6 → tap "📈 Tôi có đầu tư".
+
+## Happy Path
+
+### TC-1.7.H1 — Vào stock wizard → bot ask ticker
+- **Bước:** Trigger callback `asset_add:stock` (qua menu hoặc onboarding).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "📈 Cổ phiếu / Quỹ mới\n\nMã cổ phiếu (ticker) là gì?\n\nVí dụ: VNM, VIC, HPG, E1VFVN30".
+  - Bot không show keyboard (chờ user gõ ticker).
+
+### TC-1.7.H2 — Gõ "VNM" → bot xác nhận + ask quantity
+- **Bước:** Gửi text "VNM".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ VNM\n\nBạn đang sở hữu bao nhiêu cổ phiếu?".
+  - Bot chờ số lượng (next step).
+
+### TC-1.7.H3 — Ticker lower-case "vnm" → bot tự upper-case
+- **Bước:** Gửi "vnm" (lower).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ VNM" (chữ hoa) — confirm rằng bot đã normalize.
+  - Sau khi save, dashboard hiển thị ticker "VNM" (không phải "vnm").
+
+### TC-1.7.H4 — Ticker có whitespace "  HPG  " → bot strip
+- **Bước:** Gửi "  HPG  " (có space ở đầu/cuối).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ HPG" (không có space).
+  - Asset cuối cùng hiển thị ticker đúng "HPG", không có space leak.
+
+### TC-1.7.H5 — Quantity "100" → bot xác nhận + ask giá mua
+- **Bước:** Step ask quantity, gửi "100".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ 100 cổ phiếu\n\nGiá mua trung bình mỗi cổ phiếu?\n(Ví dụ: '45000' hoặc '45k')".
+
+### TC-1.7.H6 — Quantity với dấu phẩy "1,000"
+- **Bước:** Gửi "1,000".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ 1.000 cổ phiếu" (hoặc "1,000") — parse đúng = 1000, KHÔNG = 1.
+
+### TC-1.7.H7 — Quantity dạng VN "1.000" (dấu chấm phân cách nghìn)
+- **Bước:** Gửi "1.000".
+- **Kết quả mong đợi (user thấy):**
+  - Bot xác nhận "1.000 cổ phiếu" — parse đúng = 1000 (KHÔNG nhầm thành 1.0 = 1).
+
+### TC-1.7.H8 — Giá "45000" → bot tính total + offer "Dùng giá mua / Nhập giá hiện tại"
+- **Bước:** Step ask price, gửi "45000".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply có dòng "Tổng giá vốn: 4.500.000đ" (hoặc "4.5tr") — đúng = 100 × 45.000.
+  - Inline keyboard 2 buttons: "Dùng 45,000đ (giá mua)" và "Nhập giá hiện tại".
+
+### TC-1.7.H9 — Giá "45k" (dạng ngắn) → parse được
+- **Bước:** Gửi "45k".
+- **Kết quả mong đợi (user thấy):**
+  - Bot tính tổng = 100 × 45.000 = 4.5tr (giống TC-1.7.H8). Format ngắn parse đúng.
+
+### TC-1.7.H10 — Tap "Dùng giá mua" → save asset với current = avg price
+- **Bước:** Tap button "Dùng 45,000đ (giá mua)".
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation message: "✅ VNM × 100 cp · 4.5tr" (hoặc tương đương).
+  - Net worth update tăng đúng 4.5tr.
+  - Inline keyboard "➕ Thêm tài sản khác" + "✅ Xong rồi".
+
+### TC-1.7.H11 — Tap "Nhập giá hiện tại" → bot ask, gõ "50000" → save với gain
+- **Bước:**
+  1. Tap "Nhập giá hiện tại".
+  2. Bot ask "Giá hiện tại của cổ phiếu?".
+  3. Gửi "50000".
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation hiển thị "VNM × 100 cp · 5tr" (current value = 100 × 50.000).
+  - Có thể có dòng gain "📈 +500k" (= 5tr - 4.5tr).
+  - Net worth tăng = 5tr (KHÔNG phải 4.5tr).
+
+### TC-1.7.H12 — Subtype mặc định = vn_stock (HOSE)
+- **Bước:** Save VNM 100 × 45.000 (không chọn subtype rõ ràng).
+- **Kết quả mong đợi (user thấy):**
+  - Trong dashboard, asset VNM gán nhãn "Cổ phiếu VN" hoặc icon 📈 với exchange HOSE.
+  - Phân biệt được với fund/ETF (nếu có nhãn riêng).
+
+### TC-1.7.H13 — Confirmation hiển thị format VN
+- **Bước:** Save 100 cp × 45.000.
+- **Kết quả mong đợi (user thấy):**
+  - Hiển thị "4.5tr" hoặc "4,500,000đ" — KHÔNG raw "4500000" hay "4500000.00".
+
