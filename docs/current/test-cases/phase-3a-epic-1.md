@@ -795,4 +795,415 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
 
 ---
 
-> **DỪNG TẠI ĐÂY** — Các issue P3A-7 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
+# P3A-7 — Asset Entry Wizard: Stock Flow
+
+**Maps to AC:** `start_stock_wizard()`, `handle_stock_ticker()`, `handle_stock_quantity()`, `handle_stock_price()`, `handle_stock_current_price()` (same/new), metadata `{ticker, quantity, avg_price, exchange}`, support subtypes `vn_stock|fund|etf|foreign_stock`, ticker không tồn tại vẫn lưu (Phase 3B validate), normalize "VNM stocks" → "VNM", `initial_value = quantity * avg_price`, `current_value = quantity * current_price`.
+
+> **Setup:** Như P3A-6 (Telegram test account hoặc unit test với mock Update/Context). Đã chọn loại "📈 Chứng khoán" từ wizard chính (callback `asset_add:stock`).
+
+## Happy Path
+
+### TC-1.7.H1 — `start_stock_wizard()` show prompt nhập ticker
+- **Mục tiêu:** Verify entry point của stock flow đúng spec.
+- **Bước:** Trigger callback `asset_add:stock` (hoặc gọi trực tiếp `start_stock_wizard()`).
+- **Kết quả mong đợi:**
+  - Bot reply text "📈 Cổ phiếu / Quỹ mới\n\nMã cổ phiếu (ticker) là gì?\n\nVí dụ: VNM, VIC, HPG, E1VFVN30" (theo spec line 874-878).
+  - `context.user_data["asset_draft"] == {"asset_type": "stock"}`.
+  - `context.user_data["asset_draft_step"] == "stock_ticker"`.
+
+### TC-1.7.H2 — `handle_stock_ticker()` lưu ticker upper-case + chuyển step
+- **Bước:** Đang ở step `stock_ticker`, gửi text "VNM".
+- **Kết quả mong đợi:**
+  - `context.user_data["asset_draft"]["metadata"] == {"ticker": "VNM"}`.
+  - `context.user_data["asset_draft_step"] == "stock_quantity"`.
+  - Bot reply "✅ VNM\n\nBạn đang sở hữu bao nhiêu cổ phiếu?" (spec line 891-894).
+
+### TC-1.7.H3 — Ticker lower-case "vnm" → normalize uppercase "VNM"
+- **Bước:** Gửi "vnm" (lower).
+- **Kết quả mong đợi:** Metadata lưu `ticker == 'VNM'` (theo spec dùng `.strip().upper()` line 887).
+
+### TC-1.7.H4 — Ticker có whitespace "  HPG  " → strip
+- **Bước:** Gửi "  HPG  ".
+- **Kết quả mong đợi:** `ticker == 'HPG'`. Không có space leak vào DB.
+
+### TC-1.7.H5 — `handle_stock_quantity()` parse integer thuần
+- **Bước:** Đang ở step `stock_quantity`, gửi "100".
+- **Kết quả mong đợi:**
+  - `metadata["quantity"] == 100` (int, không Decimal cho quantity).
+  - `asset_draft_step == 'stock_price'`.
+  - Bot reply "✅ 100 cổ phiếu\n\nGiá mua trung bình mỗi cổ phiếu?\n(Ví dụ: '45000' hoặc '45k')".
+
+### TC-1.7.H6 — Parse quantity với dấu phẩy "1,000"
+- **Bước:** Gửi "1,000".
+- **Kết quả mong đợi:** `quantity == 1000` (theo spec line 903 `replace(",", "").replace(".", "")`).
+
+### TC-1.7.H7 — Parse quantity dạng VN "1.000" (dấu chấm phân cách nghìn)
+- **Bước:** Gửi "1.000".
+- **Kết quả mong đợi:** `quantity == 1000`.
+
+### TC-1.7.H8 — `handle_stock_price()` parse "45000" → lưu avg_price + tính total_value
+- **Bước:** Step `stock_price`, gửi "45000".
+- **Kết quả mong đợi:**
+  - `metadata["avg_price"] == 45000` (Decimal hoặc number).
+  - Bot tính `total_value = 100 * 45000 = 4_500_000` và hiển thị (spec line 947-948).
+  - Reply có 2 inline buttons: "Dùng 45,000đ (giá mua)" (callback `stock_price:same`) và "Nhập giá hiện tại" (callback `stock_price:new`).
+
+### TC-1.7.H9 — Parse avg_price dạng "45k" qua `parse_transaction_text`
+- **Bước:** Gửi "45k".
+- **Kết quả mong đợi:** `avg_price == 45000`. Reuse `parse_transaction_text` từ Phase 3 (CLAUDE.md spec).
+
+### TC-1.7.H10 — Tap "Dùng giá mua" (callback `stock_price:same`) → save asset, current_price = avg_price
+- **Bước:** Sau khi nhập price, tap button "Dùng 45,000đ (giá mua)".
+- **Kết quả mong đợi:**
+  - Asset được tạo với `metadata = {"ticker": "VNM", "quantity": 100, "avg_price": 45000}`.
+  - `initial_value == Decimal('4500000')` (= quantity × avg_price).
+  - `current_value == Decimal('4500000')` (cùng giá mua).
+  - Bot show confirmation + net worth update + offer "Thêm tài sản khác".
+
+### TC-1.7.H11 — Tap "Nhập giá hiện tại" → ask current_price → save với value khác
+- **Bước:**
+  1. Tap "Nhập giá hiện tại" (callback `stock_price:new`).
+  2. Bot ask "Giá hiện tại của cổ phiếu?".
+  3. Gửi "50000".
+- **Kết quả mong đợi:**
+  - `metadata["current_price"]` lưu hoặc dùng để tính `current_value`.
+  - `initial_value == Decimal('4500000')` (theo avg_price).
+  - `current_value == Decimal('5000000')` (= 100 × 50000).
+  - Asset save thành công, source = `'user_input'`.
+
+### TC-1.7.H12 — Subtype mặc định cho stock = `vn_stock` (HOSE)
+- **Bước:** Không chọn subtype rõ ràng (wizard mặc định).
+- **Kết quả mong đợi:** `asset.subtype == 'vn_stock'` và `metadata["exchange"] == 'HOSE'` (theo spec § 1.6 line 289 và CLAUDE.md asset_categories).
+
+### TC-1.7.H13 — Wizard support 4 subtypes: vn_stock, fund, etf, foreign_stock
+- **Mục tiêu:** Verify wizard có thể nhánh sang fund/ETF/foreign nếu user chọn.
+- **Bước:** Trigger các callback subtype tương ứng (qua menu sub-selection nếu spec có, hoặc field metadata `subtype` được set).
+- **Kết quả mong đợi:** 4 path đều dẫn đến save thành công với `asset.subtype` đúng. ETF có thể không cần ticker validate (E1VFVN30 ok).
+
+### TC-1.7.H14 — Sau save: confirmation message hiển thị format VN
+- **Bước:** Save asset 100 VNM × 45,000.
+- **Kết quả mong đợi:** Confirmation hiển thị "VNM × 100 cp · 4.5tr" (hoặc tương đương qua `currency_utils.format_money_short`). KHÔNG raw "4500000".
+
+### TC-1.7.H15 — Draft state clear sau save
+- **Bước:** Inspect `context.user_data` sau khi save xong.
+- **Kết quả mong đợi:** Cả `asset_draft` và `asset_draft_step` bị `pop()`. Không leak vào flow tiếp.
+
+## Corner Cases
+
+### TC-1.7.C1 — Ticker không tồn tại "ZZZ999" → vẫn cho save (Phase 3B validate)
+- **Bước:** Gửi "ZZZ999" làm ticker.
+- **Kết quả mong đợi:** Asset save bình thường với `ticker='ZZZ999'`. Phase 3A KHÔNG validate ticker thật. Document: Phase 3B sẽ check vnstock và warn.
+
+### TC-1.7.C2 — Normalize "VNM stocks" → "VNM"
+- **Bước:** Gửi "VNM stocks" (user thêm chữ rác).
+- **Kết quả mong đợi:** `metadata["ticker"] == 'VNM'` (strip word "stocks"). Spec acceptance criteria P3A-7 line 293 yêu cầu rõ.
+- **Note:** Nếu spec chỉ làm `.upper().strip()` (line 887), test này có thể FAIL — cần thêm regex/whitelist ký tự alpha. Document gap.
+
+### TC-1.7.C3 — Ticker chứa số "E1VFVN30" (ETF)
+- **Bước:** Gửi "E1VFVN30".
+- **Kết quả mong đợi:** Lưu nguyên "E1VFVN30". Verify regex normalize không cắt mất số.
+
+### TC-1.7.C4 — Ticker quá dài hoặc ký tự lạ "!@#$"
+- **Bước:** Gửi "!@#$" hoặc "VNMVNMVNMVNMVNM" (15+ chars).
+- **Kết quả mong đợi:** Hoặc reject với message "Mã cổ phiếu không hợp lệ", hoặc cho lưu (Phase 3B validate). Document chọn behavior.
+
+### TC-1.7.C5 — Quantity không phải số "abc"
+- **Bước:** Step `stock_quantity`, gửi "abc".
+- **Kết quả mong đợi:** Bot reply "Nhập số thôi nhé, ví dụ: 100" (theo spec line 905). State KHÔNG reset, vẫn ở `stock_quantity`. User retry được.
+
+### TC-1.7.C6 — Quantity âm "-100"
+- **Bước:** Gửi "-100".
+- **Kết quả mong đợi:** Reject với message rõ "Số cổ phiếu phải > 0". KHÔNG lưu negative quantity.
+- **Note:** `int("-100")` parse được → service phải validate tiếp, không chỉ dựa try/except.
+
+### TC-1.7.C7 — Quantity = 0
+- **Bước:** Gửi "0".
+- **Kết quả mong đợi:** Reject (không có lý do hold 0 cp). Hoặc lưu nhưng cảnh báo. Document.
+
+### TC-1.7.C8 — Quantity float "100.5" (mua phần lẻ ETF)
+- **Bước:** Gửi "100.5".
+- **Kết quả mong đợi:**
+  - Theo spec line 903 strip cả "." → parse thành `1005` (sai!).
+  - Hoặc spec yêu cầu integer → reject với message.
+  - **Document:** Việt Nam thường giao dịch nguyên cổ; nếu support fractional cho fund thì cần parse khác. Note gap nếu có.
+
+### TC-1.7.C9 — Quantity rất lớn (1 triệu cp)
+- **Bước:** Gửi "1000000".
+- **Kết quả mong đợi:** Lưu được. `total_value = 1_000_000 × 45_000 = 45 tỷ`. Format hiển thị "45 tỷ" hoặc "45,000tr".
+
+### TC-1.7.C10 — Avg price parse fail ("xyz")
+- **Bước:** Step `stock_price`, gửi "xyz".
+- **Kết quả mong đợi:** Bot reply "Nhập giá giúp mình nhé, ví dụ '45k' hoặc '45000'" (theo spec line 930). State giữ `stock_price`.
+
+### TC-1.7.C11 — Avg price = 0 hoặc âm
+- **Bước:** Gửi "0" hoặc "-1000".
+- **Kết quả mong đợi:** Reject với message "Giá phải > 0". KHÔNG lưu asset với `initial_value = 0`. Service layer validate (P3A-3 TC-1.3.C9).
+
+### TC-1.7.C12 — Avg price decimal nhỏ "0.5" (penny stock)
+- **Bước:** Gửi "0.5".
+- **Kết quả mong đợi:** Lưu `avg_price = Decimal('0.5')`. Edge case rare nhưng không crash. Total value = 50 (cho 100 cp).
+
+### TC-1.7.C13 — Current price < avg price (lỗ)
+- **Bước:** Avg = 50000, current = 30000.
+- **Kết quả mong đợi:**
+  - `initial_value = 5_000_000`, `current_value = 3_000_000`.
+  - `gain_loss = -2_000_000` (Decimal âm, hybrid property TC-1.2.H6).
+  - Confirmation hiển thị "📉 -2tr" hoặc tương đương.
+
+### TC-1.7.C14 — Current price > avg price rất nhiều (10x)
+- **Bước:** Avg = 10000, current = 100000.
+- **Kết quả mong đợi:** `gain_loss = +9_000_000`. Confirmation hiển thị "📈 +9tr" hoặc tương đương.
+
+### TC-1.7.C15 — Tap "stock_price:same" 2 lần liên tiếp (double tap)
+- **Bước:** Tap nhanh 2 lần button "Dùng giá mua".
+- **Kết quả mong đợi:** Chỉ tạo **1** asset (dedup qua draft state đã clear sau lần 1, hoặc qua callback handler idempotent). KHÔNG tạo duplicate.
+
+### TC-1.7.C16 — Text input ngoài stock_* steps → handler trả False
+- **Bước:** User chưa enter wizard, gửi text "100" hoặc "VNM".
+- **Kết quả mong đợi:** `handle_stock_ticker/quantity/price` đều return `False` (theo spec line 884-885, 899-900, 920-921). Message route handler khác. KHÔNG nhầm lẫn create asset rỗng.
+
+### TC-1.7.C17 — Abandon flow giữa chừng (stop ở stock_quantity)
+- **Bước:** Nhập ticker xong, không nhập quantity. Đóng app.
+- **Kết quả mong đợi:** State giữ trong `context.user_data` (Telegram persistent) → quay lại có thể tiếp tục. Hoặc timeout policy xóa. Document. KHÔNG có asset rỗng (`initial_value=null`) bị flush vào DB.
+
+### TC-1.7.C18 — User gửi sticker / photo trong stock_ticker step
+- **Bước:** Step `stock_ticker`, gửi photo.
+- **Kết quả mong đợi:** Bot reply "Mình cần text mã cổ phiếu thôi, ví dụ 'VNM'". KHÔNG crash.
+
+### TC-1.7.C19 — Cross-user: User A's asset_draft KHÔNG ảnh hưởng B
+- **Bước:** A đang ở step `stock_price`. B start stock wizard cùng lúc.
+- **Kết quả mong đợi:** `context.user_data` per-user (Telegram framework guarantee). Asset của A → user_id A, B → B. Không leak ticker / quantity giữa 2 users.
+
+### TC-1.7.C20 — Asset save nhưng `wealth_level` recompute (P3A-5 dependency)
+- **Bước:** User starter (5tr cash). Save VNM 100 × 300,000 = 30tr stock.
+- **Kết quả mong đợi:**
+  - Total net worth = 35tr → `user.wealth_level` chuyển `starter` → `young_prof`.
+  - Verify `create_asset` trigger ladder recompute (TC-1.5.H7 chéo).
+
+### TC-1.7.C21 — Confirmation message format số nguyên không thừa decimal
+- **Bước:** Save 100 cp × 45,000.
+- **Kết quả mong đợi:** Hiển thị "4.5tr" hoặc "4,500,000đ", KHÔNG "4500000.00". `format_money_short` strip trailing zeros khi nguyên.
+
+### TC-1.7.C22 — Cancel command "/cancel" giữa wizard
+- **Bước:** Đang ở `stock_quantity`, gửi `/cancel` (nếu spec có).
+- **Kết quả mong đợi:** Clear draft, bot xác nhận hủy, về main menu. Nếu spec không có → document gap (như P3A-6 TC-1.6.C20).
+
+### TC-1.7.C23 — Foreign stock (subtype `foreign_stock`) với ticker dài "AAPL"
+- **Bước:** Subtype `foreign_stock`, ticker "AAPL", quantity 10, avg_price 150 USD (note: VND-only theo CLAUDE.md `currency='VND'`).
+- **Kết quả mong đợi:**
+  - Hoặc lưu raw value VND quy đổi (user tự quy đổi).
+  - Hoặc reject với message "Phase 3A chỉ support cổ phiếu VN" — document spec.
+
+### TC-1.7.C24 — Decimal precision trong tính `initial_value`
+- **Bước:** quantity = 333, avg_price = 12345.
+- **Kết quả mong đợi:** `initial_value = Decimal('4110885')` exact. KHÔNG `4110884.99...` do float drift. Verify Decimal arithmetic xuyên suốt.
+
+### TC-1.7.C25 — Snapshot đầu tiên match `current_value`, không match `initial_value`
+- **Bước:** Save với avg=45k, current=50k. Verify snapshot.
+- **Kết quả mong đợi:** First snapshot có `value = current_value = 5_000_000` (theo P3A-3 TC-1.3.H1 logic), KHÔNG `initial_value`. NetWorthCalculator sẽ dùng `current_value`.
+
+---
+
+# P3A-8 — Asset Entry Wizard: Real Estate Flow
+
+**Maps to AC:** `start_real_estate_wizard()`, ask subtype (`house_primary`, `land`), ask name + address (optional) + `initial_value` + `acquired_at` + `current_value`, metadata `{address, area_sqm, year_built}`, warning rental → Phase 4, parse "2 tỷ" / "2.5 tỷ" / "2500tr", note "Bạn sẽ update giá trị BĐS khi có thay đổi". Phase 3A chỉ cover **Case A (nhà ở)** và **Case C (đất)**, Case B (cho thuê) ở Phase 4.
+
+> **Setup:** Như P3A-6/P3A-7. Đã chọn loại "🏠 Bất động sản" từ wizard chính (callback `asset_add:real_estate`).
+
+## Happy Path
+
+### TC-1.8.H1 — `start_real_estate_wizard()` show 2 subtype buttons (Phase 3A scope)
+- **Mục tiêu:** Verify entry point chỉ show Case A + C, KHÔNG show "cho thuê".
+- **Bước:** Trigger callback `asset_add:real_estate`.
+- **Kết quả mong đợi:**
+  - Bot hiển thị message giới thiệu (vd "🏠 Bất động sản\n\nLoại nào?").
+  - 2 inline buttons: "🏡 Nhà ở (Case A)" (callback `re_subtype:house_primary`) + "🌾 Đất (Case C)" (callback `re_subtype:land`).
+  - `context.user_data["asset_draft"] == {"asset_type": "real_estate"}`.
+  - `context.user_data["asset_draft_step"] == "re_subtype"`.
+
+### TC-1.8.H2 — Tap "Nhà ở" → ask tên BĐS
+- **Bước:** Tap "🏡 Nhà ở".
+- **Kết quả mong đợi:**
+  - `asset_draft["subtype"] == 'house_primary'`.
+  - `asset_draft_step == 're_name'`.
+  - Bot reply ví dụ "Đặt tên cho BĐS này nhé?\nVí dụ: 'Nhà Mỹ Đình', 'Căn hộ Vinhomes'".
+
+### TC-1.8.H3 — Nhập tên "Nhà Mỹ Đình" → ask địa chỉ (optional)
+- **Bước:** Step `re_name`, gửi "Nhà Mỹ Đình".
+- **Kết quả mong đợi:**
+  - `asset_draft["name"] == 'Nhà Mỹ Đình'`.
+  - `asset_draft_step == 're_address'`.
+  - Bot reply ask address với option skip: "Địa chỉ? (có thể bỏ qua)" + inline button "⏭ Bỏ qua" (callback `re_address:skip`).
+
+### TC-1.8.H4 — Nhập địa chỉ "Số 1 ABC, Mỹ Đình, HN"
+- **Bước:** Gửi địa chỉ.
+- **Kết quả mong đợi:**
+  - `asset_draft["metadata"] == {"address": "Số 1 ABC, Mỹ Đình, HN", "area_sqm": null, "year_built": null}`.
+  - `asset_draft_step == 're_initial_value'`.
+  - Bot ask "Mua giá bao nhiêu? (giá gốc)\n\nVí dụ: '2 tỷ', '2.5 tỷ', '2500tr'".
+
+### TC-1.8.H5 — Tap "Bỏ qua" địa chỉ → metadata.address = null
+- **Bước:** Step `re_address`, tap "⏭ Bỏ qua".
+- **Kết quả mong đợi:** `metadata["address"] == None` (hoặc empty string). Chuyển sang `re_initial_value`. KHÔNG block flow.
+
+### TC-1.8.H6 — Parse "2 tỷ" → initial_value = 2,000,000,000
+- **Bước:** Step `re_initial_value`, gửi "2 tỷ".
+- **Kết quả mong đợi:** `asset_draft["initial_value"] == Decimal('2000000000')`. Chuyển sang `re_acquired_at`.
+
+### TC-1.8.H7 — Parse "2.5 tỷ"
+- **Bước:** Gửi "2.5 tỷ".
+- **Kết quả mong đợi:** `initial_value == Decimal('2500000000')`.
+
+### TC-1.8.H8 — Parse "2500tr"
+- **Bước:** Gửi "2500tr".
+- **Kết quả mong đợi:** `initial_value == Decimal('2500000000')`. Cùng kết quả với "2.5 tỷ".
+
+### TC-1.8.H9 — Ask năm mua → parse "2020"
+- **Bước:** Step `re_acquired_at`, gửi "2020".
+- **Kết quả mong đợi:**
+  - `asset_draft["acquired_at"] == date(2020, 1, 1)` (hoặc tương đương — document day/month default).
+  - `asset_draft_step == 're_current_value'`.
+  - Bot ask "Giá ước tính hiện tại?\n(Nếu chưa biết, để bằng giá mua)".
+
+### TC-1.8.H10 — Nhập current_value khác initial → save asset
+- **Bước:** Initial = 2 tỷ (mua 2020), current = 3 tỷ (ước hiện tại).
+- **Kết quả mong đợi:**
+  - Asset save: `asset_type='real_estate'`, `subtype='house_primary'`, `name='Nhà Mỹ Đình'`, `initial_value=2_000_000_000`, `current_value=3_000_000_000`, `acquired_at=date(2020,1,1)`, `metadata={"address": "...", "area_sqm": null, "year_built": null}`.
+  - `source = 'user_input'`.
+  - Confirmation hiển thị "✅ Nhà Mỹ Đình · 3 tỷ (📈 +1 tỷ)".
+
+### TC-1.8.H11 — Note "update giá trị khi có thay đổi" hiển thị sau save
+- **Bước:** Sau khi save thành công.
+- **Kết quả mong đợi:** Confirmation có thêm dòng "💡 Bạn có thể update giá trị BĐS khi có thay đổi (qua /capnhat hoặc dashboard)" — vì BĐS không auto-update từ market.
+
+### TC-1.8.H12 — Tap "Đất (Case C)" subtype → flow tương tự nhưng tên ví dụ khác
+- **Bước:** Tap "🌾 Đất".
+- **Kết quả mong đợi:**
+  - `asset_draft["subtype"] == 'land'`.
+  - Bot prompt name có ví dụ "Đất Ba Vì", "Đất Hòa Lạc".
+  - Các step sau (address, initial_value, acquired_at, current_value) tương tự house_primary.
+
+### TC-1.8.H13 — Save xong: offer "Thêm tài sản khác"
+- **Bước:** Sau save.
+- **Kết quả mong đợi:** Inline keyboard 2 buttons: "➕ Thêm tài sản khác" + "✅ Xong rồi" (giống P3A-6 TC-1.6.H7).
+
+### TC-1.8.H14 — Draft state clear sau save
+- **Bước:** Inspect `context.user_data` sau save.
+- **Kết quả mong đợi:** Cả `asset_draft` và `asset_draft_step` bị `pop()`. Không leak.
+
+### TC-1.8.H15 — Snapshot đầu tiên với value = current_value
+- **Bước:** Save asset 2 tỷ initial / 3 tỷ current. Verify `asset_snapshots`.
+- **Kết quả mong đợi:** First snapshot có `value == Decimal('3000000000')` (current), `source='user_input'`, `snapshot_date=today`.
+
+## Corner Cases
+
+### TC-1.8.C1 — User mention "cho thuê" trong tên/địa chỉ → warning Phase 4
+- **Bước:** Step `re_name`, gửi "Nhà cho thuê Mỹ Đình" hoặc step address gửi "... cho thuê 5tr/tháng".
+- **Kết quả mong đợi:** Bot reply warning ấm áp "Cho thuê (Case B) sẽ có ở Phase 4 nhé! Hiện tại mình lưu như BĐS thường." Asset vẫn được save bình thường (Case A). Ghi rõ trong message.
+
+### TC-1.8.C2 — Subtype Case B chưa support
+- **Bước:** Verify wizard KHÔNG có button "🏘️ Cho thuê" trong subtype list.
+- **Kết quả mong đợi:** Chỉ 2 button (house_primary + land). Case B trong roadmap Phase 4.
+
+### TC-1.8.C3 — Parse "2ty" (không space) → vẫn work
+- **Bước:** Gửi "2ty" hoặc "2tỷ".
+- **Kết quả mong đợi:** `initial_value == 2_000_000_000`. Parser flexible.
+
+### TC-1.8.C4 — Parse "2,5 tỷ" (dấu phẩy VN style)
+- **Bước:** Gửi "2,5 tỷ".
+- **Kết quả mong đợi:** `initial_value == Decimal('2500000000')`. Hoặc reject + ask retry. Document.
+
+### TC-1.8.C5 — Parse "2 tỷ rưỡi" (cách nói VN)
+- **Bước:** Gửi "2 tỷ rưỡi".
+- **Kết quả mong đợi:** Hoặc parse được = 2.5 tỷ, hoặc reject với hint "ghi là '2.5 tỷ' nhé". Document chọn behavior.
+
+### TC-1.8.C6 — Năm mua = năm tương lai "2030"
+- **Bước:** Step `re_acquired_at`, gửi "2030".
+- **Kết quả mong đợi:** Reject với message "Năm mua không thể trong tương lai". Hoặc cho phép (user kế hoạch mua) — document. Liên quan TC-1.3.C11.
+
+### TC-1.8.C7 — Năm mua quá xa "1900"
+- **Bước:** Gửi "1900".
+- **Kết quả mong đợi:** Reject hoặc warning "Năm mua có vẻ quá lâu, bạn chắc không?". Sane validation.
+
+### TC-1.8.C8 — Năm mua dạng "10/2020" (có tháng)
+- **Bước:** Gửi "10/2020".
+- **Kết quả mong đợi:** Parse `acquired_at = date(2020, 10, 1)`. Hoặc fallback chỉ năm. Document.
+
+### TC-1.8.C9 — initial_value âm hoặc 0
+- **Bước:** Gửi "-1 tỷ" hoặc "0".
+- **Kết quả mong đợi:** Reject với message "Giá phải > 0". KHÔNG lưu (P3A-3 TC-1.3.C9 chéo).
+
+### TC-1.8.C10 — current_value < initial_value (BĐS xuống giá)
+- **Bước:** Initial = 3 tỷ, current = 2.5 tỷ.
+- **Kết quả mong đợi:**
+  - Save thành công.
+  - `gain_loss = -500_000_000` (Decimal âm).
+  - Confirmation hiển thị "📉 -500tr" hoặc tương đương.
+
+### TC-1.8.C11 — Tên rỗng hoặc chỉ whitespace
+- **Bước:** Step `re_name`, gửi "" hoặc "   ".
+- **Kết quả mong đợi:** Reject với message "Đặt tên giúp mình nhé". State giữ `re_name`.
+
+### TC-1.8.C12 — Tên dài bất thường (>200 chars)
+- **Bước:** Gửi 500 ký tự.
+- **Kết quả mong đợi:** Truncate về 200 (theo `varchar(200)`) hoặc reject với message rõ. KHÔNG raise SQLAlchemy crash (giống P3A-6 TC-1.6.C13).
+
+### TC-1.8.C13 — Địa chỉ chứa ký tự đặc biệt + tiếng Việt có dấu
+- **Bước:** "Số 1, Đường Trần Phú, P. Mỹ Đình 1, Q. Nam Từ Liêm, Hà Nội".
+- **Kết quả mong đợi:** UTF-8 round-trip qua DB ok. Query JSON `metadata->>'address'` trả về đúng string (giống TC-1.2.C5).
+
+### TC-1.8.C14 — Skip address xong → metadata KHÔNG có key "address" hoặc = null
+- **Bước:** Tap "Bỏ qua" ở step address.
+- **Kết quả mong đợi:** Document chọn 1: hoặc `metadata = {"address": null, ...}` hoặc `metadata = {}` (omit key). Consistent với TC-1.2.C4.
+
+### TC-1.8.C15 — Phase 3A KHÔNG ask `area_sqm`, `year_built` (giữ null)
+- **Bước:** Verify wizard KHÔNG hỏi diện tích / năm xây.
+- **Kết quả mong đợi:** Sau save, `metadata["area_sqm"] is None`, `metadata["year_built"] is None`. Phase 3B/4 sẽ thêm fields này (theo CLAUDE.md schema spec line 145).
+
+### TC-1.8.C16 — current_value = initial_value (chưa có info)
+- **Bước:** User trả lời step `re_current_value` bằng "như giá mua" hoặc copy initial_value.
+- **Kết quả mong đợi:** Hoặc có button "Dùng giá mua" tương tự P3A-7 stock_price flow, hoặc parse "như giá mua" / "same". `current_value == initial_value`. `gain_loss = 0`.
+
+### TC-1.8.C17 — Số rất lớn "100 tỷ"
+- **Bước:** Gửi "100 tỷ" cho biệt thự HNW.
+- **Kết quả mong đợi:** Lưu được `initial_value = 100_000_000_000`. `numeric(20,2)` chứa được. Format hiển thị "100 tỷ".
+
+### TC-1.8.C18 — User abandon flow (đóng app ở step `re_initial_value`)
+- **Bước:** Đã có name + address, bỏ giữa chừng.
+- **Kết quả mong đợi:** State giữ trong context (Telegram persistent) hoặc timeout policy. KHÔNG có asset partial bị flush vào DB (`initial_value` bắt buộc NOT NULL → service không create cho đến khi đủ data).
+
+### TC-1.8.C19 — Text input ngoài re_* steps → handler trả False
+- **Bước:** User chưa enter wizard, gửi "Nhà Mỹ Đình".
+- **Kết quả mong đợi:** Handler `handle_re_*` return `False`. Message route handler khác. Giống P3A-7 TC-1.7.C16.
+
+### TC-1.8.C20 — User gửi photo (vd ảnh sổ đỏ) trong wizard
+- **Bước:** Step `re_address`, gửi photo.
+- **Kết quả mong đợi:** Bot reply "Mình cần text địa chỉ thôi, hoặc bỏ qua." KHÔNG nhầm là OCR receipt. KHÔNG crash.
+
+### TC-1.8.C21 — Cross-user: A's BĐS draft KHÔNG ảnh hưởng B
+- **Bước:** A đang ở `re_initial_value`. B start RE wizard.
+- **Kết quả mong đợi:** Per-user context isolation. Asset của A → user_id A, B → B. Giống P3A-6 TC-1.6.C19, P3A-7 TC-1.7.C19.
+
+### TC-1.8.C22 — `wealth_level` recompute sau save (P3A-5 dependency)
+- **Bước:** User starter (5tr cash). Save BĐS 2 tỷ.
+- **Kết quả mong đợi:** Net worth = ~2 tỷ → `user.wealth_level` chuyển `starter` → `hnw` (jump 2 cấp). Verify ladder logic xử lý multi-level jump (P3A-5 TC-1.5.C13 chéo).
+
+### TC-1.8.C23 — Decimal precision không bị mất với số tỷ
+- **Bước:** initial = 2,345,678,901.50 (chính xác đến đồng).
+- **Kết quả mong đợi:** Lưu exact `Decimal('2345678901.50')`. Round-trip qua DB không lệch (giống P3A-3 TC-1.3.C15).
+
+### TC-1.8.C24 — Cancel command "/cancel" giữa wizard
+- **Bước:** Đang `re_address`, gửi `/cancel`.
+- **Kết quả mong đợi:** Clear draft, về main menu. Nếu spec không có cancel → document gap (giống P3A-6 TC-1.6.C20, P3A-7 TC-1.7.C22).
+
+### TC-1.8.C25 — Confirmation format số tỷ đúng VN style
+- **Bước:** Save BĐS 2,500,000,000.
+- **Kết quả mong đợi:** Hiển thị "2.5 tỷ" (qua `currency_utils.format_money_short`). KHÔNG raw "2500000000" hay "2,500tr" (vì >1 tỷ).
+
+### TC-1.8.C26 — Tap "Thêm tài sản khác" sau save BĐS → restart wizard sạch
+- **Bước:** Sau save, tap "➕ Thêm tài sản khác".
+- **Kết quả mong đợi:** Quay về `start_asset_entry_wizard()` với 6 buttons. Draft clear. BĐS cũ KHÔNG duplicate. Giống P3A-6 TC-1.6.C17.
+
+---
+
+> **DỪNG TẠI ĐÂY** — Issue P3A-9 sẽ được bổ sung trong lần ghi tiếp theo.
