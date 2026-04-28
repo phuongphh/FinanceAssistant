@@ -301,3 +301,134 @@
 - **Kết quả mong đợi (user thấy):**
   - Hiển thị "4.5tr" hoặc "4,500,000đ" — KHÔNG raw "4500000" hay "4500000.00".
 
+### TC-1.7.H14 — Wizard support 4 subtypes: vn_stock, fund, etf, foreign_stock
+- **Mục tiêu:** Verify wizard có thể nhánh sang fund/ETF/foreign nếu có sub-selection.
+- **Bước:** Trigger các path sub-selection (nếu có menu chọn loại stock cụ thể) — vd thử ticker "E1VFVN30" (ETF) hoặc fund VFMVF1.
+- **Kết quả mong đợi (user thấy):**
+  - Cả 4 path (vn_stock / fund / etf / foreign_stock) đều dẫn đến save thành công.
+  - Trong dashboard, asset có nhãn loại đúng (vd ETF có icon riêng hoặc tag "ETF").
+
+## Corner Cases
+
+### TC-1.7.C1 — Ticker không tồn tại "ZZZ999" → vẫn save (Phase 3B validate)
+- **Bước:** Step ticker, gửi "ZZZ999".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept và đi tiếp các step (quantity, price).
+  - Cuối cùng asset save bình thường với ticker "ZZZ999".
+  - Phase 3A chưa validate ticker thật — Phase 3B sẽ check vnstock và warn.
+
+### TC-1.7.C2 — Normalize "VNM stocks" → "VNM"
+- **Bước:** Step ticker, gửi "VNM stocks" (user thêm chữ rác).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ VNM" — strip word "stocks", chỉ lấy ticker.
+  - Nếu spec chỉ làm `.upper().strip()` mà không lọc word, bot có thể accept "VNM STOCKS" → document gap.
+
+### TC-1.7.C3 — Ticker chứa số "E1VFVN30" (ETF)
+- **Bước:** Step ticker, gửi "E1VFVN30".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "✅ E1VFVN30" — giữ nguyên cả số.
+  - Save thành công, dashboard hiển thị đúng "E1VFVN30".
+
+### TC-1.7.C4 — Ticker ký tự lạ "!@#$" hoặc quá dài "VNMVNMVNMVNM"
+- **Bước:** Step ticker, gửi "!@#$" rồi gửi "VNMVNMVNMVNM" (15+ chars).
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot reject với message "Mã cổ phiếu không hợp lệ, gõ lại nhé".
+  - Hoặc bot accept (Phase 3A để Phase 3B validate) — document chọn behavior.
+  - **KHÔNG** crash bot.
+
+### TC-1.7.C5 — Quantity "abc" (không phải số) → bot ask retry
+- **Bước:** Step quantity, gửi "abc".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Nhập số thôi nhé, ví dụ: 100".
+  - User vẫn ở step quantity — gõ "100" tiếp tục được (không phải tap subtype lại).
+
+### TC-1.7.C6 — Quantity âm "-100" → bot reject
+- **Bước:** Step quantity, gửi "-100".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reject với message "Số cổ phiếu phải > 0" (hoặc tương đương).
+  - Asset KHÔNG được tạo, user retry được.
+
+### TC-1.7.C7 — Quantity = 0 → bot reject hoặc warning
+- **Bước:** Step quantity, gửi "0".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reject với message "Số cổ phiếu phải > 0".
+  - Hoặc cho phép nhưng kèm cảnh báo. Document.
+
+### TC-1.7.C8 — Quantity float "100.5" (mua phần lẻ ETF/fund)
+- **Bước:** Step quantity, gửi "100.5".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot parse như "1005" (strip dấu chấm theo logic VN-style) — sai → document gap.
+  - Hoặc bot reject "Số cổ phiếu phải là số nguyên".
+  - Hoặc bot accept fractional cho ETF/fund.
+  - **Document chọn behavior nào** — không silent.
+
+### TC-1.7.C9 — Quantity rất lớn "1.000.000" (1 triệu cp)
+- **Bước:** Step quantity, gửi "1000000" hoặc "1.000.000".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept và tính tổng = 1.000.000 × 45.000 = 45 tỷ.
+  - Confirmation hiển thị "45 tỷ" (format ngắn) — không raw "45000000000".
+
+### TC-1.7.C10 — Avg price "xyz" → bot ask retry
+- **Bước:** Step price, gửi "xyz".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Nhập giá giúp mình nhé, ví dụ '45k' hoặc '45000'".
+  - User vẫn ở step price.
+
+### TC-1.7.C11 — Avg price = 0 hoặc âm → bot reject
+- **Bước:** Gửi "0" rồi gửi "-1000" lần lượt ở step price.
+- **Kết quả mong đợi (user thấy):**
+  - Bot reject cả 2 với message "Giá phải > 0".
+  - Asset KHÔNG được tạo với initial_value = 0.
+
+### TC-1.7.C12 — Avg price decimal nhỏ "0.5" (penny stock)
+- **Bước:** Step price, gửi "0.5".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept và tính total = 100 × 0.5 = 50.
+  - Edge case rare nhưng không crash, không round về 0.
+
+### TC-1.7.C13 — Current price < avg price (lỗ)
+- **Bước:** Avg = 50000, tap "Nhập giá hiện tại" → 30000.
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation hiển thị value = 3tr (= 100 × 30k).
+  - Có dòng gain/loss âm: "📉 -2tr" (= 3tr - 5tr).
+  - Net worth tăng đúng 3tr (current value), KHÔNG 5tr.
+
+### TC-1.7.C14 — Current price >> avg price (10x lời)
+- **Bước:** Avg = 10000, current = 100000.
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation: value = 10tr, gain "📈 +9tr".
+  - Net worth tăng đúng 10tr.
+
+### TC-1.7.C15 — Tap "Dùng giá mua" 2 lần liên tiếp (double tap)
+- **Bước:** Tap nhanh button "Dùng 45,000đ (giá mua)" 2 lần.
+- **Kết quả mong đợi (user thấy):**
+  - Chỉ **1 confirmation** message hiện ra.
+  - Trong dashboard chỉ có **1 asset VNM** — KHÔNG duplicate 2 lần.
+
+### TC-1.7.C16 — Abandon giữa wizard (đóng app ở step quantity)
+- **Bước:** Nhập ticker xong, đóng Telegram, mở lại sau 1 ngày → gõ text bất kỳ.
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc state vẫn còn → bot tiếp tục từ step quantity (text được hiểu là quantity).
+  - Hoặc state expire → bot show main menu hoặc ask "Bạn đang muốn gì?".
+  - **KHÔNG** có asset rỗng (chưa đủ data) bị lưu trong dashboard.
+
+### TC-1.7.C17 — Gửi sticker / photo trong stock_ticker step
+- **Bước:** Step ticker, gửi photo ngẫu nhiên (vd ảnh meme).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Mình cần text mã cổ phiếu thôi, ví dụ 'VNM'" (hoặc tương đương).
+  - KHÔNG crash, KHÔNG nhầm thành OCR.
+
+### TC-1.7.C18 — Cross-user: A và B cùng nhập stock không lẫn data
+- **Bước:** User A đang ở step price (đã có ticker VNM). User B trên account khác cùng start stock wizard, nhập "FPT 50 cp × 100k".
+- **Kết quả mong đợi:**
+  - User B thấy confirmation "FPT × 50 · 5tr" cho riêng B.
+  - User A khi tap "Dùng giá mua" → asset save vào account A là VNM (KHÔNG bị lẫn FPT).
+  - Net worth của A và B độc lập.
+
+### TC-1.7.C19 — Wealth level update trong briefing/dashboard sau save lớn
+- **Bước:** User starter (5tr cash). Save VNM 100 × 300.000 = 30tr stock.
+- **Kết quả mong đợi (user thấy):**
+  - Net worth ngay sau save: 35tr.
+  - Briefing buổi sáng hôm sau (hoặc dashboard) phản ánh wealth level mới = "Young Professional" (đã vượt mốc 30tr).
+  - Trước save: tone briefing là Starter; sau save: tone là Young Professional.
+
