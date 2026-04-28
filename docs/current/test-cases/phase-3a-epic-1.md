@@ -432,3 +432,142 @@
   - Briefing buổi sáng hôm sau (hoặc dashboard) phản ánh wealth level mới = "Young Professional" (đã vượt mốc 30tr).
   - Trước save: tone briefing là Starter; sau save: tone là Young Professional.
 
+### TC-1.7.C20 — Confirmation format số nguyên không thừa decimal
+- **Bước:** Save 100 cp × 45.000 (số tròn).
+- **Kết quả mong đợi (user thấy):**
+  - Hiển thị "4.5tr" hoặc "4,500,000đ".
+  - **KHÔNG** có "4500000.00" (trailing zeros) hay ".0" thừa.
+
+### TC-1.7.C21 — Hủy giữa wizard bằng `/huy`
+- **Bước:** Đang ở step quantity hoặc price, gửi `/huy`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot xác nhận hủy + về main menu.
+  - Asset KHÔNG được tạo (dashboard không có VNM mới).
+  - Nếu spec chưa có cancel command → document gap (tương tự P3A-6 TC-1.6.C19).
+
+### TC-1.7.C22 — Foreign stock với ticker "AAPL" và USD
+- **Bước:** Nếu wizard có sub-selection foreign_stock, chọn → ticker "AAPL", quantity 10, avg_price 150 (USD).
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot accept và lưu raw value (user tự quy đổi sang VND trước).
+  - Hoặc bot reply "Phase 3A chỉ support cổ phiếu VN, foreign stock sẽ có sau".
+  - Document chọn behavior — KHÔNG silent save với currency mơ hồ.
+
+### TC-1.7.C23 — Decimal precision không bị float drift
+- **Bước:** quantity = 333, avg_price = 12.345.
+- **Kết quả mong đợi (user thấy):**
+  - Tổng = 4.110.885đ exact (= 333 × 12.345).
+  - Confirmation hiển thị "4.1tr" hoặc "4,110,885đ" — KHÔNG "4110884.99…" (float drift).
+
+### TC-1.7.C24 — Net worth dùng current_value (không phải initial_value)
+- **Bước:** Save VNM với avg=45k, current=50k (qua "Nhập giá hiện tại"). 100 cp.
+- **Kết quả mong đợi (user thấy):**
+  - Net worth tăng đúng 5tr (= 100 × 50k = current_value), KHÔNG 4.5tr (initial_value).
+  - Trên dashboard, asset hiển thị giá trị 5tr; có thể có sub-text "Mua 4.5tr → +500k".
+
+---
+
+# P3A-8 — Asset Entry Wizard: Real Estate Flow
+
+**Maps to AC:** `start_real_estate_wizard()`, ask subtype (`house_primary`, `land`), ask name + address (optional) + `initial_value` + `acquired_at` + `current_value`, metadata `{address, area_sqm, year_built}`, warning rental → Phase 4, parse "2 tỷ" / "2.5 tỷ" / "2500tr". Phase 3A chỉ cover **Case A (nhà ở)** và **Case C (đất)**, Case B (cho thuê) ở Phase 4.
+
+> **Setup:** Onboard xong, gửi `/them_tai_san` → tap "🏠 Bất động sản". Hoặc onboarding step 6 → tap "🏠 Tôi có BĐS".
+
+## Happy Path
+
+### TC-1.8.H1 — Vào RE wizard show 2 subtype buttons (Phase 3A scope)
+- **Mục tiêu:** Verify entry point chỉ show Case A + C, KHÔNG show "cho thuê".
+- **Bước:** Trigger callback `asset_add:real_estate`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply message "🏠 Bất động sản\n\nLoại nào?" (hoặc tương đương).
+  - **Đúng 2 inline buttons:** "🏡 Nhà ở (Case A)" và "🌾 Đất (Case C)".
+  - **KHÔNG** có button "🏘️ Cho thuê" (Case B chỉ Phase 4).
+
+### TC-1.8.H2 — Tap "Nhà ở" → bot ask tên BĐS
+- **Bước:** Tap "🏡 Nhà ở".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Đặt tên cho BĐS này nhé?\nVí dụ: 'Nhà Mỹ Đình', 'Căn hộ Vinhomes'" (hoặc tương đương).
+  - Bot không show keyboard (chờ text input).
+
+### TC-1.8.H3 — Gõ tên "Nhà Mỹ Đình" → bot ask địa chỉ (có option skip)
+- **Bước:** Step name, gửi "Nhà Mỹ Đình".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Địa chỉ? (có thể bỏ qua)".
+  - Inline keyboard có button "⏭ Bỏ qua" (cho phép skip).
+  - User vẫn có thể gõ address text.
+
+### TC-1.8.H4 — Gõ địa chỉ "Số 1 ABC, Mỹ Đình, HN" → bot ask giá mua
+- **Bước:** Step address, gửi "Số 1 ABC, Mỹ Đình, HN".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Mua giá bao nhiêu? (giá gốc)\n\nVí dụ: '2 tỷ', '2.5 tỷ', '2500tr'".
+  - Address được lưu (sẽ thấy lại trong dashboard hoặc confirmation cuối).
+
+### TC-1.8.H5 — Tap "⏭ Bỏ qua" address → bot vẫn đi tiếp
+- **Bước:** Step address, tap "⏭ Bỏ qua".
+- **Kết quả mong đợi (user thấy):**
+  - Bot ask "Mua giá bao nhiêu?" (cùng prompt như H4).
+  - Trong dashboard cuối, asset không có địa chỉ (hoặc field empty).
+  - **KHÔNG** block flow.
+
+### TC-1.8.H6 — Parse "2 tỷ" → save initial_value = 2 tỷ
+- **Bước:** Step initial_value, gửi "2 tỷ".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept và chuyển sang step "Năm mua?".
+  - Cuối flow, dashboard hiển thị giá gốc = 2 tỷ.
+
+### TC-1.8.H7 — Parse "2.5 tỷ"
+- **Bước:** Gửi "2.5 tỷ".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept (chuyển step), giá gốc = 2.500.000.000đ.
+  - Confirmation cuối hiển thị "2.5 tỷ" (không "2.5tr" hoặc raw).
+
+### TC-1.8.H8 — Parse "2500tr" (= 2.5 tỷ)
+- **Bước:** Gửi "2500tr".
+- **Kết quả mong đợi (user thấy):**
+  - Cùng kết quả với "2.5 tỷ" — giá gốc = 2.500.000.000đ.
+  - Confirmation hiển thị "2.5 tỷ" (chuẩn hoá unit lớn nhất).
+
+### TC-1.8.H9 — Step năm mua → gõ "2020"
+- **Bước:** Step `acquired_at`, gửi "2020".
+- **Kết quả mong đợi (user thấy):**
+  - Bot accept và chuyển sang "Giá ước tính hiện tại?\n(Nếu chưa biết, để bằng giá mua)".
+  - Trong confirmation cuối, năm mua = 2020 (hoặc 01/2020).
+
+### TC-1.8.H10 — Nhập current_value khác initial_value → save với gain
+- **Bước:** Initial = 2 tỷ (mua 2020), current = 3 tỷ.
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation hiển thị: "✅ Nhà Mỹ Đình · 3 tỷ" + dòng gain "📈 +1 tỷ".
+  - Net worth tăng đúng 3 tỷ (current_value), KHÔNG 2 tỷ.
+
+### TC-1.8.H11 — Note "update giá trị khi có thay đổi"
+- **Bước:** Sau save thành công.
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation có thêm dòng hint: "💡 Bạn có thể update giá trị BĐS khi có thay đổi (qua /capnhat hoặc dashboard)".
+  - Vì BĐS không auto-update từ market, user cần biết cách self-update.
+
+### TC-1.8.H12 — Tap "Đất (Case C)" → flow tương tự nhưng prompt khác
+- **Bước:** Tap "🌾 Đất".
+- **Kết quả mong đợi (user thấy):**
+  - Bot ask name với ví dụ "Đất Ba Vì", "Đất Hòa Lạc" (khác với "Nhà Mỹ Đình").
+  - Các step sau (address, initial_value, acquired_at, current_value) tương tự house_primary.
+  - Trong dashboard, asset gán nhãn "Đất" (icon riêng).
+
+### TC-1.8.H13 — Sau save: offer "Thêm tài sản khác"
+- **Bước:** Sau confirmation BĐS.
+- **Kết quả mong đợi (user thấy):**
+  - Inline keyboard 2 buttons: "➕ Thêm tài sản khác" và "✅ Xong rồi" (giống P3A-6 H7).
+
+### TC-1.8.H14 — Net worth/dashboard sau save dùng current_value
+- **Bước:** Save BĐS 2 tỷ initial / 3 tỷ current. Mở dashboard / `/taisan`.
+- **Kết quả mong đợi (user thấy):**
+  - Asset hiển thị giá trị 3 tỷ (current), KHÔNG 2 tỷ (initial).
+  - Net worth tổng cộng = 3 tỷ + các asset khác.
+  - Có thể có sub-text "Mua 2 tỷ (2020) → +1 tỷ".
+
+## Corner Cases
+
+### TC-1.8.C1 — User mention "cho thuê" trong tên/địa chỉ → warning Phase 4
+- **Bước:** Step name, gửi "Nhà cho thuê Mỹ Đình"; hoặc step address "... cho thuê 5tr/tháng".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply warning ấm áp: "Cho thuê (Case B) sẽ có ở Phase 4 nhé! Hiện tại mình lưu như BĐS thường 🙂".
+  - Asset vẫn được save bình thường (Case A), không block flow.
+
