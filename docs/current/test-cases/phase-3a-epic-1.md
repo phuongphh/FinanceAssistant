@@ -17,7 +17,7 @@
 ### Pre-test setup chung
 
 1. **Bot ready:** Backend + Telegram bot đã chạy, webhook subscribe xong.
-2. **Test account:** Dùng 1 Telegram account đã onboard tới ít nhất `step_5_aha_moment` (cho P3A-9), hoặc đã onboard xong (cho P3A-6/7/8 chạy độc lập qua `/them_tai_san`).
+2. **Test account:** Dùng 1 Telegram account đã onboard tới ít nhất `step_5_aha_moment` (cho P3A-9), hoặc đã onboard xong (cho P3A-6/7/8 chạy độc lập qua `/themtaisan`).
 3. **Reset state khi cần:** Để test lại onboarding, nhờ admin reset `user.onboarding_step` về `AHA_MOMENT` và `onboarding_completed_at = NULL`.
 4. **Cross-user tests:** Cần 2 Telegram account riêng biệt (User A + User B).
 
@@ -29,13 +29,13 @@
 
 **Maps to AC:** `start_cash_wizard()`, `handle_cash_subtype()`, `handle_cash_text_input()` parse flexible, save với `source="user_input"`, confirmation + net worth update, "Thêm tài sản khác" button, validation âm/zero, error parse → ask graceful.
 
-> **Setup:** Onboard xong, gửi `/them_tai_san` rồi chọn "💵 Tiền mặt / TK", hoặc đang trong onboarding step 6 và tap "💵 Tiền trong NH (5 giây)".
+> **Setup:** Onboard xong, gửi `/themtaisan` rồi chọn "💵 Tiền mặt / TK", hoặc đang trong onboarding step 6 và tap "💵 Tiền trong NH (5 giây)".
 
 ## Happy Path
 
 ### TC-1.6.H1 — Vào cash wizard show 4 subtype buttons
 - **Mục tiêu:** Verify entry point của cash flow đúng spec.
-- **Bước:** Gửi `/them_tai_san` → tap "💵 Tiền mặt / TK".
+- **Bước:** Gửi `/themtaisan` → tap "💵 Tiền mặt / TK".
 - **Kết quả mong đợi (user thấy):**
   - Bot reply message "💵 Tiền ở đâu?" (hoặc tương đương theo spec line 749).
   - Inline keyboard có **đúng 4 buttons**:
@@ -219,7 +219,7 @@
 
 **Maps to AC:** `start_stock_wizard()`, `handle_stock_ticker()`, `handle_stock_quantity()`, `handle_stock_price()`, `handle_stock_current_price()` (same/new), metadata `{ticker, quantity, avg_price, exchange}`, support subtypes `vn_stock|fund|etf|foreign_stock`, ticker không tồn tại vẫn lưu (Phase 3B validate), normalize "VNM stocks" → "VNM", `initial_value = quantity * avg_price`, `current_value = quantity * current_price`.
 
-> **Setup:** Onboard xong, gửi `/them_tai_san` → tap "📈 Chứng khoán". Hoặc onboarding step 6 → tap "📈 Tôi có đầu tư".
+> **Setup:** Onboard xong, gửi `/themtaisan` → tap "📈 Chứng khoán". Hoặc onboarding step 6 → tap "📈 Tôi có đầu tư".
 
 ## Happy Path
 
@@ -470,7 +470,7 @@
 
 **Maps to AC:** `start_real_estate_wizard()`, ask subtype (`house_primary`, `land`), ask name + address (optional) + `initial_value` + `acquired_at` + `current_value`, metadata `{address, area_sqm, year_built}`, warning rental → Phase 4, parse "2 tỷ" / "2.5 tỷ" / "2500tr". Phase 3A chỉ cover **Case A (nhà ở)** và **Case C (đất)**, Case B (cho thuê) ở Phase 4.
 
-> **Setup:** Onboard xong, gửi `/them_tai_san` → tap "🏠 Bất động sản". Hoặc onboarding step 6 → tap "🏠 Tôi có BĐS".
+> **Setup:** Onboard xong, gửi `/themtaisan` → tap "🏠 Bất động sản". Hoặc onboarding step 6 → tap "🏠 Tôi có BĐS".
 
 ## Happy Path
 
@@ -862,7 +862,7 @@
 ### TC-1.9.C9 — Reminder 3 ngày: user đã thêm asset trong khoảng đó → KHÔNG nhắc
 - **Bước:**
   1. Ngày D: tap skip.
-  2. Ngày D+1: user manual thêm asset qua `/them_tai_san` (ngoài onboarding).
+  2. Ngày D+1: user manual thêm asset qua `/themtaisan` (ngoài onboarding).
   3. Đợi đến ngày D+3.
 - **Kết quả mong đợi (user thấy):**
   - Ngày D+3 user **KHÔNG** nhận reminder ("Bạn đã thêm tài sản rồi…" v.v.).
@@ -900,10 +900,10 @@
   - Sau save, dashboard / briefing tiếp theo phản ánh wealth level = "Young Professional" (100tr ∈ [30tr, 200tr)).
   - Tone briefing (hôm sau) phù hợp Young Prof, không còn Starter.
 
-### TC-1.9.C15 — Skip xong, vào lại `/them_tai_san` → flow normal
+### TC-1.9.C15 — Skip xong, vào lại `/themtaisan` → flow normal
 - **Bước:**
   1. Tap skip → graduate.
-  2. Sau đó user `/them_tai_san`.
+  2. Sau đó user `/themtaisan`.
 - **Kết quả mong đợi (user thấy):**
   - Bot vào menu chọn loại asset (6 buttons normal — Cash/Stock/RE/Crypto/Gold/Other).
   - **KHÔNG** quay lại step_6 (4 buttons "Tôi có…").
