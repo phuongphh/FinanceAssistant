@@ -24,6 +24,22 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
     )
 
 
+def format_asset_list(assets: list[Asset]) -> str:
+    """Telegram message for /taisan — all active assets + total."""
+    if not assets:
+        return (
+            "📭 Bạn chưa có tài sản nào.\n\n"
+            "Dùng /themtaisan để thêm tài sản đầu tiên!"
+        )
+    total = sum((a.current_value for a in assets), Decimal(0))
+    lines: list[str] = [f"📊 <b>Tài sản của bạn</b> ({len(assets)} mục)\n"]
+    for asset in assets:
+        icon = get_icon(asset.asset_type)
+        lines.append(f"{icon} {asset.name} — {format_money_short(asset.current_value)}")
+    lines.append(f"\n💎 Tổng: <b>{format_money_short(total)}</b>")
+    return "\n".join(lines)
+
+
 def format_breakdown_lines(by_type: dict[str, Decimal]) -> str:
     """One line per asset type — icon, label, value, percentage."""
     if not by_type:

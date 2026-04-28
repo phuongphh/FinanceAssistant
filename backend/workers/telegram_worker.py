@@ -200,6 +200,15 @@ async def _handle_message(
             db, telegram_id
         )
 
+    # /taisan — list all active assets for the user.
+    if command == "/taisan":
+        if resolved_user is not None:
+            await asset_entry_handlers.list_assets(
+                db, chat_id, resolved_user
+            )
+            return resolved_user.id
+        return None
+
     # /assets — open the asset-entry wizard (Phase 3A).
     if command in ("/assets", "/asset", "/themtaisan"):
         if resolved_user is not None:
