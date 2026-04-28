@@ -795,4 +795,213 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
 
 ---
 
-> **DỪNG TẠI ĐÂY** — Các issue P3A-7 đến P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
+# P3A-7 — Asset Entry Wizard: Stock Flow
+
+**Maps to AC:** `start_stock_wizard()`, `handle_stock_ticker()`, `handle_stock_quantity()`, `handle_stock_price()`, `handle_stock_current_price()` (same/new), metadata `{ticker, quantity, avg_price, exchange}`, support subtypes `vn_stock|fund|etf|foreign_stock`, ticker không tồn tại vẫn lưu (Phase 3B validate), normalize "VNM stocks" → "VNM", `initial_value = quantity * avg_price`, `current_value = quantity * current_price`.
+
+> **Setup:** Như P3A-6 (Telegram test account hoặc unit test với mock Update/Context). Đã chọn loại "📈 Chứng khoán" từ wizard chính (callback `asset_add:stock`).
+
+## Happy Path
+
+### TC-1.7.H1 — `start_stock_wizard()` show prompt nhập ticker
+- **Mục tiêu:** Verify entry point của stock flow đúng spec.
+- **Bước:** Trigger callback `asset_add:stock` (hoặc gọi trực tiếp `start_stock_wizard()`).
+- **Kết quả mong đợi:**
+  - Bot reply text "📈 Cổ phiếu / Quỹ mới\n\nMã cổ phiếu (ticker) là gì?\n\nVí dụ: VNM, VIC, HPG, E1VFVN30" (theo spec line 874-878).
+  - `context.user_data["asset_draft"] == {"asset_type": "stock"}`.
+  - `context.user_data["asset_draft_step"] == "stock_ticker"`.
+
+### TC-1.7.H2 — `handle_stock_ticker()` lưu ticker upper-case + chuyển step
+- **Bước:** Đang ở step `stock_ticker`, gửi text "VNM".
+- **Kết quả mong đợi:**
+  - `context.user_data["asset_draft"]["metadata"] == {"ticker": "VNM"}`.
+  - `context.user_data["asset_draft_step"] == "stock_quantity"`.
+  - Bot reply "✅ VNM\n\nBạn đang sở hữu bao nhiêu cổ phiếu?" (spec line 891-894).
+
+### TC-1.7.H3 — Ticker lower-case "vnm" → normalize uppercase "VNM"
+- **Bước:** Gửi "vnm" (lower).
+- **Kết quả mong đợi:** Metadata lưu `ticker == 'VNM'` (theo spec dùng `.strip().upper()` line 887).
+
+### TC-1.7.H4 — Ticker có whitespace "  HPG  " → strip
+- **Bước:** Gửi "  HPG  ".
+- **Kết quả mong đợi:** `ticker == 'HPG'`. Không có space leak vào DB.
+
+### TC-1.7.H5 — `handle_stock_quantity()` parse integer thuần
+- **Bước:** Đang ở step `stock_quantity`, gửi "100".
+- **Kết quả mong đợi:**
+  - `metadata["quantity"] == 100` (int, không Decimal cho quantity).
+  - `asset_draft_step == 'stock_price'`.
+  - Bot reply "✅ 100 cổ phiếu\n\nGiá mua trung bình mỗi cổ phiếu?\n(Ví dụ: '45000' hoặc '45k')".
+
+### TC-1.7.H6 — Parse quantity với dấu phẩy "1,000"
+- **Bước:** Gửi "1,000".
+- **Kết quả mong đợi:** `quantity == 1000` (theo spec line 903 `replace(",", "").replace(".", "")`).
+
+### TC-1.7.H7 — Parse quantity dạng VN "1.000" (dấu chấm phân cách nghìn)
+- **Bước:** Gửi "1.000".
+- **Kết quả mong đợi:** `quantity == 1000`.
+
+### TC-1.7.H8 — `handle_stock_price()` parse "45000" → lưu avg_price + tính total_value
+- **Bước:** Step `stock_price`, gửi "45000".
+- **Kết quả mong đợi:**
+  - `metadata["avg_price"] == 45000` (Decimal hoặc number).
+  - Bot tính `total_value = 100 * 45000 = 4_500_000` và hiển thị (spec line 947-948).
+  - Reply có 2 inline buttons: "Dùng 45,000đ (giá mua)" (callback `stock_price:same`) và "Nhập giá hiện tại" (callback `stock_price:new`).
+
+### TC-1.7.H9 — Parse avg_price dạng "45k" qua `parse_transaction_text`
+- **Bước:** Gửi "45k".
+- **Kết quả mong đợi:** `avg_price == 45000`. Reuse `parse_transaction_text` từ Phase 3 (CLAUDE.md spec).
+
+### TC-1.7.H10 — Tap "Dùng giá mua" (callback `stock_price:same`) → save asset, current_price = avg_price
+- **Bước:** Sau khi nhập price, tap button "Dùng 45,000đ (giá mua)".
+- **Kết quả mong đợi:**
+  - Asset được tạo với `metadata = {"ticker": "VNM", "quantity": 100, "avg_price": 45000}`.
+  - `initial_value == Decimal('4500000')` (= quantity × avg_price).
+  - `current_value == Decimal('4500000')` (cùng giá mua).
+  - Bot show confirmation + net worth update + offer "Thêm tài sản khác".
+
+### TC-1.7.H11 — Tap "Nhập giá hiện tại" → ask current_price → save với value khác
+- **Bước:**
+  1. Tap "Nhập giá hiện tại" (callback `stock_price:new`).
+  2. Bot ask "Giá hiện tại của cổ phiếu?".
+  3. Gửi "50000".
+- **Kết quả mong đợi:**
+  - `metadata["current_price"]` lưu hoặc dùng để tính `current_value`.
+  - `initial_value == Decimal('4500000')` (theo avg_price).
+  - `current_value == Decimal('5000000')` (= 100 × 50000).
+  - Asset save thành công, source = `'user_input'`.
+
+### TC-1.7.H12 — Subtype mặc định cho stock = `vn_stock` (HOSE)
+- **Bước:** Không chọn subtype rõ ràng (wizard mặc định).
+- **Kết quả mong đợi:** `asset.subtype == 'vn_stock'` và `metadata["exchange"] == 'HOSE'` (theo spec § 1.6 line 289 và CLAUDE.md asset_categories).
+
+### TC-1.7.H13 — Wizard support 4 subtypes: vn_stock, fund, etf, foreign_stock
+- **Mục tiêu:** Verify wizard có thể nhánh sang fund/ETF/foreign nếu user chọn.
+- **Bước:** Trigger các callback subtype tương ứng (qua menu sub-selection nếu spec có, hoặc field metadata `subtype` được set).
+- **Kết quả mong đợi:** 4 path đều dẫn đến save thành công với `asset.subtype` đúng. ETF có thể không cần ticker validate (E1VFVN30 ok).
+
+### TC-1.7.H14 — Sau save: confirmation message hiển thị format VN
+- **Bước:** Save asset 100 VNM × 45,000.
+- **Kết quả mong đợi:** Confirmation hiển thị "VNM × 100 cp · 4.5tr" (hoặc tương đương qua `currency_utils.format_money_short`). KHÔNG raw "4500000".
+
+### TC-1.7.H15 — Draft state clear sau save
+- **Bước:** Inspect `context.user_data` sau khi save xong.
+- **Kết quả mong đợi:** Cả `asset_draft` và `asset_draft_step` bị `pop()`. Không leak vào flow tiếp.
+
+## Corner Cases
+
+### TC-1.7.C1 — Ticker không tồn tại "ZZZ999" → vẫn cho save (Phase 3B validate)
+- **Bước:** Gửi "ZZZ999" làm ticker.
+- **Kết quả mong đợi:** Asset save bình thường với `ticker='ZZZ999'`. Phase 3A KHÔNG validate ticker thật. Document: Phase 3B sẽ check vnstock và warn.
+
+### TC-1.7.C2 — Normalize "VNM stocks" → "VNM"
+- **Bước:** Gửi "VNM stocks" (user thêm chữ rác).
+- **Kết quả mong đợi:** `metadata["ticker"] == 'VNM'` (strip word "stocks"). Spec acceptance criteria P3A-7 line 293 yêu cầu rõ.
+- **Note:** Nếu spec chỉ làm `.upper().strip()` (line 887), test này có thể FAIL — cần thêm regex/whitelist ký tự alpha. Document gap.
+
+### TC-1.7.C3 — Ticker chứa số "E1VFVN30" (ETF)
+- **Bước:** Gửi "E1VFVN30".
+- **Kết quả mong đợi:** Lưu nguyên "E1VFVN30". Verify regex normalize không cắt mất số.
+
+### TC-1.7.C4 — Ticker quá dài hoặc ký tự lạ "!@#$"
+- **Bước:** Gửi "!@#$" hoặc "VNMVNMVNMVNMVNM" (15+ chars).
+- **Kết quả mong đợi:** Hoặc reject với message "Mã cổ phiếu không hợp lệ", hoặc cho lưu (Phase 3B validate). Document chọn behavior.
+
+### TC-1.7.C5 — Quantity không phải số "abc"
+- **Bước:** Step `stock_quantity`, gửi "abc".
+- **Kết quả mong đợi:** Bot reply "Nhập số thôi nhé, ví dụ: 100" (theo spec line 905). State KHÔNG reset, vẫn ở `stock_quantity`. User retry được.
+
+### TC-1.7.C6 — Quantity âm "-100"
+- **Bước:** Gửi "-100".
+- **Kết quả mong đợi:** Reject với message rõ "Số cổ phiếu phải > 0". KHÔNG lưu negative quantity.
+- **Note:** `int("-100")` parse được → service phải validate tiếp, không chỉ dựa try/except.
+
+### TC-1.7.C7 — Quantity = 0
+- **Bước:** Gửi "0".
+- **Kết quả mong đợi:** Reject (không có lý do hold 0 cp). Hoặc lưu nhưng cảnh báo. Document.
+
+### TC-1.7.C8 — Quantity float "100.5" (mua phần lẻ ETF)
+- **Bước:** Gửi "100.5".
+- **Kết quả mong đợi:**
+  - Theo spec line 903 strip cả "." → parse thành `1005` (sai!).
+  - Hoặc spec yêu cầu integer → reject với message.
+  - **Document:** Việt Nam thường giao dịch nguyên cổ; nếu support fractional cho fund thì cần parse khác. Note gap nếu có.
+
+### TC-1.7.C9 — Quantity rất lớn (1 triệu cp)
+- **Bước:** Gửi "1000000".
+- **Kết quả mong đợi:** Lưu được. `total_value = 1_000_000 × 45_000 = 45 tỷ`. Format hiển thị "45 tỷ" hoặc "45,000tr".
+
+### TC-1.7.C10 — Avg price parse fail ("xyz")
+- **Bước:** Step `stock_price`, gửi "xyz".
+- **Kết quả mong đợi:** Bot reply "Nhập giá giúp mình nhé, ví dụ '45k' hoặc '45000'" (theo spec line 930). State giữ `stock_price`.
+
+### TC-1.7.C11 — Avg price = 0 hoặc âm
+- **Bước:** Gửi "0" hoặc "-1000".
+- **Kết quả mong đợi:** Reject với message "Giá phải > 0". KHÔNG lưu asset với `initial_value = 0`. Service layer validate (P3A-3 TC-1.3.C9).
+
+### TC-1.7.C12 — Avg price decimal nhỏ "0.5" (penny stock)
+- **Bước:** Gửi "0.5".
+- **Kết quả mong đợi:** Lưu `avg_price = Decimal('0.5')`. Edge case rare nhưng không crash. Total value = 50 (cho 100 cp).
+
+### TC-1.7.C13 — Current price < avg price (lỗ)
+- **Bước:** Avg = 50000, current = 30000.
+- **Kết quả mong đợi:**
+  - `initial_value = 5_000_000`, `current_value = 3_000_000`.
+  - `gain_loss = -2_000_000` (Decimal âm, hybrid property TC-1.2.H6).
+  - Confirmation hiển thị "📉 -2tr" hoặc tương đương.
+
+### TC-1.7.C14 — Current price > avg price rất nhiều (10x)
+- **Bước:** Avg = 10000, current = 100000.
+- **Kết quả mong đợi:** `gain_loss = +9_000_000`. Confirmation hiển thị "📈 +9tr" hoặc tương đương.
+
+### TC-1.7.C15 — Tap "stock_price:same" 2 lần liên tiếp (double tap)
+- **Bước:** Tap nhanh 2 lần button "Dùng giá mua".
+- **Kết quả mong đợi:** Chỉ tạo **1** asset (dedup qua draft state đã clear sau lần 1, hoặc qua callback handler idempotent). KHÔNG tạo duplicate.
+
+### TC-1.7.C16 — Text input ngoài stock_* steps → handler trả False
+- **Bước:** User chưa enter wizard, gửi text "100" hoặc "VNM".
+- **Kết quả mong đợi:** `handle_stock_ticker/quantity/price` đều return `False` (theo spec line 884-885, 899-900, 920-921). Message route handler khác. KHÔNG nhầm lẫn create asset rỗng.
+
+### TC-1.7.C17 — Abandon flow giữa chừng (stop ở stock_quantity)
+- **Bước:** Nhập ticker xong, không nhập quantity. Đóng app.
+- **Kết quả mong đợi:** State giữ trong `context.user_data` (Telegram persistent) → quay lại có thể tiếp tục. Hoặc timeout policy xóa. Document. KHÔNG có asset rỗng (`initial_value=null`) bị flush vào DB.
+
+### TC-1.7.C18 — User gửi sticker / photo trong stock_ticker step
+- **Bước:** Step `stock_ticker`, gửi photo.
+- **Kết quả mong đợi:** Bot reply "Mình cần text mã cổ phiếu thôi, ví dụ 'VNM'". KHÔNG crash.
+
+### TC-1.7.C19 — Cross-user: User A's asset_draft KHÔNG ảnh hưởng B
+- **Bước:** A đang ở step `stock_price`. B start stock wizard cùng lúc.
+- **Kết quả mong đợi:** `context.user_data` per-user (Telegram framework guarantee). Asset của A → user_id A, B → B. Không leak ticker / quantity giữa 2 users.
+
+### TC-1.7.C20 — Asset save nhưng `wealth_level` recompute (P3A-5 dependency)
+- **Bước:** User starter (5tr cash). Save VNM 100 × 300,000 = 30tr stock.
+- **Kết quả mong đợi:**
+  - Total net worth = 35tr → `user.wealth_level` chuyển `starter` → `young_prof`.
+  - Verify `create_asset` trigger ladder recompute (TC-1.5.H7 chéo).
+
+### TC-1.7.C21 — Confirmation message format số nguyên không thừa decimal
+- **Bước:** Save 100 cp × 45,000.
+- **Kết quả mong đợi:** Hiển thị "4.5tr" hoặc "4,500,000đ", KHÔNG "4500000.00". `format_money_short` strip trailing zeros khi nguyên.
+
+### TC-1.7.C22 — Cancel command "/cancel" giữa wizard
+- **Bước:** Đang ở `stock_quantity`, gửi `/cancel` (nếu spec có).
+- **Kết quả mong đợi:** Clear draft, bot xác nhận hủy, về main menu. Nếu spec không có → document gap (như P3A-6 TC-1.6.C20).
+
+### TC-1.7.C23 — Foreign stock (subtype `foreign_stock`) với ticker dài "AAPL"
+- **Bước:** Subtype `foreign_stock`, ticker "AAPL", quantity 10, avg_price 150 USD (note: VND-only theo CLAUDE.md `currency='VND'`).
+- **Kết quả mong đợi:**
+  - Hoặc lưu raw value VND quy đổi (user tự quy đổi).
+  - Hoặc reject với message "Phase 3A chỉ support cổ phiếu VN" — document spec.
+
+### TC-1.7.C24 — Decimal precision trong tính `initial_value`
+- **Bước:** quantity = 333, avg_price = 12345.
+- **Kết quả mong đợi:** `initial_value = Decimal('4110885')` exact. KHÔNG `4110884.99...` do float drift. Verify Decimal arithmetic xuyên suốt.
+
+### TC-1.7.C25 — Snapshot đầu tiên match `current_value`, không match `initial_value`
+- **Bước:** Save với avg=45k, current=50k. Verify snapshot.
+- **Kết quả mong đợi:** First snapshot có `value = current_value = 5_000_000` (theo P3A-3 TC-1.3.H1 logic), KHÔNG `initial_value`. NetWorthCalculator sẽ dùng `current_value`.
+
+---
+
+> **DỪNG TẠI ĐÂY** — Các issue P3A-8, P3A-9 sẽ được bổ sung trong các lần ghi tiếp theo.
