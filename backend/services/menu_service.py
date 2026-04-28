@@ -88,6 +88,7 @@ FEATURES = [
 BOT_COMMANDS = [
     {"command": "menu", "description": "Hiển thị menu tính năng"},
     {"command": "start", "description": "Bắt đầu sử dụng bot"},
+    {"command": "them_tai_san", "description": "Thêm tài sản mới (cash, cổ phiếu, BĐS...)"},
     {"command": "report", "description": "Báo cáo chi tiêu tháng này"},
     {"command": "goals", "description": "Xem mục tiêu tài chính"},
     {"command": "market", "description": "Thông tin thị trường"},
