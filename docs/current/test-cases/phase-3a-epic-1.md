@@ -1374,4 +1374,144 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
   - Bot reply lỗi gracefully: "Có chút lỗi, bạn thử lại nhé." (không leak stack trace).
   - Analytics `first_asset_added` KHÔNG fire (event chỉ track khi save success).
 
+### TC-1.9.C9 — Reminder 3 ngày: user đã thêm asset trong khoảng đó → KHÔNG nhắc
+- **Bước:**
+  1. Ngày D: tap skip.
+  2. Ngày D+1: user manual thêm asset qua `/them_tai_san` (ngoài onboarding).
+  3. Ngày D+3: reminder job chạy.
+- **Kết quả mong đợi:** Reminder job query check `count(assets) > 0` cho user → SKIP gửi nhắc. Tránh spam user đã action.
+
+### TC-1.9.C10 — Reminder fire xong rồi user vẫn không thêm → KHÔNG nhắc lần 2
+- **Bước:** Ngày D+3 reminder fire. Ngày D+6 hoặc D+10, không có policy nhắc lại.
+- **Kết quả mong đợi:** Theo spec line 360-361: "nhắc sau 3 ngày" (số ít) → **chỉ 1 lần**. Document nếu spec change muốn nhắc nhiều lần.
+
+### TC-1.9.C11 — Tap "Cash" rồi `/cancel` giữa wizard → quay về step_6 hay main?
+- **Bước:** Step_6 → tap Cash → đang ở `cash_amount` → gửi `/cancel`.
+- **Kết quả mong đợi:** Document chọn:
+  - **Option A:** Clear draft, quay về `step_6_first_asset` (vì onboarding chưa graduate).
+  - **Option B:** Clear draft, về main menu, mark `onboarding_skipped_asset=True`.
+  - Recommend Option A — không vô tình graduate user. KHÔNG để user mắc kẹt giữa wizard sau cancel.
+
+### TC-1.9.C12 — Callback `onboard_asset:invalid_xyz` (data corruption / replay attack)
+- **Bước:** Gửi callback data lạ, không thuộc 4 options.
+- **Kết quả mong đợi:** Handler reject với log warning, KHÔNG crash, KHÔNG raise lên user. Bot có thể re-render step_6 prompt.
+
+### TC-1.9.C13 — User đang `FIRST_ASSET` nhưng đã có asset trong DB (data drift)
+- **Bước:**
+  1. User tạo asset qua API direct (test setup), `user.onboarding_step` vẫn `FIRST_ASSET`.
+  2. Trigger `step_6_first_asset(update, user)`.
+- **Kết quả mong đợi:**
+  - Hoặc auto-complete onboarding (detect `count(assets) > 0`) → set `onboarding_completed_at`.
+  - Hoặc vẫn show step_6 prompt (bug nhỏ, document).
+  - **Recommend:** auto-detect để self-heal. Verify behavior nào được chọn.
+
+### TC-1.9.C14 — Onboarding `step_6_first_asset` reuse wizards KHÔNG duplicate code
+- **Mục tiêu:** Verify AC technical note "Reuse existing wizards, không duplicate".
+- **Bước:** Inspect `app/bot/handlers/onboarding.py` cho callback `onboard_asset:cash`.
+- **Kết quả mong đợi:**
+  - Handler import `start_cash_wizard` từ `asset_entry.py` (P3A-6).
+  - KHÔNG có copy-paste body của wizard.
+  - KHÔNG có handler riêng tên `start_onboard_cash_wizard()` duplicate logic.
+
+### TC-1.9.C15 — `onboarding_completed_at` dùng UTC, không local time
+- **Bước:** Save asset đầu tiên ở 23:30 giờ VN.
+- **Kết quả mong đợi:** `onboarding_completed_at` lưu UTC (16:30 UTC), không phải 23:30 VN. Verify consistency với phần còn lại của codebase (CLAUDE.md: timezone-aware).
+
+### TC-1.9.C16 — Net worth hiển thị sau save = đúng giá trị asset đầu tiên
+- **Bước:** User mới (0 đồng), save VCB 100tr.
+- **Kết quả mong đợi:**
+  - Congrats message hiển thị "💎 Net worth: 100tr" (không phải 0, không phải double).
+  - Gọi `NetWorthCalculator.calculate(user_id)` đúng 1 lần (verify qua log SQL).
+  - Format theo `currency_utils.format_money_short` (giống P3A-6 TC-1.6.C16).
+
+### TC-1.9.C17 — User reset onboarding (admin / debug) → step_6 hiện lại
+- **Bước:** Admin set `user.onboarding_step = FIRST_ASSET` thủ công, `onboarding_completed_at = NULL`.
+- **Kết quả mong đợi:** `/start` → trigger lại step_6_first_asset đầy đủ. Sandbox-friendly cho dev.
+
+### TC-1.9.C18 — Wealth level recompute sau save từ onboarding (P3A-5 chéo)
+- **Bước:** User starter (0 đồng) → save VCB 100tr qua step_6 Cash wizard.
+- **Kết quả mong đợi:**
+  - Sau save: `user.wealth_level == 'young_prof'` (100tr ∈ [30tr, 200tr)).
+  - Verify ladder trigger trong cùng commit boundary với asset save (TC-1.5.H7 chéo).
+
+### TC-1.9.C19 — Analytics `first_asset_added` distinguish path "onboarding" vs "manual"
+- **Bước:**
+  1. User A: thêm asset đầu tiên qua step_6.
+  2. User B: skip step_6, sau đó thêm qua `/them_tai_san`.
+- **Kết quả mong đợi:**
+  - A: event với `properties.entry_path == "onboarding"`.
+  - B: event với `properties.entry_path == "manual"` (hoặc tương đương).
+  - Phân biệt được 2 path để analyze conversion funnel.
+
+### TC-1.9.C20 — Skip xong, vào lại `/them_tai_san` → flow normal, KHÔNG re-trigger step_6
+- **Bước:**
+  1. Tap skip → `onboarding_completed_at` set.
+  2. Sau đó user `/them_tai_san`.
+- **Kết quả mong đợi:**
+  - Vào `start_asset_entry_wizard()` (6 buttons normal), KHÔNG quay lại step_6 (4 buttons).
+  - Asset save qua path này có `entry_path: "manual"`.
+  - `onboarding_skipped_asset` flag KHÔNG bị clear (giữ historical truth cho analytics).
+
+### TC-1.9.C21 — Decimal precision xuyên suốt onboarding flow
+- **Bước:** Save "VCB 1,234,567" qua step_6 Cash → ngay lập tức query net worth.
+- **Kết quả mong đợi:** Net worth hiển thị đúng `Decimal('1234567')`, KHÔNG `1234566.99` (float drift). Round-trip tester (P3A-2 TC-1.2.C3, P3A-3 TC-1.3.C15 chéo).
+
+---
+
+## ✅ Map ngược về Checklist Cuối Tuần 1
+
+> Liên kết các test trên đây tới `phase-3a-detailed.md` line 1003-1015. Nếu một mục checklist không có test cover → flag để bổ sung.
+
+| Checklist Item (phase-3a-detailed.md) | Issue | Tests cover |
+|---|---|---|
+| 4 migrations apply thành công | P3A-1 | TC-1.1.H1, H2, H3, H4, H5, H6, H7 |
+| `Asset` model với JSON metadata hoạt động | P3A-2 | TC-1.2.H1, H3, H7, C5 (UTF-8 nested), C8 (YAML missing key) |
+| `AssetSnapshot` table tạo snapshot tự động khi create/update | P3A-3 | TC-1.3.H1, H2, C2 (no duplicate same day), C13 (race) |
+| `asset_categories.yaml` đầy đủ 6 loại | P3A-2 | TC-1.2.H7, H8, H9, C7 (missing file), C8 (corrupt) |
+| `AssetService.create_asset()` tested | P3A-3 | TC-1.3.H1, C1 (default current_value), C7 (negative), C9 (zero), C12 (metadata None) |
+| `NetWorthCalculator.calculate()` accurate | P3A-4 | TC-1.4.H1, H2, H6, C1 (0 assets), C4 (Decimal), C11 (cross-user) |
+| `NetWorthCalculator.calculate_change()` cho day/week/month/year | P3A-4 | TC-1.4.H4, H5, C2 (0 assets), C3 (no history), C7 (invalid period), C8 (negative), C9 (div 0) |
+| `WealthLevel` detection đúng | P3A-5 | TC-1.5.H1-H6, C1-C3 (boundaries), C5 (negative), C8-C9 (recompute) |
+| Asset entry wizard cho ít nhất 3 loại: cash, stock, real_estate | P3A-6, P3A-7, P3A-8 | TC-1.6.H1-H9, TC-1.7.H1-H15, TC-1.8.H1-Hn (đầy đủ wizard 3 loại) |
+| Onboarding flow có step "first asset" | P3A-9 | TC-1.9.H1-H12 (state machine + 4 routes + skip + completion) |
+| Tự test: tạo 5 assets đa loại, net worth tính đúng | Cross-issue | TC-1.4.H1 (multi-type sum), TC-1.6.H7 (net worth update), TC-1.7.H10 (net worth sau stock), TC-1.8.C22 (jump level), TC-1.9.H8 (net worth sau onboarding asset) |
+
+### Gaps & Open Questions
+
+Các điểm sau spec chưa rõ — cần product confirm trước khi implement:
+
+1. **FK ON DELETE policy** (TC-1.1.C3) — CASCADE vs RESTRICT?
+2. **`asset_type` validation layer** (TC-1.2.C1) — Postgres ENUM vs Python validation?
+3. **`get_asset_by_id` cross-user** (TC-1.3.C3) — raise vs return None?
+4. **`acquired_at` future date** (TC-1.3.C11) — accept hay reject?
+5. **`change_percentage` khi previous=0** (TC-1.4.C9) — return 0, Infinity, hay None?
+6. **`largest_asset` tie-break** (TC-1.4.C12) — by created_at hay by id?
+7. **`detect_level` với value âm** (TC-1.5.C5) — STARTER hay raise?
+8. **Wizard `/cancel` command** (TC-1.6.C20, TC-1.7.C22, TC-1.8.C24, TC-1.9.C11) — spec chưa define?
+9. **`onboarding_skipped_asset` column** (TC-1.9.H7) — column riêng hay reuse `onboarding_skipped`?
+10. **Reminder lặp lại** (TC-1.9.C10) — chỉ 1 lần hay theo policy n lần?
+11. **Foreign stock currency** (TC-1.7.C23) — chỉ VND hay support USD?
+12. **Onboarding auto-complete khi user đã có asset** (TC-1.9.C13) — self-heal hay không?
+
+→ Trước khi merge implementation, các gap trên cần được resolve trong phase-3a-detailed.md hoặc inline doc của handler.
+
+---
+
+## 📊 Tổng kết Epic 1
+
+- **Issues covered:** P3A-1 → P3A-9 (9/9 — đủ cả epic)
+- **Tổng test cases:** ~210 tests (Happy + Corner)
+  - P3A-1: 7H + 10C = 17
+  - P3A-2: 10H + 13C = 23
+  - P3A-3: 7H + 15C = 22
+  - P3A-4: 7H + 15C = 22
+  - P3A-5: 7H + 13C = 20
+  - P3A-6: 9H + 20C = 29
+  - P3A-7: 15H + 25C = 40
+  - P3A-8: ~10H + 26C ≈ 36 (theo file hiện tại)
+  - P3A-9: 12H + 21C = 33
+- **Critical security tests:** TC-1.3.C3/C4/C5, TC-1.4.C11, TC-1.5.C12, TC-1.6.C19, TC-1.7.C19, TC-1.8.C21, TC-1.9.C7
+- **Decimal-not-float invariant:** TC-1.2.C3, TC-1.3.C15, TC-1.4.C4, TC-1.5.C6/C11, TC-1.7.C24, TC-1.8.C23, TC-1.9.C21
+
+> **Next:** Khi Epic 2 (P3A-10 → P3A-15) start, tạo file `phase-3a-epic-2.md` cùng cấu trúc.
 
