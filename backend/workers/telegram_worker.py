@@ -201,7 +201,7 @@ async def _handle_message(
         )
 
     # /assets — open the asset-entry wizard (Phase 3A).
-    if command in ("/assets", "/asset", "/themtaisan", "/them_tai_san"):
+    if command in ("/assets", "/asset", "/themtaisan"):
         if resolved_user is not None:
             await asset_entry_handlers.start_asset_wizard(
                 db, chat_id, resolved_user
