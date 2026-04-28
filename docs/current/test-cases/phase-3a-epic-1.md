@@ -1206,4 +1206,172 @@ export TEST_USER_ID=$(psql $DATABASE_URL -tAc "SELECT id FROM users WHERE telegr
 
 ---
 
-> **DỪNG TẠI ĐÂY** — Issue P3A-9 sẽ được bổ sung trong lần ghi tiếp theo.
+# P3A-9 — Integrate "First Asset" Step into Onboarding
+
+**Maps to AC:** Onboarding step `step_6_first_asset` ngay sau `step_5_aha_moment`, keyboard 4 options (Cash / Invest / Real Estate / Skip), tap → route đúng wizard, "Skip" set `onboarding_skipped_asset=True` + reminder sau 3 ngày, sau complete → congrats + first net worth, analytics `first_asset_added` & `first_asset_skipped`, `user.onboarding_completed_at` chỉ set khi có asset (hoặc skip rõ), state machine có `ONBOARDING_STEP_FIRST_ASSET`, **reuse existing wizards** không duplicate.
+
+> **Setup:** User mới qua step_1 → step_5 (đã có giao dịch đầu tiên). `user.onboarding_step == AHA_MOMENT` (hoặc step số tương đương). Test qua Telegram bot test account, hoặc unit test với mock Update/Context + DB session.
+
+## Happy Path
+
+### TC-1.9.H1 — `OnboardingStep.FIRST_ASSET` enum tồn tại + đúng vị trí
+- **Mục tiêu:** Verify state machine có step mới sau `AHA_MOMENT`, trước `COMPLETED`.
+- **Bước:**
+  ```python
+  from app.bot.personality.onboarding_flow import OnboardingStep
+  steps = [s for s in OnboardingStep]
+  ```
+- **Kết quả mong đợi:**
+  - `OnboardingStep.FIRST_ASSET` tồn tại với value số nguyên.
+  - Thứ tự: `... AHA_MOMENT < FIRST_ASSET < COMPLETED`.
+  - Không trùng value với step cũ (P3A-9 spec: thêm mới, không thay đổi cũ).
+
+### TC-1.9.H2 — Sau `step_5_aha_moment` → trigger `step_6_first_asset`
+- **Bước:**
+  1. User đang ở `AHA_MOMENT`, vừa tap "🚀 Bắt đầu" (callback `onboarding:complete` cũ).
+  2. Verify `step_6_first_asset` được gọi thay vì `mark_completed` ngay.
+- **Kết quả mong đợi:**
+  - `user.onboarding_step` chuyển sang `FIRST_ASSET` (không nhảy thẳng `COMPLETED`).
+  - `user.onboarding_completed_at` vẫn là `None`.
+  - Bot hiển thị message theo spec line 979-987: "💎 Bước quan trọng cuối cùng {name}!\n\nHãy thêm ít nhất 1 tài sản của bạn..."
+
+### TC-1.9.H3 — `step_6_first_asset` hiển thị đúng 4 inline buttons
+- **Bước:** Trigger `step_6_first_asset(update, user)`.
+- **Kết quả mong đợi:** Inline keyboard có **đúng 4** buttons (theo spec line 989-994):
+  - "💵 Tiền trong NH (5 giây)" → callback `onboard_asset:cash`
+  - "📈 Tôi có đầu tư" → callback `onboard_asset:invest`
+  - "🏠 Tôi có BĐS" → callback `onboard_asset:real_estate`
+  - "⏭ Skip, thêm sau" → callback `onboard_asset:skip`
+
+### TC-1.9.H4 — Tap "Cash" → route tới `start_cash_wizard()`
+- **Bước:** Tap button "💵 Tiền trong NH (5 giây)" (callback `onboard_asset:cash`).
+- **Kết quả mong đợi:**
+  - `start_cash_wizard(update, context)` được gọi (P3A-6 TC-1.6.H1 chéo).
+  - `context.user_data["asset_draft"] == {"asset_type": "cash"}`.
+  - Bot hiển thị 4 subtype buttons như P3A-6.
+  - **Reuse**, không duplicate handler logic (AC P3A-9).
+
+### TC-1.9.H5 — Tap "Invest" → route tới `start_stock_wizard()`
+- **Bước:** Tap "📈 Tôi có đầu tư" (callback `onboard_asset:invest`).
+- **Kết quả mong đợi:**
+  - `start_stock_wizard(update, context)` được gọi (P3A-7 TC-1.7.H1 chéo).
+  - `context.user_data["asset_draft"] == {"asset_type": "stock"}`.
+  - Bot ask ticker.
+
+### TC-1.9.H6 — Tap "Real Estate" → route tới `start_real_estate_wizard()`
+- **Bước:** Tap "🏠 Tôi có BĐS" (callback `onboard_asset:real_estate`).
+- **Kết quả mong đợi:**
+  - `start_real_estate_wizard(update, context)` được gọi (P3A-8 chéo).
+  - `context.user_data["asset_draft"] == {"asset_type": "real_estate"}`.
+
+### TC-1.9.H7 — Tap "Skip" → set `onboarding_skipped_asset=True` + lên lịch reminder 3 ngày
+- **Bước:** Tap "⏭ Skip, thêm sau" (callback `onboard_asset:skip`).
+- **Kết quả mong đợi:**
+  - `user.onboarding_skipped_asset == True` (column mới hoặc trong existing `onboarding_skipped` — document rõ).
+  - Reminder job được schedule cho `now + 3 days` (qua APScheduler hoặc table `user_events` flag).
+  - `user.onboarding_completed_at` được set (đã graduate, dù skip).
+  - Bot reply ấm áp: "OK, mình ghi nhớ rồi. 3 ngày nữa mình sẽ nhắc nhẹ nhé 💚" (hoặc tương đương).
+
+### TC-1.9.H8 — Sau save first asset (qua wizard) → congrats + show first net worth
+- **Bước:**
+  1. Vào step_6 → tap Cash → save "VCB 100tr".
+  2. Sau khi `AssetService.create_asset()` thành công.
+- **Kết quả mong đợi:**
+  - Bot reply congrats kèm net worth: "🎉 Tài sản đầu tiên của bạn: VCB 100tr\n💎 Net worth: 100tr" (format VN).
+  - Net worth được tính bằng `NetWorthCalculator.calculate(user_id)` (P3A-4 chéo) — không hardcode value.
+  - `user.onboarding_completed_at` được set = `datetime.utcnow()`.
+  - `user.onboarding_step == OnboardingStep.COMPLETED`.
+
+### TC-1.9.H9 — Analytics event `first_asset_added` fire khi save thành công
+- **Bước:** Save asset đầu tiên qua onboarding flow.
+- **Kết quả mong đợi:**
+  - Event `first_asset_added` được track với:
+    - `user_id` đúng.
+    - `properties` chứa: `asset_type`, `subtype`, `entry_path: "onboarding"` (phân biệt với "manual").
+  - Verify qua `user_events` table hoặc analytics mock.
+
+### TC-1.9.H10 — Analytics event `first_asset_skipped` fire khi tap Skip
+- **Bước:** Tap "⏭ Skip, thêm sau".
+- **Kết quả mong đợi:**
+  - Event `first_asset_skipped` track với `user_id`, timestamp.
+  - **Chỉ fire 1 lần** ngay khi tap.
+
+### TC-1.9.H11 — `user.onboarding_completed_at` chỉ set sau khi có asset HOẶC skip rõ
+- **Mục tiêu:** Verify graduation gate đúng AC.
+- **Bước:**
+  1. User ở `FIRST_ASSET`, chưa làm gì → check `onboarding_completed_at`.
+  2. User save asset → check lại.
+  3. User khác tap skip → check.
+- **Kết quả mong đợi:**
+  - Chưa làm gì: `onboarding_completed_at IS NULL`.
+  - Sau save asset: `onboarding_completed_at` được set.
+  - Sau skip: `onboarding_completed_at` được set + `onboarding_skipped_asset=True`.
+
+### TC-1.9.H12 — Reminder sau 3 ngày fire đúng nội dung + idempotent
+- **Bước:**
+  1. User skip ngày D.
+  2. Mock time → D+3 days. Trigger reminder job.
+  3. Trigger lần 2 cùng ngày.
+- **Kết quả mong đợi:**
+  - Lần 1: bot gửi nhắc nhẹ "3 ngày trước bạn skip thêm tài sản — giờ thêm 1 cái thử nhé? 💎" + button "💵 Thêm ngay" / "⏭ Để sau".
+  - Lần 2: **không** gửi lại (idempotent qua `user_events` flag hoặc reminder DB table).
+
+## Corner Cases
+
+### TC-1.9.C1 — User skip step_6 → `onboarding_completed_at` set HAY không?
+- **Mục tiêu:** Document rõ behavior, vì spec mơ hồ ("chỉ khi có asset HOẶC skip rõ").
+- **Bước:** Tap skip, query `users` table.
+- **Kết quả mong đợi:** Theo AC line 364: "Update `user.onboarding_completed_at` chỉ khi có asset (hoặc skip rõ)" → skip **DOES** count → `onboarding_completed_at` được set. Verify behavior này chứ không phải để `NULL` vô thời hạn.
+
+### TC-1.9.C2 — User abandon giữa wizard sau khi tap "Cash" → KHÔNG set `onboarding_completed_at`
+- **Bước:**
+  1. Tap "💵 Tiền trong NH" → vào cash wizard.
+  2. Đóng app, không gửi text.
+  3. Mở lại sau 1 ngày, gửi `/start`.
+- **Kết quả mong đợi:**
+  - `user.onboarding_step` vẫn là `FIRST_ASSET` (chưa graduate).
+  - `user.onboarding_completed_at IS NULL`.
+  - `OnboardingService.resume_or_start()` route lại về `step_6_first_asset` (không nhảy về step cũ).
+  - `context.user_data["asset_draft"]` có thể vẫn còn (tuỳ Telegram persistent context) — document policy.
+
+### TC-1.9.C3 — User tap subtype, save asset xong → KHÔNG quay lại `step_6` lần 2
+- **Bước:** Save xong asset đầu tiên. Gửi `/start` lại.
+- **Kết quả mong đợi:**
+  - `OnboardingService.resume_or_start()` thấy `onboarding_step == COMPLETED` → KHÔNG hiển thị step_6.
+  - Bot route về main menu / help.
+  - Asset đầu tiên KHÔNG bị duplicate.
+
+### TC-1.9.C4 — Tap "Skip" 2 lần liên tiếp (double tap)
+- **Bước:** Tap skip, ngay lập tức tap lại.
+- **Kết quả mong đợi:**
+  - Lần 1: set flag, fire analytics, schedule reminder.
+  - Lần 2: idempotent — KHÔNG fire analytics lần 2, KHÔNG schedule reminder lần 2.
+  - User chỉ thấy 1 message confirm.
+
+### TC-1.9.C5 — User tap "Skip" sau khi đã save asset (race condition)
+- **Bước:**
+  1. Tap "Cash" → save asset thành công.
+  2. Quay lại tap "Skip" (button cũ vẫn còn trong message lịch sử).
+- **Kết quả mong đợi:**
+  - Hệ thống detect `onboarding_step == COMPLETED` → callback handler trả về sớm với message "Bạn đã thêm tài sản rồi 😊", KHÔNG set `onboarding_skipped_asset=True`.
+  - Analytics `first_asset_skipped` KHÔNG fire (vì thực tế không skip).
+
+### TC-1.9.C6 — User vẫn ở step_5 (chưa tap "Bắt đầu") → step_6 KHÔNG hiện
+- **Bước:** User đang ở `AHA_MOMENT`, chưa tap callback `onboarding:complete`. Gửi text bừa.
+- **Kết quả mong đợi:** Bot vẫn ở step_5 prompt. KHÔNG bypass sang step_6.
+
+### TC-1.9.C7 — Cross-user isolation: User A's onboarding_step không ảnh hưởng B
+- **Bước:** A đang `FIRST_ASSET`. B vừa tạo (NOT_STARTED). Cả 2 gửi `/start`.
+- **Kết quả mong đợi:** A → step_6, B → step_1. Per-user state hoàn toàn độc lập (giống P3A-6 TC-1.6.C19).
+
+### TC-1.9.C8 — Save asset thất bại (DB error) trong wizard từ onboarding → KHÔNG mark completed
+- **Bước:**
+  1. Vào step_6 → Cash wizard → "VCB 100tr".
+  2. Mock `AssetService.create_asset()` raise `IntegrityError`.
+- **Kết quả mong đợi:**
+  - `user.onboarding_step` vẫn là `FIRST_ASSET` (không chuyển COMPLETED).
+  - `user.onboarding_completed_at IS NULL`.
+  - Bot reply lỗi gracefully: "Có chút lỗi, bạn thử lại nhé." (không leak stack trace).
+  - Analytics `first_asset_added` KHÔNG fire (event chỉ track khi save success).
+
+
