@@ -852,3 +852,118 @@
   - B → bot show step_1 (welcome flow đầu).
   - Hoàn toàn độc lập, không có data leak.
 
+### TC-1.9.C8 — Save asset thất bại (lỗi backend) trong wizard từ onboarding
+- **Bước:** Tạo điều kiện DB / network lỗi (nhờ admin tắt DB tạm). Vào step_6 → Cash → "VCB 100tr".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply gracefully: "Có chút lỗi, bạn thử lại nhé 🙏" — KHÔNG leak stack trace, KHÔNG im lặng.
+  - User vẫn ở step_6 (chưa graduate) — gõ `/start` quay lại step_6.
+  - Khi backend hồi phục, user thử lại → save thành công và graduate đúng.
+
+### TC-1.9.C9 — Reminder 3 ngày: user đã thêm asset trong khoảng đó → KHÔNG nhắc
+- **Bước:**
+  1. Ngày D: tap skip.
+  2. Ngày D+1: user manual thêm asset qua `/them_tai_san` (ngoài onboarding).
+  3. Đợi đến ngày D+3.
+- **Kết quả mong đợi (user thấy):**
+  - Ngày D+3 user **KHÔNG** nhận reminder ("Bạn đã thêm tài sản rồi…" v.v.).
+  - Tránh spam user đã action.
+
+### TC-1.9.C10 — Reminder fire xong 1 lần, không nhắc nữa
+- **Bước:** Ngày D+3 nhận reminder. Đợi đến ngày D+6 hoặc D+10, không thêm asset.
+- **Kết quả mong đợi (user thấy):**
+  - Bot **KHÔNG** gửi reminder lần 2 ở D+6/D+10.
+  - Theo spec: "nhắc sau 3 ngày" (số ít) → chỉ 1 lần.
+  - Nếu spec change muốn nhắc nhiều lần → document.
+
+### TC-1.9.C11 — Tap "Cash" rồi `/huy` giữa wizard → quay về step_6
+- **Bước:** Step_6 → tap Cash → đang ở step nhập tên/số tiền → gửi `/huy`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot xác nhận hủy.
+  - Bot quay về step_6 (4 buttons) — chưa graduate, user có thể chọn lại Cash/Stock/RE/Skip.
+  - **KHÔNG** vô tình mark skipped, **KHÔNG** mắc kẹt giữa wizard sau cancel.
+
+### TC-1.9.C12 — Net worth hiển thị sau save = đúng giá trị asset đầu tiên
+- **Bước:** User mới (0 đồng), save VCB 100tr qua step_6 Cash.
+- **Kết quả mong đợi (user thấy):**
+  - Congrats message: "💎 Net worth: 100tr" — đúng = giá trị asset, không phải 0, không double-count.
+  - Format VN ngắn ("100tr", không "100000000").
+
+### TC-1.9.C13 — Admin reset onboarding → step_6 hiện lại
+- **Bước:** Nhờ admin set `user.onboarding_step = FIRST_ASSET` + `onboarding_completed_at = NULL`. Gõ `/start`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot trigger lại step_6 đầy đủ (4 buttons).
+  - Giúp dev test re-onboarding flow dễ dàng.
+
+### TC-1.9.C14 — Wealth level đúng sau save từ onboarding
+- **Bước:** User starter (0 đồng) → step_6 → Cash → save "VCB 100tr".
+- **Kết quả mong đợi (user thấy):**
+  - Sau save, dashboard / briefing tiếp theo phản ánh wealth level = "Young Professional" (100tr ∈ [30tr, 200tr)).
+  - Tone briefing (hôm sau) phù hợp Young Prof, không còn Starter.
+
+### TC-1.9.C15 — Skip xong, vào lại `/them_tai_san` → flow normal
+- **Bước:**
+  1. Tap skip → graduate.
+  2. Sau đó user `/them_tai_san`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot vào menu chọn loại asset (6 buttons normal — Cash/Stock/RE/Crypto/Gold/Other).
+  - **KHÔNG** quay lại step_6 (4 buttons "Tôi có…").
+  - Asset save qua path này hoạt động bình thường.
+
+### TC-1.9.C16 — Decimal precision xuyên suốt onboarding
+- **Bước:** Save "VCB 1,234,567" qua step_6 Cash → ngay lập tức query net worth qua congrats message.
+- **Kết quả mong đợi (user thấy):**
+  - Net worth hiển thị đúng "1,234,567đ" hoặc "1.23tr" — KHÔNG "1234566.99…" (float drift).
+  - Round-trip qua wizard không mất precision.
+
+---
+
+## ✅ Map ngược về Checklist Cuối Tuần 1
+
+> Liên kết các test trên đây tới `phase-3a-detailed.md` line 1003-1015. Chỉ list checklist items có Telegram-testable coverage.
+
+| Checklist Item (phase-3a-detailed.md) | Issue | Tests cover |
+|---|---|---|
+| Asset entry wizard cho Cash | P3A-6 | TC-1.6.H1-H8 + Corner C1-C19 |
+| Asset entry wizard cho Stock | P3A-7 | TC-1.7.H1-H14 + Corner C1-C24 |
+| Asset entry wizard cho Real Estate | P3A-8 | TC-1.8.H1-H14 + Corner C1-C25 |
+| Onboarding flow có step "first asset" | P3A-9 | TC-1.9.H1-H9 + Corner C1-C16 |
+| Tự test: tạo nhiều asset đa loại, net worth tính đúng | Cross-issue | TC-1.6.H7, TC-1.7.H10/H11, TC-1.8.H10/H14, TC-1.9.H7 |
+| Wealth level adapt theo asset thay đổi | P3A-7, P3A-8, P3A-9 | TC-1.7.C19, TC-1.8.C21, TC-1.9.C14 |
+| Cross-user isolation | All wizards | TC-1.6.C18, TC-1.7.C18, TC-1.8.C20, TC-1.9.C7 |
+| Cancel / hủy giữa flow | All wizards | TC-1.6.C19, TC-1.7.C21, TC-1.8.C23, TC-1.9.C11 |
+
+> **Note:** Checklist items thuộc DB / model / service / calculator (migrations, AssetService, NetWorthCalculator, WealthLevel detection) đã được tách ra file test internal layer riêng — không cover qua Telegram.
+
+### Gaps & Open Questions (chỉ những điểm user có thể quan sát)
+
+Các điểm sau spec chưa rõ ràng — cần product confirm trước khi implement, vì bot behavior khác nhau sẽ ảnh hưởng UX:
+
+1. **Wizard `/cancel` / `/huy`** (TC-1.6.C19, TC-1.7.C21, TC-1.8.C23, TC-1.9.C11) — spec có command hủy không?
+2. **Timeout policy** cho wizard state (TC-1.6.C9, TC-1.7.C16, TC-1.8.C18) — bao lâu thì expire?
+3. **Parse VN style "2,5 tỷ" vs "2.5 tỷ"** (TC-1.8.C4) — accept dấu phẩy?
+4. **Năm mua tương lai/quá xa** (TC-1.8.C6, C7) — accept hay reject?
+5. **Foreign stock currency** (TC-1.7.C22) — chỉ VND hay support USD?
+6. **Skip button sau save (race)** (TC-1.9.C5) — bot detect graduated đúng?
+7. **Reminder lặp lại** (TC-1.9.C10) — chỉ 1 lần hay theo policy n lần?
+8. **Quantity float "100.5"** (TC-1.7.C8) — accept fractional cho ETF/fund?
+9. **Skip address hiển thị thế nào** (TC-1.8.C14) — empty hay "Không có"?
+
+→ Trước khi merge implementation, các gap trên cần được resolve trong phase-3a-detailed.md hoặc inline doc của handler.
+
+---
+
+## 📊 Tổng kết Epic 1 (Telegram-only test cases)
+
+- **Issues covered (qua Telegram bot):** P3A-6, P3A-7, P3A-8, P3A-9 (4 wizards/onboarding flows)
+- **Tổng test cases:** ~117 tests
+  - P3A-6 (Cash wizard): 8H + 19C = 27
+  - P3A-7 (Stock wizard): 14H + 24C = 38
+  - P3A-8 (RE wizard): 14H + 25C = 39
+  - P3A-9 (Onboarding first asset): 9H + 16C = 25 (skip ~8 internal-only TCs)
+- **Test bị lược bỏ khỏi file này (không Telegram-testable):**
+  - Toàn bộ P3A-1 → P3A-5 (DB, model, service, calculator, wealth level — chỉ test qua psql/pytest)
+  - Một số corner cases internal-only trong P3A-6 → P3A-9 (vd inspect `context.user_data`, analytics event firing, callback data corruption replay, code inspection cho duplicate logic, UTC timestamp internals)
+
+> **Cách dùng:** Chạy file này khi cần verify UX/wizard hoạt động đúng từ phía user. Để verify layer DB/service, dùng file test internal riêng (sẽ bổ sung).
+
+> **Next:** Khi Epic 2 (P3A-10 → P3A-15 — Morning Briefing) start, tạo file `phase-3a-epic-2.md` cùng cấu trúc — chỉ giữ TC user test qua Telegram (vd nhận briefing 7h sáng, tap inline buttons).
