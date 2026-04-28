@@ -105,7 +105,7 @@ async def call_llm(
     short-lived scripts and background jobs don't have to thread a
     user id through when they genuinely don't have one.
 
-    See docs/strategy/scaling-refactor-B.md §B4 for rationale.
+    See docs/archive/scaling-refactor-B.md §B4 for rationale.
     """
     prompt_hash = _hash_prompt(prompt)
     cache_key = _build_cache_key(task_type, prompt_hash, user_id, shared_cache)

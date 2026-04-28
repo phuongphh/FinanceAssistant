@@ -8,7 +8,7 @@ Creates the ``telegram_updates`` table used to:
 - Dedup retried Telegram webhook deliveries (PK = update_id).
 - Track background-processing status for orphan recovery on restart.
 
-Rationale in docs/strategy/scaling-refactor-A.md §A1.
+Rationale in docs/archive/scaling-refactor-A.md §A1.
 """
 from typing import Sequence, Union
 

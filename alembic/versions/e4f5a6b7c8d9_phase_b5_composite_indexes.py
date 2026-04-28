@@ -19,7 +19,7 @@ once soft-deletes accumulate) and ``CREATE INDEX CONCURRENTLY`` so the
 migration doesn't take a table-level lock on write-heavy tables at the
 size we'll be at in Phase 1 VPS.
 
-Rationale: docs/strategy/scaling-refactor-B.md §B5.
+Rationale: docs/archive/scaling-refactor-B.md §B5.
 """
 from typing import Sequence, Union
 

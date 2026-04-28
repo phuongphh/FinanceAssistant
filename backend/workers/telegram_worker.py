@@ -12,7 +12,7 @@ The webhook route claims an ``update_id`` row and spawns
 - ``recover_orphaned_updates`` — scan for rows stuck in ``processing``
   at startup and re-enqueue them.
 
-See docs/strategy/scaling-refactor-A.md §A3 + §A1 for context.
+See docs/archive/scaling-refactor-A.md §A3 + §A1 for context.
 """
 from __future__ import annotations
 

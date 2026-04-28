@@ -1,5 +1,17 @@
 # Scaling Refactor — Phase A (Stop-the-bleeding)
 
+> **STATUS: ✅ IMPLEMENTED (archived 2026-04-28).**
+> Tất cả 3 fix (A1 dedup, A2 pool tuning, A3 LLM background) đã merge.
+> Code references:
+> - A1 — `backend/models/telegram_update.py`, migration `d3e4f5a6b7c8`,
+>   `backend/routers/telegram.py:43` (`_claim_update`).
+> - A2 — `backend/config/__init__.py:24-30`, `backend/database.py:18-23`.
+> - A3 — `backend/workers/telegram_worker.py` (`route_update`,
+>   `process_update_safely`, `recover_orphaned_updates`).
+> Items "không giải quyết ở giai đoạn A" được follow up ở Phase B
+> (`docs/archive/scaling-refactor-B.md`) và Phase C
+> (`docs/current/scaling-refactor-C.md`).
+>
 > **Mục tiêu:** Webhook Telegram không chết ở 1K users. 3 fix bắt buộc trước khi go-live Phase 1.
 > **Thời gian:** 2-3 ngày. **Blocks:** Phase 1 go-live.
 > **Không làm:** Không thêm Redis, không thay queue stack, không rewrite service layer.

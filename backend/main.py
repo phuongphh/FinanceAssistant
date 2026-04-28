@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     logger.info("Finance Assistant API starting up")
 
     # Pick up any telegram_updates that were mid-flight when the previous
-    # process died. See docs/strategy/scaling-refactor-A.md §A1.
+    # process died. See docs/archive/scaling-refactor-A.md §A1.
     try:
         recovered = await recover_orphaned_updates()
         if recovered:

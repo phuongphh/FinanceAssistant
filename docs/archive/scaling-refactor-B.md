@@ -1,5 +1,19 @@
 # Scaling Refactor — Phase B (Cleanup layers)
 
+> **STATUS: ✅ IMPLEMENTED (archived 2026-04-28).**
+> Cả 5 fix đã merge:
+> - B1 commit boundary — services có tag `TRANSACTION_OWNED_BY_CALLER`,
+>   guard test `backend/tests/test_service_boundary.py`.
+> - B2 duplicate user lookup — `backend/tests/test_handler_boundary.py`.
+> - B3 Notifier port — `backend/ports/notifier.py`,
+>   `backend/adapters/telegram_notifier.py`,
+>   `backend/services/morning_report_service.py:18,227`.
+> - B4 cache key per `user_id` + `shared_cache` — `llm_service.py:34`,
+>   `backend/tests/test_llm_cache_isolation.py`.
+> - B5 composite indexes — migration `e4f5a6b7c8d9`.
+> Section "Sau Phase B — những gì còn lại cho Phase C" đã chuyển thành
+> doc riêng: `docs/current/scaling-refactor-C.md`.
+>
 > **Mục tiêu:** Code không drift khi codebase/team lớn. Ranh giới layer rõ để issue Phase 2 tiếp theo không đi lạc.
 > **Thời gian:** 3-4 ngày. **Blocks:** Bất kỳ issue Phase 2 mới nào.
 > **Tiền đề:** Giai đoạn A đã merge — webhook đã có background worker, nên layer boundary mới có chỗ áp vào.

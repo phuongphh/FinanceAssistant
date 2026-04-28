@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-finance_db}
     # max_connections default 100 is below workers × (pool_size + max_overflow).
-    # 4 workers × (20 + 30) = 200 — see docs/strategy/scaling-refactor-A.md §A2.
+    # 4 workers × (20 + 30) = 200 — see docs/archive/scaling-refactor-A.md §A2.
     command: ["postgres", "-c", "max_connections=200"]
     ports:
       - "5433:5432"

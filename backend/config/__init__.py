@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
 
-    # Database connection pool — see docs/strategy/scaling-refactor-A.md §A2.
+    # Database connection pool — see docs/archive/scaling-refactor-A.md §A2.
     # Defaults target 1K-user Phase 1 VPS; override via env for Mac Mini dev.
     db_pool_size: int = 20
     db_max_overflow: int = 30

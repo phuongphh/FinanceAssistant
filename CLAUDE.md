@@ -19,8 +19,9 @@
 - [`docs/archive/MIGRATION_NOTES.md`](docs/archive/MIGRATION_NOTES.md) — Context về pivot V1→V2
 
 **Strategy/scaling docs:**
-- `docs/strategy/scaling-refactor-A.md` — Phase A refactor (webhook dedup, pool tuning, LLM hot path)
-- `docs/strategy/scaling-refactor-B.md` — Layer boundary cleanup
+- `docs/archive/scaling-refactor-A.md` — Phase A refactor (webhook dedup, pool tuning, LLM hot path) — ✅ DONE
+- `docs/archive/scaling-refactor-B.md` — Layer boundary cleanup — ✅ DONE
+- `docs/current/scaling-refactor-C.md` — True SaaS scaling (10K users) — pending, blocks Phase 2 launch
 
 **Rule:** Khi code Phase 3A, đọc **phase-3a-detailed.md** trước. CLAUDE.md là technical spec; phase doc là implementation guide chi tiết.
 

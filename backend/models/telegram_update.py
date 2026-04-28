@@ -10,7 +10,7 @@ dispatched. Serves two purposes:
    and finishing work, the row stays at ``status='processing'``. A
    startup hook re-enqueues rows older than a cutoff.
 
-See docs/strategy/scaling-refactor-A.md §A1 for the full rationale.
+See docs/archive/scaling-refactor-A.md §A1 for the full rationale.
 """
 import uuid
 from datetime import datetime
