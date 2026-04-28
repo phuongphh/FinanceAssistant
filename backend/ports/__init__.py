@@ -7,5 +7,5 @@ Services program against the ports (``Notifier``, later ``LLM``,
 - swappable (send via email / SMS / web push by adding a new adapter)
 - free of transport concerns that don't belong in business logic
 
-See docs/strategy/scaling-refactor-B.md §B3.
+See docs/archive/scaling-refactor-B.md §B3.
 """

@@ -1,5 +1,12 @@
 # Refactor Handoff Document
 
+> **STATUS: ✅ COMPLETED (archived 2026-04-28).**
+> File này là handoff session đã xong vai trò. Phase A và Phase B đã merge
+> đầy đủ — xem `docs/archive/scaling-refactor-A.md` và
+> `docs/archive/scaling-refactor-B.md` để biết design + implementation
+> references. Phase C (item còn lại cho 10K users) ở
+> `docs/current/scaling-refactor-C.md`.
+
 ## Mục tiêu refactor
 Trước khi implement các issue tiếp theo của phase 2, tôi cần bạn đóng vai trò là một kiến trúc sư phần mềm có nhiều kinh nghiệm, là chuyên gia trong thiết kế hệ thống, bạn hãy xem lại kiến trúc của hệ thống phần mềm Finance Assistant, refactor để code có thể không bị nhầm lẫn giữa các tầng layer service của sản phẩm, cũng như không có conflict gì giữa hệ thống backend service và hệ thống handler/router của sp. Hãy review lại một lượt đồng thời tự hỏi là có thể làm gì tốt hơn nữa để hệ thống chạy với performance tốt nhất (hiện tôi đã muốn sản phẩm bước dần sang hệ thống Production phục vụ cho mass-user như một sản phẩm SaaS), làm sao để hệ thống Scale được tốt nhất. Đồng thời, hãy nhìn lại hệ thống webhook khi làm việc với telegram, cũng như việc gọi LLM API như thế nào để hiệu quả và tiết kiệm nhất.
 

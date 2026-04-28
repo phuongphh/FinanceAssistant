@@ -6,7 +6,7 @@ recovery design), then hands processing off to a background task so the
 webhook returns 200 in ≤100ms regardless of downstream LLM latency.
 
 All dispatch logic lives in ``backend/workers/telegram_worker.py``.
-See docs/strategy/scaling-refactor-A.md §A1 and §A3.
+See docs/archive/scaling-refactor-A.md §A1 and §A3.
 """
 import asyncio
 import hmac

@@ -1,6 +1,6 @@
 """Integration tests for the onboarding dispatch flow.
 
-After the Phase A refactor (docs/strategy/scaling-refactor-A.md) the
+After the Phase A refactor (docs/archive/scaling-refactor-A.md) the
 webhook route only verifies + claims + enqueues. All dispatch logic
 lives in ``backend.workers.telegram_worker.route_update``. These tests
 drive ``route_update`` directly with realistic Telegram payloads — that
