@@ -571,3 +571,133 @@
   - Bot reply warning ấm áp: "Cho thuê (Case B) sẽ có ở Phase 4 nhé! Hiện tại mình lưu như BĐS thường 🙂".
   - Asset vẫn được save bình thường (Case A), không block flow.
 
+### TC-1.8.C2 — Case B (cho thuê) chưa có button trong subtype list
+- **Bước:** Tap "🏠 Bất động sản" trong menu chính. Quan sát keyboard.
+- **Kết quả mong đợi (user thấy):**
+  - **Đúng 2 buttons** (Nhà ở + Đất). KHÔNG có button "🏘️ Cho thuê".
+  - Nếu user hỏi "tôi có nhà cho thuê", bot trả lời "Phase 4 sẽ hỗ trợ rental".
+
+### TC-1.8.C3 — Parse "2ty" / "2tỷ" (không space) → vẫn work
+- **Bước:** Step initial_value, gửi lần lượt "2ty" và "2tỷ".
+- **Kết quả mong đợi (user thấy):**
+  - Cả 2 đều save = 2.000.000.000đ.
+  - Confirmation hiển thị "2 tỷ" (chuẩn hoá format).
+
+### TC-1.8.C4 — Parse "2,5 tỷ" (dấu phẩy VN style)
+- **Bước:** Gửi "2,5 tỷ".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot accept = 2.5 tỷ (parse VN-style).
+  - Hoặc bot reject + ask "Ghi là '2.5 tỷ' hoặc '2500tr' nhé".
+  - **KHÔNG** parse nhầm thành 25 tỷ hoặc 2 tỷ.
+
+### TC-1.8.C5 — Parse "2 tỷ rưỡi" (cách nói VN)
+- **Bước:** Gửi "2 tỷ rưỡi".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot parse = 2.5 tỷ.
+  - Hoặc bot reject với hint "Ghi là '2.5 tỷ' nhé".
+  - Document chọn behavior.
+
+### TC-1.8.C6 — Năm mua = năm tương lai "2030"
+- **Bước:** Step `acquired_at`, gửi "2030".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot reject "Năm mua không thể trong tương lai".
+  - Hoặc bot accept (user kế hoạch mua) — document chọn behavior.
+
+### TC-1.8.C7 — Năm mua quá xa "1900"
+- **Bước:** Gửi "1900".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot reject với cảnh báo "Năm mua có vẻ quá lâu, bạn chắc không?".
+  - Hoặc accept (sane validation tuỳ spec). KHÔNG crash.
+
+### TC-1.8.C8 — Năm mua dạng "10/2020" (có tháng)
+- **Bước:** Gửi "10/2020".
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot accept và lưu acquired = 10/2020.
+  - Hoặc fallback chỉ lấy năm 2020.
+  - Confirmation cuối hiển thị đúng theo behavior chọn.
+
+### TC-1.8.C9 — initial_value âm hoặc 0 → bot reject
+- **Bước:** Step initial_value, gửi "-1 tỷ" rồi "0".
+- **Kết quả mong đợi (user thấy):**
+  - Cả 2 đều bị reject với message "Giá phải > 0".
+  - Asset KHÔNG được tạo, user retry được.
+
+### TC-1.8.C10 — current_value < initial_value (BĐS xuống giá)
+- **Bước:** Initial = 3 tỷ, current = 2.5 tỷ.
+- **Kết quả mong đợi (user thấy):**
+  - Save thành công.
+  - Confirmation hiển thị "✅ … · 2.5 tỷ" + dòng loss "📉 -500tr".
+  - Net worth tăng đúng 2.5 tỷ.
+
+### TC-1.8.C11 — Tên rỗng hoặc chỉ whitespace → bot reject
+- **Bước:** Step name, gửi "" hoặc "   " (chỉ space).
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Đặt tên giúp mình nhé" hoặc tương đương.
+  - User vẫn ở step name, gõ tên thật là tiếp tục được.
+
+### TC-1.8.C12 — Tên dài bất thường (>200 chars)
+- **Bước:** Gửi tên 500 ký tự.
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc bot truncate về 200 ký tự (confirmation hiển thị tên ngắn lại).
+  - Hoặc bot reject "Tên quá dài, ngắn lại giúp mình".
+  - **KHÔNG** crash bot (giống P3A-6 TC-1.6.C12).
+
+### TC-1.8.C13 — Địa chỉ chứa ký tự đặc biệt + tiếng Việt có dấu
+- **Bước:** Address: "Số 1, Đường Trần Phú, P. Mỹ Đình 1, Q. Nam Từ Liêm, Hà Nội".
+- **Kết quả mong đợi (user thấy):**
+  - Save thành công.
+  - Trong dashboard / confirmation cuối, address hiển thị đúng dấu đầy đủ (UTF-8 không bị mất).
+
+### TC-1.8.C14 — Skip address → asset trong dashboard không có địa chỉ
+- **Bước:** Tap "⏭ Bỏ qua" ở step address. Hoàn tất wizard.
+- **Kết quả mong đợi (user thấy):**
+  - Asset save thành công.
+  - Trong dashboard, field address của asset này empty / không hiển thị.
+  - **KHÔNG** lưu literal "skip" hay "Bỏ qua" làm địa chỉ.
+
+### TC-1.8.C15 — Phase 3A KHÔNG hỏi `area_sqm` / `year_built`
+- **Bước:** Hoàn tất wizard từ đầu đến cuối, đếm số câu hỏi bot đặt.
+- **Kết quả mong đợi (user thấy):**
+  - Bot chỉ hỏi: subtype, name, address (skip-able), initial_value, acquired_at (năm), current_value.
+  - **KHÔNG** hỏi diện tích (m²) hay năm xây dựng — Phase 3B/4 mới có.
+
+### TC-1.8.C16 — current_value = initial_value (chưa có info)
+- **Bước:** Step current_value, gõ "như giá mua" hoặc tap "Dùng giá mua" (nếu có button) hoặc copy initial_value.
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc có button "Dùng giá mua" tương tự P3A-7 stock flow.
+  - Hoặc bot parse "như giá mua" / "same".
+  - Cuối cùng asset save với gain = 0; confirmation không có dòng "+/-".
+
+### TC-1.8.C17 — Số rất lớn "100 tỷ" (biệt thự HNW)
+- **Bước:** Step initial_value, gửi "100 tỷ".
+- **Kết quả mong đợi (user thấy):**
+  - Save thành công với giá = 100.000.000.000đ.
+  - Confirmation hiển thị "100 tỷ" (chuẩn hoá).
+
+### TC-1.8.C18 — Abandon flow giữa chừng (đóng app ở step initial_value)
+- **Bước:** Đã có name + address, đóng app. Mở lại sau 1 ngày.
+- **Kết quả mong đợi (user thấy):**
+  - Hoặc state vẫn còn → bot tiếp tục từ step initial_value.
+  - Hoặc state expire → bot ask lại từ đầu hoặc về main menu.
+  - **KHÔNG** có asset rỗng / partial trong dashboard.
+
+### TC-1.8.C19 — User gửi photo (vd ảnh sổ đỏ) trong wizard
+- **Bước:** Step address, gửi photo.
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Mình cần text địa chỉ thôi, hoặc bỏ qua bằng nút ⏭".
+  - **KHÔNG** nhầm thành OCR receipt, KHÔNG crash.
+
+### TC-1.8.C20 — Cross-user: A's BĐS draft KHÔNG ảnh hưởng B
+- **Bước:** A đang ở step initial_value (Nhà Mỹ Đình). B trên account khác cùng start RE wizard và nhập "Đất Ba Vì 1 tỷ".
+- **Kết quả mong đợi:**
+  - User B thấy confirmation "Đất Ba Vì · 1 tỷ" cho riêng B.
+  - User A khi tiếp tục flow của mình → asset Nhà Mỹ Đình save vào account A.
+  - Net worth của A và B độc lập.
+
+### TC-1.8.C21 — Wealth level update sau save BĐS lớn (multi-level jump)
+- **Bước:** User starter (5tr cash). Save BĐS 2 tỷ.
+- **Kết quả mong đợi (user thấy):**
+  - Net worth ngay sau save: ~2 tỷ.
+  - Briefing hôm sau (hoặc dashboard) phản ánh wealth level mới = "High Net Worth" (jump 3 cấp từ Starter).
+  - Tone của briefing chuyển sang HNW (sophisticated content).
+
