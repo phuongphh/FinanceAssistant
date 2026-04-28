@@ -701,3 +701,154 @@
   - Briefing hôm sau (hoặc dashboard) phản ánh wealth level mới = "High Net Worth" (jump 3 cấp từ Starter).
   - Tone của briefing chuyển sang HNW (sophisticated content).
 
+### TC-1.8.C22 — Decimal precision không bị mất với số tỷ
+- **Bước:** initial = 2.345.678.901,50đ (chính xác đến đồng).
+- **Kết quả mong đợi (user thấy):**
+  - Confirmation hiển thị "2.35 tỷ" (rounded ở UI), nhưng dashboard chi tiết hiển thị giá trị đầy đủ "2,345,678,901đ" — KHÔNG lệch float (vd 2.345.678.901,49).
+
+### TC-1.8.C23 — Hủy giữa wizard bằng `/huy`
+- **Bước:** Đang ở step `re_address`, gửi `/huy`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot xác nhận hủy + về main menu.
+  - Asset KHÔNG được tạo. Nếu spec chưa có cancel → document gap (giống P3A-6/P3A-7).
+
+### TC-1.8.C24 — Format số tỷ đúng VN style
+- **Bước:** Save BĐS 2.500.000.000đ.
+- **Kết quả mong đợi (user thấy):**
+  - Hiển thị "2.5 tỷ" (qua format VN).
+  - **KHÔNG** raw "2500000000" hay "2,500tr" (vì >1 tỷ thì dùng "tỷ").
+
+### TC-1.8.C25 — Tap "Thêm tài sản khác" sau save BĐS → restart wizard sạch
+- **Bước:** Sau save BĐS, tap "➕ Thêm tài sản khác".
+- **Kết quả mong đợi (user thấy):**
+  - Bot quay về menu 6 buttons (Cash, Stock, Real Estate, Crypto, Gold, Other).
+  - BĐS cũ KHÔNG bị duplicate khi user chọn lại Real Estate + nhập asset mới.
+
+---
+
+# P3A-9 — Integrate "First Asset" Step into Onboarding
+
+**Maps to AC:** Onboarding step `step_6_first_asset` ngay sau `step_5_aha_moment`, keyboard 4 options (Cash / Invest / Real Estate / Skip), tap → route đúng wizard, "Skip" set `onboarding_skipped_asset=True` + reminder sau 3 ngày, sau complete → congrats + first net worth, **reuse existing wizards** không duplicate.
+
+> **Setup:** User test account đã onboard tới ít nhất `step_5_aha_moment`. Nhờ admin reset `user.onboarding_step = AHA_MOMENT` và `onboarding_completed_at = NULL` nếu cần test lại.
+
+## Happy Path
+
+### TC-1.9.H1 — Sau `step_5_aha_moment` → bot trigger step_6_first_asset
+- **Bước:** Đang ở `AHA_MOMENT`, tap button "🚀 Bắt đầu" (callback hoàn tất step_5).
+- **Kết quả mong đợi (user thấy):**
+  - Bot KHÔNG nhảy thẳng về main menu (chứng tỏ chưa graduate).
+  - Bot reply message: "💎 Bước quan trọng cuối cùng {tên}!\n\nHãy thêm ít nhất 1 tài sản của bạn..." (theo spec line 979-987).
+
+### TC-1.9.H2 — Step_6 hiển thị đúng 4 inline buttons
+- **Bước:** Sau khi step_6 trigger.
+- **Kết quả mong đợi (user thấy):** Inline keyboard có **đúng 4 buttons**:
+  - "💵 Tiền trong NH (5 giây)"
+  - "📈 Tôi có đầu tư"
+  - "🏠 Tôi có BĐS"
+  - "⏭ Skip, thêm sau"
+
+### TC-1.9.H3 — Tap "💵 Tiền trong NH" → vào cash wizard (reuse)
+- **Bước:** Tap "💵 Tiền trong NH (5 giây)".
+- **Kết quả mong đợi (user thấy):**
+  - Bot show prompt giống P3A-6 TC-1.6.H1: "💵 Tiền ở đâu?" + 4 subtype buttons.
+  - Flow tiếp theo y hệt cash wizard thường (chứng tỏ reuse, không duplicate code).
+
+### TC-1.9.H4 — Tap "📈 Tôi có đầu tư" → vào stock wizard
+- **Bước:** Tap "📈 Tôi có đầu tư".
+- **Kết quả mong đợi (user thấy):**
+  - Bot ask ticker giống P3A-7 TC-1.7.H1: "📈 Cổ phiếu / Quỹ mới\n\nMã cổ phiếu (ticker) là gì?...".
+
+### TC-1.9.H5 — Tap "🏠 Tôi có BĐS" → vào real estate wizard
+- **Bước:** Tap "🏠 Tôi có BĐS".
+- **Kết quả mong đợi (user thấy):**
+  - Bot show 2 subtype buttons (Nhà ở + Đất) giống P3A-8 TC-1.8.H1.
+
+### TC-1.9.H6 — Tap "⏭ Skip" → bot xác nhận + sẽ nhắc sau 3 ngày
+- **Bước:** Tap "⏭ Skip, thêm sau".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply ấm áp: "OK, mình ghi nhớ rồi. 3 ngày nữa mình sẽ nhắc nhẹ nhé 💚" (hoặc tương đương).
+  - Bot return về main menu (graduated khỏi onboarding dù skip).
+  - Gõ `/start` sau đó → KHÔNG hiện step_6 nữa (đã skip rõ ràng).
+
+### TC-1.9.H7 — Sau save first asset → congrats + show first net worth
+- **Bước:**
+  1. Vào step_6 → tap "💵 Tiền trong NH" → save "VCB 100tr".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply congrats: "🎉 Tài sản đầu tiên của bạn: VCB 100tr\n💎 Net worth: 100tr".
+  - Net worth hiển thị đúng = giá trị asset vừa save (100tr), không phải 0 hay double-count.
+  - Format theo VN style ("100tr"), không raw "100000000".
+  - Bot return về main menu (đã graduate).
+
+### TC-1.9.H8 — `onboarding_completed_at` chỉ set sau khi có asset HOẶC skip rõ
+- **Mục tiêu:** Verify graduation gate đúng AC (qua user-observable transition).
+- **Bước:**
+  1. Đang ở step_6, gõ `/start` (chưa làm gì) → bot quay lại step_6.
+  2. Save asset → gõ `/start` lại → KHÔNG hiện step_6 nữa.
+  3. (Hoặc) Tap skip → gõ `/start` → KHÔNG hiện step_6 nữa.
+- **Kết quả mong đợi (user thấy):**
+  - Trước khi save/skip: `/start` luôn quay về step_6 (chưa graduate).
+  - Sau khi save asset HOẶC tap skip: `/start` về main menu / help (đã graduate).
+
+### TC-1.9.H9 — Reminder sau 3 ngày fire đúng nội dung + idempotent
+- **Bước:**
+  1. Tap skip ngày D.
+  2. Đợi đến ngày D+3 (hoặc nhờ admin advance time).
+- **Kết quả mong đợi (user thấy):**
+  - Đúng ngày D+3, user nhận message từ bot (không cần thao tác): "3 ngày trước bạn skip thêm tài sản — giờ thêm 1 cái thử nhé? 💎".
+  - Có 2 inline buttons: "💵 Thêm ngay" và "⏭ Để sau".
+  - Reminder **chỉ fire 1 lần** trong ngày — không spam.
+
+## Corner Cases
+
+### TC-1.9.C1 — Skip → KHÔNG bị stuck ở step_6
+- **Bước:** Tap skip. Hôm sau gõ `/start`.
+- **Kết quả mong đợi (user thấy):**
+  - `/start` về main menu, KHÔNG quay lại step_6 nữa.
+  - User được coi là đã graduate (dù không add asset).
+
+### TC-1.9.C2 — Abandon giữa wizard sau khi tap "Cash" → vẫn ở step_6 khi quay lại
+- **Bước:**
+  1. Tap "💵 Tiền trong NH" → vào cash wizard.
+  2. Đóng app, không gửi text trong 1 ngày.
+  3. Mở lại + gửi `/start`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot trigger lại step_6 (4 buttons), KHÔNG nhảy về step cũ hơn (như AHA_MOMENT).
+  - Hoặc bot tiếp tục từ cash wizard nếu state vẫn còn.
+  - **KHÔNG** tạo asset rỗng / partial.
+
+### TC-1.9.C3 — Sau save asset → `/start` lại KHÔNG quay về step_6
+- **Bước:** Save xong asset đầu tiên. Gõ `/start`.
+- **Kết quả mong đợi (user thấy):**
+  - Bot route về main menu / help.
+  - **KHÔNG** hiển thị step_6 lần 2.
+  - Asset đầu tiên KHÔNG bị duplicate khi user thử thao tác lại.
+
+### TC-1.9.C4 — Tap "Skip" 2 lần liên tiếp (double tap)
+- **Bước:** Tap skip, ngay lập tức tap lại button skip cũ trong message lịch sử.
+- **Kết quả mong đợi (user thấy):**
+  - Lần 1: bot xác nhận skip + về main menu.
+  - Lần 2: hoặc bot im lặng, hoặc reply "Bạn đã skip rồi 😊". KHÔNG hiển thị message confirm skip lần 2.
+  - Reminder vẫn chỉ schedule 1 lần (D+3 ngày).
+
+### TC-1.9.C5 — Tap "Skip" sau khi đã save asset (race / button cũ)
+- **Bước:**
+  1. Tap "Cash" → save asset thành công.
+  2. Cuộn lên message cũ của step_6, tap lại "⏭ Skip, thêm sau".
+- **Kết quả mong đợi (user thấy):**
+  - Bot reply "Bạn đã thêm tài sản rồi 😊" (hoặc tương đương — detect đã graduate).
+  - **KHÔNG** mark `onboarding_skipped_asset` (vì user thực sự không skip).
+
+### TC-1.9.C6 — User vẫn ở step_5 (chưa tap "Bắt đầu") → step_6 KHÔNG hiện
+- **Bước:** User đang ở `AHA_MOMENT`, chưa tap callback hoàn tất. Gõ text bừa.
+- **Kết quả mong đợi (user thấy):**
+  - Bot vẫn ở step_5 prompt — KHÔNG bypass sang step_6.
+  - User phải tap "🚀 Bắt đầu" rõ ràng mới tới step_6.
+
+### TC-1.9.C7 — Cross-user: A's onboarding step không ảnh hưởng B
+- **Bước:** A đang `FIRST_ASSET`. B vừa tạo account mới (NOT_STARTED). Cả 2 cùng gõ `/start`.
+- **Kết quả mong đợi:**
+  - A → bot show step_6 (4 buttons).
+  - B → bot show step_1 (welcome flow đầu).
+  - Hoàn toàn độc lập, không có data leak.
+
