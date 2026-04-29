@@ -31,15 +31,17 @@ _MUTED   = "#99a6b3"
 _GREEN   = "#4CAF50"
 _RED     = "#E15759"
 
-# Asset type catalogue
+# Asset type catalogue — includes both Phase 3A names and legacy V1 names
 _ASSET_CFG: dict[str, dict] = {
     "real_estate":    {"label": "Bất động sản",   "color": "#4ECDC4"},
-    "stocks":         {"label": "Chứng khoán",    "color": "#F28E2B"},
-    "mutual_fund":    {"label": "Chứng chỉ quỹ", "color": "#E15759"},
+    "stock":          {"label": "Chứng khoán",    "color": "#F28E2B"},  # Phase 3A
+    "stocks":         {"label": "Chứng khoán",    "color": "#F28E2B"},  # V1 legacy
+    "mutual_fund":    {"label": "Chứng chỉ quỹ", "color": "#E15759"},  # V1 legacy
     "crypto":         {"label": "Tiền số",         "color": "#76B7B2"},
     "life_insurance": {"label": "Bảo hiểm",       "color": "#59A14F"},
     "gold":           {"label": "Vàng",            "color": "#EDC948"},
     "cash":           {"label": "Tiền mặt",        "color": "#B07AA1"},
+    "other":          {"label": "Khác",            "color": "#BAB0AC"},
 }
 _EXTRA_COLORS = ["#FF6B6B", "#A8E6CF", "#FFD93D", "#C3B1E1", "#FAD7A0"]
 _DEFAULT_CFG  = {"label": "Khác", "color": "#BAB0AC"}
