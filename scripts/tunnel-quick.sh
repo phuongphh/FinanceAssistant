@@ -33,12 +33,12 @@ cloudflared tunnel --url "http://localhost:${BACKEND_PORT}" 2>&1 | tee "$LOG_FIL
         echo "  TUNNEL URL: $url"
         echo "  Saved to:   $URL_FILE"
         echo ""
-        echo "  Mini App Dashboard: ${url}/miniapp/dashboard"
+        echo "  Mini App Dashboard: ${url}/miniapp/wealth"
         echo "  API:                ${url}/miniapp/api/"
         echo "============================================"
         echo ""
         echo "  Next: copy the tunnel URL and set it in BotFather:"
-        echo "  /setmenubutton → paste URL/miniapp/dashboard"
+        echo "  /setmenubutton → paste URL/miniapp/wealth"
         echo ""
     fi
 done

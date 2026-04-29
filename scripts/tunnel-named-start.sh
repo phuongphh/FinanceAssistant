@@ -20,7 +20,7 @@ HOSTNAME_FILE="${PROJECT_ROOT}/.cloudflared/.tunnel-hostname"
 if [[ -f "$HOSTNAME_FILE" ]]; then
     TUNNEL_HOSTNAME=$(cat "$HOSTNAME_FILE")
     echo "Starting tunnel → https://${TUNNEL_HOSTNAME}"
-    echo "  Dashboard: https://${TUNNEL_HOSTNAME}/miniapp/dashboard"
+    echo "  Dashboard: https://${TUNNEL_HOSTNAME}/miniapp/wealth"
 else
     echo "Starting named Cloudflare tunnel..."
 fi
