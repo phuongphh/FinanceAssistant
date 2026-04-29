@@ -7,15 +7,13 @@ import logging
 import uuid
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
-from backend.services.chart_generator import generate_portfolio_chart
-from backend.services.chart_service import ASSET_TYPE_CONFIG
-from backend.services.portfolio_service import _compute_asset_fields, list_assets
 from backend.ports.notifier import get_notifier
+from backend.services.chart_generator import generate_portfolio_chart
+from backend.wealth.asset_types import get_icon, get_label
+from backend.wealth.services import asset_service, net_worth_calculator
 
 logger = logging.getLogger(__name__)
 
@@ -49,37 +47,15 @@ def _format_vnd_text(amount: float) -> str:
 async def _get_previous_month_total(
     db: AsyncSession, user_id: uuid.UUID
 ) -> float | None:
-    """Estimate previous month's total portfolio value.
+    """Net worth at end of last month, sourced from asset_snapshots.
 
-    Uses the oldest snapshot approach: if assets existed last month,
-    approximate by using purchase_price * quantity for assets created
-    before last month, plus current_price for newer ones.
-    This is a best-effort estimate.
+    Returns None when no snapshots exist before this month (new user or
+    first run after data migration — show no change rather than wrong data).
     """
     first_of_month = date.today().replace(day=1)
     last_month_end = first_of_month - timedelta(days=1)
-    last_month_start = last_month_end.replace(day=1)
-
-    # Get assets that existed before this month
-    stmt = select(PortfolioAsset).where(
-        PortfolioAsset.user_id == user_id,
-        PortfolioAsset.deleted_at.is_(None),
-        PortfolioAsset.created_at < first_of_month,
-    )
-    result = await db.execute(stmt)
-    assets = list(result.scalars().all())
-
-    if not assets:
-        return None
-
-    total = 0.0
-    for asset in assets:
-        quantity = float(asset.quantity) if asset.quantity is not None else 0.0
-        # Use purchase_price as estimate for last month
-        price = float(asset.purchase_price) if asset.purchase_price is not None else 0.0
-        total += quantity * price
-
-    return total if total > 0 else None
+    total = await net_worth_calculator.calculate_historical(db, user_id, last_month_end)
+    return float(total) if total > 0 else None
 
 
 async def build_morning_report(
@@ -89,20 +65,19 @@ async def build_morning_report(
 
     Returns:
         (chart_png_bytes, text_summary, has_assets)
-        chart_png_bytes is None if user has no assets.
+        chart_png_bytes is None if user has no assets or chart fails.
     """
-    assets = await list_assets(db, user_id, limit=500)
+    assets = await asset_service.get_user_assets(db, user_id)
 
     if not assets:
         return None, "", False
 
-    # Aggregate by asset type
+    # Aggregate by asset type using current_value directly (no qty × price)
     allocation_values: dict[str, float] = {}
     total_value = 0.0
 
     for asset in assets:
-        computed = _compute_asset_fields(asset)
-        mv = computed["market_value"] or 0.0
+        mv = float(asset.current_value or 0)
         total_value += mv
         allocation_values[asset.asset_type] = (
             allocation_values.get(asset.asset_type, 0.0) + mv
@@ -126,7 +101,7 @@ async def build_morning_report(
     now = datetime.now()
     timestamp = now.strftime("%H:%M %d/%m/%Y")
 
-    # Render chart via new generator (fallback to None on failure)
+    # Render chart (fallback to None on failure)
     assets_data = [
         {"asset_type": t, "value": v}
         for t, v in allocation_values.items()
@@ -141,7 +116,6 @@ async def build_morning_report(
         logger.exception("Chart generation failed for user %s — will send text only", user_id)
         chart_bytes = None
 
-    # Build text summary
     text = _build_text_summary(
         allocation_values=allocation_values,
         allocation_pct=allocation_pct,
@@ -149,7 +123,7 @@ async def build_morning_report(
         change_pct=change_pct,
     )
 
-    return chart_bytes, text, True  # chart_bytes may be None if rendering failed
+    return chart_bytes, text, True
 
 
 def _build_text_summary(
@@ -178,12 +152,11 @@ def _build_text_summary(
     )
 
     for asset_type in sorted_types:
-        cfg = ASSET_TYPE_CONFIG.get(asset_type, {"emoji": "📦", "label": asset_type})
+        icon = get_icon(asset_type)
+        label = get_label(asset_type)
         value = allocation_values[asset_type]
         pct = allocation_pct.get(asset_type, 0)
-        lines.append(
-            f'{cfg["emoji"]} {cfg["label"]}: {_format_vnd_text(value)} ({pct:.1f}%)'
-        )
+        lines.append(f"{icon} {label}: {_format_vnd_text(value)} ({pct:.1f}%)")
 
     return "\n".join(lines)
 
@@ -243,7 +216,6 @@ async def send_morning_report(
             reply_markup={"inline_keyboard": MORNING_REPORT_BUTTONS},
         )
     else:
-        # Send chart with greeting as caption
         caption = f"{greeting}\n\n{text_summary}"
         # Telegram caption limit is 1024 chars; if too long, send separately
         if len(caption) > 1024:
