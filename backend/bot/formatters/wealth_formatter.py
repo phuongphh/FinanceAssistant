@@ -9,13 +9,13 @@ from __future__ import annotations
 from decimal import Decimal
 
 from backend.bot.formatters.money import format_money_full, format_money_short
-from backend.wealth.asset_types import get_icon, get_label
+from backend.wealth.asset_types import get_icon, get_label, get_subtype_icon, get_subtype_label
 from backend.wealth.models.asset import Asset
 
 
 def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
     """Confirmation after a wizard creates an asset."""
-    icon = get_icon(asset.asset_type)
+    icon = get_subtype_icon(asset.asset_type, asset.subtype)
     label = get_label(asset.asset_type)
     return (
         f"✅ Đã ghi {icon} {asset.name}\n"
@@ -34,8 +34,13 @@ def format_asset_list(assets: list[Asset]) -> str:
     total = sum((a.current_value for a in assets), Decimal(0))
     lines: list[str] = [f"📊 <b>Tài sản của bạn</b> ({len(assets)} mục)\n"]
     for asset in assets:
-        icon = get_icon(asset.asset_type)
-        lines.append(f"{icon} {asset.name} — {format_money_short(asset.current_value)}")
+        icon = get_subtype_icon(asset.asset_type, asset.subtype)
+        subtype_label = get_subtype_label(asset.subtype)
+        amount = format_money_short(asset.current_value)
+        if subtype_label:
+            lines.append(f"{icon} {asset.name} — {subtype_label} — {amount}")
+        else:
+            lines.append(f"{icon} {asset.name} — {amount}")
     lines.append(f"\n💎 Tổng: <b>{format_money_short(total)}</b>")
     return "\n".join(lines)
 

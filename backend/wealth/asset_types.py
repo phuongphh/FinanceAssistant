@@ -55,3 +55,53 @@ def get_icon(asset_type: str) -> str:
 
 def get_label(asset_type: str) -> str:
     return get_asset_config(asset_type).get("label_vi", asset_type)
+
+
+_SUBTYPE_ICONS: dict[str, str] = {
+    "bank_savings": "🏦",
+    "bank_checking": "💳",
+    "cash": "💵",
+    "e_wallet": "📱",
+    "vn_stock": "📈",
+    "fund": "📊",
+    "etf": "📊",
+    "foreign_stock": "📈",
+}
+
+_SUBTYPE_SHORT_LABELS: dict[str, str] = {
+    "bank_savings": "Tiết kiệm",
+    "bank_checking": "Thanh toán",
+    "cash": "Tiền mặt",
+    "e_wallet": "Ví điện tử",
+    "vn_stock": "Cổ phiếu VN",
+    "fund": "Quỹ đầu tư",
+    "etf": "ETF",
+    "foreign_stock": "Cổ phiếu nước ngoài",
+    "house_primary": "Nhà ở",
+    "land": "Đất",
+    "bitcoin": "BTC",
+    "ethereum": "ETH",
+    "stablecoin": "Stablecoin",
+    "altcoin": "Altcoin",
+    "sjc": "Vàng SJC",
+    "pnj": "Vàng PNJ",
+    "nhan": "Vàng nhẫn",
+    "trang_suc": "Trang sức",
+    "vehicle": "Xe cộ",
+    "collection": "Đồ sưu tầm",
+    "business": "Kinh doanh",
+}
+
+
+def get_subtype_icon(asset_type: str, subtype: str | None) -> str:
+    """Return a subtype-specific icon, falling back to the asset_type icon."""
+    if subtype and subtype in _SUBTYPE_ICONS:
+        return _SUBTYPE_ICONS[subtype]
+    return get_icon(asset_type)
+
+
+def get_subtype_label(subtype: str | None) -> str | None:
+    """Return a short Vietnamese label for the subtype, or None if unknown."""
+    if not subtype:
+        return None
+    return _SUBTYPE_SHORT_LABELS.get(subtype)

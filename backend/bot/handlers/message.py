@@ -32,6 +32,18 @@ Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
+_ASSET_QUERY_PATTERNS = (
+    "tài sản của tôi",
+    "danh sách tài sản",
+    "xem tài sản",
+    "tài sản có gì",
+    "tôi có tài sản",
+    "tài sản tôi",
+    "liệt kê tài sản",
+    "tài sản hiện tại",
+    "tôi đang có gì",
+)
+
 
 async def _send_report(db: AsyncSession, chat_id: int, telegram_id: int, text: str = "") -> None:
     """Ask the service for report text and deliver it to the user."""
@@ -76,6 +88,13 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     user = await get_user_by_telegram_id(db, telegram_id)
     if not user:
         await send_message(chat_id, _NOT_REGISTERED)
+        return True
+
+    # Fast-path: asset list intent.
+    lower = text.lower()
+    if any(pat in lower for pat in _ASSET_QUERY_PATTERNS):
+        from backend.bot.handlers.asset_entry import list_assets
+        await list_assets(db, chat_id, user)
         return True
 
     try:
