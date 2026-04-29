@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """User streak model — consecutive days of activity.
 
 One row per user. `current_streak` ticks up each day the user logs a

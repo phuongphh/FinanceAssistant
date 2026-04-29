@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import get_settings
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
+from backend.services.telegram_service import register_bot_commands
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,15 @@ async def lifespan(app: FastAPI):
     # Keeping them out of the web server prevents duplicate cron fires when
     # more than one uvicorn worker is running.
     logger.info("Finance Assistant API starting up")
+
+    # Sync the bot's command list with Telegram so the "/" menu always
+    # reflects the current BOT_COMMANDS definition without a manual call
+    # to the /set-commands endpoint after each deploy.
+    try:
+        await register_bot_commands()
+        logger.info("Telegram bot commands registered")
+    except Exception:
+        logger.exception("Failed to register bot commands at startup; continuing")
 
     # Pick up any telegram_updates that were mid-flight when the previous
     # process died. See docs/archive/scaling-refactor-A.md §A1.

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Analytics event model.
 
 Append-only — every user action that matters for product metrics

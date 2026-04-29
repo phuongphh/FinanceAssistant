@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """User milestone model — Memory Moments feature (Phase 2).
 
 Each row records a single recognised moment in the user's journey:

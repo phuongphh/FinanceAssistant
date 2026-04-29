@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Telegram update dedup + background-processing queue.
 
 Every incoming Telegram webhook update is recorded here **before** being
