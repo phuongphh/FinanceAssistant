@@ -15,5 +15,24 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
+| #110 | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [issue-110.md](issue-110.md) |
+| #111 | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [issue-111.md](issue-111.md) |
+| #112 | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [issue-112.md](issue-112.md) |
+| #113 | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [issue-113.md](issue-113.md) |
+| #114 | [Story] P3.5-S1: Define intent types and result data structures | [issue-114.md](issue-114.md) |
+| #116 | [Story] P3.5-S3: Build parameter extractors (time, category, ticker, amount) | [issue-116.md](issue-116.md) |
+| #117 | [Story] P3.5-S4: Implement rule-based pattern matching engine | [issue-117.md](issue-117.md) |
+| #120 | [Story] P3.5-S7: Implement LLM-based intent classifier | [issue-120.md](issue-120.md) |
+| #121 | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [issue-121.md](issue-121.md) |
+| #122 | [Story] P3.5-S9: Create clarification message templates (YAML) | [issue-122.md](issue-122.md) |
+| #123 | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [issue-123.md](issue-123.md) |
+| #125 | [Story] P3.5-S12: Add personality wrapper to query responses | [issue-125.md](issue-125.md) |
+| #126 | [Story] P3.5-S13: Implement wealth-level adaptive responses | [issue-126.md](issue-126.md) |
+| #127 | [Story] P3.5-S14: Build advisory handler with rich context | [issue-127.md](issue-127.md) |
+| #128 | [Story] P3.5-S15: Add follow-up suggestions as inline buttons | [issue-128.md](issue-128.md) |
+| #129 | [Story] P3.5-S16: Handle voice queries through intent pipeline | [issue-129.md](issue-129.md) |
+| #131 | [Story] P3.5-S18: Build automated test suite for 30 canonical queries | [issue-131.md](issue-131.md) |
+| #132 | [Story] P3.5-S19: Performance and cost verification | [issue-132.md](issue-132.md) |
+| #133 | [Story] P3.5-S20: User testing with 5 real users (1 week) | [issue-133.md](issue-133.md) |
 
-**Total active:** 11
+**Total active:** 30

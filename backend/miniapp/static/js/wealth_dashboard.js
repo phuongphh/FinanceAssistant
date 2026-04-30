@@ -375,12 +375,23 @@
             const positive = (a.change || 0) >= 0;
             const sign = positive ? '+' : '';
             const cls = positive ? 'positive' : 'negative';
+            // Subtitle composes "<Type> · <Subtype>" so the user can tell
+            // apart e.g. Techcombank Thanh toán vs Techcombank Tiết kiệm.
+            const subtitle = a.subtype_label
+                ? `${escapeHtml(a.type_label)} · ${escapeHtml(a.subtype_label)}`
+                : escapeHtml(a.type_label);
+            // Backend merges rows with the same name+subtype; surface the
+            // bundle count so users know one card represents multiple
+            // entries (e.g. two ``Tiền mặt`` deposits → ``×2``).
+            const countBadge = (a.count || 1) > 1
+                ? `<span class="asset-count">×${a.count}</span>`
+                : '';
             return `
                 <div class="asset-card">
                     <span class="asset-icon">${escapeHtml(a.icon)}</span>
                     <div class="asset-info">
-                        <div class="asset-name">${escapeHtml(a.name)}</div>
-                        <div class="asset-type">${escapeHtml(a.type_label)}</div>
+                        <div class="asset-name">${escapeHtml(a.name)}${countBadge}</div>
+                        <div class="asset-type">${subtitle}</div>
                     </div>
                     <div class="asset-value">
                         <div class="asset-current">${formatMoneyShort(a.current_value)}</div>
