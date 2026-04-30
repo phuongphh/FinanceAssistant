@@ -6,8 +6,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from backend.config import get_settings
+from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
 from backend.services.telegram_service import register_bot_commands
@@ -23,6 +25,37 @@ settings = get_settings()
 # startup picks it up as an orphan.
 SHUTDOWN_TASK_GRACE_SECONDS = 30
 
+# Max seconds to wait for PostgreSQL before proceeding anyway. Handles the
+# race where launchd starts the backend before Docker containers finish
+# coming up after a reboot.
+_DB_WAIT_INTERVAL = 3   # seconds between retries
+_DB_WAIT_ATTEMPTS = 20  # 20 × 3s = 60s max
+
+
+async def _wait_for_db() -> None:
+    """Retry DB connection at startup until PostgreSQL is reachable."""
+    for attempt in range(1, _DB_WAIT_ATTEMPTS + 1):
+        try:
+            session_factory = get_session_factory()
+            async with session_factory() as db:
+                await db.execute(text("SELECT 1"))
+            if attempt > 1:
+                logger.info("Database ready after %d attempt(s)", attempt)
+            return
+        except Exception as exc:
+            if attempt < _DB_WAIT_ATTEMPTS:
+                logger.warning(
+                    "DB not ready (attempt %d/%d): %s — retrying in %ds",
+                    attempt, _DB_WAIT_ATTEMPTS, exc, _DB_WAIT_INTERVAL,
+                )
+                await asyncio.sleep(_DB_WAIT_INTERVAL)
+            else:
+                logger.error(
+                    "DB unreachable after %d attempts — proceeding anyway; "
+                    "pool_pre_ping will recover connections as DB comes up",
+                    _DB_WAIT_ATTEMPTS,
+                )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +63,10 @@ async def lifespan(app: FastAPI):
     # Keeping them out of the web server prevents duplicate cron fires when
     # more than one uvicorn worker is running.
     logger.info("Finance Assistant API starting up")
+
+    # Block until PostgreSQL is reachable. This prevents the race where
+    # launchd boots the backend before Docker containers finish starting.
+    await _wait_for_db()
 
     # Sync the bot's command list with Telegram so the "/" menu always
     # reflects the current BOT_COMMANDS definition without a manual call
