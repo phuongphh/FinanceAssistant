@@ -27,7 +27,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #123 | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [issue-123.md](issue-123.md) |
 | #125 | [Story] P3.5-S12: Add personality wrapper to query responses | [issue-125.md](issue-125.md) |
 | #126 | [Story] P3.5-S13: Implement wealth-level adaptive responses | [issue-126.md](issue-126.md) |
+| #127 | [Story] P3.5-S14: Build advisory handler with rich context | [issue-127.md](issue-127.md) |
 | #128 | [Story] P3.5-S15: Add follow-up suggestions as inline buttons | [issue-128.md](issue-128.md) |
 | #129 | [Story] P3.5-S16: Handle voice queries through intent pipeline | [issue-129.md](issue-129.md) |
 
-**Total active:** 25
+**Total active:** 26
