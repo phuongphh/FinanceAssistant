@@ -222,6 +222,53 @@ class TestWealthTrendEndpoint:
             assert data[0]["value"] == 5_000_000.0
 
 
+class TestStartAssetWizardRoute:
+    def teardown_method(self):
+        _clear_overrides()
+
+    def test_invokes_wizard_with_user_telegram_id_as_chat_id(self):
+        _override_auth()
+        user = _fake_user(telegram_id=98765)
+
+        async def _fake_resolve(auth, db):
+            return user
+
+        wizard_mock = AsyncMock()
+        # Patch the symbol where it's imported — the route does a lazy
+        # import inside the handler, so we patch the source module.
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
+             patch(
+                 "backend.bot.handlers.asset_entry.start_asset_wizard",
+                 wizard_mock,
+             ):
+            resp = client.post(
+                "/miniapp/api/wealth/start-asset-wizard",
+                headers={"X-Telegram-Init-Data": "stub"},
+            )
+            assert resp.status_code == 200
+            assert resp.json() == {"data": {"ok": True}, "error": None}
+
+            wizard_mock.assert_awaited_once()
+            args = wizard_mock.await_args.args
+            # (db, chat_id, user) — chat_id must equal user.telegram_id
+            # so the bot posts the type-picker into the user's private chat.
+            assert args[1] == 98765
+            assert args[2] is user
+
+    def test_requires_auth(self):
+        # No auth override — the real require_miniapp_auth dependency
+        # rejects the missing/invalid initData.
+        app.dependency_overrides[get_db] = _stub_db
+        try:
+            resp = client.post(
+                "/miniapp/api/wealth/start-asset-wizard",
+                headers={"X-Telegram-Init-Data": "invalid"},
+            )
+            assert resp.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+
+
 class TestWealthDashboardPage:
     def test_serves_html(self):
         resp = client.get("/miniapp/wealth")

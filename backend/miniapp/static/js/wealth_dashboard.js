@@ -449,9 +449,27 @@
 
     // -- Misc -------------------------------------------------------------
 
-    function closeAndAddAsset() {
-        // The bot listens for /add_asset — closing the WebApp surfaces the
-        // chat where the user types/taps it. Future: deep-link directly.
+    async function closeAndAddAsset() {
+        // Disable both buttons to prevent a double-tap firing the wizard
+        // twice — a second call would just reset the flow but it's wasted
+        // work and a wasted Telegram message.
+        if (els.addAssetBtn) els.addAssetBtn.disabled = true;
+        if (els.addFirstAssetBtn) els.addFirstAssetBtn.disabled = true;
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            // Wait for the bot to post the type-picker before closing
+            // the WebApp — otherwise the user lands on an empty chat
+            // and assumes the button did nothing.
+            await fetch('/miniapp/api/wealth/start-asset-wizard', {
+                method: 'POST',
+                headers,
+            });
+        } catch (_err) {
+            // Best-effort: even on failure we still close so the user
+            // isn't stuck staring at the dashboard.
+        }
         if (tg && tg.close) tg.close();
     }
 
