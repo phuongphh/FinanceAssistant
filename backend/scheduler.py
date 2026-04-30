@@ -17,11 +17,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
-from backend.jobs.gmail_poller import poll_gmail
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
 from backend.jobs.morning_briefing_job import run_morning_briefing_job
-from backend.jobs.morning_report_job import send_all_morning_reports
 from backend.jobs.seasonal_notifier import run_seasonal_check
 from backend.jobs.weekly_fun_facts import run_weekly_fun_facts
 from backend.jobs.weekly_goal_reminder import run_weekly_goal_reminder
@@ -30,16 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
-    scheduler.add_job(poll_gmail, "cron", minute="*/30", id="gmail_sync")
     scheduler.add_job(poll_market, "cron", hour=8, minute=0, id="market_snapshot")
     scheduler.add_job(
         generate_all_monthly_reports, "cron",
         day=1, hour=9, minute=0, id="monthly_report",
-    )
-    scheduler.add_job(
-        send_all_morning_reports, "cron",
-        hour=7, minute=0, timezone="Asia/Ho_Chi_Minh",
-        id="morning_report",
     )
     scheduler.add_job(
         run_daily_milestone_check, "cron",
