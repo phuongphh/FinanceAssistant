@@ -5,7 +5,11 @@ from decimal import Decimal
 
 import pytest
 
-from backend.wealth.amount_parser import parse_amount, parse_label_and_amount
+from backend.wealth.amount_parser import (
+    has_negative_sign,
+    parse_amount,
+    parse_label_and_amount,
+)
 
 
 class TestParseAmount:
@@ -62,3 +66,32 @@ class TestParseLabelAndAmount:
     def test_zero_or_negative_rejected(self):
         # Parser returns positive amounts only; "0 triệu" → None
         assert parse_label_and_amount("0 triệu") is None
+
+
+class TestHasNegativeSign:
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "-100 triệu",
+            "VCB -100 triệu",
+            "VCB -100tr",
+            "  -45000",
+            "Techcom -50tr",
+        ],
+    )
+    def test_detects_negative(self, raw):
+        assert has_negative_sign(raw) is True
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "VCB 100 triệu",
+            "100tr",
+            "VCB-001 100tr",  # label dash, not a sign
+            "TK-1234 50tr",
+            "",
+            "ngày 1-2 chi 100k",  # range dash, not a sign
+        ],
+    )
+    def test_does_not_flag_non_negative(self, raw):
+        assert has_negative_sign(raw) is False
