@@ -48,6 +48,7 @@ def _result_with_scalars(rows: list):
 def _mock_session(execute_side_effect=None) -> MagicMock:
     db = MagicMock()
     db.add = MagicMock()
+    db.delete = AsyncMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.execute = AsyncMock()
@@ -261,6 +262,31 @@ class TestSoftDelete:
         db = _mock_session([_result_with_scalar(None)])
         with pytest.raises(ValueError):
             await asset_service.soft_delete(db, uuid.uuid4(), uuid.uuid4())
+
+
+@pytest.mark.asyncio
+class TestHardDelete:
+    async def test_deletes_asset_when_found(self):
+        user_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        asset = Asset(id=asset_id, user_id=user_id, asset_type="cash",
+                      name="VCB", initial_value=Decimal(1),
+                      current_value=Decimal(1), acquired_at=date.today())
+        db = _mock_session([_result_with_scalar(asset)])
+
+        result = await asset_service.hard_delete(db, user_id, asset_id)
+
+        assert result is True
+        db.delete.assert_awaited_once_with(asset)
+        _assert_flush_only(db)
+
+    async def test_returns_false_when_not_found(self):
+        db = _mock_session([_result_with_scalar(None)])
+        result = await asset_service.hard_delete(
+            db, uuid.uuid4(), uuid.uuid4()
+        )
+        assert result is False
+        db.delete.assert_not_awaited()
 
 
 @pytest.mark.asyncio
