@@ -41,6 +41,25 @@ _AMOUNT_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
+# Detects a leading-minus before a number, e.g. "-100tr" or "VCB -100 triệu".
+# Anchored to start-of-string OR whitespace so that ordinary label dashes
+# like "VCB-001 100tr" are not flagged.
+_NEGATIVE_RE = re.compile(r"(?:^|\s)-\s*\d")
+
+
+def has_negative_sign(text: str) -> bool:
+    """True if ``text`` has a ``-`` immediately before a number.
+
+    Used by wizard handlers to reject negative amounts with a specific
+    "must be > 0" message instead of the generic "couldn't parse" reply.
+    The parsers themselves drop the sign silently (the regex doesn't
+    capture it), so the caller has to detect this before parsing.
+    """
+    if not text:
+        return False
+    return bool(_NEGATIVE_RE.search(text))
+
+
 _UNIT_MULTIPLIERS = {
     "tỷ": Decimal("1_000_000_000"),
     "ty": Decimal("1_000_000_000"),
