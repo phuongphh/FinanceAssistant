@@ -11,10 +11,14 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:more                        — add another asset
     asset_add:done                        — finish wizard
     asset_add:cancel                      — abort wizard
+    asset_add:undo:<asset_uuid>           — undo last save (hard delete)
 
-Total callback bytes stay well under Telegram's 64-byte cap.
+Total callback bytes stay well under Telegram's 64-byte cap
+(``asset_add:undo:`` + 36-char UUID = 51 bytes).
 """
 from __future__ import annotations
+
+import uuid
 
 from backend.bot.keyboards.common import build_callback
 from backend.wealth.asset_types import AssetType, get_subtypes
@@ -146,19 +150,31 @@ def stock_current_price_keyboard() -> InlineKeyboardMarkup:
     }
 
 
-def add_more_keyboard() -> InlineKeyboardMarkup:
-    """Shown after a successful asset save."""
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "➕ Thêm tài sản khác",
-                    "callback_data": build_callback(CB_ASSET_ADD, "more"),
-                },
-                {
-                    "text": "✅ Xong",
-                    "callback_data": build_callback(CB_ASSET_ADD, "done"),
-                },
-            ]
+def add_more_keyboard(undo_asset_id: uuid.UUID | str | None = None) -> InlineKeyboardMarkup:
+    """Shown after a successful asset save.
+
+    If ``undo_asset_id`` is given, an extra "↩️ Huỷ" row appears so the
+    user can revert a mis-entered asset. The id is embedded in the
+    callback (``asset_add:undo:<uuid>``) so the handler knows exactly
+    which row to roll back without trusting state from elsewhere.
+    """
+    rows = [
+        [
+            {
+                "text": "➕ Thêm tài sản khác",
+                "callback_data": build_callback(CB_ASSET_ADD, "more"),
+            },
+            {
+                "text": "✅ Xong",
+                "callback_data": build_callback(CB_ASSET_ADD, "done"),
+            },
         ]
-    }
+    ]
+    if undo_asset_id is not None:
+        rows.append([
+            {
+                "text": "↩️ Huỷ tài sản vừa nhập",
+                "callback_data": build_callback(CB_ASSET_ADD, "undo", str(undo_asset_id)),
+            },
+        ])
+    return {"inline_keyboard": rows}

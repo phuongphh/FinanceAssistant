@@ -26,6 +26,7 @@ never commits — the worker owns the transaction boundary.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -67,6 +68,7 @@ class AssetEvent:
     WIZARD_OPENED = "asset_wizard_opened"
     TYPE_PICKED = "asset_wizard_type_picked"
     ASSET_ADDED = "asset_added"
+    ASSET_UNDONE = "asset_undone"
     WIZARD_CANCELED = "asset_wizard_canceled"
     PARSE_FAILED = "asset_wizard_parse_failed"
 
@@ -612,7 +614,53 @@ async def _post_save(
     await send_message(
         chat_id=chat_id,
         text="Tiếp tục thêm tài sản, hay xong rồi?",
-        reply_markup=add_more_keyboard(),
+        reply_markup=add_more_keyboard(undo_asset_id=asset.id),
+    )
+
+
+async def _handle_undo(
+    db: AsyncSession, chat_id: int, user: User, asset_id_str: str
+) -> None:
+    """Hard-delete the asset referenced by the undo button.
+
+    Distinct from ``soft_delete`` (which is for sales): the user is
+    saying "I never meant to add this", so we remove it cleanly.
+    The undo callback embeds the asset id so we don't have to trust
+    "the most recent asset" — concurrent edits can't trick us.
+    """
+    try:
+        asset_uuid = uuid.UUID(asset_id_str)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản để huỷ.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None:
+        await send_message(
+            chat_id=chat_id,
+            text="Tài sản này đã được xử lý rồi 🤔",
+        )
+        return
+
+    asset_name = asset.name
+    deleted = await asset_service.hard_delete(db, user.id, asset_uuid)
+    if not deleted:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản để huỷ.")
+        return
+
+    breakdown = await net_worth_calculator.calculate(db, user.id)
+    await update_user_level(db, user.id, breakdown.total)
+
+    analytics.track(
+        AssetEvent.ASSET_UNDONE,
+        user_id=user.id,
+        properties={"asset_id": str(asset_uuid)},
+    )
+
+    await send_message(
+        chat_id=chat_id,
+        text=f"↩️ Đã huỷ <b>{asset_name}</b>. Tổng tài sản đã được cập nhật.",
+        parse_mode="HTML",
     )
 
 
@@ -705,6 +753,10 @@ async def handle_asset_callback(
         await wizard_service.clear(db, user.id)
         analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
         await send_message(chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋")
+        return True
+
+    if action == "undo" and arg:
+        await _handle_undo(db, chat_id, user, arg)
         return True
 
     if action == "done":
