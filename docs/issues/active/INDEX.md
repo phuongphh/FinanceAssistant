@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #110 | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [issue-110.md](issue-110.md) |
 | #111 | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [issue-111.md](issue-111.md) |
 | #113 | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [issue-113.md](issue-113.md) |
+| #116 | [Story] P3.5-S3: Build parameter extractors (time, category, ticker, amount) | [issue-116.md](issue-116.md) |
 
-**Total active:** 14
+**Total active:** 15
