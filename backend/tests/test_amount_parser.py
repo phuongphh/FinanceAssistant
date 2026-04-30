@@ -67,6 +67,32 @@ class TestParseLabelAndAmount:
         # Parser returns positive amounts only; "0 triệu" → None
         assert parse_label_and_amount("0 triệu") is None
 
+    @pytest.mark.parametrize(
+        "raw,expected_label,expected_amount",
+        [
+            # Digits inside the label must NOT be read as the amount.
+            # The bug was "VCB-001 100 triệu" parsing to 1đ because the
+            # search greedily took "001" — the first digit run.
+            ("VCB-001 100 triệu", "VCB-001", Decimal("100000000")),
+            ("VCB-001 100tr", "VCB-001", Decimal("100000000")),
+            ("TK-1234 50tr", "TK-1234", Decimal("50000000")),
+            ("VCB-001 45000", "VCB-001", Decimal("45000")),
+            ("ACB123 2 tỷ", "ACB123", Decimal("2000000000")),
+        ],
+    )
+    def test_digits_in_label_are_not_amounts(
+        self, raw, expected_label, expected_amount
+    ):
+        result = parse_label_and_amount(raw)
+        assert result is not None, f"parser returned None for {raw!r}"
+        label, amount = result
+        assert label == expected_label
+        assert amount == expected_amount
+
+    def test_label_only_no_amount_returns_none(self):
+        # "VCB-001" alone has digits but no free-standing amount — reject.
+        assert parse_label_and_amount("VCB-001") is None
+
 
 class TestHasNegativeSign:
     @pytest.mark.parametrize(

@@ -219,3 +219,24 @@ async def soft_delete(
 
     await db.flush()
     return asset
+
+
+async def hard_delete(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    asset_id: uuid.UUID,
+) -> bool:
+    """Hard-delete an asset and its snapshots (FK cascades the snapshots).
+
+    Used for "undo" right after a mistaken create — the asset has no
+    history worth preserving and the user wants it to look like it
+    never happened. Distinct from ``soft_delete`` which is for sales.
+
+    Returns True if a row was deleted, False if not found / not owned.
+    """
+    asset = await get_asset_by_id(db, user_id, asset_id)
+    if asset is None:
+        return False
+    await db.delete(asset)
+    await db.flush()
+    return True

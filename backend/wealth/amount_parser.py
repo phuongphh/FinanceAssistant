@@ -123,30 +123,51 @@ def parse_amount(text: str) -> Decimal | None:
     return amount
 
 
+# Match an amount candidate that is "free-standing" — i.e. its leading
+# digit sits at start-of-string or right after whitespace. The lookbehind
+# is what stops "001" inside "VCB-001" from being read as the amount:
+# "001" is preceded by '-', not whitespace, so it isn't a candidate.
+# A number with an explicit unit ("100 triệu") is preferred over a bare
+# number, so an account label like "VCB-001" with a unit-less typo never
+# silently gets misread.
+_LABELED_AMOUNT_RE = re.compile(
+    r"""
+    (?:^|(?<=\s))
+    (?P<num>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)
+    \s*
+    (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
 def parse_label_and_amount(text: str) -> tuple[str, Decimal] | None:
     """Split ``"VCB 100 triệu"`` into ``("VCB", 100_000_000)``.
 
     Returns ``None`` if no amount can be extracted. The label is whatever
     sits before the number, stripped — empty string is fine ("100tr"
     alone gives ``("", 100_000_000)``).
+
+    Numbers embedded in identifiers ("001" inside "VCB-001") are NOT
+    candidates: only digits at start-of-string or after whitespace count.
+    Among the free-standing candidates, a number with an explicit unit
+    wins; otherwise the first bare number is used. This way "VCB-001 100
+    triệu" parses correctly even though the string contains "001" first.
     """
     if not text:
         return None
     s = text.strip()
 
-    # Use a forgiving regex: find the first number-with-unit anywhere in
-    # the string and treat everything before it as the label.
-    m = re.search(
-        r"(?P<num>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*"
-        r"(?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?",
-        s,
-        flags=re.IGNORECASE,
-    )
-    if not m:
+    candidates = list(_LABELED_AMOUNT_RE.finditer(s))
+    if not candidates:
         return None
 
-    label = s[: m.start()].strip(" \t\n\r-,.;:")
-    amount = parse_amount(m.group(0))
+    # Prefer a candidate that has a unit attached — it's unambiguously
+    # an amount. Fall back to the first bare-number candidate.
+    chosen = next((m for m in candidates if m.group("unit")), candidates[0])
+
+    label = s[: chosen.start()].strip(" \t\n\r-,.;:")
+    amount = parse_amount(chosen.group(0))
     if amount is None or amount <= 0:
         return None
     return label, amount

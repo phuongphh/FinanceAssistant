@@ -368,6 +368,102 @@ async def test_callback_type_picker_routes_to_starter():
 
 
 @pytest.mark.asyncio
+async def test_callback_undo_hard_deletes_asset_and_recomputes_net_worth():
+    """User taps 'Huỷ tài sản vừa nhập' → hard delete + send confirmation."""
+    user = _user()
+    db = _db(user)
+    target_id = uuid.uuid4()
+    asset = _asset()
+    asset.id = target_id
+    asset.name = "VCB-001"
+
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "get_asset_by_id",
+                      AsyncMock(return_value=asset)), \
+         patch.object(asset_entry.asset_service, "hard_delete",
+                      AsyncMock(return_value=True)) as delete_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("0"), asset_count=0,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        consumed = await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": f"asset_add:undo:{target_id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    assert consumed is True
+    delete_mock.assert_awaited_once()
+    args = delete_mock.await_args.args
+    assert args[1] == user.id
+    assert args[2] == target_id
+    send.assert_awaited()
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "Đã huỷ" in sent_text
+    assert "VCB-001" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_callback_undo_handles_invalid_uuid_gracefully():
+    user = _user()
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "hard_delete",
+                      AsyncMock()) as delete_mock, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        consumed = await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:undo:not-a-uuid",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    assert consumed is True
+    delete_mock.assert_not_awaited()
+    send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_callback_undo_when_asset_already_gone():
+    """Tapping undo twice (or after another action removed the asset)
+    should not crash — show a friendly message instead."""
+    user = _user()
+    db = _db(user)
+    target_id = uuid.uuid4()
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "get_asset_by_id",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.asset_service, "hard_delete",
+                      AsyncMock(return_value=False)) as delete_mock, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": f"asset_add:undo:{target_id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    delete_mock.assert_not_awaited()  # bailed before delete
+    send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_text_input_returns_false_when_no_wizard():
     user = _user(state=None)
     db = _db(user)
