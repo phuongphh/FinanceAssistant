@@ -50,7 +50,11 @@ from backend.services.telegram_service import (
     edit_message_text,
     send_message,
 )
-from backend.wealth.amount_parser import parse_amount, parse_label_and_amount
+from backend.wealth.amount_parser import (
+    has_negative_sign,
+    parse_amount,
+    parse_label_and_amount,
+)
 from backend.wealth.asset_types import AssetType, get_subtypes
 from backend.wealth.ladder import update_user_level
 from backend.wealth.services import asset_service, net_worth_calculator
@@ -163,6 +167,12 @@ async def _handle_cash_subtype_pick(
 async def _handle_cash_amount_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
+
     parsed = parse_label_and_amount(text)
     if not parsed:
         analytics.track(
@@ -183,7 +193,9 @@ async def _handle_cash_amount_input(
 
     label, amount = parsed
     if amount <= 0:
-        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0.")
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
         return
 
     name = label or {
@@ -311,6 +323,11 @@ async def _handle_stock_quantity_input(
 async def _handle_stock_avg_price_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
     avg_price = parse_amount(text)
     if avg_price is None or avg_price <= 0:
         analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
@@ -368,6 +385,11 @@ async def _handle_stock_current_price_choice(
 async def _handle_stock_current_price_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
     current_price = parse_amount(text)
     if current_price is None or current_price <= 0:
         await send_message(
@@ -481,6 +503,11 @@ async def _handle_re_name_input(
 async def _handle_re_initial_value_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
     amount = parse_amount(text)
     if amount is None or amount <= 0:
         analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
@@ -511,6 +538,11 @@ async def _handle_re_initial_value_input(
 async def _handle_re_current_value_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
     current = parse_amount(text)
     if current is None or current <= 0:
         await send_message(

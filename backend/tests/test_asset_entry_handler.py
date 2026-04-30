@@ -103,6 +103,39 @@ async def test_cash_amount_input_parses_label_and_creates_asset():
 
 
 @pytest.mark.asyncio
+async def test_cash_amount_input_rejects_negative_with_warm_message():
+    """TC-1.6.C1 — `"VCB -100 triệu"` must be rejected.
+
+    Asset must NOT be created, wizard state must NOT be cleared, and the
+    reply must be the specific "must be > 0" message — not the generic
+    "couldn't parse" one.
+    """
+    user = _user({
+        "flow": asset_entry.FLOW_CASH,
+        "step": "amount",
+        "draft": {"asset_type": "cash", "subtype": "bank_savings"},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock()) as create_mock, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send, \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear:
+        consumed = await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "VCB -100 triệu", "chat": {"id": 100},
+             "from": {"id": 100}},
+        )
+    assert consumed is True
+    create_mock.assert_not_awaited()
+    clear.assert_not_awaited()  # user stays on amount step
+    send.assert_awaited_once()
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "lớn hơn 0" in sent_text
+
+
+@pytest.mark.asyncio
 async def test_cash_amount_input_parse_fails_keeps_wizard_open():
     user = _user({
         "flow": asset_entry.FLOW_CASH,
