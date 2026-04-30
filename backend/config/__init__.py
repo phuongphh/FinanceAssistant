@@ -66,7 +66,14 @@ class Settings(BaseSettings):
     # briefing handler falls back to a placeholder message.
     miniapp_base_url: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # ``extra="ignore"`` lets the .env file hold sibling env vars used by
+    # docker-compose (e.g. POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
+    # without pydantic-settings 2.x rejecting them as extras.
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
 
 @lru_cache
