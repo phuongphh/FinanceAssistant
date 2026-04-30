@@ -21,10 +21,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
-      - name: Sync issue file and regenerate indexes
-        run: node .github/scripts/issue-lifecycle.js
-
-      - name: Commit and push to main
+      - name: Sync issue file, regenerate indexes, commit and push
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -35,25 +32,35 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
-          # Pull latest to avoid non-fast-forward when multiple events fire close together
-          git pull --rebase origin main || true
+          # Each attempt resets to the latest origin/main, re-runs the
+          # idempotent sync script (writes our issue file from the event
+          # payload + regenerates indexes from filesystem), then tries to
+          # push. This avoids merge conflicts on docs/issues/INDEX.md when
+          # many issue events fire concurrently (e.g. bulk issue creation).
+          attempt_sync() {
+            git fetch origin main || return 1
+            git reset --hard origin/main || return 1
 
-          git add docs/issues/
-          if git diff --cached --quiet; then
-            echo "No changes to commit — docs/issues already up to date"
-            exit 0
-          fi
+            node .github/scripts/issue-lifecycle.js || return 1
 
-          git commit -m "docs(issues): sync #${ISSUE_NUMBER} (${ACTION}, state=${STATE})"
+            git add docs/issues/
+            if git diff --cached --quiet; then
+              echo "No changes to commit — docs/issues already up to date"
+              return 0
+            fi
 
-          # Push with retry (network flakiness)
-          for i in 1 2 3 4; do
-            if git push origin main; then
+            git commit -m "docs(issues): sync #${ISSUE_NUMBER} (${ACTION}, state=${STATE})" || return 1
+            git push origin main
+          }
+
+          for i in 1 2 3 4 5 6; do
+            if attempt_sync; then
               exit 0
             fi
-            echo "Push attempt $i failed, retrying..."
-            git pull --rebase origin main || true
-            sleep $((2 ** i))
+            sleep_secs=$((2 ** i))
+            echo "Sync attempt $i failed; retrying in ${sleep_secs}s..."
+            sleep $sleep_secs
           done
-          echo "Push failed after 4 attempts"
+
+          echo "Sync failed after 6 attempts"
           exit 1
