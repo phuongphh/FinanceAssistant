@@ -30,5 +30,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #127 | [Story] P3.5-S14: Build advisory handler with rich context | [issue-127.md](issue-127.md) |
 | #128 | [Story] P3.5-S15: Add follow-up suggestions as inline buttons | [issue-128.md](issue-128.md) |
 | #129 | [Story] P3.5-S16: Handle voice queries through intent pipeline | [issue-129.md](issue-129.md) |
+| #131 | [Story] P3.5-S18: Build automated test suite for 30 canonical queries | [issue-131.md](issue-131.md) |
 
-**Total active:** 26
+**Total active:** 27
