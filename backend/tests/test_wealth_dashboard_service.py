@@ -1,11 +1,14 @@
 """Tests for ``backend.services.wealth_dashboard_service``.
 
 Covers:
-- ``_serialize_asset`` — happy path, missing initial value, unknown type fallback.
+- ``_serialize_group`` — happy path, missing initial value, unknown type fallback.
+- ``_group_assets`` — name+subtype merging, case/whitespace normalization,
+  same-name-different-subtype stays split, sort order, change aggregation.
 - ``_build_breakdown`` — sort order, percentage math, zero-total guard.
 - ``get_trend`` — input validation, row serialization, default end-date,
   query parameter binding (start/end derived from ``days``).
-- ``build_overview`` — payload composition for Starter / empty / HNW.
+- ``build_overview`` — payload composition for Starter / empty / HNW,
+  duplicate rollup behavior end-to-end.
 
 Real Postgres isn't required — we monkeypatch ``net_worth_calculator``
 and ``asset_service`` and stub ``db.execute`` for the trend SQL.
@@ -36,14 +39,16 @@ def _asset(asset_type, name, current, initial=None, subtype=None):
     )
 
 
-class TestSerializeAsset:
-    def test_known_type_attaches_yaml_metadata(self):
+class TestSerializeGroup:
+    def test_single_member_known_type(self):
         a = _asset("cash", "VCB", 5_000_000, initial=4_000_000, subtype="bank_savings")
-        out = svc._serialize_asset(a)
-        # YAML config drives icon + label, so we don't hardcode the
-        # display copy in code — just verify the loader plugged in.
+        out = svc._serialize_group([a])
+        # YAML config drives icon + parent label.
         assert out["asset_type"] == "cash"
         assert out["subtype"] == "bank_savings"
+        # Subtype label surfaces alongside the parent type so users can
+        # distinguish products that share a name but differ in subtype.
+        assert out["subtype_label"] == "Tiết kiệm"
         assert out["icon"] == "💵"
         assert out["type_label"] == "Tiền mặt & Tài khoản"
         assert out["current_value"] == 5_000_000.0
@@ -51,33 +56,115 @@ class TestSerializeAsset:
         assert out["change"] == 1_000_000.0
         assert out["change_pct"] == 25.0
         assert out["acquired_at"] == "2026-01-01"
+        assert out["count"] == 1
+        assert out["member_ids"] == [str(a.id)]
         assert isinstance(out["id"], str)  # UUID stringified
 
     def test_unknown_type_falls_back_to_default_icon_and_label(self):
         a = _asset("widgets", "Magic Bean", 1_000_000)
-        out = svc._serialize_asset(a)
+        out = svc._serialize_group([a])
         # Unknown asset_type → 📌 default + raw type as label.
         assert out["icon"] == "📌"
         assert out["type_label"] == "widgets"
+        assert out["subtype_label"] is None
 
     def test_zero_initial_value_does_not_divide_by_zero(self):
         a = _asset("other", "Gift", 5_000_000, initial=0)
-        out = svc._serialize_asset(a)
+        out = svc._serialize_group([a])
         # Initial 0 → percentage flat 0% rather than infinity.
         assert out["change"] == 5_000_000.0
         assert out["change_pct"] == 0.0
 
     def test_loss_renders_negative_change(self):
         a = _asset("crypto", "BTC", 80_000_000, initial=100_000_000)
-        out = svc._serialize_asset(a)
+        out = svc._serialize_group([a])
         assert out["change"] == -20_000_000.0
         assert out["change_pct"] == -20.0
 
     def test_missing_acquired_at_yields_none(self):
         a = _asset("cash", "VCB", 1_000_000)
         a.acquired_at = None
-        out = svc._serialize_asset(a)
+        out = svc._serialize_group([a])
         assert out["acquired_at"] is None
+
+
+class TestGroupAssets:
+    def test_same_name_and_subtype_merge(self):
+        # User added "Tiền mặt" twice (10tr + 2tr) → one card 12tr.
+        a1 = _asset("cash", "Tiền mặt", 10_000_000, subtype="cash")
+        a2 = _asset("cash", "Tiền mặt", 2_000_000, subtype="cash")
+        out = svc._group_assets([a1, a2])
+        assert len(out) == 1
+        assert out[0]["current_value"] == 12_000_000.0
+        assert out[0]["count"] == 2
+        assert set(out[0]["member_ids"]) == {str(a1.id), str(a2.id)}
+
+    def test_same_name_different_subtypes_stay_separate(self):
+        # Techcombank checking and Techcombank savings are different
+        # products even though the bank name matches. The subtype label
+        # makes the distinction visible to the user.
+        a1 = _asset("cash", "Techcombank", 20_000_000, subtype="bank_checking")
+        a2 = _asset("cash", "Techcombank", 15_000_000, subtype="bank_savings")
+        out = svc._group_assets([a1, a2])
+        assert len(out) == 2
+        # Sorted desc by value: checking (20tr) first.
+        assert out[0]["subtype"] == "bank_checking"
+        assert out[0]["subtype_label"] == "Thanh toán"
+        assert out[0]["current_value"] == 20_000_000.0
+        assert out[1]["subtype"] == "bank_savings"
+        assert out[1]["subtype_label"] == "Tiết kiệm"
+
+    def test_name_match_is_case_and_whitespace_insensitive(self):
+        # Trim + casefold names before grouping — "tiền mặt" and
+        # "Tiền mặt " are obviously the same bucket to a user.
+        a1 = _asset("cash", "Tiền mặt", 5_000_000, subtype="cash")
+        a2 = _asset("cash", "tiền mặt ", 3_000_000, subtype="cash")
+        out = svc._group_assets([a1, a2])
+        assert len(out) == 1
+        assert out[0]["current_value"] == 8_000_000.0
+        assert out[0]["count"] == 2
+
+    def test_sorts_largest_first(self):
+        a1 = _asset("cash", "VCB", 5_000_000, subtype="bank_savings")
+        a2 = _asset("crypto", "BTC", 100_000_000)
+        a3 = _asset("real_estate", "Đất", 1_500_000_000)
+        out = svc._group_assets([a1, a2, a3])
+        assert [g["asset_type"] for g in out] == [
+            "real_estate", "crypto", "cash"
+        ]
+
+    def test_change_pct_aggregated_across_members(self):
+        # Combined initial 10tr (5+5), combined current 12tr (10+2)
+        # → blended +20%.
+        a1 = _asset("cash", "X", 10_000_000, initial=5_000_000, subtype="cash")
+        a2 = _asset("cash", "X", 2_000_000, initial=5_000_000, subtype="cash")
+        out = svc._group_assets([a1, a2])
+        assert out[0]["initial_value"] == 10_000_000.0
+        assert out[0]["current_value"] == 12_000_000.0
+        assert out[0]["change"] == 2_000_000.0
+        assert out[0]["change_pct"] == 20.0
+
+    def test_acquired_at_is_earliest(self):
+        a1 = _asset("cash", "X", 5_000_000, subtype="cash")
+        a1.acquired_at = date(2026, 3, 1)
+        a2 = _asset("cash", "X", 5_000_000, subtype="cash")
+        a2.acquired_at = date(2026, 1, 15)
+        out = svc._group_assets([a1, a2])
+        # Earliest preserves the genuine "since when" the bucket existed.
+        assert out[0]["acquired_at"] == "2026-01-15"
+
+    def test_empty_returns_empty(self):
+        assert svc._group_assets([]) == []
+
+    def test_none_subtype_groups_with_other_none(self):
+        # Crypto / real_estate sometimes have no subtype. Two no-subtype
+        # rows with the same name should still merge.
+        a1 = _asset("crypto", "BTC", 50_000_000)
+        a2 = _asset("crypto", "BTC", 30_000_000)
+        out = svc._group_assets([a1, a2])
+        assert len(out) == 1
+        assert out[0]["count"] == 2
+        assert out[0]["current_value"] == 80_000_000.0
 
 
 class TestBuildBreakdown:
@@ -214,6 +301,53 @@ class TestBuildOverview:
         # User at 0₫ should still see the first milestone — Young Professional.
         assert result["next_milestone"]["target"] == 30_000_000.0
         assert result["next_milestone"]["pct_progress"] == 0.0
+
+    async def test_duplicate_assets_collapse_in_payload(self, monkeypatch):
+        # Mirrors a real user's data: two "Tiền mặt | cash" rows + two
+        # Techcombank rows with different subtypes. Expect three cards:
+        # one merged "Tiền mặt" 12tr + two distinct Techcombank cards.
+        monkeypatch.setattr(
+            "backend.wealth.services.asset_service.get_user_assets",
+            AsyncMock(return_value=[
+                _asset("cash", "Tiền mặt", 10_000_000, subtype="cash"),
+                _asset("cash", "Tiền mặt", 2_000_000, subtype="cash"),
+                _asset("cash", "Techcombank", 20_000_000, subtype="bank_checking"),
+                _asset("cash", "Techcombank", 15_000_000, subtype="bank_savings"),
+            ]),
+        )
+
+        async def fake_change(db, uid, period):
+            return nwc.NetWorthChange(
+                current=Decimal("47_000_000"),
+                previous=Decimal("47_000_000"),
+                change_absolute=Decimal(0),
+                change_percentage=0.0,
+                period_label="",
+            )
+
+        monkeypatch.setattr(nwc, "calculate_change", fake_change)
+        monkeypatch.setattr(svc, "get_trend", AsyncMock(return_value=[]))
+
+        result = await svc.build_overview(MagicMock(), uuid.uuid4())
+
+        # Hero count reflects logical cards, not raw rows.
+        assert result["asset_count"] == 3
+        assert len(result["assets"]) == 3
+
+        # Cards sorted largest-first.
+        names = [(a["name"], a["subtype"]) for a in result["assets"]]
+        assert names == [
+            ("Techcombank", "bank_checking"),
+            ("Techcombank", "bank_savings"),
+            ("Tiền mặt", "cash"),
+        ]
+        # The merged Tiền mặt card sums values and tags count.
+        merged = result["assets"][2]
+        assert merged["current_value"] == 12_000_000.0
+        assert merged["count"] == 2
+        # Techcombank cards stay split (different subtypes).
+        assert result["assets"][0]["count"] == 1
+        assert result["assets"][1]["count"] == 1
 
     async def test_breakdown_sorted_desc(self, monkeypatch):
         monkeypatch.setattr(

@@ -16,13 +16,14 @@ window. For a user with ~10 assets and 365 days this is one round-trip,
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.wealth.asset_types import get_asset_config
+from backend.wealth.asset_types import get_asset_config, get_subtype_label
 from backend.wealth.ladder import WealthLevel, detect_level, next_milestone
 from backend.wealth.services import asset_service, net_worth_calculator
 
@@ -38,30 +39,73 @@ _LEVEL_LABELS_VI = {
 }
 
 
-def _serialize_asset(asset) -> dict:
-    """Trim asset ORM object → dashboard JSON shape."""
-    config = get_asset_config(asset.asset_type)
-    initial = Decimal(asset.initial_value or 0)
-    current = Decimal(asset.current_value or 0)
+def _group_key(asset) -> tuple[str, str, str]:
+    """Identity for asset aggregation on the dashboard.
+
+    Same name (case + whitespace insensitive) + same subtype + same
+    asset_type → merged into one card. Different subtypes stay separate
+    even if the name matches: a Techcombank checking and a Techcombank
+    savings are functionally different products and the user benefits
+    from seeing them apart.
+    """
+    name = (asset.name or "").strip().casefold()
+    return (asset.asset_type, asset.subtype or "", name)
+
+
+def _serialize_group(members: list) -> dict:
+    """Aggregate a list of assets sharing the same identity into one card.
+
+    Members must already be pre-grouped by ``_group_key``. Values are
+    summed, ``acquired_at`` is the earliest of any member, and the
+    ``count`` / ``member_ids`` fields let the frontend annotate rows
+    that bundle multiple raw entries (e.g. ``×2`` badge).
+    """
+    first = members[0]
+    asset_type = first.asset_type
+    subtype = first.subtype
+    config = get_asset_config(asset_type)
+
+    initial = sum((Decimal(m.initial_value or 0) for m in members), Decimal(0))
+    current = sum((Decimal(m.current_value or 0) for m in members), Decimal(0))
     change = current - initial
-    if initial > 0:
-        change_pct = float(change / initial * 100)
-    else:
-        change_pct = 0.0
+    change_pct = float(change / initial * 100) if initial > 0 else 0.0
+
+    acquired_dates = [m.acquired_at for m in members if m.acquired_at]
+    earliest = min(acquired_dates) if acquired_dates else None
 
     return {
-        "id": str(asset.id),
-        "name": asset.name,
-        "asset_type": asset.asset_type,
-        "subtype": asset.subtype,
+        "id": str(first.id),
+        "name": first.name,
+        "asset_type": asset_type,
+        "subtype": subtype,
+        "subtype_label": get_subtype_label(subtype),
         "icon": config.get("icon", "📌"),
-        "type_label": config.get("label_vi", asset.asset_type),
+        "type_label": config.get("label_vi", asset_type),
         "current_value": float(current),
         "initial_value": float(initial),
         "change": float(change),
         "change_pct": round(change_pct, 2),
-        "acquired_at": asset.acquired_at.isoformat() if asset.acquired_at else None,
+        "acquired_at": earliest.isoformat() if earliest else None,
+        "count": len(members),
+        "member_ids": [str(m.id) for m in members],
     }
+
+
+def _group_assets(assets: list) -> list[dict]:
+    """Group raw asset rows into dashboard cards, sorted largest-first.
+
+    Two rows with the same name + subtype merge into one card with
+    summed values. Different subtypes stay separate. Sorting by current
+    value puts the user's biggest holdings on top — what they care
+    about glancing at first.
+    """
+    groups: dict[tuple[str, str, str], list] = defaultdict(list)
+    for a in assets:
+        groups[_group_key(a)].append(a)
+
+    serialized = [_serialize_group(members) for members in groups.values()]
+    serialized.sort(key=lambda g: g["current_value"], reverse=True)
+    return serialized
 
 
 def _build_breakdown(
@@ -172,6 +216,7 @@ async def build_overview(
 
     trend = await get_trend(db, user_id, days=trend_days)
     assets = await asset_service.get_user_assets(db, user_id)
+    grouped_assets = _group_assets(assets)
 
     breakdown = _build_breakdown(breakdown_now.by_type, breakdown_now.total)
 
@@ -183,7 +228,10 @@ async def build_overview(
 
     payload = {
         "net_worth": float(breakdown_now.total),
-        "asset_count": breakdown_now.asset_count,
+        # Logical card count, not raw row count: the user thinks of
+        # two ``Tiền mặt`` entries as one bucket, so the hero pill
+        # should match what they see in the asset list below.
+        "asset_count": len(grouped_assets),
         "currency": breakdown_now.currency,
         "level": level.value,
         "level_label": _LEVEL_LABELS_VI.get(level, level.value),
@@ -198,7 +246,7 @@ async def build_overview(
         "breakdown": breakdown,
         "trend": trend,
         "trend_days": trend_days,
-        "assets": [_serialize_asset(a) for a in assets],
+        "assets": grouped_assets,
         "next_milestone": {
             "target": float(target_amount),
             "target_level": target_level.value,
