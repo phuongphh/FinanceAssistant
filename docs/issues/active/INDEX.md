@@ -25,6 +25,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #121 | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [issue-121.md](issue-121.md) |
 | #122 | [Story] P3.5-S9: Create clarification message templates (YAML) | [issue-122.md](issue-122.md) |
 | #123 | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [issue-123.md](issue-123.md) |
+| #125 | [Story] P3.5-S12: Add personality wrapper to query responses | [issue-125.md](issue-125.md) |
 | #126 | [Story] P3.5-S13: Implement wealth-level adaptive responses | [issue-126.md](issue-126.md) |
 
-**Total active:** 22
+**Total active:** 23
