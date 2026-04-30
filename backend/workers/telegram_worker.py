@@ -227,14 +227,18 @@ async def _handle_message(
             return resolved_user.id
         return None
 
-    # /huy or /cancel — drop the storytelling mode if active. Doesn't
-    # touch the asset wizard (it has its own cancel button) — only here
-    # because storytelling mode otherwise blocks NL expense parsing.
+    # /huy or /cancel — escape hatch out of any active wizard. Tries the
+    # asset wizard first; if that wasn't active, falls back to
+    # storytelling. Either flow's text mode otherwise blocks NL parsing,
+    # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            await storytelling_handlers.cancel_storytelling(
+            if not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
-            )
+            ):
+                await storytelling_handlers.cancel_storytelling(
+                    db, chat_id, resolved_user
+                )
             return resolved_user.id
         return None
 

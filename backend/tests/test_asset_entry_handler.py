@@ -474,3 +474,121 @@ async def test_text_input_returns_false_when_no_wizard():
             {"text": "anything", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is False
+
+
+@pytest.mark.asyncio
+async def test_text_input_returns_false_for_non_asset_flow():
+    """Storytelling and other non-asset flows must NOT be intercepted —
+    they have their own router earlier in the dispatch chain."""
+    user = _user({"flow": "storytelling", "step": "awaiting_story", "draft": {}})
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)):
+        consumed = await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "anything", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    assert consumed is False
+
+
+@pytest.mark.asyncio
+async def test_text_input_at_picker_step_nudges_instead_of_leaking():
+    """Regression for the VCB-002 incident.
+
+    User taps "+Thêm tài sản" → wizard at FLOW_PICKER:type. Then types
+    "VCB-002 20 triệu" without picking a type. Must be CONSUMED with a
+    nudge — not fall through to the NL expense parser.
+    """
+    user = _user({
+        "flow": asset_entry.FLOW_PICKER,
+        "step": "type",
+        "draft": {},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send, \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear:
+        consumed = await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "VCB-002 20 triệu", "chat": {"id": 100},
+             "from": {"id": 100}},
+        )
+    assert consumed is True
+    clear.assert_not_awaited()  # picker stays open so user can still tap
+    send.assert_awaited_once()
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "tap nút" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_text_input_at_subtype_step_nudges_instead_of_leaking():
+    """Same incident class, second leaky step: user picked Cash type but
+    typed text instead of picking a subtype. Must be consumed."""
+    user = _user({
+        "flow": asset_entry.FLOW_CASH,
+        "step": "subtype",
+        "draft": {"asset_type": "cash"},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        consumed = await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "VCB-002 20 triệu", "chat": {"id": 100},
+             "from": {"id": 100}},
+        )
+    assert consumed is True
+    send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_start_asset_wizard_sets_picker_state():
+    """After starting the wizard, wizard_state must be the picker
+    sentinel — NOT null. That's what closes the leak window."""
+    user = _user(state={"flow": "asset_add_cash", "step": "amount", "draft": {}})
+    db = _db(user)
+    with patch.object(asset_entry.wizard_service, "start_flow",
+                      AsyncMock()) as start_flow, \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.start_asset_wizard(db, 100, user)
+    start_flow.assert_awaited_once()
+    args = start_flow.await_args.args
+    kwargs = start_flow.await_args.kwargs
+    # Signature: start_flow(db, user_id, flow, step=, draft=)
+    assert args[2] == asset_entry.FLOW_PICKER
+    assert kwargs["step"] == "type"
+    assert kwargs["draft"] == {}
+
+
+@pytest.mark.asyncio
+async def test_cancel_wizard_clears_active_asset_flow():
+    user = _user({
+        "flow": asset_entry.FLOW_CASH,
+        "step": "amount",
+        "draft": {"asset_type": "cash"},
+    })
+    db = _db(user)
+    with patch.object(asset_entry.wizard_service, "clear",
+                      AsyncMock()) as clear, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        cancelled = await asset_entry.cancel_wizard(db, 100, user)
+    assert cancelled is True
+    clear.assert_awaited_once()
+    send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cancel_wizard_noop_when_other_flow_active():
+    """If the user is in storytelling (or no flow), cancel_wizard must
+    return False so the caller can fall back to the right canceller."""
+    user = _user({"flow": "storytelling", "step": "x", "draft": {}})
+    db = _db(user)
+    with patch.object(asset_entry.wizard_service, "clear",
+                      AsyncMock()) as clear, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        cancelled = await asset_entry.cancel_wizard(db, 100, user)
+    assert cancelled is False
+    clear.assert_not_awaited()
+    send.assert_not_awaited()
