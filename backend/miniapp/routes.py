@@ -230,6 +230,27 @@ async def get_wealth_overview(
     return {"data": payload, "error": None}
 
 
+@router.post("/api/wealth/start-asset-wizard")
+async def start_asset_wizard_route(
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger the asset-add wizard from the Mini App "+ Thêm tài sản" button.
+
+    Posts the type-picker message into the user's private chat with the
+    bot, so when the WebApp closes the user lands on a chat that is
+    already mid-flow. Private-chat ``chat_id`` equals ``telegram_id``.
+    """
+    user = await _resolve_user(auth, db)
+    # Lazy import — asset_entry pulls in the wizard graph; keep the
+    # miniapp module light and avoid any chance of a circular import
+    # at process start.
+    from backend.bot.handlers.asset_entry import start_asset_wizard
+
+    await start_asset_wizard(db, user.telegram_id, user)
+    return {"data": {"ok": True}, "error": None}
+
+
 @router.get("/api/wealth/trend")
 async def get_wealth_trend(
     days: int = Query(
