@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #110 | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [issue-110.md](issue-110.md) |
 | #111 | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [issue-111.md](issue-111.md) |
+| #113 | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [issue-113.md](issue-113.md) |
 
-**Total active:** 13
+**Total active:** 14
