@@ -24,5 +24,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #120 | [Story] P3.5-S7: Implement LLM-based intent classifier | [issue-120.md](issue-120.md) |
 | #121 | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [issue-121.md](issue-121.md) |
 | #122 | [Story] P3.5-S9: Create clarification message templates (YAML) | [issue-122.md](issue-122.md) |
+| #126 | [Story] P3.5-S13: Implement wealth-level adaptive responses | [issue-126.md](issue-126.md) |
 
-**Total active:** 20
+**Total active:** 21
