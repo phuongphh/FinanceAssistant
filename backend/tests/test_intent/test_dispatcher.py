@@ -7,9 +7,18 @@ import pytest
 
 from backend.intent.dispatcher import (
     CONFIRM_THRESHOLD,
+    DispatchOutcome,
     EXECUTE_THRESHOLD,
     IntentDispatcher,
+    OUTCOME_CLARIFY_SENT,
+    OUTCOME_CONFIRM_SENT,
+    OUTCOME_ERROR,
+    OUTCOME_EXECUTED,
+    OUTCOME_NOT_IMPLEMENTED,
+    OUTCOME_OUT_OF_SCOPE,
+    OUTCOME_UNCLEAR,
     READ_INTENTS,
+    WRITE_INTENTS,
 )
 from backend.intent.intents import IntentResult, IntentType
 
@@ -19,7 +28,17 @@ def _user(name: str = "Bé Tiền") -> MagicMock:
     user.id = "user-1"
     user.display_name = name
     user.monthly_income = None
+    user.wizard_state = None
     return user
+
+
+def _fake_db() -> MagicMock:
+    db = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = AsyncMock()
+    db.add = MagicMock()
+    return db
 
 
 @pytest.fixture
@@ -28,52 +47,82 @@ def dispatcher() -> IntentDispatcher:
 
 
 @pytest.fixture
-def db() -> MagicMock:
-    return MagicMock()
+def db():
+    return _fake_db()
 
 
 @pytest.mark.asyncio
-async def test_meta_intent_uses_dedicated_handler(dispatcher, db):
+async def test_greeting_uses_meta_handler(dispatcher, db):
     result = IntentResult(
         intent=IntentType.GREETING, confidence=0.95, raw_text="chào"
     )
-    response = await dispatcher.dispatch(result, _user(), db)
-    assert "chào" in response.lower()
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert isinstance(outcome, DispatchOutcome)
+    assert outcome.kind == OUTCOME_EXECUTED
+    assert "chào" in outcome.text.lower()
 
 
 @pytest.mark.asyncio
-async def test_unclear_intent_below_threshold_uses_unclear_handler(
-    dispatcher, db
-):
+async def test_unclear_intent_returns_unclear_outcome(dispatcher, db):
+    result = IntentResult(
+        intent=IntentType.UNCLEAR, confidence=0.0, raw_text="???"
+    )
+    outcome = await dispatcher.dispatch(result, _user("An"), db)
+    assert outcome.kind == OUTCOME_UNCLEAR
+    assert (
+        "chưa hiểu" in outcome.text.lower()
+        or "thử hỏi" in outcome.text.lower()
+    )
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_known_intent_triggers_clarification(dispatcher, db):
+    """At confidence <0.5 with a known intent, clarification message
+    should be sent + state persisted."""
     result = IntentResult(
         intent=IntentType.QUERY_ASSETS,
-        confidence=CONFIRM_THRESHOLD - 0.01,
-        raw_text="???",
+        confidence=0.4,
+        raw_text="tài sản gì đó",
     )
-    response = await dispatcher.dispatch(result, _user("An"), db)
-    assert "chưa hiểu" in response.lower() or "thử hỏi" in response.lower()
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_CLARIFY_SENT
+    assert outcome.inline_keyboard_hint  # buttons extracted from YAML
 
 
 @pytest.mark.asyncio
-async def test_write_intent_at_medium_confidence_falls_to_unclear(
+async def test_write_intent_at_medium_confidence_triggers_confirmation(
     dispatcher, db
 ):
-    """Confidence in 0.5–0.8 for an action_* intent must NOT execute
-    until the confirm flow lands in Epic 2."""
+    """0.5–0.8 + write intent → confirmation, NOT execution."""
     result = IntentResult(
         intent=IntentType.ACTION_RECORD_SAVING,
         confidence=0.65,
         parameters={"amount": 1_000_000},
         raw_text="tiết kiệm 1tr",
     )
-    response = await dispatcher.dispatch(result, _user(), db)
-    assert "chưa hiểu" in response.lower() or "thử hỏi" in response.lower()
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_CONFIRM_SENT
+    assert outcome.inline_keyboard_hint == ["✅ Đúng", "❌ Không phải"]
+    assert "1,000,000" in outcome.text
+
+
+@pytest.mark.asyncio
+async def test_write_intent_missing_params_falls_to_clarification(dispatcher, db):
+    """Even at high confidence, a write intent without required params
+    should clarify instead of confirming an empty action."""
+    result = IntentResult(
+        intent=IntentType.ACTION_RECORD_SAVING,
+        confidence=0.7,
+        parameters={},
+        raw_text="tiết kiệm",
+    )
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_CLARIFY_SENT
 
 
 @pytest.mark.asyncio
 async def test_read_intent_at_medium_confidence_executes(dispatcher, db):
     """Read intents are safe — execute even at medium confidence."""
-    # Patch the handler to verify it actually got called.
     fake_handler = MagicMock()
     fake_handler.handle = AsyncMock(return_value="OK")
     dispatcher._handlers[IntentType.QUERY_ASSETS] = fake_handler
@@ -83,15 +132,14 @@ async def test_read_intent_at_medium_confidence_executes(dispatcher, db):
         confidence=0.65,
         raw_text="tài sản",
     )
-    response = await dispatcher.dispatch(result, _user(), db)
-    assert response == "OK"
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_EXECUTED
+    assert outcome.text == "OK"
     fake_handler.handle.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_handler_exception_is_swallowed_to_friendly_message(
-    dispatcher, db
-):
+async def test_handler_exception_returns_friendly_error(dispatcher, db):
     fake_handler = MagicMock()
     fake_handler.handle = AsyncMock(side_effect=RuntimeError("boom"))
     dispatcher._handlers[IntentType.QUERY_ASSETS] = fake_handler
@@ -101,20 +149,33 @@ async def test_handler_exception_is_swallowed_to_friendly_message(
         confidence=0.95,
         raw_text="tài sản",
     )
-    response = await dispatcher.dispatch(result, _user(), db)
-    assert "lỗi" in response.lower() or "thử lại" in response.lower()
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_ERROR
+    assert "lỗi" in outcome.text.lower() or "thử lại" in outcome.text.lower()
 
 
 @pytest.mark.asyncio
-async def test_unknown_handler_returns_coming_soon(dispatcher, db):
-    # ADVISORY has no handler in Epic 1.
+async def test_unknown_handler_returns_not_implemented(dispatcher, db):
+    """ADVISORY has no handler in Epic 1 — gracefully say so."""
     result = IntentResult(
         intent=IntentType.ADVISORY,
         confidence=0.9,
         raw_text="nên đầu tư gì",
     )
-    response = await dispatcher.dispatch(result, _user(), db)
-    assert "coming soon" in response.lower()
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_NOT_IMPLEMENTED
+    assert "coming soon" in outcome.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_oos_returns_oos_outcome(dispatcher, db):
+    result = IntentResult(
+        intent=IntentType.OUT_OF_SCOPE,
+        confidence=0.9,
+        raw_text="thời tiết hôm nay",
+    )
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_OUT_OF_SCOPE
 
 
 def test_thresholds_have_sane_ordering():
@@ -135,3 +196,9 @@ def test_read_intents_set_includes_all_query_intents():
         IntentType.QUERY_GOAL_PROGRESS,
     }
     assert expected.issubset(READ_INTENTS)
+
+
+def test_write_intents_set_excludes_reads():
+    assert WRITE_INTENTS.isdisjoint(READ_INTENTS)
+    assert IntentType.ACTION_RECORD_SAVING in WRITE_INTENTS
+    assert IntentType.ACTION_QUICK_TRANSACTION in WRITE_INTENTS

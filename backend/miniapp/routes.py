@@ -13,14 +13,19 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
+from backend.config import get_settings
 from backend.database import get_db
 from backend.miniapp.auth import require_miniapp_auth
-from backend.services import dashboard_service, wealth_dashboard_service
+from backend.services import (
+    dashboard_service,
+    intent_metrics,
+    wealth_dashboard_service,
+)
 
 _HERE = Path(__file__).parent
 _TEMPLATES_DIR = _HERE / "templates"
@@ -291,3 +296,73 @@ async def get_wealth_trend(
     )
 
     return {"data": trend, "error": None}
+
+
+# --- Phase 3.5 — Intent metrics (admin) --------------------------------
+
+
+def _require_admin_api_key(
+    x_admin_key: str = Header(
+        ..., alias="X-Admin-Key", description="Internal admin API key"
+    ),
+) -> None:
+    """Gatekeeper for the admin metrics endpoint.
+
+    We don't reuse ``require_miniapp_auth`` because this endpoint isn't
+    surfaced from the Mini App — it's an ops endpoint hit from a
+    dashboard or curl. The shared internal_api_key from .env is the
+    secret; in production swap for a per-user JWT once the admin UI
+    grows beyond one human.
+    """
+    settings = get_settings()
+    expected = (settings.internal_api_key or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503, detail="Admin API key not configured"
+        )
+    if x_admin_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+
+@router.get("/api/intent-metrics")
+async def get_intent_metrics(
+    window_days: int = Query(
+        1, ge=1, le=30, description="Daily summary window in days"
+    ),
+    histogram_days: int = Query(7, ge=1, le=90),
+    cost_trend_days: int = Query(7, ge=1, le=90),
+    top_unclear_limit: int = Query(20, ge=1, le=100),
+    _: None = Depends(_require_admin_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregations powering the intent ops dashboard.
+
+    Bundles the four queries into one response so a single fetch hydrates
+    the whole admin page. Cached implicitly by the events table indexes —
+    no in-process cache because this endpoint is hit infrequently.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    summary_since = datetime.now(timezone.utc) - timedelta(days=window_days)
+    histogram_since = datetime.now(timezone.utc) - timedelta(days=histogram_days)
+
+    summary = await intent_metrics.daily_summary(db, since=summary_since)
+    histogram = await intent_metrics.confidence_histogram(
+        db, since=histogram_since
+    )
+    top_unclear = await intent_metrics.top_unclear_intents(
+        db, since=histogram_since, limit=top_unclear_limit
+    )
+    trend = await intent_metrics.cost_trend(db, days=cost_trend_days)
+    alerts = intent_metrics.evaluate_alerts(summary)
+
+    return {
+        "data": {
+            "summary": summary,
+            "confidence_histogram": histogram,
+            "top_unclear_intents": top_unclear,
+            "cost_trend": trend,
+            "alerts": alerts,
+        },
+        "error": None,
+    }

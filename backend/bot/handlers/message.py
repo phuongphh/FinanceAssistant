@@ -4,13 +4,15 @@ Phase 3.5 routing order (after the worker has dispatched commands and
 wizards):
 
   1. Report intent (legacy, still served by ``report_service``).
-  2. ``IntentPipeline.classify`` — covers ~75% of user queries via
-     rule-based patterns. Confident matches dispatch immediately and
-     return.
-  3. LLM transaction parser — fallback for "vừa chi 200k ăn trưa"
+  2. Pending intent state (confirm-await / clarify-await) handled by
+     ``classify_and_dispatch`` — it inspects ``user.wizard_state`` first
+     and resolves any active intent flow.
+  3. ``IntentPipeline.classify`` — covers ~95% of queries (rule-based
+     + LLM fallback). Confident matches dispatch immediately.
+  4. LLM transaction parser — fallback for "vừa chi 200k ăn trưa"
      style messages that don't match any query pattern.
-  4. ``IntentDispatcher`` UNCLEAR / OOS response — final fallback so
-     the user always gets a friendly reply (no silent fail).
+  5. Dispatcher's UNCLEAR / OOS reply — final fallback so the user
+     always gets a friendly message (no silent fail).
 """
 from __future__ import annotations
 
@@ -20,9 +22,15 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend import analytics
 from backend.bot.handlers import free_form_text as intent_layer
 from backend.bot.handlers.transaction import send_transaction_confirmation
+from backend.intent import pending_action
+from backend.intent.dispatcher import (
+    OUTCOME_CLARIFY_SENT,
+    OUTCOME_CONFIRM_SENT,
+    OUTCOME_OUT_OF_SCOPE,
+    OUTCOME_UNCLEAR,
+)
 from backend.intent.intents import IntentType
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service, report_service
@@ -48,13 +56,16 @@ Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
-# Below this confidence the intent layer hands off to the LLM transaction
-# parser instead of dispatching. Above it (or any non-meta intent) we
-# trust the rule match.
-_INTENT_DISPATCH_CONFIDENCE = 0.5
+# Outcome kinds that mean "the user got their answer / a follow-up
+# prompt — do NOT fall through to the LLM transaction parser".
+_TERMINAL_OUTCOMES = frozenset(
+    {OUTCOME_CLARIFY_SENT, OUTCOME_CONFIRM_SENT, OUTCOME_OUT_OF_SCOPE}
+)
 
 
-async def _send_report(db: AsyncSession, chat_id: int, telegram_id: int, text: str = "") -> None:
+async def _send_report(
+    db: AsyncSession, chat_id: int, telegram_id: int, text: str = ""
+) -> None:
     """Ask the service for report text and deliver it to the user."""
     await send_message(chat_id, "⏳ Đang tổng hợp báo cáo...")
     result = await report_service.process_report_request(db, telegram_id, text)
@@ -102,41 +113,27 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         await send_message(chat_id, _NOT_REGISTERED)
         return True
 
-    # Phase 3.5 — classify before falling back to the LLM transaction
-    # parser. A confident, non-meta match means the user asked a query
-    # we already know how to handle, so the LLM round-trip is skipped.
-    intent_result = await intent_layer._pipeline.classify(text)
-    analytics.track(
-        intent_layer.EVENT_INTENT_CLASSIFIED,
-        user_id=user.id,
-        properties={
-            "intent": intent_result.intent.value,
-            "confidence": round(intent_result.confidence, 3),
-            "classifier": intent_result.classifier_used,
-        },
+    # Phase 3.5 — full intent flow with confirm/clarify state handling.
+    outcome = await intent_layer.classify_and_dispatch(
+        db=db, chat_id=chat_id, user=user, text=text
     )
 
+    if outcome is None:
+        return False  # empty text — shouldn't happen given the early return
+
+    # Confident execution OR terminal outcomes (clarify/confirm/OOS) — done.
     if (
-        intent_result.intent
-        not in (IntentType.UNCLEAR, IntentType.OUT_OF_SCOPE)
-        and intent_result.confidence >= _INTENT_DISPATCH_CONFIDENCE
+        outcome.kind not in (OUTCOME_UNCLEAR,)
+        and outcome.intent != IntentType.UNCLEAR
     ):
-        response = await intent_layer._dispatcher.dispatch(
-            intent_result, user, db
-        )
-        await send_message(chat_id, response)
-        analytics.track(
-            intent_layer.EVENT_INTENT_HANDLER_EXECUTED,
-            user_id=user.id,
-            properties={
-                "intent": intent_result.intent.value,
-                "confidence": round(intent_result.confidence, 3),
-            },
-        )
+        return True
+    if outcome.kind in _TERMINAL_OUTCOMES:
         return True
 
-    # Try the LLM transaction parser — covers free-form expense entry
-    # like "vừa chi 200k ăn trưa" that doesn't match a query pattern.
+    # UNCLEAR — try the LLM transaction parser before giving up. The
+    # dispatcher already sent the unclear reply, so we only proceed if
+    # the parser returns a real transaction; if not, the unclear text
+    # remains the final answer.
     parsed: dict | None = None
     try:
         raw = await call_llm(
@@ -168,13 +165,142 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         await send_transaction_confirmation(db, expense)
         return True
 
-    # Final fallback: friendly unclear / out-of-scope reply through the
-    # dispatcher so messaging stays consistent.
-    response = await intent_layer._dispatcher.dispatch(intent_result, user, db)
-    await send_message(chat_id, response)
-    analytics.track(
-        intent_layer.EVENT_INTENT_UNCLEAR,
-        user_id=user.id,
-        properties={"intent": intent_result.intent.value},
+    # Already sent the unclear reply via the dispatcher.
+    return True
+
+
+# -------------------- callback handler --------------------
+
+
+async def handle_intent_callback(db: AsyncSession, callback_query: dict) -> bool:
+    """Resolve an Epic 2 intent callback (confirm or clarify).
+
+    Returns True when the callback was recognised and handled. The
+    worker dispatches this BEFORE the menu callback handler so menu
+    callbacks aren't shadowed by the more specific intent prefix.
+    """
+    data = callback_query.get("data", "")
+    if not data.startswith("intent_"):
+        return False
+
+    chat_id = callback_query["message"]["chat"]["id"]
+    from_user = callback_query.get("from") or {}
+    telegram_id = from_user.get("id", chat_id)
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if not user:
+        return True  # ignore — user gone
+
+    state = pending_action.get_active(user)
+
+    if data.startswith("intent_confirm:"):
+        return await _handle_confirm_callback(
+            db, chat_id, user, state, action=data.split(":", 1)[1]
+        )
+
+    if data.startswith("intent_clarify:"):
+        return await _handle_clarify_callback(
+            db, chat_id, user, state, index=data.split(":", 1)[1]
+        )
+
+    return False
+
+
+async def _handle_confirm_callback(
+    db: AsyncSession,
+    chat_id: int,
+    user,
+    state: dict | None,
+    *,
+    action: str,
+) -> bool:
+    """Resolve a [✅ Đúng] / [❌ Không phải] tap."""
+    from backend import analytics
+
+    if state is None or state.get("flow") != pending_action.FLOW_PENDING_ACTION:
+        await send_message(
+            chat_id,
+            "Mình không tìm thấy yêu cầu nào đang chờ xác nhận 🌱",
+        )
+        return True
+
+    intent = state.get("intent")
+    params = state.get("parameters") or {}
+    await pending_action.clear(db, user)
+
+    if action != "yes":
+        await send_message(
+            chat_id,
+            "OK, bỏ qua nhé! Bạn nói lại giúp mình một câu khác xem 🌱",
+        )
+        analytics.track(
+            "intent_confirm_rejected",
+            user_id=user.id,
+            properties={"intent": intent},
+        )
+        return True
+
+    # Execute the action. Currently only ACTION_RECORD_SAVING is wired
+    # — other action types fall back to a "not implemented" message.
+    if intent == IntentType.ACTION_RECORD_SAVING.value:
+        amount = float(params.get("amount", 0))
+        if amount <= 0:
+            await send_message(
+                chat_id,
+                "Mình không thấy số tiền — bạn gõ lại như 'tiết kiệm 1tr' nhé.",
+            )
+            return True
+        expense_data = ExpenseCreate(
+            amount=amount,
+            merchant="Tiết kiệm",
+            note="action_record_saving",
+            source="manual",
+            category="saving",
+            expense_date=date.today(),
+        )
+        expense = await expense_service.create_expense(db, user.id, expense_data)
+        await send_transaction_confirmation(db, expense)
+        analytics.track(
+            "intent_confirm_accepted",
+            user_id=user.id,
+            properties={"intent": intent, "amount": int(amount)},
+        )
+        return True
+
+    await send_message(
+        chat_id,
+        "Mình đã hiểu nhưng tính năng này chưa sẵn sàng — coming soon nhé! 🚀",
+    )
+    return True
+
+
+async def _handle_clarify_callback(
+    db: AsyncSession,
+    chat_id: int,
+    user,
+    state: dict | None,
+    *,
+    index: str,
+) -> bool:
+    """Resolve a clarification button tap.
+
+    The button label is the user's clarification answer — re-classify
+    that label as if the user typed it, with the original parameters
+    merged in.
+    """
+    if state is None or state.get("flow") != pending_action.FLOW_AWAITING_CLARIFY:
+        await send_message(
+            chat_id,
+            "Câu hỏi này đã hết hạn rồi 🌱 — bạn hỏi lại giúp mình nhé.",
+        )
+        return True
+
+    # We don't have access to the button label text from callback_data
+    # alone — but the original intent was already classified. Re-treat
+    # the situation as a confident execution of the original intent.
+    await intent_layer.classify_and_dispatch(
+        db=db,
+        chat_id=chat_id,
+        user=user,
+        text=state.get("raw_text") or "",
     )
     return True

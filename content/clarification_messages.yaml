@@ -1,0 +1,141 @@
+# Phase 3.5 — clarification messages.
+#
+# Used when the dispatcher gets a low-confidence (<0.5) classification
+# and needs to ask the user to disambiguate. Each key holds 2-3
+# variations so we don't sound repetitive when the same flow fires
+# back-to-back. Templates are formatted with str.format(); supported
+# placeholders are noted per-section.
+#
+# Inline keyboards: each variation uses bracket notation [Label] so the
+# dispatcher can lift them into Telegram inline-keyboard buttons. The
+# actual callback_data wiring lives in
+# ``backend.bot.keyboards.clarification_keyboard``.
+#
+# Adding a new template:
+#   1. Pick a key matching the dispatcher branch
+#      (low_confidence_<intent_group>).
+#   2. Provide ≥2 variations.
+#   3. Use {name} for the user's display_name (always available).
+#   4. Other placeholders only when the dispatcher passes them.
+
+low_confidence_assets:
+  # Placeholders: {name}
+  - |
+    Mình hiểu bạn hỏi về tài sản, nhưng chưa rõ chi tiết {name} ơi 🤔
+
+    Bạn muốn xem:
+    [📊 Tổng tài sản]
+    [🏠 Bất động sản]
+    [📈 Chứng khoán]
+    [💵 Tiền mặt]
+  - |
+    Tài sản nào {name} ơi? Mình giúp bạn xem theo loại nhé:
+    [📊 Tổng]
+    [🏠 BĐS]
+    [📈 Cổ phiếu]
+    [💵 Tiền mặt]
+
+low_confidence_expenses:
+  # Placeholders: {name}
+  - |
+    Bạn muốn xem chi tiêu của khoảng nào {name}?
+
+    [📅 Hôm nay]
+    [📅 Tuần này]
+    [📅 Tháng này]
+    [📅 Tháng trước]
+  - |
+    Để mình check chi tiêu cho đúng — period nào {name}?
+
+    [📅 Tuần này]
+    [📅 Tháng này]
+    [📅 Tháng trước]
+
+low_confidence_market:
+  # Placeholders: {name}
+  - |
+    Bạn muốn xem giá mã nào {name}?
+    Ví dụ: VNM, VIC, FPT, BTC, VN-Index...
+
+    Gõ tên mã hoặc tap:
+    [📊 VN-Index]
+    [💎 BTC]
+    [📈 Top VN30]
+
+low_confidence_action:
+  # Placeholders: {name}
+  - |
+    Bạn muốn làm gì {name}?
+
+    [💰 Ghi tiết kiệm]
+    [📝 Ghi giao dịch]
+    [🎯 Đặt mục tiêu]
+  - |
+    Mình giúp bạn được nhiều việc đấy {name} — bạn muốn:
+
+    [💰 Tiết kiệm]
+    [📝 Chi tiêu]
+    [🎯 Mục tiêu]
+
+low_confidence_goals:
+  # Placeholders: {name}
+  - |
+    Mục tiêu nào {name} ơi?
+
+    [📋 Xem tất cả]
+    [➕ Đặt mới]
+  - |
+    Bạn muốn làm gì với mục tiêu {name}?
+
+    [📋 Xem mục tiêu hiện có]
+    [➕ Tạo mục tiêu mới]
+
+ambiguous_amount:
+  # Placeholders: {name}, {amount} (formatted with thousands separator)
+  - |
+    Mình hiểu là {amount}đ — đúng không {name}?
+
+    [✅ Đúng]
+    [✏️ Sửa lại]
+  - |
+    Số tiền là {amount}đ {name} nhé? Xác nhận giúp mình:
+
+    [✅ Chuẩn]
+    [✏️ Khác cơ]
+
+ambiguous_category:
+  # Placeholders: {name}
+  - |
+    Loại chi tiêu nào {name}?
+
+    [🍜 Ăn uống]
+    [🚗 Di chuyển]
+    [💊 Sức khỏe]
+    [👕 Mua sắm]
+    [🎮 Giải trí]
+    [📌 Khác]
+
+awaiting_response:
+  # Generic "still waiting on you" message used when a clarification
+  # times out OR when the user tries to start a new query while one is
+  # active. Placeholders: {name}
+  - |
+    Mình vẫn đang đợi câu trả lời {name} ơi 🌱
+    Tap một trong các option ở trên, hoặc gõ /huy để bỏ qua.
+  - |
+    Còn câu hỏi trước nữa {name} — bạn chọn giúp mình một option nhé.
+    Hoặc /huy nếu muốn bắt đầu lại.
+
+confirmation_action_record_saving:
+  # Placeholders: {name}, {amount}
+  - |
+    Mình hiểu bạn muốn ghi tiết kiệm *{amount}đ* — đúng không {name}?
+
+    [✅ Đúng] [❌ Không phải]
+
+confirmation_action_quick_transaction:
+  # Placeholders: {name}, {amount}, {merchant}
+  - |
+    Mình hiểu bạn muốn ghi *{amount}đ* cho *{merchant}* — đúng chưa {name}?
+
+    [✅ Đúng] [❌ Không phải]
