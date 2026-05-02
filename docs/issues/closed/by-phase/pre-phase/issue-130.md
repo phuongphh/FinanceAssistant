@@ -1,9 +1,6 @@
-# Issue #130: [Story] P3.5-S17: Run regression test suite for existing flows
+# Issue #130
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/130  
-**Status:** Open
-
----
+[Story] P3.5-S17: Run regression test suite for existing flows
 
 **Parent Epic:** #113 (Epic 4: Quality Assurance)
 
