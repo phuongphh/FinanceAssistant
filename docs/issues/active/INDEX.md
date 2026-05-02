@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #113 | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [issue-113.md](issue-113.md) |
 | #114 | [Story] P3.5-S1: Define intent types and result data structures | [issue-114.md](issue-114.md) |
 | #115 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/115 | [issue-115.md](issue-115.md) |
 | #116 | [Story] P3.5-S3: Build parameter extractors (time, category, ticker, amount) | [issue-116.md](issue-116.md) |
@@ -38,4 +37,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #133 | [Story] P3.5-S20: User testing with 5 real users (1 week) | [issue-133.md](issue-133.md) |
 | #135 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/135 | [issue-135.md](issue-135.md) |
 
-**Total active:** 33
+**Total active:** 32

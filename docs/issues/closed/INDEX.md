@@ -45,9 +45,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
 | #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
+| #113 | Pre-Phase | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [pre-phase/issue-113.md](by-phase/pre-phase/issue-113.md) |
 | #130 | Pre-Phase | [Story] P3.5-S17: Run regression test suite for existing flows | [pre-phase/issue-130.md](by-phase/pre-phase/issue-130.md) |
 | #132 | Pre-Phase | [Story] P3.5-S19: Performance and cost verification | [pre-phase/issue-132.md](by-phase/pre-phase/issue-132.md) |
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 
-**Total:** 44 closed issues
-(7 Phase 1, 9 Phase 2, 28 Pre-Phase)
+**Total:** 45 closed issues
+(7 Phase 1, 9 Phase 2, 29 Pre-Phase)
