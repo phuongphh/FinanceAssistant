@@ -43,6 +43,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #78 | Pre-Phase | [P3A-20] Integrate storytelling with briefing keyboard | [pre-phase/issue-78.md](by-phase/pre-phase/issue-78.md) |
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
+| #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
 
-**Total:** 39 closed issues
-(7 Phase 1, 9 Phase 2, 23 Pre-Phase)
+**Total:** 40 closed issues
+(7 Phase 1, 9 Phase 2, 24 Pre-Phase)
