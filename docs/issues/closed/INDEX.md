@@ -53,6 +53,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #118 | Pre-Phase | [Story] P3.5-S5: Build read query handlers (8 handlers) | [pre-phase/issue-118.md](by-phase/pre-phase/issue-118.md) |
 | #119 | Pre-Phase | [Story] P3.5-S6: Wire intent pipeline into Telegram message router | [pre-phase/issue-119.md](by-phase/pre-phase/issue-119.md) |
 | #120 | Pre-Phase | [Story] P3.5-S7: Implement LLM-based intent classifier | [pre-phase/issue-120.md](by-phase/pre-phase/issue-120.md) |
+| #121 | Pre-Phase | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [pre-phase/issue-121.md](by-phase/pre-phase/issue-121.md) |
 | #122 | Pre-Phase | [Story] P3.5-S9: Create clarification message templates (YAML) | [pre-phase/issue-122.md](by-phase/pre-phase/issue-122.md) |
 | #123 | Pre-Phase | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [pre-phase/issue-123.md](by-phase/pre-phase/issue-123.md) |
 | #124 | Pre-Phase | [Story] P3.5-S11: Add analytics for classifier accuracy and cost tracking | [pre-phase/issue-124.md](by-phase/pre-phase/issue-124.md) |
@@ -67,5 +68,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 62 closed issues
-(7 Phase 1, 9 Phase 2, 46 Pre-Phase)
+**Total:** 63 closed issues
+(7 Phase 1, 9 Phase 2, 47 Pre-Phase)

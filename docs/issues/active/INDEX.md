@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #121 | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [issue-121.md](issue-121.md) |
 | #128 | [Story] P3.5-S15: Add follow-up suggestions as inline buttons | [issue-128.md](issue-128.md) |
 
-**Total active:** 15
+**Total active:** 14
