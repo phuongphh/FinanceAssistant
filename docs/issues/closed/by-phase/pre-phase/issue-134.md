@@ -1,9 +1,6 @@
-# Issue #134: [Story] P3.5-S21: Pattern improvement based on unclear queries
+# Issue #134
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/134  
-**Status:** Open
-
----
+[Story] P3.5-S21: Pattern improvement based on unclear queries
 
 **Parent Epic:** #113 (Epic 4: Quality Assurance)
 
