@@ -54,6 +54,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #119 | Pre-Phase | [Story] P3.5-S6: Wire intent pipeline into Telegram message router | [pre-phase/issue-119.md](by-phase/pre-phase/issue-119.md) |
 | #120 | Pre-Phase | [Story] P3.5-S7: Implement LLM-based intent classifier | [pre-phase/issue-120.md](by-phase/pre-phase/issue-120.md) |
 | #122 | Pre-Phase | [Story] P3.5-S9: Create clarification message templates (YAML) | [pre-phase/issue-122.md](by-phase/pre-phase/issue-122.md) |
+| #123 | Pre-Phase | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [pre-phase/issue-123.md](by-phase/pre-phase/issue-123.md) |
 | #130 | Pre-Phase | [Story] P3.5-S17: Run regression test suite for existing flows | [pre-phase/issue-130.md](by-phase/pre-phase/issue-130.md) |
 | #131 | Pre-Phase | [Story] P3.5-S18: Build automated test suite for 30 canonical queries | [pre-phase/issue-131.md](by-phase/pre-phase/issue-131.md) |
 | #132 | Pre-Phase | [Story] P3.5-S19: Performance and cost verification | [pre-phase/issue-132.md](by-phase/pre-phase/issue-132.md) |
@@ -61,5 +62,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 56 closed issues
-(7 Phase 1, 9 Phase 2, 40 Pre-Phase)
+**Total:** 57 closed issues
+(7 Phase 1, 9 Phase 2, 41 Pre-Phase)
