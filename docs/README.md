@@ -6,12 +6,17 @@
 
 ## 🎯 Current Focus
 
-**🚀 Phase 3A — Wealth Foundation** (4 tuần)
+**✅ Phase 3.5 — Intent Understanding Layer** (3 tuần)
 
-- 📖 Read: [current/phase-3a-detailed.md](current/phase-3a-detailed.md)
-- 📋 Issues: [current/phase-3a-issues.md](current/phase-3a-issues.md)
+- 📖 Read: [current/phase-3.5-detailed.md](current/phase-3.5-detailed.md)
+- 📋 Issues: [current/phase-3.5-issues.md](current/phase-3.5-issues.md)
+- 📊 Perf report: [current/phase-3.5-perf-report.md](current/phase-3.5-perf-report.md)
+- 🔍 Regression sign-off: [current/phase-3.5-regression-signoff.md](current/phase-3.5-regression-signoff.md)
+- 🧪 User testing protocol: [current/phase-3.5-user-testing.md](current/phase-3.5-user-testing.md)
+- 📈 Pattern improvement loop: [current/phase-3.5-improvement-process.md](current/phase-3.5-improvement-process.md)
+- 📝 Retrospective: [current/phase-3.5-retrospective.md](current/phase-3.5-retrospective.md)
 
-**Next up:** Copy issues từ `phase-3a-issues.md` vào GitHub, bắt đầu với `#P3A-1`.
+**Next up:** User testing (Story #133) → ship-or-iterate decision → Phase 3B.
 
 ---
 
@@ -26,9 +31,10 @@
 | Phase | Status | Detailed Doc | Issues |
 |-------|--------|--------------|--------|
 | Phase 1: UX Foundation | ✅ Complete | [phase-1-detailed.md](current/phase-1-detailed.md) | — |
-| Phase 2: Personality & Care | ⏳ In Progress | [phase-2-detailed.md](current/phase-2-detailed.md) | — |
-| **Phase 3A: Wealth Foundation** | 📋 **Next** | **[phase-3a-detailed.md](current/phase-3a-detailed.md)** | **[phase-3a-issues.md](current/phase-3a-issues.md)** |
-| Phase 3B: Market Intelligence | 🔮 Planned | [phase-3b-outline.md](current/phase-3b-outline.md) | TBD after 3A validation |
+| Phase 2: Personality & Care | ✅ Complete | [phase-2-detailed.md](current/phase-2-detailed.md) | — |
+| Phase 3A: Wealth Foundation | ✅ Complete | [phase-3a-detailed.md](current/phase-3a-detailed.md) | [phase-3a-issues.md](current/phase-3a-issues.md) |
+| **Phase 3.5: Intent Understanding** | ✅ **Complete** | **[phase-3.5-detailed.md](current/phase-3.5-detailed.md)** | **[phase-3.5-issues.md](current/phase-3.5-issues.md)** |
+| Phase 3B: Market Intelligence | 🔮 Planned | [phase-3b-outline.md](current/phase-3b-outline.md) | TBD after 3.5 validation |
 | Phase 4: Investment Intelligence | 🔮 Planned | TBD | TBD |
 | Phase 5: Behavioral Engine | 🔮 Planned | TBD | TBD |
 | Phase 6: Scale & Commercialize | 🔮 Planned | TBD | TBD |
