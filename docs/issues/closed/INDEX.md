@@ -51,6 +51,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #116 | Pre-Phase | [Story] P3.5-S3: Build parameter extractors (time, category, ticker, amount) | [pre-phase/issue-116.md](by-phase/pre-phase/issue-116.md) |
 | #117 | Pre-Phase | [Story] P3.5-S4: Implement rule-based pattern matching engine | [pre-phase/issue-117.md](by-phase/pre-phase/issue-117.md) |
 | #118 | Pre-Phase | [Story] P3.5-S5: Build read query handlers (8 handlers) | [pre-phase/issue-118.md](by-phase/pre-phase/issue-118.md) |
+| #119 | Pre-Phase | [Story] P3.5-S6: Wire intent pipeline into Telegram message router | [pre-phase/issue-119.md](by-phase/pre-phase/issue-119.md) |
 | #120 | Pre-Phase | [Story] P3.5-S7: Implement LLM-based intent classifier | [pre-phase/issue-120.md](by-phase/pre-phase/issue-120.md) |
 | #122 | Pre-Phase | [Story] P3.5-S9: Create clarification message templates (YAML) | [pre-phase/issue-122.md](by-phase/pre-phase/issue-122.md) |
 | #130 | Pre-Phase | [Story] P3.5-S17: Run regression test suite for existing flows | [pre-phase/issue-130.md](by-phase/pre-phase/issue-130.md) |
@@ -60,5 +61,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 55 closed issues
-(7 Phase 1, 9 Phase 2, 39 Pre-Phase)
+**Total:** 56 closed issues
+(7 Phase 1, 9 Phase 2, 40 Pre-Phase)
