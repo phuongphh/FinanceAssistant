@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #118 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/118 | [issue-118.md](issue-118.md) |
 | #119 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/119 | [issue-119.md](issue-119.md) |
 | #121 | [Story] P3.5-S8: Build confidence-based dispatcher with confirm/clarify flows | [issue-121.md](issue-121.md) |
 | #122 | [Story] P3.5-S9: Create clarification message templates (YAML) | [issue-122.md](issue-122.md) |
@@ -29,4 +28,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #128 | [Story] P3.5-S15: Add follow-up suggestions as inline buttons | [issue-128.md](issue-128.md) |
 | #129 | [Story] P3.5-S16: Handle voice queries through intent pipeline | [issue-129.md](issue-129.md) |
 
-**Total active:** 24
+**Total active:** 23

@@ -1,9 +1,6 @@
-# Issue #118: [Story] P3.5-S5: Build read query handlers (8 handlers)
+# Issue #118
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/118  
-**Status:** Open
-
----
+[Story] P3.5-S5: Build read query handlers (8 handlers)
 
 **Parent Epic:** #110 (Epic 1: Intent Foundation & Patterns)
 
