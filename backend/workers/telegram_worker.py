@@ -359,6 +359,15 @@ async def _handle_callback(
     if await storytelling_handlers.handle_storytelling_callback(db, callback_query):
         return await _resolved_user_id()
 
+    # Phase 3.5 intent confirm/clarify callbacks (intent_confirm:*,
+    # intent_clarify:*). Routed before the transaction handler because
+    # intent_* is a distinct prefix and the user is mid-flow.
+    if callback_data.startswith("intent_"):
+        from backend.bot.handlers.message import handle_intent_callback
+        await answer_callback(callback_id)
+        if await handle_intent_callback(db, callback_query):
+            return await _resolved_user_id()
+
     # Transaction callbacks handle their own answerCallbackQuery so users
     # get richer feedback.
     if await handle_transaction_callback(db, callback_query):

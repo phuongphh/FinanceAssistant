@@ -1,29 +1,32 @@
-"""Confidence-aware dispatcher.
+"""Confidence-aware dispatcher with confirm + clarify flows (Epic 2).
 
-Routes ``IntentResult`` → concrete handler. Confidence policy:
+Routes ``IntentResult`` → response string. Confidence policy:
 
-  ≥ 0.8        → execute immediately
-  0.5 - 0.8    → read intents execute (read is safe); write intents
-                 fall back to UNCLEAR (Epic 2 will add confirm flow)
-  < 0.5        → UNCLEAR or OUT_OF_SCOPE message
+  ≥ 0.8        → execute (read or write)
+  0.5 – 0.8    → READ : execute (data isn't damaged by reading)
+                 WRITE: build confirmation + persist pending action
+  < 0.5        → clarify with YAML-templated prompt + persist
+                 awaiting-clarification state
 
-Handlers are instantiated lazily on first dispatch — keeps app startup
-cheap and avoids importing the SQLAlchemy models from this module's
-top level (the meta handlers do, but everything else is wrapped).
+Dispatcher returns a ``DispatchOutcome`` (text + optional pending state
+description) so the caller (free_form_text) can attach inline keyboards
+and clear/restore state appropriately.
 """
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.intent import clarifier, pending_action
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.handlers.meta import (
     GreetingHandler,
     HelpHandler,
-    OutOfScopeHandler,
     UnclearHandler,
 )
+from backend.intent.handlers.out_of_scope import OutOfScopeHandler
 from backend.intent.intents import IntentResult, IntentType
 from backend.models.user import User
 
@@ -46,12 +49,43 @@ READ_INTENTS = frozenset({
     IntentType.QUERY_GOAL_PROGRESS,
 })
 
+WRITE_INTENTS = frozenset({
+    IntentType.ACTION_RECORD_SAVING,
+    IntentType.ACTION_QUICK_TRANSACTION,
+})
+
+
+# Outcome kinds — string constants so analytics + tests stay decoupled
+# from the dispatcher object.
+OUTCOME_EXECUTED = "executed"
+OUTCOME_CONFIRM_SENT = "confirm_sent"
+OUTCOME_CLARIFY_SENT = "clarify_sent"
+OUTCOME_UNCLEAR = "unclear"
+OUTCOME_OUT_OF_SCOPE = "out_of_scope"
+OUTCOME_NOT_IMPLEMENTED = "not_implemented"
+OUTCOME_ERROR = "error"
+
+
+@dataclass(frozen=True)
+class DispatchOutcome:
+    """Result of a dispatch — what to send + bookkeeping for callers.
+
+    ``kind`` lets the caller emit the right analytics event without
+    re-inspecting the response string. ``inline_keyboard_hint`` carries
+    the parsed [Label] options from clarification templates so the
+    caller can render Telegram buttons.
+    """
+
+    text: str
+    kind: str
+    intent: IntentType
+    confidence: float = 0.0
+    inline_keyboard_hint: list[str] | None = None
+
 
 class IntentDispatcher:
     def __init__(self) -> None:
         self._handlers: dict[IntentType, IntentHandler] = {}
-        # Meta handlers are cheap and have no DB deps — eager init keeps
-        # them out of the lazy-load critical path.
         self._meta = {
             IntentType.GREETING: GreetingHandler(),
             IntentType.HELP: HelpHandler(),
@@ -64,40 +98,152 @@ class IntentDispatcher:
         result: IntentResult,
         user: User,
         db: AsyncSession,
-    ) -> str:
-        # Meta intents short-circuit the confidence policy.
-        if result.intent in self._meta:
-            return await self._meta[result.intent].handle(result, user, db)
-
-        if result.confidence < CONFIRM_THRESHOLD:
-            return await self._meta[IntentType.UNCLEAR].handle(
+    ) -> DispatchOutcome:
+        # Meta intents short-circuit the confidence policy entirely.
+        if result.intent == IntentType.OUT_OF_SCOPE:
+            text = await self._meta[IntentType.OUT_OF_SCOPE].handle(
                 result, user, db
             )
+            return DispatchOutcome(
+                text=text,
+                kind=OUTCOME_OUT_OF_SCOPE,
+                intent=result.intent,
+                confidence=result.confidence,
+            )
+        if result.intent in (IntentType.GREETING, IntentType.HELP):
+            text = await self._meta[result.intent].handle(result, user, db)
+            return DispatchOutcome(
+                text=text,
+                kind=OUTCOME_EXECUTED,
+                intent=result.intent,
+                confidence=result.confidence,
+            )
 
-        # 0.5 – 0.8: read intents are safe, write intents fall back to
-        # UNCLEAR until the confirm flow lands in Epic 2.
+        # Low confidence — clarify.
+        if (
+            result.confidence < CONFIRM_THRESHOLD
+            or result.intent == IntentType.UNCLEAR
+        ):
+            return await self._build_clarification(result, user, db)
+
+        # Medium confidence — read intents execute, write intents confirm.
         if result.confidence < EXECUTE_THRESHOLD:
-            if result.intent not in READ_INTENTS:
-                return await self._meta[IntentType.UNCLEAR].handle(
-                    result, user, db
-                )
+            if result.intent in WRITE_INTENTS:
+                return await self._build_confirmation(result, user, db)
+            # Read intents fall through to executor below.
 
+        # Execute.
+        return await self._execute(result, user, db)
+
+    # ------------------------ confirmation ------------------------
+
+    async def _build_confirmation(
+        self,
+        result: IntentResult,
+        user: User,
+        db: AsyncSession,
+    ) -> DispatchOutcome:
+        # Validate the action has the params it needs — if not, it's
+        # actually a clarify case (e.g. "tiết kiệm" without an amount).
+        if result.intent == IntentType.ACTION_RECORD_SAVING:
+            amount = result.parameters.get("amount")
+            if not amount:
+                return await self._build_clarification(result, user, db)
+
+        text = clarifier.build_action_confirmation(result, user)
+        await pending_action.set_pending_action(
+            db,
+            user,
+            intent=result.intent.value,
+            parameters=dict(result.parameters or {}),
+        )
+        return DispatchOutcome(
+            text=text,
+            kind=OUTCOME_CONFIRM_SENT,
+            intent=result.intent,
+            confidence=result.confidence,
+            inline_keyboard_hint=["✅ Đúng", "❌ Không phải"],
+        )
+
+    # ------------------------ clarification ------------------------
+
+    async def _build_clarification(
+        self,
+        result: IntentResult,
+        user: User,
+        db: AsyncSession,
+    ) -> DispatchOutcome:
+        # Truly UNCLEAR (no signal at all) — friendly default; do NOT
+        # persist clarification state because there's no original intent
+        # to come back to.
+        if result.intent == IntentType.UNCLEAR or result.confidence == 0.0:
+            text = await self._meta[IntentType.UNCLEAR].handle(
+                result, user, db
+            )
+            return DispatchOutcome(
+                text=text,
+                kind=OUTCOME_UNCLEAR,
+                intent=IntentType.UNCLEAR,
+                confidence=result.confidence,
+            )
+
+        text = clarifier.build_clarification(result.intent, user)
+        keyboard_hint = _extract_button_labels(text)
+
+        await pending_action.set_awaiting_clarification(
+            db,
+            user,
+            intent=result.intent.value,
+            raw_text=result.raw_text or "",
+            parameters=dict(result.parameters or {}),
+        )
+        return DispatchOutcome(
+            text=text,
+            kind=OUTCOME_CLARIFY_SENT,
+            intent=result.intent,
+            confidence=result.confidence,
+            inline_keyboard_hint=keyboard_hint,
+        )
+
+    # ------------------------ execute ------------------------
+
+    async def _execute(
+        self,
+        result: IntentResult,
+        user: User,
+        db: AsyncSession,
+    ) -> DispatchOutcome:
         handler = self._get_handler(result.intent)
         if handler is None:
-            return self._not_implemented(result)
-
+            return DispatchOutcome(
+                text=self._not_implemented(result),
+                kind=OUTCOME_NOT_IMPLEMENTED,
+                intent=result.intent,
+                confidence=result.confidence,
+            )
         try:
-            return await handler.handle(result, user, db)
+            text = await handler.handle(result, user, db)
         except Exception:
             logger.exception(
                 "Handler error for intent=%s", result.intent.value
             )
-            return (
-                "Mình đang hơi rối, gặp lỗi khi xử lý 😔\n"
-                "Bạn thử lại sau vài phút nhé!"
+            return DispatchOutcome(
+                text=(
+                    "Mình đang hơi rối, gặp lỗi khi xử lý 😔\n"
+                    "Bạn thử lại sau vài phút nhé!"
+                ),
+                kind=OUTCOME_ERROR,
+                intent=result.intent,
+                confidence=result.confidence,
             )
+        return DispatchOutcome(
+            text=text,
+            kind=OUTCOME_EXECUTED,
+            intent=result.intent,
+            confidence=result.confidence,
+        )
 
-    # -------------------- handler registry --------------------
+    # ------------------------ handler registry ------------------------
 
     def _get_handler(self, intent: IntentType) -> IntentHandler | None:
         cached = self._handlers.get(intent)
@@ -109,13 +255,8 @@ class IntentDispatcher:
         return handler
 
     def _build_handler(self, intent: IntentType) -> IntentHandler | None:
-        # Lazy imports so the app can boot without instantiating SQLAlchemy
-        # session machinery up front. One module per intent keeps the
-        # mapping easy to follow.
         if intent == IntentType.QUERY_ASSETS:
-            from backend.intent.handlers.query_assets import (
-                QueryAssetsHandler,
-            )
+            from backend.intent.handlers.query_assets import QueryAssetsHandler
             return QueryAssetsHandler()
         if intent == IntentType.QUERY_NET_WORTH:
             from backend.intent.handlers.query_net_worth import (
@@ -143,22 +284,15 @@ class IntentDispatcher:
             )
             return QueryIncomeHandler()
         if intent == IntentType.QUERY_CASHFLOW:
-            # Cashflow not yet implemented as a dedicated handler — show
-            # the user the closest approximation (expense listing) plus
-            # a "coming soon" hint.
             from backend.intent.handlers.query_expenses import (
                 QueryExpensesHandler,
             )
             return QueryExpensesHandler()
         if intent == IntentType.QUERY_MARKET:
-            from backend.intent.handlers.query_market import (
-                QueryMarketHandler,
-            )
+            from backend.intent.handlers.query_market import QueryMarketHandler
             return QueryMarketHandler()
         if intent == IntentType.QUERY_GOALS:
-            from backend.intent.handlers.query_goals import (
-                QueryGoalsHandler,
-            )
+            from backend.intent.handlers.query_goals import QueryGoalsHandler
             return QueryGoalsHandler()
         if intent == IntentType.QUERY_GOAL_PROGRESS:
             from backend.intent.handlers.query_goals import (
@@ -168,9 +302,6 @@ class IntentDispatcher:
         return None
 
     def _not_implemented(self, result: IntentResult) -> str:
-        # Used for intents recognised by the classifier but without a
-        # handler yet (advisory, planning, action_*).  Friendlier than
-        # the unclear fallback because we DID understand the user.
         intent_label = {
             IntentType.ADVISORY: "tư vấn đầu tư",
             IntentType.PLANNING: "lập kế hoạch tài chính",
@@ -183,4 +314,35 @@ class IntentDispatcher:
         )
 
 
-__all__ = ["IntentDispatcher", "READ_INTENTS"]
+# ------------------------ small helpers ------------------------
+
+
+def _extract_button_labels(text: str) -> list[str]:
+    """Pull ``[Label]`` segments out of a YAML-rendered prompt so the
+    caller can build an inline keyboard. Empty list when no buttons.
+    """
+    import re
+
+    labels: list[str] = []
+    for match in re.finditer(r"\[([^\[\]\n]+)\]", text):
+        label = match.group(1).strip()
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
+__all__ = [
+    "CONFIRM_THRESHOLD",
+    "DispatchOutcome",
+    "EXECUTE_THRESHOLD",
+    "IntentDispatcher",
+    "OUTCOME_CLARIFY_SENT",
+    "OUTCOME_CONFIRM_SENT",
+    "OUTCOME_ERROR",
+    "OUTCOME_EXECUTED",
+    "OUTCOME_NOT_IMPLEMENTED",
+    "OUTCOME_OUT_OF_SCOPE",
+    "OUTCOME_UNCLEAR",
+    "READ_INTENTS",
+    "WRITE_INTENTS",
+]
