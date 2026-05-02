@@ -45,6 +45,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
 | #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
+| #132 | Pre-Phase | [Story] P3.5-S19: Performance and cost verification | [pre-phase/issue-132.md](by-phase/pre-phase/issue-132.md) |
 
-**Total:** 41 closed issues
-(7 Phase 1, 9 Phase 2, 25 Pre-Phase)
+**Total:** 42 closed issues
+(7 Phase 1, 9 Phase 2, 26 Pre-Phase)
