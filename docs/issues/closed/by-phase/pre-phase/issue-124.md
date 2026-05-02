@@ -1,9 +1,6 @@
-# Issue #124: [Story] P3.5-S11: Add analytics for classifier accuracy and cost tracking
+# Issue #124
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/124  
-**Status:** Open
-
----
+[Story] P3.5-S11: Add analytics for classifier accuracy and cost tracking
 
 **Parent Epic:** #111 (Epic 2: LLM Fallback & Clarification)
 
