@@ -1,9 +1,6 @@
-# Issue #115: [Story] P3.5-S2: Create test fixtures from real queries
+# Issue #115
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/115  
-**Status:** Open
-
----
+[Story] P3.5-S2: Create test fixtures from real queries
 
 **Parent Epic:** #110 (Epic 1: Intent Foundation & Patterns)
 
