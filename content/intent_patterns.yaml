@@ -44,6 +44,15 @@ query_assets:
     # short forms "tài sản có gì" / "tai san co gi" (no possessive)
     - pattern: '^tai\s*san\s+co\s+gi'
       confidence: 0.7
+    # NEW (S21): "tài sản hiện tại bao nhiêu" — informational, no possessive
+    - pattern: 'tai\s*san\s+hien\s*tai.*bao\s*nhieu'
+      confidence: 0.85
+    # NEW (S21): pronoun variants — "em có tài sản gì", "anh có tài sản nào"
+    - pattern: '(?:em|anh|chi|ban)\s+co.*tai\s*san.*(?:gi|nao)'
+      confidence: 0.85
+    # NEW (S21): "tài sản của em/anh/chị/bạn"
+    - pattern: 'tai\s*san\s+cua\s+(?:em|anh|chi|ban)'
+      confidence: 0.9
   parameter_extractors:
     asset_type:
       patterns:
@@ -64,6 +73,12 @@ query_net_worth:
       confidence: 0.85
     - pattern: 'net\s*worth'
       confidence: 0.95
+    # NEW (S21): "tổng cộng có bao nhiêu tiền" — pronoun-less variant
+    - pattern: 'tong\s*cong\s+co\s+bao\s*nhieu\s+tien'
+      confidence: 0.9
+    # NEW (S21): "tiền có bao nhiêu" — short form
+    - pattern: '^tien\s+co\s+bao\s*nhieu'
+      confidence: 0.7
 
 query_portfolio:
   description: "User asks about their stock portfolio."
@@ -88,6 +103,9 @@ query_expenses:
       confidence: 0.85
     - pattern: 'tieu\s+bao\s*nhieu'
       confidence: 0.85
+    # NEW (S21): "liệt kê chi tiêu" — imperative without time range
+    - pattern: '^(?:liet\s*ke|list|xem)\s+chi\s*(?:tieu|phi)\s*$'
+      confidence: 0.85
   parameter_extractors:
     time_range:
       use_extractor: time_range
@@ -98,6 +116,9 @@ query_expenses_by_category:
     # "chi tiêu cho sức khỏe tháng này"
     - pattern: 'chi\s*(?:tieu|phi).*(?:cho|ve).*?\w+.*(?:thang|tuan|nam)'
       confidence: 0.95
+    # "chi phí sức khỏe tháng trước" (no "cho/về" between chi phí and category)
+    - pattern: 'chi\s*(?:tieu|phi)\s+\w+.*(?:thang|tuan|nam)\s+(?:nay|truoc|qua)'
+      confidence: 0.93
     # "liệt kê chi phí ăn uống tháng này"
     - pattern: '(?:liet\s*ke|list|xem|cac).*chi\s*(?:phi|tieu).*\w+'
       confidence: 0.92
@@ -118,6 +139,12 @@ query_income:
     - pattern: '(?:toi|minh).*kiem\s*duoc.*bao\s*nhieu'
       confidence: 0.85
     - pattern: 'luong.*(?:cua\s+)?(?:toi|minh)'
+      confidence: 0.9
+    # NEW (S21): "lương tháng bao nhiêu" — short form, no possessive
+    - pattern: '^luong\s+(?:thang|nay)?.*bao\s*nhieu'
+      confidence: 0.85
+    # NEW (S21): "tổng thu nhập tháng" — informational, no possessive
+    - pattern: 'tong\s+thu\s*nhap\s+(?:thang|nam)'
       confidence: 0.9
 
 query_cashflow:
@@ -167,6 +194,9 @@ query_goal_progress:
     # "X cần bao nhiêu nữa"
     - pattern: '(?:con|can).*?(?:bao\s*nhieu|bao\s*lau)\s+nua'
       confidence: 0.7
+    # NEW (S21): "còn bao nhiêu mới đủ mua xe" — alt phrasing
+    - pattern: 'con\s+bao\s*nhieu.*(?:moi|de)\s+du.*(?:mua|co)\s+\w+'
+      confidence: 0.85
   parameter_extractors:
     goal_name:
       use_extractor: goal_name
@@ -180,6 +210,12 @@ query_goals:
       confidence: 0.9
     - pattern: 'goals?\s+(?:cua\s+(?:toi|minh)|toi)'
       confidence: 0.95
+    # NEW (S21): "mục tiêu hiện tại" / "goal hiện tại" — informational
+    - pattern: '^(?:muc\s*tieu|goals?)\s+hien\s*tai'
+      confidence: 0.85
+    # NEW (S21): "liệt kê mục tiêu" / "xem mục tiêu" — imperative
+    - pattern: '(?:liet\s*ke|xem|list)\s+(?:muc\s*tieu|goals?)'
+      confidence: 0.9
 
 action_record_saving:
   description: "User wants to record a saving."
