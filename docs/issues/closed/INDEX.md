@@ -56,6 +56,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #122 | Pre-Phase | [Story] P3.5-S9: Create clarification message templates (YAML) | [pre-phase/issue-122.md](by-phase/pre-phase/issue-122.md) |
 | #123 | Pre-Phase | [Story] P3.5-S10: Implement out-of-scope detection and polite decline | [pre-phase/issue-123.md](by-phase/pre-phase/issue-123.md) |
 | #124 | Pre-Phase | [Story] P3.5-S11: Add analytics for classifier accuracy and cost tracking | [pre-phase/issue-124.md](by-phase/pre-phase/issue-124.md) |
+| #125 | Pre-Phase | [Story] P3.5-S12: Add personality wrapper to query responses | [pre-phase/issue-125.md](by-phase/pre-phase/issue-125.md) |
 | #126 | Pre-Phase | [Story] P3.5-S13: Implement wealth-level adaptive responses | [pre-phase/issue-126.md](by-phase/pre-phase/issue-126.md) |
 | #127 | Pre-Phase | [Story] P3.5-S14: Build advisory handler with rich context | [pre-phase/issue-127.md](by-phase/pre-phase/issue-127.md) |
 | #129 | Pre-Phase | [Story] P3.5-S16: Handle voice queries through intent pipeline | [pre-phase/issue-129.md](by-phase/pre-phase/issue-129.md) |
@@ -66,5 +67,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 61 closed issues
-(7 Phase 1, 9 Phase 2, 45 Pre-Phase)
+**Total:** 62 closed issues
+(7 Phase 1, 9 Phase 2, 46 Pre-Phase)
