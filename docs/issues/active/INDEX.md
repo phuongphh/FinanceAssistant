@@ -35,6 +35,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #129 | [Story] P3.5-S16: Handle voice queries through intent pipeline | [issue-129.md](issue-129.md) |
 | #131 | [Story] P3.5-S18: Build automated test suite for 30 canonical queries | [issue-131.md](issue-131.md) |
 | #133 | [Story] P3.5-S20: User testing with 5 real users (1 week) | [issue-133.md](issue-133.md) |
-| #135 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/135 | [issue-135.md](issue-135.md) |
 
-**Total active:** 32
+**Total active:** 31

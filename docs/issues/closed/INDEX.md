@@ -49,6 +49,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #130 | Pre-Phase | [Story] P3.5-S17: Run regression test suite for existing flows | [pre-phase/issue-130.md](by-phase/pre-phase/issue-130.md) |
 | #132 | Pre-Phase | [Story] P3.5-S19: Performance and cost verification | [pre-phase/issue-132.md](by-phase/pre-phase/issue-132.md) |
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
+| #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 45 closed issues
-(7 Phase 1, 9 Phase 2, 29 Pre-Phase)
+**Total:** 46 closed issues
+(7 Phase 1, 9 Phase 2, 30 Pre-Phase)
