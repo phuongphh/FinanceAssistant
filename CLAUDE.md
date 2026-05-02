@@ -164,6 +164,38 @@ Issue số đơn lẻ không có sub-issues → expand step skip → behavior nh
 - `.github/workflows/project-done.yml` — chạy on PR merge HOẶC issue close →
   move issues sang Done trên Project Board #4
 - `.github/workflows/issue-lifecycle.yml` — sync issue events → `docs/issues/`
+- `.github/workflows/sync-phase-status.yml` — chạy khi
+  `docs/current/phase-status.yaml` thay đổi → regenerate marker sections
+  trong CLAUDE.md / README.md / docs/README.md / strategy.md
+
+### Push policy — default to PR for substantive changes
+
+**Default:** mọi thay đổi đi qua `claude/**` branch + PR. Auto-pr.yml tự
+tạo PR. User merge → workflow chuyển issue sang Done.
+
+**Direct-to-main CHỈ chấp nhận trong các case sau:**
+
+| Case | Ví dụ | Tại sao OK |
+|---|---|---|
+| One-off ops script ≤100 lines | `scripts/cleanup-branches.sh` | Không có business logic, không cần review |
+| Hotfix workflow YAML đang hư | Fix bug `auto-pr.yml` không tạo PR | PR sẽ chính nó là victim của bug |
+| Auto-generated content | Output của `sync_phase_status.py` (qua workflow bot) | Đã được review qua source-of-truth file |
+
+**Substantive changes LUÔN đi qua PR** kể cả khi cảm giác urgent:
+- Code thay đổi có business logic
+- Schema migrations
+- Doc thay đổi structure (không phải auto-gen)
+- Workflow YAML thêm/sửa logic mới (không phải hotfix)
+- File ≥3 hoặc diff ≥100 lines
+
+**Khi không chắc → ASK USER hoặc DEFAULT TO PR.** PR cost thêm 1-2 phút,
+direct-to-main cost mất review history + ngược convention. Trade-off rõ.
+
+**Self-check trước khi `git push origin main`:**
+1. Có phải one-off script ngắn không? KHÔNG → branch + PR
+2. Có phải hotfix workflow đang hư không? KHÔNG → branch + PR
+3. Có phải auto-gen output từ trusted source-of-truth không? KHÔNG → branch + PR
+4. Tất cả KHÔNG → branch + PR
 
 ---
 
