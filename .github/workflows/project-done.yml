@@ -83,6 +83,11 @@ jobs:
       # Nếu issue có sub-issues (GitHub native hierarchy), expand thêm
       # tất cả children. Mirror logic của auto-pr.yml — bảo đảm khi PR
       # tạo thủ công với chỉ `Closes #parent`, sub-issues vẫn được xử lý.
+      #
+      # FALLBACK: Nếu Epic không có native sub-issues (legacy convention
+      # — checkbox list `- [ ] #N` trong body), parse body để lấy
+      # children. Ngăn lặp lại bug "Epic được đóng mà children stay open"
+      # khi convention #2 ở CLAUDE.md § 0.2 không được follow.
       # -------------------------------------------------------
       - name: Move issues to Done and close
         if: steps.extract.outputs.issue_numbers != ''
@@ -99,6 +104,21 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
+            // Helper: parse "- [ ] #N" / "- [x] #N" checkbox refs from
+            // an Epic body. Used as fallback when native subIssues is
+            // empty. Anchored to a list-item line so prose mentions
+            // like "see #50 for context" don't get pulled in.
+            const parseChecklistChildren = (body) => {
+              if (!body) return [];
+              const out = new Set();
+              const re = /^[-*]\s+\[[ xX]\]\s+#(\d+)\b/gm;
+              let m;
+              while ((m = re.exec(body)) !== null) {
+                out.add(parseInt(m[1], 10));
+              }
+              return [...out];
+            };
+
             // BFS expand parent → sub-issues (cùng logic với auto-pr.yml)
             const expanded = new Set(initial);
             const visited = new Set();
@@ -109,11 +129,13 @@ jobs:
               for (const n of frontier) {
                 if (visited.has(n)) continue;
                 visited.add(n);
+                let foundChildren = [];
                 try {
                   const result = await github.graphql(`
                     query($owner: String!, $repo: String!, $issue: Int!) {
                       repository(owner: $owner, name: $repo) {
                         issue(number: $issue) {
+                          body
                           subIssues(first: 100) {
                             nodes { number }
                           }
@@ -121,14 +143,23 @@ jobs:
                       }
                     }
                   `, { owner, repo, issue: n });
-                  const subs = result.repository?.issue?.subIssues?.nodes || [];
+                  const issueData = result.repository?.issue;
+                  const subs = issueData?.subIssues?.nodes || [];
                   if (subs.length > 0) {
-                    console.log(`Issue #${n} has ${subs.length} sub-issue(s): [${subs.map(s => '#' + s.number).join(', ')}]`);
+                    foundChildren = subs.map(s => s.number);
+                    console.log(`Issue #${n} has ${subs.length} native sub-issue(s): [${foundChildren.map(x => '#' + x).join(', ')}]`);
+                  } else {
+                    // Fallback: parse checkbox list from body.
+                    const fallback = parseChecklistChildren(issueData?.body || '');
+                    if (fallback.length > 0) {
+                      foundChildren = fallback;
+                      console.log(`Issue #${n} has no native sub-issues; fell back to checklist: [${fallback.map(x => '#' + x).join(', ')}]`);
+                    }
                   }
-                  for (const sub of subs) {
-                    if (!expanded.has(sub.number)) {
-                      expanded.add(sub.number);
-                      next.push(sub.number);
+                  for (const sub of foundChildren) {
+                    if (!expanded.has(sub)) {
+                      expanded.add(sub);
+                      next.push(sub);
                     }
                   }
                 } catch (err) {

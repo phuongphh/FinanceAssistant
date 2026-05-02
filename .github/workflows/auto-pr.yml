@@ -79,8 +79,13 @@ jobs:
       # hierarchy), thêm tất cả vào danh sách. Cho phép convention:
       # commit `Closes #parent` → PR auto-close cả parent + children.
       #
-      # Recursion: chỉ expand 1 level (parent → children). Nếu cần
-      # nested epic-of-epics, mở rộng vòng lặp BFS bên dưới.
+      # FALLBACK: Nếu Epic không có native sub-issues (legacy convention
+      # — checkbox list `- [ ] #N` trong body), parse body để lấy
+      # children. Phải mirror với project-done.yml — nếu không, PR sẽ
+      # tạo với chỉ `Closes #parent` rồi project-done cũng không expand
+      # được, dẫn tới children stay open mãi.
+      #
+      # Recursion: BFS qua nhiều level — Epic of Epics vẫn work.
       # -------------------------------------------------------
       - name: Expand parent issues with sub-issues
         id: expand
@@ -98,6 +103,20 @@ jobs:
             const repo = context.repo.repo;
             const expanded = new Set(initial);
 
+            // Helper: parse "- [ ] #N" / "- [x] #N" checkbox refs from
+            // an Epic body. Anchored to a list-item line so prose
+            // mentions like "see #50 for context" don't get pulled in.
+            const parseChecklistChildren = (body) => {
+              if (!body) return [];
+              const out = new Set();
+              const re = /^[-*]\s+\[[ xX]\]\s+#(\d+)\b/gm;
+              let m;
+              while ((m = re.exec(body)) !== null) {
+                out.add(parseInt(m[1], 10));
+              }
+              return [...out];
+            };
+
             // BFS expand: mỗi vòng query sub-issues của các issue mới thêm.
             // Bảo vệ chống vòng lặp / depth quá lớn bằng `visited`.
             const visited = new Set();
@@ -108,11 +127,13 @@ jobs:
               for (const issueNumber of frontier) {
                 if (visited.has(issueNumber)) continue;
                 visited.add(issueNumber);
+                let foundChildren = [];
                 try {
                   const result = await github.graphql(`
                     query($owner: String!, $repo: String!, $issue: Int!) {
                       repository(owner: $owner, name: $repo) {
                         issue(number: $issue) {
+                          body
                           subIssues(first: 100) {
                             nodes { number }
                           }
@@ -121,14 +142,23 @@ jobs:
                     }
                   `, { owner, repo, issue: issueNumber });
 
-                  const subs = result.repository?.issue?.subIssues?.nodes || [];
+                  const issueData = result.repository?.issue;
+                  const subs = issueData?.subIssues?.nodes || [];
                   if (subs.length > 0) {
-                    console.log(`Issue #${issueNumber} has ${subs.length} sub-issue(s): [${subs.map(s => '#' + s.number).join(', ')}]`);
+                    foundChildren = subs.map(s => s.number);
+                    console.log(`Issue #${issueNumber} has ${subs.length} native sub-issue(s): [${foundChildren.map(x => '#' + x).join(', ')}]`);
+                  } else {
+                    // Fallback: checkbox list from body.
+                    const fallback = parseChecklistChildren(issueData?.body || '');
+                    if (fallback.length > 0) {
+                      foundChildren = fallback;
+                      console.log(`Issue #${issueNumber} has no native sub-issues; fell back to checklist: [${fallback.map(x => '#' + x).join(', ')}]`);
+                    }
                   }
-                  for (const sub of subs) {
-                    if (!expanded.has(sub.number)) {
-                      expanded.add(sub.number);
-                      next.push(sub.number);
+                  for (const sub of foundChildren) {
+                    if (!expanded.has(sub)) {
+                      expanded.add(sub);
+                      next.push(sub);
                     }
                   }
                 } catch (err) {
