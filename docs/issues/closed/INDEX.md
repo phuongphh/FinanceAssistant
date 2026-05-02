@@ -44,6 +44,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
+| #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
 
-**Total:** 40 closed issues
-(7 Phase 1, 9 Phase 2, 24 Pre-Phase)
+**Total:** 41 closed issues
+(7 Phase 1, 9 Phase 2, 25 Pre-Phase)
