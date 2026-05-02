@@ -122,9 +122,17 @@ async def test_write_intent_missing_params_falls_to_clarification(dispatcher, db
 
 @pytest.mark.asyncio
 async def test_read_intent_at_medium_confidence_executes(dispatcher, db):
-    """Read intents are safe — execute even at medium confidence."""
+    """Read intents are safe — execute even at medium confidence.
+
+    Epic 3 wraps executed responses with personality + follow-ups so we
+    only assert the handler was called and the output starts with the
+    handler text — the wrapper may prepend a greeting or append a
+    suggestion non-deterministically.
+    """
+    from unittest.mock import patch as _patch
+
     fake_handler = MagicMock()
-    fake_handler.handle = AsyncMock(return_value="OK")
+    fake_handler.handle = AsyncMock(return_value="HANDLER_OK")
     dispatcher._handlers[IntentType.QUERY_ASSETS] = fake_handler
 
     result = IntentResult(
@@ -132,9 +140,16 @@ async def test_read_intent_at_medium_confidence_executes(dispatcher, db):
         confidence=0.65,
         raw_text="tài sản",
     )
-    outcome = await dispatcher.dispatch(result, _user(), db)
+    # Short-circuit the wealth-level lookup so the dispatcher doesn't
+    # try to query the fake DB for assets just to pick a follow-up
+    # keyboard. The keyboard is non-essential to this test.
+    with _patch(
+        "backend.wealth.services.net_worth_calculator.calculate",
+        AsyncMock(side_effect=Exception("test-skip")),
+    ):
+        outcome = await dispatcher.dispatch(result, _user(), db)
     assert outcome.kind == OUTCOME_EXECUTED
-    assert outcome.text == "OK"
+    assert "HANDLER_OK" in outcome.text
     fake_handler.handle.assert_awaited_once()
 
 
@@ -156,11 +171,15 @@ async def test_handler_exception_returns_friendly_error(dispatcher, db):
 
 @pytest.mark.asyncio
 async def test_unknown_handler_returns_not_implemented(dispatcher, db):
-    """ADVISORY has no handler in Epic 1 — gracefully say so."""
+    """PLANNING has no handler — gracefully say so.
+
+    (ADVISORY got a handler in Epic 3 so we use PLANNING here as the
+    sentinel of "intent recognised but no handler".)
+    """
     result = IntentResult(
-        intent=IntentType.ADVISORY,
+        intent=IntentType.PLANNING,
         confidence=0.9,
-        raw_text="nên đầu tư gì",
+        raw_text="lập kế hoạch",
     )
     outcome = await dispatcher.dispatch(result, _user(), db)
     assert outcome.kind == OUTCOME_NOT_IMPLEMENTED

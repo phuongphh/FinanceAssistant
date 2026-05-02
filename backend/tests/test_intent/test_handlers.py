@@ -174,6 +174,19 @@ async def test_query_net_worth_handler_zero_assets():
 # ---------------------- query_portfolio ----------------------
 
 
+def _young_prof_style():
+    """Young Professional level style — shows P&L, hides allocation %."""
+    from backend.intent.wealth_adapt import style_for_level
+    from backend.wealth.ladder import WealthLevel
+    return style_for_level(WealthLevel.YOUNG_PROFESSIONAL, Decimal("100000000"))
+
+
+def _starter_style():
+    from backend.intent.wealth_adapt import style_for_level
+    from backend.wealth.ladder import WealthLevel
+    return style_for_level(WealthLevel.STARTER, Decimal("10000000"))
+
+
 @pytest.mark.asyncio
 async def test_query_portfolio_handler_shows_positions_and_pnl():
     from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
@@ -190,6 +203,9 @@ async def test_query_portfolio_handler_shows_positions_and_pnl():
     with patch(
         "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
         AsyncMock(return_value=stocks),
+    ), patch(
+        "backend.intent.handlers.query_portfolio.resolve_style",
+        AsyncMock(return_value=_young_prof_style()),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_PORTFOLIO,

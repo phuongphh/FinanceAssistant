@@ -173,14 +173,23 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
 
 
 async def handle_intent_callback(db: AsyncSession, callback_query: dict) -> bool:
-    """Resolve an Epic 2 intent callback (confirm or clarify).
+    """Resolve an Epic 2 / Epic 3 intent callback.
+
+    Three callback prefixes share this entry point:
+      - ``intent_confirm:yes|no`` (Epic 2 — pending write action)
+      - ``intent_clarify:<idx>``  (Epic 2 — disambiguation buttons)
+      - ``followup:<payload>``    (Epic 3 — re-run a related intent)
 
     Returns True when the callback was recognised and handled. The
     worker dispatches this BEFORE the menu callback handler so menu
     callbacks aren't shadowed by the more specific intent prefix.
     """
+    from backend.intent import follow_up
+
     data = callback_query.get("data", "")
-    if not data.startswith("intent_"):
+    if not (
+        data.startswith("intent_") or data.startswith(follow_up.CALLBACK_PREFIX)
+    ):
         return False
 
     chat_id = callback_query["message"]["chat"]["id"]
@@ -202,7 +211,55 @@ async def handle_intent_callback(db: AsyncSession, callback_query: dict) -> bool
             db, chat_id, user, state, index=data.split(":", 1)[1]
         )
 
+    if data.startswith(follow_up.CALLBACK_PREFIX):
+        return await _handle_followup_callback(db, chat_id, user, data)
+
     return False
+
+
+async def _handle_followup_callback(
+    db: AsyncSession,
+    chat_id: int,
+    user,
+    callback_data: str,
+) -> bool:
+    """Resolve a ``followup:<...>`` tap by re-running the encoded intent.
+
+    The follow-up button carries the target intent + parameters in its
+    callback_data; we synthesise an ``IntentResult`` at high confidence
+    and dispatch it through the normal pipeline (so personality +
+    suggestions still apply).
+    """
+    from backend.bot.handlers import free_form_text as intent_layer
+    from backend.intent import follow_up
+    from backend.intent.classifier.base import IntentClassifier  # noqa: F401
+    from backend.intent.intents import CLASSIFIER_RULE, IntentResult
+
+    parsed = follow_up.parse_callback_data(callback_data)
+    if parsed is None:
+        await send_message(
+            chat_id,
+            "Câu hỏi này đã hết hạn rồi 🌱 — bạn hỏi lại nhé.",
+        )
+        return True
+
+    synthesised = IntentResult(
+        intent=parsed.intent,
+        confidence=0.95,
+        parameters=dict(parsed.parameters or {}),
+        raw_text=f"[follow-up] {parsed.intent.value}",
+        classifier_used=CLASSIFIER_RULE,
+    )
+    outcome = await intent_layer._dispatcher.dispatch(synthesised, user, db)
+    await intent_layer._send_outcome(chat_id, outcome)
+
+    from backend import analytics
+    analytics.track(
+        "intent_followup_tapped",
+        user_id=user.id,
+        properties={"intent": parsed.intent.value},
+    )
+    return True
 
 
 async def _handle_confirm_callback(

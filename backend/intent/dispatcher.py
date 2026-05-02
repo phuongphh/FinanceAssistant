@@ -54,6 +54,19 @@ WRITE_INTENTS = frozenset({
     IntentType.ACTION_QUICK_TRANSACTION,
 })
 
+# Intents whose handler output should NOT be wrapped with the
+# personality layer. Advisory speaks for itself (LLM-shaped tone +
+# legal disclaimer). Meta intents (greeting/help) and action handlers
+# also format their own copy.
+_SKIP_PERSONALITY_INTENTS = frozenset({
+    IntentType.ADVISORY,
+    IntentType.PLANNING,
+    IntentType.GREETING,
+    IntentType.HELP,
+    IntentType.ACTION_RECORD_SAVING,
+    IntentType.ACTION_QUICK_TRANSACTION,
+})
+
 
 # Outcome kinds — string constants so analytics + tests stay decoupled
 # from the dispatcher object.
@@ -236,11 +249,51 @@ class IntentDispatcher:
                 intent=result.intent,
                 confidence=result.confidence,
             )
+
+        # Phase 3.5 Epic 3 — wrap with personality + follow-up buttons.
+        # Skip for advisory (already has its own disclaimer footer + LLM
+        # tone) and meta intents (greeting/help format their own copy).
+        from backend.bot.personality.query_voice import add_personality
+        from backend.intent import follow_up
+        from backend.wealth.ladder import detect_level
+        from backend.wealth.services import net_worth_calculator
+
+        wrapped = text
+        keyboard_hint: list[str] | None = None
+        if result.intent not in _SKIP_PERSONALITY_INTENTS:
+            wrapped = add_personality(text, user, result.intent)
+
+            # Detect wealth level once for the keyboard. Skip the read
+            # roundtrip for handlers that already pulled it (we don't have
+            # access to their Style object from here — one DB hit is
+            # cheap and the dispatcher path is already async).
+            level = None
+            try:
+                maybe = net_worth_calculator.calculate(db, user.id)
+                # Guard against tests passing a sync Mock that returns
+                # something not awaitable — produces a clean None level
+                # instead of a "never-awaited coroutine" warning.
+                import inspect as _inspect
+                if _inspect.isawaitable(maybe):
+                    breakdown = await maybe
+                    level = detect_level(breakdown.total)
+            except Exception:
+                level = None
+
+            suggestions = follow_up.get_follow_ups(
+                result.intent,
+                wealth_level=level,
+                avoid_intent=result.intent,
+            )
+            if suggestions:
+                keyboard_hint = [fu.label for fu in suggestions]
+
         return DispatchOutcome(
-            text=text,
+            text=wrapped,
             kind=OUTCOME_EXECUTED,
             intent=result.intent,
             confidence=result.confidence,
+            inline_keyboard_hint=keyboard_hint,
         )
 
     # ------------------------ handler registry ------------------------
@@ -284,10 +337,10 @@ class IntentDispatcher:
             )
             return QueryIncomeHandler()
         if intent == IntentType.QUERY_CASHFLOW:
-            from backend.intent.handlers.query_expenses import (
-                QueryExpensesHandler,
+            from backend.intent.handlers.query_cashflow import (
+                QueryCashflowHandler,
             )
-            return QueryExpensesHandler()
+            return QueryCashflowHandler()
         if intent == IntentType.QUERY_MARKET:
             from backend.intent.handlers.query_market import QueryMarketHandler
             return QueryMarketHandler()
@@ -299,6 +352,9 @@ class IntentDispatcher:
                 QueryGoalProgressHandler,
             )
             return QueryGoalProgressHandler()
+        if intent == IntentType.ADVISORY:
+            from backend.intent.handlers.advisory import AdvisoryHandler
+            return AdvisoryHandler()
         return None
 
     def _not_implemented(self, result: IntentResult) -> str:

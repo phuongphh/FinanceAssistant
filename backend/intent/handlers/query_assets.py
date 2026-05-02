@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
+from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
 from backend.wealth.services import asset_service
 
@@ -29,7 +30,11 @@ class QueryAssetsHandler(IntentHandler):
                 return self._no_match_for_type(type_filter, user)
             return self._empty_state(user)
 
-        return self._format(assets, user, filtered_type=type_filter)
+        style = await resolve_style(db, user)
+        formatted = self._format(
+            assets, user, filtered_type=type_filter, style=style
+        )
+        return decorate(formatted, style)
 
     # -------------------- formatting --------------------
 
@@ -50,7 +55,12 @@ class QueryAssetsHandler(IntentHandler):
         )
 
     def _format(
-        self, assets, user: User, *, filtered_type: str | None
+        self,
+        assets,
+        user: User,
+        *,
+        filtered_type: str | None,
+        style: LevelStyle,
     ) -> str:
         by_type: dict[str, list] = {}
         total = Decimal(0)
@@ -84,7 +94,13 @@ class QueryAssetsHandler(IntentHandler):
             icon = _ASSET_ICONS.get(asset_type, "📌")
             label = _ASSET_LABELS.get(asset_type, asset_type)
             type_total = sum(Decimal(a.current_value or 0) for a in items)
-            lines.append(f"{icon} *{label}* — {format_money_short(type_total)}")
+            # Show allocation % only for Mass Affluent + HNW. Starter and
+            # Young Pro see the raw amount only — fewer numbers to scan.
+            type_line = f"{icon} *{label}* — {format_money_short(type_total)}"
+            if style.show_allocation_pct and total > 0:
+                pct = float(type_total / total * 100)
+                type_line += f" _({pct:.0f}%)_"
+            lines.append(type_line)
             for asset in items[:_TOP_N_PER_TYPE]:
                 lines.append(
                     f"   • {asset.name}: {format_money_short(asset.current_value)}"
@@ -95,7 +111,12 @@ class QueryAssetsHandler(IntentHandler):
                 )
             lines.append("")
 
-        lines.append("Muốn xem chi tiết phần nào? Hỏi mình nhé 😊")
+        # The personality wrapper adds its own follow-up prompt — only
+        # add the static one for Starter (where the wrapper is muted to
+        # avoid stacking too many "ơi" greetings on top of "Bước đầu
+        # tốt!" lines).
+        if style.is_starter:
+            lines.append("Hỏi mình nếu cần thêm chi tiết nhé 😊")
         return "\n".join(lines).rstrip()
 
 

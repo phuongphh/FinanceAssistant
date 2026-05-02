@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
+from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
 from backend.wealth.services import asset_service
 
@@ -25,7 +26,8 @@ class QueryPortfolioHandler(IntentHandler):
         if not stocks:
             return self._empty(user)
 
-        return self._format(stocks, user)
+        style = await resolve_style(db, user)
+        return decorate(self._format(stocks, user, style=style), style)
 
     def _empty(self, user: User) -> str:
         name = user.display_name or "bạn"
@@ -34,7 +36,7 @@ class QueryPortfolioHandler(IntentHandler):
             "Thêm vào nhanh qua /themtaisan nhé."
         )
 
-    def _format(self, stocks, user: User) -> str:
+    def _format(self, stocks, user: User, *, style: LevelStyle) -> str:
         # Sort by current value desc — biggest holdings first.
         ordered = sorted(
             stocks,
@@ -55,13 +57,18 @@ class QueryPortfolioHandler(IntentHandler):
             quantity = (asset.extra or {}).get("quantity")
             qty_str = f" ({quantity:g} cổ)" if isinstance(quantity, (int, float)) else ""
             value = format_money_short(asset.current_value)
-            pnl_pct = asset.gain_loss_pct
-            if pnl_pct is None:
-                pnl_str = ""
+            # Hide P&L percentage for Starter — too much information for
+            # a user with their first few thousand VND in stocks.
+            if style.show_pnl_pct:
+                pnl_pct = asset.gain_loss_pct
+                if pnl_pct is None:
+                    pnl_str = ""
+                else:
+                    arrow = "🟢" if pnl_pct >= 0 else "🔴"
+                    sign = "+" if pnl_pct >= 0 else ""
+                    pnl_str = f" {arrow} {sign}{pnl_pct:.1f}%"
             else:
-                arrow = "🟢" if pnl_pct >= 0 else "🔴"
-                sign = "+" if pnl_pct >= 0 else ""
-                pnl_str = f" {arrow} {sign}{pnl_pct:.1f}%"
+                pnl_str = ""
             lines.append(f"• *{ticker}*{qty_str} — {value}{pnl_str}")
 
         return "\n".join(lines)
