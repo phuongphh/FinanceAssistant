@@ -257,6 +257,16 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+    # Phase 3.5 — voice OUTSIDE storytelling = free-form query. Runs
+    # AFTER the storytelling branch so a user mid-story doesn't get
+    # their voice misrouted; before the text fallthrough so plain
+    # voice messages aren't ignored.
+    if message.get("voice") and resolved_user is not None:
+        from backend.bot.handlers.voice_query import handle_voice_query
+        consumed = await handle_voice_query(db, message)
+        if consumed:
+            return resolved_user.id
+
     # Plain text during the onboarding name step must be consumed here —
     # otherwise the NL expense parser would try to parse the user's name
     # as a transaction.
@@ -359,10 +369,12 @@ async def _handle_callback(
     if await storytelling_handlers.handle_storytelling_callback(db, callback_query):
         return await _resolved_user_id()
 
-    # Phase 3.5 intent confirm/clarify callbacks (intent_confirm:*,
-    # intent_clarify:*). Routed before the transaction handler because
-    # intent_* is a distinct prefix and the user is mid-flow.
-    if callback_data.startswith("intent_"):
+    # Phase 3.5 intent callbacks (intent_confirm:*, intent_clarify:*,
+    # followup:*). Routed before the transaction handler because
+    # those prefixes are distinct and the user is mid-flow.
+    if callback_data.startswith("intent_") or callback_data.startswith(
+        "followup:"
+    ):
         from backend.bot.handlers.message import handle_intent_callback
         await answer_callback(callback_id)
         if await handle_intent_callback(db, callback_query):

@@ -78,13 +78,23 @@ def set_dispatcher(dispatcher: IntentDispatcher) -> None:
     _dispatcher = dispatcher
 
 
-def _build_inline_keyboard(labels: list[str] | None) -> dict | None:
-    """Telegram inline keyboard payload for clarification options.
+def _build_inline_keyboard(
+    labels: list[str] | None,
+    *,
+    intent: IntentType | None = None,
+    follow_ups: list = None,
+    is_executed: bool = False,
+) -> dict | None:
+    """Telegram inline keyboard payload.
 
-    Each label becomes one button on its own row (vertical stack reads
-    cleanly on mobile). callback_data uses a stable prefix the callback
-    handler in ``callbacks.py`` can dispatch on.
+    For executed handlers we send ``followup:<encoded>`` callbacks via
+    ``follow_up.build_inline_keyboard`` so a tap re-runs a related
+    intent. For clarifications the callback is ``intent_clarify:<idx>``.
+    Empty / None labels → no keyboard.
     """
+    if is_executed and follow_ups:
+        from backend.intent.follow_up import build_inline_keyboard
+        return build_inline_keyboard(follow_ups)
     if not labels:
         return None
     return {
@@ -187,8 +197,24 @@ async def _track_outcome(user: User, outcome: DispatchOutcome) -> None:
 
 async def _send_outcome(chat_id: int, outcome: DispatchOutcome) -> None:
     """Send the outcome text + appropriate keyboard."""
+    from backend.intent.dispatcher import OUTCOME_EXECUTED
+    from backend.intent import follow_up
+
     if outcome.kind == OUTCOME_CONFIRM_SENT:
         keyboard = _build_confirm_keyboard()
+    elif outcome.kind == OUTCOME_EXECUTED and outcome.inline_keyboard_hint:
+        # The dispatcher passed labels; rebuild as follow-up suggestions
+        # using the same intent so the callback round-trips correctly.
+        # We don't have access to the wealth level here, so re-derive
+        # via follow_up's default pool (matches the labels we got).
+        suggestions = follow_up.get_follow_ups(
+            outcome.intent, avoid_intent=outcome.intent
+        )
+        # Filter to the labels the dispatcher selected — keeps the two
+        # paths in sync if e.g. the dispatcher shrunk the list.
+        wanted = set(outcome.inline_keyboard_hint)
+        suggestions = [fu for fu in suggestions if fu.label in wanted]
+        keyboard = follow_up.build_inline_keyboard(suggestions)
     else:
         keyboard = _build_inline_keyboard(outcome.inline_keyboard_hint)
     await send_message(chat_id, outcome.text, reply_markup=keyboard)
