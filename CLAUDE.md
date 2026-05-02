@@ -5,8 +5,14 @@
 > Đọc toàn bộ file này trước khi viết bất kỳ dòng code nào.  
 > Mọi quyết định kỹ thuật đã được thiết kế và giải thích lý do ở đây.
 >
-> **Document version:** 2.0 (updated sau pivot V1→V2, 24/04/2026)  
-> **Phase hiện tại:** 3A — Wealth Foundation
+> **Document version:** 2.0 (updated sau pivot V1→V2, 24/04/2026)
+
+**Phase status** (auto-synced from
+[`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
+
+<!-- BEGIN: phase-status:current-line -->
+✅ **Phase 3.5: Intent Understanding Layer** (done) — [detail](docs/current/phase-3.5-detailed.md)
+<!-- END: phase-status:current-line -->
 
 ---
 
@@ -14,8 +20,7 @@
 
 **Product docs (đọc song song với file này):**
 - [`docs/current/strategy.md`](docs/current/strategy.md) — Product vision, positioning, roadmap
-- [`docs/current/phase-3a-detailed.md`](docs/current/phase-3a-detailed.md) — **Phase hiện tại**, read TRƯỚC khi code
-- [`docs/current/phase-3a-issues.md`](docs/current/phase-3a-issues.md) — GitHub-ready tasks
+- [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml) — **Source of truth** cho phase status; auto-sync vào CLAUDE.md / README / strategy.md
 - [`docs/archive/MIGRATION_NOTES.md`](docs/archive/MIGRATION_NOTES.md) — Context về pivot V1→V2
 
 **Strategy/scaling docs:**
@@ -23,7 +28,22 @@
 - `docs/archive/scaling-refactor-B.md` — Layer boundary cleanup — ✅ DONE
 - `docs/current/scaling-refactor-C.md` — True SaaS scaling (10K users) — pending, blocks Phase 2 launch
 
-**Rule:** Khi code Phase 3A, đọc **phase-3a-detailed.md** trước. CLAUDE.md là technical spec; phase doc là implementation guide chi tiết.
+**Roadmap (auto-synced):**
+
+<!-- BEGIN: phase-status:roadmap-table -->
+| Phase | Status | Duration | Detailed Doc | Description |
+|---|---|---|---|---|
+| Phase 1: UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/current/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
+| Phase 2: Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/current/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
+| Phase 3A: Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/current/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
+| **Phase 3.5: Intent Understanding Layer** | ✅ done | 3 tuần | [phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
+| Phase 3B: Market Intelligence | 📋 next | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
+| Phase 4: Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
+| Phase 5: Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
+| Phase 6: Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
+<!-- END: phase-status:roadmap-table -->
+
+**Rule:** Trước khi code, đọc `phase-status.yaml` để biết phase hiện tại, rồi mở phase doc tương ứng (cột "Detailed Doc" trong bảng trên). CLAUDE.md là technical spec; phase doc là implementation guide chi tiết.
 
 ---
 
