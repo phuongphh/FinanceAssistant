@@ -47,9 +47,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
 | #113 | Pre-Phase | [Epic] Phase 3.5 — Epic 4: Quality Assurance | [pre-phase/issue-113.md](by-phase/pre-phase/issue-113.md) |
 | #130 | Pre-Phase | [Story] P3.5-S17: Run regression test suite for existing flows | [pre-phase/issue-130.md](by-phase/pre-phase/issue-130.md) |
+| #131 | Pre-Phase | [Story] P3.5-S18: Build automated test suite for 30 canonical queries | [pre-phase/issue-131.md](by-phase/pre-phase/issue-131.md) |
 | #132 | Pre-Phase | [Story] P3.5-S19: Performance and cost verification | [pre-phase/issue-132.md](by-phase/pre-phase/issue-132.md) |
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 
-**Total:** 46 closed issues
-(7 Phase 1, 9 Phase 2, 30 Pre-Phase)
+**Total:** 47 closed issues
+(7 Phase 1, 9 Phase 2, 31 Pre-Phase)
