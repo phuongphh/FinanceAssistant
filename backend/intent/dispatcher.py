@@ -140,10 +140,19 @@ class IntentDispatcher:
             return await self._build_clarification(result, user, db)
 
         # Medium confidence — read intents execute, write intents confirm.
+        # Exception: ACTION_QUICK_TRANSACTION executes directly even at
+        # medium confidence. The rich expense card already gives the user
+        # an undo/edit path, and the LLM classifier doesn't reliably
+        # extract ``merchant`` (only ``amount``), so a confirmation
+        # prompt would be missing context. Trust the handler's own LLM
+        # re-parse to validate intent before persisting.
         if result.confidence < EXECUTE_THRESHOLD:
-            if result.intent in WRITE_INTENTS:
+            if (
+                result.intent in WRITE_INTENTS
+                and result.intent != IntentType.ACTION_QUICK_TRANSACTION
+            ):
                 return await self._build_confirmation(result, user, db)
-            # Read intents fall through to executor below.
+            # Read intents (and ACTION_QUICK_TRANSACTION) fall through.
 
         # Execute.
         return await self._execute(result, user, db)
@@ -308,6 +317,11 @@ class IntentDispatcher:
         return handler
 
     def _build_handler(self, intent: IntentType) -> IntentHandler | None:
+        if intent == IntentType.ACTION_QUICK_TRANSACTION:
+            from backend.intent.handlers.action_quick_transaction import (
+                ActionQuickTransactionHandler,
+            )
+            return ActionQuickTransactionHandler()
         if intent == IntentType.QUERY_ASSETS:
             from backend.intent.handlers.query_assets import QueryAssetsHandler
             return QueryAssetsHandler()

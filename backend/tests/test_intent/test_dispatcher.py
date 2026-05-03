@@ -197,6 +197,52 @@ async def test_oos_returns_oos_outcome(dispatcher, db):
     assert outcome.kind == OUTCOME_OUT_OF_SCOPE
 
 
+@pytest.mark.asyncio
+async def test_quick_transaction_executes_at_high_confidence(dispatcher, db):
+    """Regression for the "coming soon" bug: ``ACTION_QUICK_TRANSACTION``
+    must dispatch to its own handler, not fall back to the not-implemented
+    reply. Phase 3.5 Epic 2 introduced the intent without a handler, so
+    high-confidence expense entries (e.g. "170k ăn trưa") were getting
+    "coming soon — chưa sẵn sàng" instead of being recorded.
+    """
+    fake_handler = MagicMock()
+    fake_handler.handle = AsyncMock(return_value="")  # rich card sent itself
+    dispatcher._handlers[IntentType.ACTION_QUICK_TRANSACTION] = fake_handler
+
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={"amount": 170_000},
+        raw_text="170k ăn trưa",
+    )
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_EXECUTED
+    fake_handler.handle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_quick_transaction_executes_at_medium_confidence(dispatcher, db):
+    """Quick transactions skip the "are you sure?" confirmation flow and
+    execute even at 0.5–0.8 confidence — the rich expense card already
+    gives the user undo/edit affordances, and the LLM classifier doesn't
+    reliably extract ``merchant`` so a confirmation prompt would be
+    missing context.
+    """
+    fake_handler = MagicMock()
+    fake_handler.handle = AsyncMock(return_value="")
+    dispatcher._handlers[IntentType.ACTION_QUICK_TRANSACTION] = fake_handler
+
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.65,
+        parameters={"amount": 170_000},
+        raw_text="170k ăn trưa",
+    )
+    outcome = await dispatcher.dispatch(result, _user(), db)
+    assert outcome.kind == OUTCOME_EXECUTED
+    fake_handler.handle.assert_awaited_once()
+
+
 def test_thresholds_have_sane_ordering():
     assert 0 < CONFIRM_THRESHOLD < EXECUTE_THRESHOLD <= 1
 

@@ -200,6 +200,13 @@ async def _send_outcome(chat_id: int, outcome: DispatchOutcome) -> None:
     from backend.intent.dispatcher import OUTCOME_EXECUTED
     from backend.intent import follow_up
 
+    # A handler can opt out of the standard plain-text reply by returning
+    # an empty string after sending its own custom message (e.g. the
+    # rich transaction confirmation card from ACTION_QUICK_TRANSACTION).
+    # Skip the duplicate send to avoid an empty bubble in the chat.
+    if not outcome.text:
+        return
+
     if outcome.kind == OUTCOME_CONFIRM_SENT:
         keyboard = _build_confirm_keyboard()
     elif outcome.kind == OUTCOME_EXECUTED and outcome.inline_keyboard_hint:
