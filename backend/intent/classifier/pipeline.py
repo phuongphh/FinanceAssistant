@@ -1,0 +1,89 @@
+"""Intent classification pipeline.
+
+Layer 1 — RuleBasedClassifier — runs first. Returns immediately on a
+high-confidence match. Layer 2 — LLMClassifier — fires only when the
+rule layer returns None or low-confidence. Cache + cheap DeepSeek
+prompt keep cost <$0.0005/call.
+
+If both layers fail, the pipeline returns ``IntentResult(UNCLEAR, 0.0)``
+so callers never have to handle ``None`` — making routing logic shorter
+and the bot's "I didn't get that" behaviour explicit.
+"""
+from __future__ import annotations
+
+import inspect
+import logging
+
+from backend.intent.classifier.base import IntentClassifier
+from backend.intent.classifier.llm_based import LLMClassifier
+from backend.intent.classifier.rule_based import RuleBasedClassifier
+from backend.intent.intents import (
+    CLASSIFIER_NONE,
+    IntentResult,
+    IntentType,
+)
+
+logger = logging.getLogger(__name__)
+
+# Confidence above which the rule classifier is trusted to short-circuit
+# the LLM step. Below this we escalate to the LLM (costs ~50 tokens).
+HIGH_CONFIDENCE_THRESHOLD = 0.85
+
+
+class IntentPipeline:
+    def __init__(
+        self,
+        rule_classifier: IntentClassifier | None = None,
+        llm_classifier: IntentClassifier | None = None,
+    ) -> None:
+        self.rule_classifier = rule_classifier or RuleBasedClassifier()
+        # Construct lazily so tests can pass ``llm_classifier=None`` to
+        # force rule-only behaviour, while production gets the real
+        # classifier by default.
+        self.llm_classifier = (
+            llm_classifier if llm_classifier is not None else LLMClassifier()
+        )
+
+    async def classify(self, text: str) -> IntentResult:
+        rule_result = self.rule_classifier.classify(text)
+        if rule_result and rule_result.confidence >= HIGH_CONFIDENCE_THRESHOLD:
+            return rule_result
+
+        if self.llm_classifier is not None:
+            try:
+                llm_result = await self._llm_classify(text)
+            except Exception:
+                logger.exception("LLM classifier raised; falling back")
+                llm_result = None
+            if llm_result is not None:
+                # Prefer LLM when it gives ≥ rule confidence. Otherwise
+                # the rule match (lower-confidence but still a hint)
+                # wins because it's free and predictable.
+                if (
+                    rule_result is None
+                    or llm_result.confidence >= rule_result.confidence
+                ):
+                    return llm_result
+
+        if rule_result is not None:
+            return rule_result
+
+        return IntentResult(
+            intent=IntentType.UNCLEAR,
+            confidence=0.0,
+            raw_text=text,
+            classifier_used=CLASSIFIER_NONE,
+        )
+
+    async def _llm_classify(self, text: str) -> IntentResult | None:
+        # The classifier may be sync or async. Inspect the return value
+        # after invocation rather than the type up front — Mock objects
+        # used in tests don't advertise correctly via isawaitable on
+        # the function reference.
+        result = self.llm_classifier.classify(text)  # type: ignore[union-attr]
+        if inspect.isawaitable(result):
+            result = await result
+        return result
+
+
+__all__ = ["IntentPipeline", "HIGH_CONFIDENCE_THRESHOLD"]

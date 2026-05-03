@@ -1,0 +1,111 @@
+# Phase status — single source of truth.
+#
+# This file is read by ``scripts/sync_phase_status.py`` to update the
+# marked sections in CLAUDE.md, README.md, docs/README.md, and
+# docs/current/strategy.md. Edit THIS file when phases change; the
+# auto-sync workflow propagates to the rest.
+#
+# Workflow: ``.github/workflows/sync-phase-status.yml`` reruns the
+# sync on every push that touches this file or adds a new
+# ``phase-*-detailed.md`` document.
+#
+# Schema:
+#   current_phase     — id of the phase the team is actively working on
+#   roadmap[]         — every phase the team plans to ship, in order
+#     id              — short tag, used in section headings (e.g. "3.5")
+#     name            — human title (Vietnamese OK)
+#     status          — done | current | next | planned
+#     duration        — informational ("3 tuần", "4 tuần", "TBD")
+#     detailed_doc    — path (relative to repo root); empty if not yet drafted
+#     issues_doc      — path; empty if no GitHub-ready issue list
+#     description     — 1-line summary that goes into roadmap tables
+#     completed_date  — ISO date OR empty; populated when status flips to "done"
+#     icon            — emoji shown next to the name in tables
+#
+# Adding a new phase:
+#   1. Append an entry under roadmap.
+#   2. If you flip current_phase, set the previous phase's status to "done".
+#   3. Commit. The workflow updates all marker sections.
+
+current_phase: "3.5"
+
+roadmap:
+  - id: "1"
+    name: "UX Foundation"
+    status: done
+    duration: "3 tuần"
+    detailed_doc: "docs/current/phase-1-detailed.md"
+    issues_doc: ""
+    description: "Telegram bot + manual entry + monthly report + Notion dashboard"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "2"
+    name: "Personality & Care"
+    status: done
+    duration: "3 tuần"
+    detailed_doc: "docs/current/phase-2-detailed.md"
+    issues_doc: ""
+    description: "Onboarding, Bé Tiền tone, milestone celebration, empathy engine"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3A"
+    name: "Wealth Foundation"
+    status: done
+    duration: "4 tuần"
+    detailed_doc: "docs/current/phase-3a-detailed.md"
+    issues_doc: "docs/current/phase-3a-issues.md"
+    description: "Asset model, net worth, morning briefing, Mini App dashboard"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3.5"
+    name: "Intent Understanding Layer"
+    status: done
+    duration: "3 tuần"
+    detailed_doc: "docs/current/phase-3.5-detailed.md"
+    issues_doc: "docs/current/phase-3.5-issues.md"
+    description: "Rule + LLM intent classifier, confirm/clarify, advisory, voice queries"
+    completed_date: "2026-05-02"
+    icon: "✅"
+
+  - id: "3B"
+    name: "Market Intelligence"
+    status: next
+    duration: "TBD"
+    detailed_doc: "docs/current/phase-3b-outline.md"
+    issues_doc: ""
+    description: "Real market data, advisory deepening, portfolio analytics"
+    completed_date: ""
+    icon: "📋"
+
+  - id: "4"
+    name: "Investment Intelligence"
+    status: planned
+    duration: "TBD"
+    detailed_doc: ""
+    issues_doc: ""
+    description: "Investment Twin, scenario modeling, rental property tracking"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5"
+    name: "Behavioral Engine"
+    status: planned
+    duration: "TBD"
+    detailed_doc: ""
+    issues_doc: ""
+    description: "Wealth-aware nudges, Financial DNA, anomaly detection"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "6"
+    name: "Scale & Commercialize"
+    status: planned
+    duration: "TBD"
+    detailed_doc: ""
+    issues_doc: ""
+    description: "Public beta, subscriptions, multi-region, household mode"
+    completed_date: ""
+    icon: "🔮"

@@ -1,0 +1,61 @@
+name: Intent Tests
+
+# Phase 3.5 Story #131 acceptance criterion: GitHub Action runs the
+# canonical-query test suite on every PR, blocking merge if patterns
+# or prompts regress. Cheap to run — LLM is mocked, no DB needed —
+# so it stays under 30s per PR.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/intent/**'
+      - 'backend/bot/handlers/free_form_text.py'
+      - 'backend/bot/handlers/message.py'
+      - 'backend/bot/handlers/voice_query.py'
+      - 'backend/bot/personality/**'
+      - 'backend/services/intent_metrics.py'
+      - 'content/intent_patterns.yaml'
+      - 'content/clarification_messages.yaml'
+      - 'content/out_of_scope_responses.yaml'
+      - 'backend/tests/test_intent/**'
+      - '.github/workflows/intent-tests.yml'
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        # The intent layer pulls in sqlalchemy + pydantic-settings via
+        # the model imports + a minimal subset of the LLM SDKs. Keep
+        # the install list tight so this job stays fast.
+        run: |
+          pip install --upgrade pip
+          pip install \
+            pytest pytest-asyncio pyyaml \
+            'sqlalchemy[asyncio]' pydantic-settings python-dotenv \
+            httpx fastapi 'uvicorn[standard]' python-multipart \
+            openai anthropic apscheduler
+
+      - name: Run canonical query suite
+        run: |
+          python -m pytest backend/tests/test_intent/test_canonical_queries.py -v
+
+      - name: Run full intent suite
+        run: |
+          python -m pytest backend/tests/test_intent/ -q

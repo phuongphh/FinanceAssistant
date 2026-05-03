@@ -1,9 +1,6 @@
-# Issue #135: [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective)
+# Issue #135
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/135  
-**Status:** Open
-
----
+[Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective)
 
 **Parent Epic:** #113 (Epic 4: Quality Assurance)
 

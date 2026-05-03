@@ -227,14 +227,18 @@ async def _handle_message(
             return resolved_user.id
         return None
 
-    # /huy or /cancel — drop the storytelling mode if active. Doesn't
-    # touch the asset wizard (it has its own cancel button) — only here
-    # because storytelling mode otherwise blocks NL expense parsing.
+    # /huy or /cancel — escape hatch out of any active wizard. Tries the
+    # asset wizard first; if that wasn't active, falls back to
+    # storytelling. Either flow's text mode otherwise blocks NL parsing,
+    # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            await storytelling_handlers.cancel_storytelling(
+            if not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
-            )
+            ):
+                await storytelling_handlers.cancel_storytelling(
+                    db, chat_id, resolved_user
+                )
             return resolved_user.id
         return None
 
@@ -250,6 +254,16 @@ async def _handle_message(
         consumed = await storytelling_handlers.handle_storytelling_input(
             db, message
         )
+        if consumed:
+            return resolved_user.id
+
+    # Phase 3.5 — voice OUTSIDE storytelling = free-form query. Runs
+    # AFTER the storytelling branch so a user mid-story doesn't get
+    # their voice misrouted; before the text fallthrough so plain
+    # voice messages aren't ignored.
+    if message.get("voice") and resolved_user is not None:
+        from backend.bot.handlers.voice_query import handle_voice_query
+        consumed = await handle_voice_query(db, message)
         if consumed:
             return resolved_user.id
 
@@ -354,6 +368,17 @@ async def _handle_callback(
     # generic per-transaction edit/delete callbacks.
     if await storytelling_handlers.handle_storytelling_callback(db, callback_query):
         return await _resolved_user_id()
+
+    # Phase 3.5 intent callbacks (intent_confirm:*, intent_clarify:*,
+    # followup:*). Routed before the transaction handler because
+    # those prefixes are distinct and the user is mid-flow.
+    if callback_data.startswith("intent_") or callback_data.startswith(
+        "followup:"
+    ):
+        from backend.bot.handlers.message import handle_intent_callback
+        await answer_callback(callback_id)
+        if await handle_intent_callback(db, callback_query):
+            return await _resolved_user_id()
 
     # Transaction callbacks handle their own answerCallbackQuery so users
     # get richer feedback.

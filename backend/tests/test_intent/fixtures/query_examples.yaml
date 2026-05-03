@@ -1,0 +1,197 @@
+# Query fixtures for the Phase 3.5 intent classifier.
+#
+# Schema (per entry):
+#   text:                       raw user message exactly as typed
+#   expected_intent:            an IntentType.value from backend/intent/intents.py
+#   expected_parameters:        OPTIONAL dict — only keys that MUST appear; extras allowed
+#   expected_min_confidence:    OPTIONAL float, default 0.85 for canonical, 0.5 for edge cases
+#   notes:                      free-form annotation for humans
+#
+# Adding new fixtures:
+#   - keep the comment block above each block describing WHY this case matters
+#   - prefer real queries pasted from telegram chats over synthetic ones
+#   - if it tests a regression, add the issue # in notes
+#
+# Loaded via ``backend.tests.test_intent.fixtures.load_query_fixtures``.
+
+canonical:
+  # The 11 design-phase queries — these are the primary contract for
+  # rule-based coverage. Confidence ≥0.85 is the bar (issue #117).
+
+  - text: "tiết kiệm 1tr"
+    expected_intent: action_record_saving
+    expected_parameters:
+      amount: 1000000
+    notes: "Saving action with amount shorthand."
+
+  - text: "tài sản của tôi có gì?"
+    expected_intent: query_assets
+    notes: "Direct asset list query."
+
+  - text: "tôi có tài sản gì?"
+    expected_intent: query_assets
+    notes: "Same query, different word order."
+
+  - text: "làm thế nào để đầu tư tiếp?"
+    expected_intent: advisory
+    notes: "Open-ended advisory — needs LLM in real flow but rule should still tag advisory."
+
+  - text: "hiện tại có thể mua gì để có thêm tài sản?"
+    expected_intent: advisory
+    notes: "Buying suggestion — advisory class."
+
+  - text: "mục tiêu hiện giờ của tôi có gì?"
+    expected_intent: query_goals
+    notes: "Goal listing query."
+
+  - text: "muốn đạt được việc mua xe tôi cần phải làm gì?"
+    expected_intent: query_goal_progress
+    expected_parameters:
+      goal_name: "mua xe"
+    notes: "Specific-goal progress query."
+
+  - text: "portfolios chứng khoán của tôi gồm những mã gì?"
+    expected_intent: query_portfolio
+    notes: "Stock portfolio listing."
+
+  - text: "các chi tiêu cho sức khỏe của tôi trong tháng này gồm những gì?"
+    expected_intent: query_expenses_by_category
+    expected_parameters:
+      category: "health"
+      time_range: "this_month"
+    notes: "Expense-by-category with time range."
+
+  - text: "liệt kê cho tôi mọi chi phí về ăn uống của tôi tháng này?"
+    expected_intent: query_expenses_by_category
+    expected_parameters:
+      category: "food"
+      time_range: "this_month"
+    notes: "List intent + category + time range."
+
+  - text: "thu nhập của tôi là như thế nào?"
+    expected_intent: query_income
+    notes: "Income listing."
+
+  # Additional canonical for the remaining intent types so coverage
+  # is complete (issue #117 requires patterns for query_net_worth,
+  # query_market, query_cashflow as well).
+  - text: "tổng tài sản của tôi là bao nhiêu?"
+    expected_intent: query_net_worth
+    notes: "Direct net-worth question."
+
+  - text: "VNM giá bao nhiêu?"
+    expected_intent: query_market
+    expected_parameters:
+      ticker: "VNM"
+    notes: "Stock price query with explicit ticker."
+
+  - text: "VN-Index hôm nay"
+    expected_intent: query_market
+    expected_parameters:
+      ticker: "VNINDEX"
+    notes: "Index price query."
+
+  - text: "tháng này tôi tiết kiệm được bao nhiêu?"
+    expected_intent: query_cashflow
+    notes: "Net cashflow / saving for the month."
+
+
+edge_cases:
+  # Edge cases — diacritics, typos, English, gibberish, OOS, greetings, etc.
+  # Confidence threshold relaxed; the goal is to NOT silent-fail.
+
+  - text: "tai san cua toi"
+    expected_intent: query_assets
+    expected_min_confidence: 0.6
+    notes: "No diacritics. Pattern should still match."
+
+  - text: "tai san co gi"
+    expected_intent: query_assets
+    expected_min_confidence: 0.6
+    notes: "No diacritics, short form."
+
+  - text: "tài sảnn của tôii"
+    expected_intent: query_assets
+    expected_min_confidence: 0.5
+    notes: "Typos with double letters — should still match for query_assets."
+
+  - text: "show my assets"
+    expected_intent: query_assets
+    expected_min_confidence: 0.6
+    notes: "English query."
+
+  - text: "asdkfjh"
+    expected_intent: unclear
+    expected_min_confidence: 0.0
+    notes: "Gibberish must classify as unclear, not pretend match."
+
+  - text: "?"
+    expected_intent: unclear
+    expected_min_confidence: 0.0
+    notes: "Single-char punctuation — unclear."
+
+  - text: "thời tiết hôm nay thế nào"
+    expected_intent: out_of_scope
+    expected_min_confidence: 0.0
+    notes: "Weather — out of scope for a finance bot."
+
+  - text: "hôm nay có news gì về Apple"
+    expected_intent: out_of_scope
+    expected_min_confidence: 0.0
+    notes: "US stock news — outside Phase 3.5 scope."
+
+  - text: "chào"
+    expected_intent: greeting
+    notes: "Greeting only."
+
+  - text: "xin chào Bé Tiền"
+    expected_intent: greeting
+    notes: "Polite greeting."
+
+  - text: "hi"
+    expected_intent: greeting
+    notes: "English greeting."
+
+  - text: "/help"
+    expected_intent: help
+    expected_min_confidence: 1.0
+    notes: "Slash help command."
+
+  - text: "giúp tôi với"
+    expected_intent: help
+    notes: "Vietnamese help request."
+
+  - text: "không biết làm sao bắt đầu"
+    expected_intent: help
+    expected_min_confidence: 0.6
+    notes: "User is lost — counts as help."
+
+  - text: "BTC giá hôm nay"
+    expected_intent: query_market
+    expected_parameters:
+      ticker: "BTC"
+    notes: "Crypto price query."
+
+  - text: "bitcoin giá bao nhiêu"
+    expected_intent: query_market
+    expected_parameters:
+      ticker: "BTC"
+    notes: "Vietnamese form 'bitcoin' should map to BTC ticker."
+
+  - text: "chi tiêu tháng trước"
+    expected_intent: query_expenses
+    expected_parameters:
+      time_range: "last_month"
+    notes: "General expense query for previous month."
+
+  - text: "lương của mình tháng này"
+    expected_intent: query_income
+    notes: "Salary alias for income."
+
+  - text: "danh mục đầu tư"
+    expected_intent: query_portfolio
+    notes: "Portfolio short form."
+
+  - text: "nên đầu tư cổ phiếu nào"
+    expected_intent: advisory
+    notes: "Stock-pick advisory."

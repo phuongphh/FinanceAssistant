@@ -123,20 +123,54 @@ Bot tự tính và adjust.
 
 ## 📋 Roadmap Mới (V2)
 
+> **Auto-synced** từ
+> [`phase-status.yaml`](phase-status.yaml). Phần phía dưới giữa các
+> marker được regenerate bởi `scripts/sync_phase_status.py` — đừng
+> sửa tay. Bốn dòng mô tả chi tiết cho mỗi phase nằm bên DƯỚI bảng
+> (auto-table chỉ cho overview).
+
+<!-- BEGIN: phase-status:current-line -->
+✅ **Phase 3.5: Intent Understanding Layer** (done) — [detail](docs/current/phase-3.5-detailed.md)
+<!-- END: phase-status:current-line -->
+
+<!-- BEGIN: phase-status:roadmap-table -->
+| Phase | Status | Duration | Detailed Doc | Description |
+|---|---|---|---|---|
+| Phase 1: UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/current/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
+| Phase 2: Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/current/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
+| Phase 3A: Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/current/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
+| **Phase 3.5: Intent Understanding Layer** | ✅ done | 3 tuần | [phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
+| Phase 3B: Market Intelligence | 📋 next | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
+| Phase 4: Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
+| Phase 5: Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
+| Phase 6: Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
+<!-- END: phase-status:roadmap-table -->
+
+
 ### Phase 1: UX Foundation
-**Thời gian:** 3-4 tuần (✅ giữ nguyên)
+**Thời gian:** 3-4 tuần
 - Rich messages, inline buttons, Mini App, visual identity
 
 ### Phase 2: Personality & Care
-**Thời gian:** 2-3 tuần (✅ giữ nguyên)
+**Thời gian:** 2-3 tuần
 - Onboarding, memory moments, empathy, surprise & delight
 
-### Phase 3A: Wealth Foundation ⭐ MỚI
+### Phase 3A: Wealth Foundation ⭐
 **Thời gian:** 4 tuần
 - Net worth calculator + data model
 - Manual asset entry (BĐS, stocks, crypto, cash, vàng)
 - Morning briefing (basic, chưa market data)
 - Simple storytelling expense (threshold-based)
+
+### Phase 3.5: Intent Understanding Layer ⭐ NEW
+**Thời gian:** 3 tuần (added giữa 3A và 3B sau khi phát hiện gap về free-form text)
+- Rule-based intent classifier (75% queries, zero LLM cost)
+- LLM fallback (DeepSeek, ~$0.0001/call) cho queries lạ
+- Confidence-based dispatcher: execute / confirm / clarify
+- Personality wrapper + wealth-level adaptive responses
+- Advisory handler với rich context + legal disclaimer
+- Voice queries → intent pipeline (storytelling fallback)
+- Admin metrics endpoint + pattern improvement loop
 
 ### Phase 3B: Market Intelligence
 **Thời gian:** 3 tuần

@@ -1,0 +1,273 @@
+# Phase 3.5 — rule-based intent patterns.
+#
+# How matching works:
+#   - Each intent has a list of patterns. A pattern is a regex matched
+#     against the user message after lowercasing AND diacritic stripping
+#     (so "tài sản của tôi" and "tai san cua toi" both hit).
+#   - Patterns are scored by their `confidence`. The classifier returns
+#     the single highest-confidence match across ALL intents.
+#   - `parameter_extractors` runs after a pattern matches; values from
+#     named regex groups are merged with the dedicated extractors.
+#
+# Adding a new pattern:
+#   1. Write the regex in DIACRITIC-STRIPPED form (see normalize step).
+#   2. Pick a confidence in [0, 1]: ≥0.9 = unambiguous, 0.7-0.85 =
+#      probable, <0.7 = soft hint that must escalate before acting.
+#   3. Add at least one fixture in tests/test_intent/fixtures/query_examples.yaml.
+#
+# Reference: docs/current/phase-3.5-detailed.md § 1.2
+
+query_assets:
+  description: "User asks about their assets (any type)."
+  patterns:
+    # "tài sản của tôi có gì?" / "tai san cua toi co gi"
+    - pattern: 'tai\s*san.*(?:cua\s+(?:toi|minh)|toi\s+co).*?(?:gi|nao|nhung)'
+      confidence: 0.95
+    # "tôi có tài sản gì"
+    - pattern: '(?:toi|minh)\s+co.*tai\s*san.*(?:gi|nao)'
+      confidence: 0.95
+    # "show my assets" — English fallback
+    - pattern: 'show\s+(?:my|the)\s+assets?'
+      confidence: 0.9
+    # "asset của tôi"
+    - pattern: 'assets?\s+(?:cua\s+(?:toi|minh)|toi)'
+      confidence: 0.9
+    # short "tài sản của tôi" / "danh sách tài sản"
+    - pattern: '(?:danh\s*sach|liet\s*ke|xem)\s+tai\s*san'
+      confidence: 0.9
+    # plain "tài sản" with possessive — broader, lower confidence.
+    - pattern: 'tai\s*san\s+(?:cua\s+)?(?:toi|minh)'
+      confidence: 0.75
+    # diacritic-typo / doubled-letter case ("tài sảnn của tôii")
+    - pattern: 'tai\s*sann?\s+cua\s+toii?'
+      confidence: 0.7
+    # short forms "tài sản có gì" / "tai san co gi" (no possessive)
+    - pattern: '^tai\s*san\s+co\s+gi'
+      confidence: 0.7
+    # NEW (S21): "tài sản hiện tại bao nhiêu" — informational, no possessive
+    - pattern: 'tai\s*san\s+hien\s*tai.*bao\s*nhieu'
+      confidence: 0.85
+    # NEW (S21): pronoun variants — "em có tài sản gì", "anh có tài sản nào"
+    - pattern: '(?:em|anh|chi|ban)\s+co.*tai\s*san.*(?:gi|nao)'
+      confidence: 0.85
+    # NEW (S21): "tài sản của em/anh/chị/bạn"
+    - pattern: 'tai\s*san\s+cua\s+(?:em|anh|chi|ban)'
+      confidence: 0.9
+  parameter_extractors:
+    asset_type:
+      patterns:
+        - { match: 'bat\s*dong\s*san|bds|nha\s+dat', value: real_estate }
+        - { match: 'chung\s*khoan|co\s*phieu|stocks?', value: stock }
+        - { match: 'crypto|tien\s*so|btc|bitcoin|ethereum', value: crypto }
+        - { match: 'vang|gold', value: gold }
+        - { match: 'tien\s*mat|cash|tien\s+gui', value: cash }
+
+query_net_worth:
+  description: "User asks total net worth."
+  patterns:
+    - pattern: 'tong\s+(?:tai\s*san|asset|net\s*worth)'
+      confidence: 0.95
+    - pattern: 'tai\s*san.*tong'
+      confidence: 0.85
+    - pattern: '(?:toi|minh).*co\s+(?:tong\s*cong|tat\s*ca).*bao\s*nhieu'
+      confidence: 0.85
+    - pattern: 'net\s*worth'
+      confidence: 0.95
+    # NEW (S21): "tổng cộng có bao nhiêu tiền" — pronoun-less variant
+    - pattern: 'tong\s*cong\s+co\s+bao\s*nhieu\s+tien'
+      confidence: 0.9
+    # NEW (S21): "tiền có bao nhiêu" — short form
+    - pattern: '^tien\s+co\s+bao\s*nhieu'
+      confidence: 0.7
+
+query_portfolio:
+  description: "User asks about their stock portfolio."
+  patterns:
+    - pattern: 'portfolios?\s*(?:chung\s*khoan|dau\s*tu)'
+      confidence: 0.95
+    - pattern: 'danh\s*muc.*(?:chung\s*khoan|co\s*phieu|dau\s*tu)'
+      confidence: 0.95
+    - pattern: '(?:chung\s*khoan|co\s*phieu).*(?:cua\s+(?:toi|minh)|toi\s+(?:co|dang|so\s*huu))'
+      confidence: 0.9
+    - pattern: '(?:nhung|cac)\s+ma\s*(?:nao|gi)'
+      confidence: 0.85
+    - pattern: 'danh\s*muc\s+dau\s*tu'
+      confidence: 0.9
+
+query_expenses:
+  description: "User asks about expenses (general, no specific category)."
+  patterns:
+    - pattern: 'chi\s*(?:tieu|phi).*(?:thang|tuan|nam|hom)'
+      confidence: 0.9
+    - pattern: '(?:toi|minh).*(?:da\s+)?(?:chi|tieu).*(?:thang|tuan)'
+      confidence: 0.85
+    - pattern: 'tieu\s+bao\s*nhieu'
+      confidence: 0.85
+    # NEW (S21): "liệt kê chi tiêu" — imperative without time range
+    - pattern: '^(?:liet\s*ke|list|xem)\s+chi\s*(?:tieu|phi)\s*$'
+      confidence: 0.85
+  parameter_extractors:
+    time_range:
+      use_extractor: time_range
+
+query_expenses_by_category:
+  description: "User asks expenses filtered by category."
+  patterns:
+    # "chi tiêu cho sức khỏe tháng này"
+    - pattern: 'chi\s*(?:tieu|phi).*(?:cho|ve).*?\w+.*(?:thang|tuan|nam)'
+      confidence: 0.95
+    # "chi phí sức khỏe tháng trước" (no "cho/về" between chi phí and category)
+    - pattern: 'chi\s*(?:tieu|phi)\s+\w+.*(?:thang|tuan|nam)\s+(?:nay|truoc|qua)'
+      confidence: 0.93
+    # "liệt kê chi phí ăn uống tháng này"
+    - pattern: '(?:liet\s*ke|list|xem|cac).*chi\s*(?:phi|tieu).*\w+'
+      confidence: 0.92
+    # "tháng này tôi tiêu cho ăn uống bao nhiêu"
+    - pattern: '(?:thang|tuan)\s+(?:nay|truoc|qua).*(?:tieu|chi).*\w+'
+      confidence: 0.9
+  parameter_extractors:
+    category:
+      use_extractor: category
+    time_range:
+      use_extractor: time_range
+
+query_income:
+  description: "User asks about income."
+  patterns:
+    - pattern: 'thu\s*nhap.*(?:cua\s+(?:toi|minh)|toi)'
+      confidence: 0.95
+    - pattern: '(?:toi|minh).*kiem\s*duoc.*bao\s*nhieu'
+      confidence: 0.85
+    - pattern: 'luong.*(?:cua\s+)?(?:toi|minh)'
+      confidence: 0.9
+    # NEW (S21): "lương tháng bao nhiêu" — short form, no possessive
+    - pattern: '^luong\s+(?:thang|nay)?.*bao\s*nhieu'
+      confidence: 0.85
+    # NEW (S21): "tổng thu nhập tháng" — informational, no possessive
+    - pattern: 'tong\s+thu\s*nhap\s+(?:thang|nam)'
+      confidence: 0.9
+
+query_cashflow:
+  description: "User asks net cashflow / savings for a period."
+  patterns:
+    - pattern: '(?:thang|tuan)\s+(?:nay|truoc|qua).*(?:du|con\s*lai|tiet\s*kiem\s+duoc)'
+      confidence: 0.9
+    - pattern: 'dong\s+tien'
+      confidence: 0.95
+    - pattern: 'tiet\s*kiem.*(?:thang|tuan)\s+(?:nay|truoc|qua)'
+      confidence: 0.85
+    - pattern: '(?:thang|tuan)\s+(?:nay|truoc).*(?:du\s+bao\s*nhieu|con\s+lai\s+bao\s*nhieu)'
+      confidence: 0.9
+  parameter_extractors:
+    time_range:
+      use_extractor: time_range
+
+query_market:
+  description: "User asks about market price."
+  patterns:
+    # "VNM giá bao nhiêu"
+    - pattern: '(?P<ticker>[a-z]{2,8})\s*(?:gia|hom\s+nay|hien\s*tai)'
+      confidence: 0.92
+    # "giá VNM"
+    - pattern: 'gia\s+(?P<ticker>[a-z]{2,8})'
+      confidence: 0.92
+    # "VN-Index hôm nay"
+    - pattern: 'vn[\s\-]?index'
+      confidence: 0.95
+    # "BTC hôm nay" / "bitcoin giá"
+    - pattern: '(?:btc|bitcoin|eth|ethereum).*(?:gia|hom\s+nay|bao\s*nhieu)'
+      confidence: 0.92
+    # "giá bitcoin"
+    - pattern: 'gia\s+(?:btc|bitcoin|eth|ethereum)'
+      confidence: 0.92
+  parameter_extractors:
+    ticker:
+      use_extractor: ticker
+
+query_goal_progress:
+  description: "User asks about progress toward a specific named goal."
+  # IMPORTANT: must be ABOVE query_goals so the more specific intent wins.
+  patterns:
+    # "muốn đạt được X tôi cần làm gì"
+    - pattern: '(?:muon|de)\s+(?:dat\s+duoc|co\s+duoc|mua\s+duoc|lam\s+duoc).*?\w+.*(?:can|phai).*(?:lam\s*gi|lam\s*sao|nhu\s*the\s*nao)'
+      confidence: 0.95
+    # "X cần bao nhiêu nữa"
+    - pattern: '(?:con|can).*?(?:bao\s*nhieu|bao\s*lau)\s+nua'
+      confidence: 0.7
+    # NEW (S21): "còn bao nhiêu mới đủ mua xe" — alt phrasing
+    - pattern: 'con\s+bao\s*nhieu.*(?:moi|de)\s+du.*(?:mua|co)\s+\w+'
+      confidence: 0.85
+  parameter_extractors:
+    goal_name:
+      use_extractor: goal_name
+
+query_goals:
+  description: "User asks about their goals."
+  patterns:
+    - pattern: 'muc\s*tieu.*(?:cua\s+(?:toi|minh)|toi)'
+      confidence: 0.95
+    - pattern: '(?:toi|minh).*dat.*muc\s*tieu'
+      confidence: 0.9
+    - pattern: 'goals?\s+(?:cua\s+(?:toi|minh)|toi)'
+      confidence: 0.95
+    # NEW (S21): "mục tiêu hiện tại" / "goal hiện tại" — informational
+    - pattern: '^(?:muc\s*tieu|goals?)\s+hien\s*tai'
+      confidence: 0.85
+    # NEW (S21): "liệt kê mục tiêu" / "xem mục tiêu" — imperative
+    - pattern: '(?:liet\s*ke|xem|list)\s+(?:muc\s*tieu|goals?)'
+      confidence: 0.9
+
+action_record_saving:
+  description: "User wants to record a saving."
+  patterns:
+    # bare "tiết kiệm 1tr" — anchored to start to avoid grabbing
+    # "tháng này tôi tiết kiệm được" (which is query_cashflow).
+    - pattern: '^tiet\s*kiem\s+\d+'
+      confidence: 0.85
+    - pattern: '(?:gui|chuyen|de\s+danh|cat).*(?:tiet\s*kiem|saving)\s*\d+'
+      confidence: 0.9
+  parameter_extractors:
+    amount:
+      use_extractor: amount
+
+advisory:
+  description: "User asks for investment / financial advice."
+  patterns:
+    - pattern: 'nen\s+(?:dau\s+tu|mua)\s+(?:gi|cai\s+nao|co\s+phieu\s+nao)'
+      confidence: 0.9
+    - pattern: 'lam\s+the\s+nao\s+de\s+(?:dau\s+tu|tiet\s+kiem|kiem\s+them)'
+      confidence: 0.92
+    - pattern: 'co\s+the\s+mua\s+(?:gi|cai\s+nao)'
+      confidence: 0.85
+    - pattern: 'dau\s+tu.*(?:tiep|them|nua)'
+      confidence: 0.88
+    - pattern: 'co\s+nen\s+(?:ban|mua|dau\s+tu)'
+      confidence: 0.9
+
+greeting:
+  description: "Greetings."
+  patterns:
+    - pattern: '^(?:chao|hi|hello|xin\s*chao|hey)\b'
+      confidence: 0.95
+
+help:
+  description: "Help requests."
+  patterns:
+    - pattern: '^/help$'
+      confidence: 1.0
+    - pattern: '(?:giup|help|huong\s*dan).*(?:toi|minh)'
+      confidence: 0.9
+    - pattern: 'khong\s+biet.*(?:lam\s*sao|nhu\s*the\s*nao|gi)'
+      confidence: 0.7
+
+out_of_scope:
+  description: "Politely decline things obviously outside scope."
+  patterns:
+    - pattern: 'thoi\s*tiet'
+      confidence: 0.9
+    - pattern: '(?:tin\s*tuc|news).*(?:apple|google|microsoft|tesla|amazon|meta)'
+      confidence: 0.85
+    - pattern: 'co\s*phieu\s+(?:my|us|nasdaq)'
+      confidence: 0.8
+    - pattern: 'thi\s*truong\s+(?:my|us)'
+      confidence: 0.8

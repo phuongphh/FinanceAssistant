@@ -6,12 +6,21 @@
 
 ## 🎯 Current Focus
 
-**🚀 Phase 3A — Wealth Foundation** (4 tuần)
+<!-- BEGIN: phase-status:current-block -->
+✅ **Phase 3.5 — Intent Understanding Layer** (3 tuần)
 
-- 📖 Read: [current/phase-3a-detailed.md](current/phase-3a-detailed.md)
-- 📋 Issues: [current/phase-3a-issues.md](current/phase-3a-issues.md)
+- 📖 Detailed doc: [docs/current/phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md)
+- 📋 Issues: [docs/current/phase-3.5-issues.md](docs/current/phase-3.5-issues.md)
+- 📝 Scope: Rule + LLM intent classifier, confirm/clarify, advisory, voice queries
 
-**Next up:** Copy issues từ `phase-3a-issues.md` vào GitHub, bắt đầu với `#P3A-1`.
+<!-- END: phase-status:current-block -->
+
+**Auto-sync:** This block is regenerated from
+[`current/phase-status.yaml`](current/phase-status.yaml). Edit that
+file when phases change — never edit between the markers by hand.
+The companion script lives at
+[`../scripts/sync_phase_status.py`](../scripts/sync_phase_status.py)
+and the GitHub Action `sync-phase-status.yml` runs on every push.
 
 ---
 
@@ -19,19 +28,23 @@
 
 ### Strategy
 - 📜 [Product Strategy V2](current/strategy.md) — Vision, roadmap, positioning, pricing
+- 📋 [Phase Status (source of truth)](current/phase-status.yaml) — Single YAML driving all roadmap tables in this repo
 - 📝 [Migration Notes V1→V2](archive/MIGRATION_NOTES.md) — Tại sao pivot từ Finance Assistant → Personal CFO
 
 ### Implementation Guides
 
-| Phase | Status | Detailed Doc | Issues |
-|-------|--------|--------------|--------|
-| Phase 1: UX Foundation | ✅ Complete | [phase-1-detailed.md](current/phase-1-detailed.md) | — |
-| Phase 2: Personality & Care | ⏳ In Progress | [phase-2-detailed.md](current/phase-2-detailed.md) | — |
-| **Phase 3A: Wealth Foundation** | 📋 **Next** | **[phase-3a-detailed.md](current/phase-3a-detailed.md)** | **[phase-3a-issues.md](current/phase-3a-issues.md)** |
-| Phase 3B: Market Intelligence | 🔮 Planned | [phase-3b-outline.md](current/phase-3b-outline.md) | TBD after 3A validation |
-| Phase 4: Investment Intelligence | 🔮 Planned | TBD | TBD |
-| Phase 5: Behavioral Engine | 🔮 Planned | TBD | TBD |
-| Phase 6: Scale & Commercialize | 🔮 Planned | TBD | TBD |
+<!-- BEGIN: phase-status:roadmap-table -->
+| Phase | Status | Duration | Detailed Doc | Description |
+|---|---|---|---|---|
+| Phase 1: UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/current/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
+| Phase 2: Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/current/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
+| Phase 3A: Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/current/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
+| **Phase 3.5: Intent Understanding Layer** | ✅ done | 3 tuần | [phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
+| Phase 3B: Market Intelligence | 📋 next | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
+| Phase 4: Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
+| Phase 5: Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
+| Phase 6: Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
+<!-- END: phase-status:roadmap-table -->
 
 ### Archive
 - 📦 [v1 Finance Assistant](archive/v1-finance-assistant/) — Original positioning before pivot

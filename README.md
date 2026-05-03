@@ -9,17 +9,28 @@
 
 ## 🎯 Current Status
 
-🚧 **Phase 3A: Wealth Foundation** (in progress)
+<!-- BEGIN: phase-status:current-line -->
+✅ **Phase 3.5: Intent Understanding Layer** (done) — [detail](docs/current/phase-3.5-detailed.md)
+<!-- END: phase-status:current-line -->
 
+<!-- BEGIN: phase-status:status-list -->
 - ✅ Phase 1: UX Foundation
 - ✅ Phase 2: Personality & Care
-- 🔨 Phase 3A: Wealth Foundation ← **current**
-- 📋 Phase 3B: Market Intelligence (next)
+- ✅ Phase 3A: Wealth Foundation
+- ✅ Phase 3.5: Intent Understanding Layer ← **just shipped**
+- 📋 Phase 3B: Market Intelligence
 - 🔮 Phase 4: Investment Intelligence
 - 🔮 Phase 5: Behavioral Engine
 - 🔮 Phase 6: Scale & Commercialize
+<!-- END: phase-status:status-list -->
+
 
 → See [`docs/README.md`](docs/README.md) for full roadmap and phase details.
+
+> **Note:** Phase status is auto-synced from
+> [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
+> Edit that file to update the roadmap; the GitHub Action
+> `sync-phase-status.yml` rewrites this section on push.
 
 ---
 
@@ -228,53 +239,3 @@ alembic upgrade head
 ## History
 
 This project pivoted from **"Finance Assistant"** (V1, expense tracking focus) to **"Personal CFO"** (V2, wealth management focus) in April 2026. For pivot context and V1 archived docs, see [`docs/archive/`](docs/archive/).
-alembic upgrade head
-```
-
-### 5. Chạy server
-
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-
-### 6. Chạy scheduler (process riêng)
-
-Các job cron (morning report 7h, gmail poll, market snapshot, monthly report)
-chạy ở process riêng để tránh duplicate khi có nhiều uvicorn worker:
-
-```bash
-python -m backend.scheduler
-```
-
-Chỉ chạy **một** instance. Phase 1 sẽ thay bằng Celery worker.
-
-## Cấu trúc dự án
-
-```
-├── backend/              # FastAPI application
-│   ├── models/           # SQLAlchemy ORM models
-│   ├── schemas/          # Pydantic request/response schemas
-│   ├── routers/          # API endpoints
-│   ├── services/         # Business logic
-│   ├── jobs/             # Scheduled tasks (APScheduler)
-│   └── utils/            # Helpers
-├── openclaw-skills/      # OpenClaw Skills (thin API wrappers)
-├── docker-compose.yml    # PostgreSQL + Redis
-└── CLAUDE.md             # System design document
-```
-
-## API
-
-Base URL: `http://localhost:8000/api/v1`
-
-| Endpoint | Mô tả |
-|---|---|
-| `POST /expenses` | Tạo expense |
-| `GET /expenses` | List expenses |
-| `POST /goals` | Tạo goal |
-| `GET /reports/monthly` | Báo cáo tháng |
-| `POST /ingestion/ocr` | OCR hóa đơn |
-| `GET /market/snapshot` | Thị trường hôm nay |
-| `POST /market/advice` | Gợi ý đầu tư |
-
-Chi tiết API: xem Swagger UI tại `http://localhost:8000/docs`

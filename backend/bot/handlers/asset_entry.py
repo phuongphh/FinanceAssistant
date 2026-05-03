@@ -74,6 +74,9 @@ class AssetEvent:
 
 
 # Flow names persisted in wizard_state.
+# All start with "asset_add" so the text dispatcher can detect "user is mid
+# asset-wizard" with a single prefix check (see ``handle_asset_text_input``).
+FLOW_PICKER = "asset_add_picker"  # 6-button type picker shown, nothing chosen
 FLOW_CASH = "asset_add_cash"
 FLOW_STOCK = "asset_add_stock"
 FLOW_REAL_ESTATE = "asset_add_real_estate"
@@ -84,8 +87,17 @@ FLOW_REAL_ESTATE = "asset_add_real_estate"
 async def start_asset_wizard(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
-    """Show the 6-button asset-type picker. First step of every flow."""
-    await wizard_service.clear(db, user.id)
+    """Show the 6-button asset-type picker. First step of every flow.
+
+    Sets ``wizard_state`` to a picker sentinel rather than clearing it, so
+    that text typed while the picker (or a downstream subtype keyboard) is
+    on screen gets caught by ``handle_asset_text_input`` and answered with
+    a "tap a button" nudge — instead of falling through to the NL expense
+    parser and being silently saved as a transaction.
+    """
+    await wizard_service.start_flow(
+        db, user.id, FLOW_PICKER, step="type", draft={},
+    )
     await send_message(
         chat_id=chat_id,
         text=(
@@ -96,6 +108,26 @@ async def start_asset_wizard(
         reply_markup=asset_type_picker_keyboard(),
     )
     analytics.track(AssetEvent.WIZARD_OPENED, user_id=user.id)
+
+
+async def cancel_wizard(
+    db: AsyncSession, chat_id: int, user: User
+) -> bool:
+    """Clear an active asset-wizard state and acknowledge.
+
+    Returns True if there was an asset wizard to cancel. Used by the
+    ``/huy`` and ``/cancel`` commands so the user has a text-based escape
+    hatch in addition to the inline ❌ Hủy button.
+    """
+    flow = (user.wizard_state or {}).get("flow") or ""
+    if not flow.startswith("asset_add"):
+        return False
+    await wizard_service.clear(db, user.id)
+    analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
+    await send_message(
+        chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋"
+    )
+    return True
 
 
 async def list_assets(
@@ -683,7 +715,17 @@ _TEXT_DISPATCH = {
 async def handle_asset_text_input(
     db: AsyncSession, message: dict
 ) -> bool:
-    """Consume free text if the user is mid-wizard. Return True if so."""
+    """Consume free text if the user is mid-wizard. Return True if so.
+
+    Returns True for *any* asset-wizard flow — including the picker /
+    subtype / stock-price-choice steps that don't accept text input. In
+    those cases we send a "tap a button" nudge rather than letting the
+    text fall through to the NL expense parser, which would silently
+    record it as a transaction. The previous behaviour caused a real
+    incident: user tapped "+Thêm tài sản khác" then typed
+    "VCB-002 20 triệu" without picking a subtype, and the bot saved it
+    as an expense (see commit message / PR).
+    """
     text = (message.get("text") or "").strip()
     if not text or text.startswith("/"):
         return False
@@ -699,9 +741,31 @@ async def handle_asset_text_input(
 
     flow = wizard_service.get_flow(user.wizard_state)
     step = wizard_service.get_step(user.wizard_state)
+
+    # Only intercept asset-wizard flows. Storytelling and any future
+    # wizards have their own routers earlier in the dispatch chain.
+    if not (flow or "").startswith("asset_add"):
+        return False
+
     handler = _TEXT_DISPATCH.get((flow, step))
     if handler is None:
-        return False
+        # Wizard is at a step that expects a button tap, not free text.
+        # Consume the text with a nudge so it can't reach the NL expense
+        # parser and be misclassified.
+        analytics.track(
+            AssetEvent.PARSE_FAILED,
+            user_id=user.id,
+            properties={"flow": flow, "step": step, "reason": "text_at_button_step"},
+        )
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "👆 Bạn đang trong wizard <b>thêm tài sản</b> — "
+                "vui lòng tap nút phía trên (hoặc ❌ Hủy / gõ /huy để thoát)."
+            ),
+            parse_mode="HTML",
+        )
+        return True
 
     draft = wizard_service.get_draft(user.wizard_state)
     try:

@@ -1,9 +1,6 @@
-# Issue #119: [Story] P3.5-S6: Wire intent pipeline into Telegram message router
+# Issue #119
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/119  
-**Status:** Open
-
----
+[Story] P3.5-S6: Wire intent pipeline into Telegram message router
 
 **Parent Epic:** #110 (Epic 1: Intent Foundation & Patterns)
 
