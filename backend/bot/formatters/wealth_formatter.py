@@ -14,14 +14,30 @@ from backend.wealth.models.asset import Asset
 
 
 def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
-    """Confirmation after a wizard creates an asset."""
+    """Confirmation after a wizard creates an asset.
+
+    For assets with both purchase and current price (stocks, real estate
+    where user gave a different "current" estimate), shows an unrealised
+    gain/loss line. Skipped when current == initial so the cash flow and
+    "use same price" stock flow stay one-line.
+    """
     icon = get_subtype_icon(asset.asset_type, asset.subtype)
     label = get_label(asset.asset_type)
-    return (
-        f"✅ Đã ghi {icon} {asset.name}\n"
-        f"   {label}: {format_money_full(asset.current_value)}\n\n"
-        f"💎 Tổng tài sản: <b>{format_money_full(net_worth)}</b>"
-    )
+    initial = Decimal(asset.initial_value or 0)
+    current = Decimal(asset.current_value or 0)
+    lines = [
+        f"✅ Đã ghi {icon} {asset.name}",
+        f"   {label}: {format_money_full(current)}",
+    ]
+    diff = current - initial
+    if diff > 0:
+        lines.append(f"   📈 +{format_money_short(diff)}")
+    elif diff < 0:
+        # format_money_short(-2_000_000) returns "-2tr" — sign baked in.
+        lines.append(f"   📉 {format_money_short(diff)}")
+    lines.append("")
+    lines.append(f"💎 Tổng tài sản: <b>{format_money_full(net_worth)}</b>")
+    return "\n".join(lines)
 
 
 def format_asset_list(assets: list[Asset]) -> str:
