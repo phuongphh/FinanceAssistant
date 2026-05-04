@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #159 | [Epic] Phase 3.6 — Epic 2: Adaptive Polish & Integration | [issue-159.md](issue-159.md) |
 | #160 | [Epic] Phase 3.6 — Epic 3: Migration & Quality Assurance | [issue-160.md](issue-160.md) |
 | #161 | [Story] P3.6-S1: Create menu copy YAML with all 5 categories | [issue-161.md](issue-161.md) |
+| #162 | [Story] P3.6-S2: Build MenuFormatter with basic intros | [issue-162.md](issue-162.md) |
 
-**Total active:** 13
+**Total active:** 14
