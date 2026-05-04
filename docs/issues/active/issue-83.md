@@ -35,7 +35,7 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 - [x] ≥5/7 users sẵn lòng trả ≥100k/tháng (willingness to pay)
 
 ## Deliverables
-- [ ] Spreadsheet kết quả analytics 7 users × 7 days
+- [x] Spreadsheet kết quả analytics 7 users × 7 days
 - [ ] Summary insights document
 - [ ] Bug list from feedback
 
