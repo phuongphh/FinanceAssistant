@@ -193,3 +193,72 @@ streak_100:
     🏔 Streak 100 {name}!
 
     100 ngày liên tục là thứ mà tiền không mua được — chỉ có kỷ luật của bạn làm được. Tôn trọng 🫡
+
+# ---------- Wealth level transitions (Issue #155) -------------------
+# Placeholders specific to these messages:
+#   {level_label}       — short themed name of new level (e.g. "Kho thóc")
+#   {level_full}        — descriptive name (e.g. "Có chút tiết kiệm")
+#   {next_target}       — formatted money string for next milestone
+#   {next_level_label}  — short themed name of upcoming level
+#
+# Tone for DOWN messages: KHÔNG blame, chỉ ấm áp + động viên.
+
+wealth_level_up_young_prof:
+  - |-
+    🎉 {name} ơi, chúc mừng bạn lên cấp {level_label} rồi!
+    Level này bạn nên bắt đầu đầu tư thêm — stocks, fund mở đều phù hợp.
+    🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
+  - |-
+    🌾 Vượt mốc 30tr, chính thức Kho thóc {name} ơi!
+    Đây là lúc tiền bắt đầu sinh tiền — học về lãi kép và quỹ chỉ số nhé.
+    🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
+
+wealth_level_up_mass_affluent:
+  - |-
+    🏠 Chúc mừng {name} bước vào cấp {level_label}!
+    Tài sản đa dạng hơn — BĐS, danh mục cổ phiếu, có thể nghĩ tới rental income.
+    🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
+  - |-
+    🍚 {name} ơi, Phú hộ rồi đấy!
+    Giờ là lúc tối ưu thuế và rebalance danh mục — không chỉ tích luỹ nữa.
+    🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
+
+wealth_level_up_hnw:
+  - |-
+    👑 {name} ơi, chính thức cấp {level_label}!
+    Estate planning, investment twin, alternative investments — full CFO suite mở khoá.
+    🎯 Mục tiêu tiếp: {next_target}
+  - |-
+    🏛 Vương giả {name}!
+    Ở level này, câu hỏi không còn là "tiết kiệm bao nhiêu" mà là "để lại gì".
+    🎯 Mục tiêu tiếp: {next_target}
+
+wealth_level_down_starter:
+  - |-
+    🌊 {name} ơi, tài sản tạm về cấp {level_label}.
+    Thị trường có lúc lên lúc xuống — quan trọng là bạn vẫn đang theo dõi.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+  - |-
+    🌱 Quay lại Trồng lúa cũng không sao {name}.
+    Mình đã cùng bạn đi qua mốc này một lần rồi — lần này sẽ nhanh hơn.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+
+wealth_level_down_young_prof:
+  - |-
+    🌊 {name}, tài sản tạm về cấp {level_label}.
+    Đầu tư có nhịp — giữ kỷ luật, tránh bán đáy là điều quan trọng nhất.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+  - |-
+    🌾 Lùi về Kho thóc cũng không sao {name}.
+    Bạn đã từng vượt mốc này — kinh nghiệm vẫn còn nguyên đó.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+
+wealth_level_down_mass_affluent:
+  - |-
+    🌊 {name}, tài sản tạm về cấp {level_label}.
+    Biến động lớn ở danh mục lớn là chuyện thường — không cần phản ứng vội.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+  - |-
+    🏠 Quay lại Phú hộ cũng không sao {name}.
+    Tài sản nền tảng vẫn còn — dài hạn vẫn đi lên nếu bạn không hoảng.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
