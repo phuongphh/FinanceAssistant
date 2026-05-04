@@ -9,7 +9,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #73 | [P3A-15] Analytics tracking for morning briefing events | [issue-73.md](issue-73.md) |
 | #75 | [P3A-17] Write & test storytelling LLM prompt (accuracy ≥80%) | [issue-75.md](issue-75.md) |
 | #80 | [P3A-22] Implement /api/wealth/overview endpoint | [issue-80.md](issue-80.md) |
-| #81 | **GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/81 | [issue-81.md](issue-81.md) |
+| #81 | [P3A-23] Chart.js integration: pie chart + trend line chart | [issue-81.md](issue-81.md) |
 | #82 | [P3A-24] Milestone progress display for Starter level | [issue-82.md](issue-82.md) |
 | #83 | [P3A-25] User testing protocol — 7 users, 7 days validation | [issue-83.md](issue-83.md) |
 | #84 | [P3A-26] Bug fixes & Phase 3A exit review | [issue-84.md](issue-84.md) |

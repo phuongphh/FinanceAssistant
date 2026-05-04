@@ -1,9 +1,6 @@
-# Issue #81: [P3A-23] Chart.js integration: pie chart + trend line chart
+# Issue #81
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/81  
-**Status:** Open
-
----
+[P3A-23] Chart.js integration: pie chart + trend line chart
 
 ## Epic
 Epic 4 — Visualization & Testing | **Week 4** | Depends: P3A-21, P3A-22
@@ -12,7 +9,7 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: P3A-21, P3A-22
 Interactive charts với Chart.js. Vietnamese money format. Smooth animations.
 
 ## Acceptance Criteria
-- [ ] File `app/miniapp/static/js/wealth_dashboard.js`
+- [x] File `app/miniapp/static/js/wealth_dashboard.js`
 - [ ] Doughnut chart cho asset type breakdown
 - [ ] Line chart cho net worth trend
 - [ ] Tooltips format tiền Việt: "1.5tr" thay vì "1,500,000"
