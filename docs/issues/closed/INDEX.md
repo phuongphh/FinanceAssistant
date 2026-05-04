@@ -68,6 +68,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #133 | Pre-Phase | [Story] P3.5-S20: User testing with 5 real users (1 week) | [pre-phase/issue-133.md](by-phase/pre-phase/issue-133.md) |
 | #134 | Pre-Phase | [Story] P3.5-S21: Pattern improvement based on unclear queries | [pre-phase/issue-134.md](by-phase/pre-phase/issue-134.md) |
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
+| #153 | Pre-Phase | [Bug] Monthly report advice section không phù hợp với định hướng Personal CFO và data thực tế của user HNW | [pre-phase/issue-153.md](by-phase/pre-phase/issue-153.md) |
 
-**Total:** 64 closed issues
-(7 Phase 1, 9 Phase 2, 48 Pre-Phase)
+**Total:** 65 closed issues
+(7 Phase 1, 9 Phase 2, 49 Pre-Phase)
