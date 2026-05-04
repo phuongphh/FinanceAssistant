@@ -9,9 +9,9 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: P3A-4, P3A-5 | Blocks
 FastAPI endpoint trả về toàn bộ data cho wealth dashboard. Performance critical.
 
 ## Acceptance Criteria
-- [ ] Route `GET /miniapp/api/wealth/overview`
+- [x] Route `GET /miniapp/api/wealth/overview`
 - [x] Auth: `require_miniapp_auth` (Telegram initData)
-- [ ] Response JSON schema:
+- [x] Response JSON schema:
   ```json
   {
     "net_worth": 150000000,
@@ -24,7 +24,7 @@ FastAPI endpoint trả về toàn bộ data cho wealth dashboard. Performance cr
     "next_milestone": {"target": 200000000, "label": "Mass Affluent", "pct_progress": 75}
   }
   ```
-- [ ] Performance: <500ms cho user có 10+ assets
+- [x] Performance: <500ms cho user có 10+ assets
 - [ ] Sub-endpoint: `GET /miniapp/api/wealth/trend?days=30|90|365`
 - [ ] Cache response 30 giây (Redis hoặc in-memory)
 - [ ] Error: 401 auth fail, 500 graceful với message
