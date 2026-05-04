@@ -14,7 +14,7 @@ UI section hiển thị tiến trình tới wealth milestone tiếp theo. Chỉ 
 - [ ] Text: "X.Xtr / Y.Ytr để đạt [Level Name]"
 - [ ] CSS transition 0.5s khi bar fills
 - [ ] Motivational text: "Tiếp tục thêm Xtr nữa!"
-- [ ] Milestone achieved celebration:
+- [x] Milestone achieved celebration:
   - Pass threshold → confetti animation (lightweight library)
   - Trigger Phase 2 milestone event `wealth_level_up`
 - [x] Confetti library <10KB gzipped
