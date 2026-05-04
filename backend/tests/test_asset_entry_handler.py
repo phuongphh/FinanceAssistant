@@ -256,6 +256,265 @@ async def test_stock_quantity_accepts_with_separators():
 # -----------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_stock_subtype_pick_seeds_usd_currency_for_foreign_stock():
+    """Picking 'foreign_stock' must seed extra.currency=USD + fx_rate
+    so downstream price prompts and the saver know to convert."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "subtype",
+        "draft": {"asset_type": "stock", "extra": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry._handle_stock_subtype_pick(
+            db, 100, user, "foreign_stock",
+        )
+    patch_kwargs = update_step.await_args.kwargs
+    assert patch_kwargs["draft_patch"]["subtype"] == "foreign_stock"
+    extra = patch_kwargs["draft_patch"]["extra"]
+    assert extra["currency"] == "USD"
+    assert extra["fx_rate_vnd"] == float(asset_entry.USD_VND_RATE)
+
+
+@pytest.mark.asyncio
+async def test_stock_subtype_pick_no_currency_for_vn_stock():
+    """vn_stock must NOT get a currency tag — the saver branches on it."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "subtype",
+        "draft": {"asset_type": "stock", "extra": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry._handle_stock_subtype_pick(
+            db, 100, user, "vn_stock",
+        )
+    extra = update_step.await_args.kwargs["draft_patch"]["extra"]
+    assert "currency" not in extra
+    assert extra.get("exchange") == "HOSE"
+
+
+@pytest.mark.asyncio
+async def test_fund_quantity_prompt_uses_chung_chi_quy():
+    """Fund subtype must prompt with 'chứng chỉ quỹ', not 'cổ phiếu'."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "quantity",
+        "draft": {"asset_type": "stock", "subtype": "fund",
+                  "extra": {"ticker": "VESAF"}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "100", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "chứng chỉ quỹ" in sent_text
+    assert "cổ phiếu" not in sent_text  # do NOT reuse stock wording
+
+
+@pytest.mark.asyncio
+async def test_fund_avg_price_confirm_uses_ccq_suffix():
+    """Per-unit price confirmation should read '/ccq' for funds, '/cp' for stocks."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "avg_price",
+        "draft": {"asset_type": "stock", "subtype": "fund",
+                  "extra": {"ticker": "VESAF", "quantity": 100}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "15000", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "/ccq" in sent_text
+    assert "/cp" not in sent_text
+    assert "1 chứng chỉ quỹ" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_foreign_stock_avg_price_parses_usd_and_converts_to_vnd():
+    """Typing '150' on a foreign-stock avg-price step must be read as USD,
+    converted with USD_VND_RATE, and saved as float VND in extra.avg_price."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "avg_price",
+        "draft": {"asset_type": "stock", "subtype": "foreign_stock",
+                  "extra": {"ticker": "AAPL", "quantity": 10,
+                            "currency": "USD",
+                            "fx_rate_vnd": float(asset_entry.USD_VND_RATE)}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "150", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    patch_kwargs = update_step.await_args.kwargs
+    extra = patch_kwargs["draft_patch"]["extra"]
+    expected_vnd = float(Decimal("150") * asset_entry.USD_VND_RATE)
+    assert extra["avg_price"] == expected_vnd
+    assert extra["avg_price_usd"] == 150.0
+    # initial_value (VND) = 150 USD × 10 × rate.
+    assert patch_kwargs["draft_patch"]["initial_value"] == expected_vnd * 10
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    # User-facing message must show both USD and tạm tính VND.
+    assert "$150" in sent_text
+    assert "$1,500" in sent_text
+    assert "VNĐ tạm tính" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_foreign_stock_avg_price_rejects_vn_unit_suffix():
+    """'150 tr' on a foreign-stock step must be rejected, not interpreted as
+    150 million USD. The USD parser ignores VN units entirely."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "avg_price",
+        "draft": {"asset_type": "stock", "subtype": "foreign_stock",
+                  "extra": {"ticker": "AAPL", "quantity": 10,
+                            "currency": "USD"}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "150 tr", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    update_step.assert_not_awaited()  # bail with re-prompt
+    sent_text = send.await_args.kwargs.get("text") or send.await_args.args[0]
+    assert "USD" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_foreign_stock_save_persists_usd_and_fx_rate():
+    """End of foreign-stock flow: extra must carry USD-side fields + FX rate."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "current_price",
+        "draft": {
+            "asset_type": "stock",
+            "subtype": "foreign_stock",
+            "name": "AAPL",
+            "extra": {
+                "ticker": "AAPL",
+                "quantity": 10,
+                "currency": "USD",
+                "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
+                "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
+                "avg_price_usd": 150.0,
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="stock", value=int(Decimal("165") * asset_entry.USD_VND_RATE * 10))
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)) as create_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("100_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry.wizard_service, "update_step", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        # Simulate the user picking "Nhập giá hiện tại" and typing "165".
+        draft = user.wizard_state["draft"]
+        await asset_entry._handle_stock_current_price_input(
+            db, 100, user, "165", draft,
+        )
+    create_mock.assert_awaited_once()
+    kwargs = create_mock.await_args.kwargs
+    extra = kwargs["extra"]
+    assert extra["currency"] == "USD"
+    assert extra["avg_price_usd"] == 150.0
+    assert extra["current_price_usd"] == 165.0
+    assert extra["initial_value_usd"] == 1500.0
+    assert extra["current_value_usd"] == 1650.0
+    assert extra["fx_rate_vnd"] == float(asset_entry.USD_VND_RATE)
+    # Stored VND value is the converted current_price × quantity.
+    expected_current_vnd = Decimal("165") * asset_entry.USD_VND_RATE * 10
+    assert kwargs["current_value"] == expected_current_vnd
+
+
+@pytest.mark.asyncio
+async def test_foreign_stock_same_as_purchase_reuses_usd_avg_as_current():
+    """'Use purchase price' for foreign stock: current_price_usd must mirror
+    avg_price_usd, not be left missing or zero."""
+    user = _user({
+        "flow": asset_entry.FLOW_STOCK,
+        "step": "current_price",
+        "draft": {
+            "asset_type": "stock",
+            "subtype": "foreign_stock",
+            "name": "AAPL",
+            "extra": {
+                "ticker": "AAPL",
+                "quantity": 10,
+                "currency": "USD",
+                "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
+                "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
+                "avg_price_usd": 150.0,
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="stock")
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)) as create_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("100_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:stock_price:same",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    extra = create_mock.await_args.kwargs["extra"]
+    assert extra["current_price_usd"] == 150.0
+    assert extra["initial_value_usd"] == 1500.0
+    assert extra["current_value_usd"] == 1500.0
+
+
+@pytest.mark.asyncio
 async def test_real_estate_initial_value_accepts_ty():
     user = _user({
         "flow": asset_entry.FLOW_REAL_ESTATE,

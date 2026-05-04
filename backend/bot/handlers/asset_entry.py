@@ -34,6 +34,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
+from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.wealth_formatter import format_asset_added, format_asset_list
 from backend.bot.keyboards.asset_keyboard import (
     add_more_keyboard,
@@ -58,6 +59,7 @@ from backend.wealth.amount_parser import (
     parse_label_and_amount,
 )
 from backend.wealth.asset_types import AssetType, get_subtypes
+from backend.wealth.fx import USD_VND_RATE, parse_usd_amount, usd_to_vnd
 from backend.wealth.ladder import update_user_level
 from backend.wealth.services import asset_service, net_worth_calculator
 
@@ -252,6 +254,37 @@ async def _handle_cash_amount_input(
 
 # ---------- Stock flow ------------------------------------------------
 
+def _stock_unit_label(subtype: str | None) -> str:
+    """Human-readable unit name shown in stock-flow prompts.
+
+    Funds trade in "chứng chỉ quỹ" (CCQ); everything else (VN stock,
+    ETF, foreign stock) trades in "cổ phiếu". The two subtypes share
+    the same wizard but the user-facing wording must match.
+    """
+    if subtype == "fund":
+        return "chứng chỉ quỹ"
+    return "cổ phiếu"
+
+
+def _stock_unit_short(subtype: str | None) -> str:
+    """Short suffix for per-unit prices, e.g. ``45,000đ/cp`` vs ``/ccq``."""
+    if subtype == "fund":
+        return "ccq"
+    return "cp"
+
+
+def _format_usd(amount: Decimal) -> str:
+    """Format a USD amount with US thousands separators and 2 decimals.
+
+    Drops the trailing ``.00`` on whole-dollar amounts so ``$150`` reads
+    cleaner than ``$150.00`` in the typical foreign-stock case.
+    """
+    value = float(amount)
+    if value == int(value):
+        return f"${int(value):,}"
+    return f"${value:,.2f}"
+
+
 async def _start_stock_subtype_pick(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
@@ -278,17 +311,28 @@ async def _handle_stock_subtype_pick(
     extra: dict = {}
     if subtype == "vn_stock":
         extra["exchange"] = "HOSE"
+    elif subtype == "foreign_stock":
+        # Foreign-stock prices are entered in USD; record the rate snapshot
+        # at wizard time so historical values can be back-traced if the
+        # mid-rate gets updated later.
+        extra["currency"] = "USD"
+        extra["fx_rate_vnd"] = float(USD_VND_RATE)
 
     await wizard_service.update_step(
         db, user.id, step="ticker",
         draft_patch={"subtype": subtype, "extra": extra},
     )
+    examples = {
+        "vn_stock": "<code>VNM</code>, <code>VIC</code>, <code>HPG</code>",
+        "etf": "<code>E1VFVN30</code>, <code>FUEVFVND</code>",
+        "fund": "<code>VESAF</code>, <code>VEOF</code>, <code>DCDS</code>",
+        "foreign_stock": "<code>AAPL</code>, <code>GOOGL</code>, <code>NVDA</code>",
+    }.get(subtype, "<code>VNM</code>, <code>VIC</code>, <code>HPG</code>")
     await send_message(
         chat_id=chat_id,
         text=(
             "📈 <b>Mã (ticker) là gì?</b>\n\n"
-            "Ví dụ: <code>VNM</code>, <code>VIC</code>, <code>HPG</code>, "
-            "<code>E1VFVN30</code>"
+            f"Ví dụ: {examples}"
         ),
         parse_mode="HTML",
     )
@@ -312,11 +356,12 @@ async def _handle_stock_ticker_input(
         db, user.id, step="quantity",
         draft_patch={"extra": extra, "name": ticker},
     )
+    unit = _stock_unit_label(draft.get("subtype"))
     await send_message(
         chat_id=chat_id,
         text=(
             f"✅ <b>{ticker}</b>\n\n"
-            "Bạn đang sở hữu bao nhiêu cổ phiếu / chứng chỉ quỹ?"
+            f"Bạn đang sở hữu bao nhiêu {unit}?"
         ),
         parse_mode="HTML",
     )
@@ -344,15 +389,27 @@ async def _handle_stock_quantity_input(
     await wizard_service.update_step(
         db, user.id, step="avg_price", draft_patch={"extra": extra},
     )
-    await send_message(
-        chat_id=chat_id,
-        text=(
-            f"✅ <b>{quantity:,}</b> cổ phiếu\n\n"
-            "Giá mua trung bình mỗi cổ phiếu?\n"
+    subtype = draft.get("subtype")
+    unit = _stock_unit_label(subtype)
+    if subtype == "foreign_stock":
+        prompt = (
+            f"✅ <b>{quantity:,}</b> {unit}\n\n"
+            f"Giá mua trung bình mỗi {unit} (USD)?\n"
+            "Ví dụ: <code>150</code> hoặc <code>150.5</code>"
+        )
+    elif subtype == "fund":
+        prompt = (
+            f"✅ <b>{quantity:,}</b> {unit}\n\n"
+            f"Giá mua trung bình 1 {unit}?\n"
+            "Ví dụ: <code>15000</code> hoặc <code>15k</code>"
+        )
+    else:
+        prompt = (
+            f"✅ <b>{quantity:,}</b> {unit}\n\n"
+            f"Giá mua trung bình mỗi {unit}?\n"
             "Ví dụ: <code>45000</code> hoặc <code>45k</code>"
-        ),
-        parse_mode="HTML",
-    )
+        )
+    await send_message(chat_id=chat_id, text=prompt, parse_mode="HTML")
 
 
 async def _handle_stock_avg_price_input(
@@ -363,37 +420,68 @@ async def _handle_stock_avg_price_input(
             chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
         )
         return
-    avg_price = parse_amount(text)
-    if avg_price is None or avg_price <= 0:
+
+    subtype = draft.get("subtype")
+    is_foreign = subtype == "foreign_stock"
+    unit = _stock_unit_label(subtype)
+    unit_short = _stock_unit_short(subtype)
+
+    if is_foreign:
+        avg_price_usd = parse_usd_amount(text)
+        avg_price_vnd = usd_to_vnd(avg_price_usd) if avg_price_usd is not None else None
+    else:
+        avg_price_usd = None
+        avg_price_vnd = parse_amount(text)
+
+    if avg_price_vnd is None or avg_price_vnd <= 0:
         analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
                         properties={"flow": FLOW_STOCK, "field": "avg_price"})
+        example = (
+            "Ví dụ: <code>150</code> hoặc <code>150.5</code> (USD)"
+            if is_foreign else
+            "Ví dụ: <code>45000</code> hoặc <code>45k</code>"
+        )
         await send_message(
             chat_id=chat_id,
-            text=(
-                "Nhập giá giúp mình nhé 🙏\n"
-                "Ví dụ: <code>45000</code> hoặc <code>45k</code>"
-            ),
+            text=f"Nhập giá giúp mình nhé 🙏\n{example}",
             parse_mode="HTML",
         )
         return
 
     extra = dict(draft.get("extra") or {})
-    extra["avg_price"] = float(avg_price)
+    # ``avg_price`` is canonical VND-per-unit so downstream readers
+    # (Mini App, briefing) don't need to know the source currency.
+    extra["avg_price"] = float(avg_price_vnd)
+    if avg_price_usd is not None:
+        extra["avg_price_usd"] = float(avg_price_usd)
     quantity = extra.get("quantity", 0)
-    initial_value = avg_price * quantity
+    initial_value = avg_price_vnd * quantity
 
     await wizard_service.update_step(
         db, user.id, step="current_price",
         draft_patch={"extra": extra, "initial_value": float(initial_value)},
     )
+
+    if is_foreign:
+        initial_usd = avg_price_usd * Decimal(quantity)
+        confirm = (
+            f"✅ Giá mua TB: <b>{_format_usd(avg_price_usd)}/{unit_short}</b>\n"
+            f"Tổng vốn: <b>{_format_usd(initial_usd)}</b> "
+            f"(~{format_money_short(initial_value)} VNĐ tạm tính)\n"
+            f"FX: {int(USD_VND_RATE):,} VND/USD\n\n"
+            f"Giá hiện tại của 1 {unit} là bao nhiêu (USD)?\n"
+            "(Hoặc dùng giá mua nếu không nhớ)"
+        )
+    else:
+        confirm = (
+            f"✅ Giá mua TB: <b>{int(avg_price_vnd):,}đ/{unit_short}</b>\n"
+            f"Tổng vốn: <b>{int(initial_value):,}đ</b>\n\n"
+            f"Giá hiện tại của 1 {unit} là bao nhiêu?\n"
+            "(Hoặc dùng giá mua nếu không nhớ)"
+        )
     await send_message(
         chat_id=chat_id,
-        text=(
-            f"✅ Giá mua TB: <b>{int(avg_price):,}đ/cp</b>\n"
-            f"Tổng vốn: <b>{int(initial_value):,}đ</b>\n\n"
-            "Giá hiện tại của 1 cổ phiếu là bao nhiêu?\n"
-            "(Hoặc dùng giá mua nếu không nhớ)"
-        ),
+        text=confirm,
         parse_mode="HTML",
         reply_markup=stock_current_price_keyboard(),
     )
@@ -402,19 +490,32 @@ async def _handle_stock_avg_price_input(
 async def _handle_stock_current_price_choice(
     db: AsyncSession, chat_id: int, user: User, choice: str, draft: dict
 ) -> None:
+    subtype = draft.get("subtype")
     if choice == "same":
-        avg_price = Decimal(str(draft.get("extra", {}).get("avg_price") or 0))
-        await _save_stock_asset(db, chat_id, user, draft, avg_price)
+        # "Use purchase price" reuses whatever was captured during the
+        # avg_price step — VND for domestic flows, USD-derived VND for
+        # foreign. ``_save_stock_asset`` re-derives both.
+        avg_price_vnd = Decimal(str(draft.get("extra", {}).get("avg_price") or 0))
+        await _save_stock_asset(db, chat_id, user, draft, avg_price_vnd)
     elif choice == "new":
         await wizard_service.update_step(db, user.id, step="current_price_input")
-        await send_message(
-            chat_id=chat_id,
-            text=(
-                "💹 Nhập giá hiện tại của 1 cổ phiếu:\n"
+        unit = _stock_unit_label(subtype)
+        if subtype == "foreign_stock":
+            prompt = (
+                f"💹 Nhập giá hiện tại của 1 {unit} (USD):\n"
+                "Ví dụ: <code>165</code>"
+            )
+        elif subtype == "fund":
+            prompt = (
+                f"💹 Nhập giá hiện tại của 1 {unit}:\n"
+                "Ví dụ: <code>16000</code>"
+            )
+        else:
+            prompt = (
+                f"💹 Nhập giá hiện tại của 1 {unit}:\n"
                 "Ví dụ: <code>52000</code>"
-            ),
-            parse_mode="HTML",
-        )
+            )
+        await send_message(chat_id=chat_id, text=prompt, parse_mode="HTML")
 
 
 async def _handle_stock_current_price_input(
@@ -425,15 +526,39 @@ async def _handle_stock_current_price_input(
             chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
         )
         return
-    current_price = parse_amount(text)
-    if current_price is None or current_price <= 0:
+
+    subtype = draft.get("subtype")
+    is_foreign = subtype == "foreign_stock"
+
+    if is_foreign:
+        current_price_usd = parse_usd_amount(text)
+        current_price_vnd = (
+            usd_to_vnd(current_price_usd) if current_price_usd is not None else None
+        )
+    else:
+        current_price_usd = None
+        current_price_vnd = parse_amount(text)
+
+    if current_price_vnd is None or current_price_vnd <= 0:
+        example = (
+            "Ví dụ: <code>165</code> (USD)" if is_foreign
+            else "Ví dụ: <code>52000</code>"
+        )
         await send_message(
             chat_id=chat_id,
-            text="Nhập giá giúp mình nhé. Ví dụ: <code>52000</code>",
+            text=f"Nhập giá giúp mình nhé. {example}",
             parse_mode="HTML",
         )
         return
-    await _save_stock_asset(db, chat_id, user, draft, current_price)
+
+    if current_price_usd is not None:
+        # Stash the USD figure on the draft so ``_save_stock_asset``
+        # records it alongside the converted VND.
+        extra = dict(draft.get("extra") or {})
+        extra["current_price_usd"] = float(current_price_usd)
+        draft["extra"] = extra
+
+    await _save_stock_asset(db, chat_id, user, draft, current_price_vnd)
 
 
 async def _save_stock_asset(
@@ -445,6 +570,20 @@ async def _save_stock_asset(
     initial_value = avg_price * quantity
     current_value = current_price * quantity
     name = draft.get("name") or extra.get("ticker", "Cổ phiếu")
+
+    # For foreign stocks: persist the USD-side numbers and the FX rate
+    # used, so the confirmation message and any future Mini-App detail
+    # view can show "$1,500 ≈ 37.5tr tạm tính" without re-deriving.
+    if extra.get("currency") == "USD":
+        avg_price_usd = Decimal(str(extra.get("avg_price_usd") or 0))
+        current_price_usd = Decimal(str(
+            extra.get("current_price_usd") if extra.get("current_price_usd") is not None
+            else extra.get("avg_price_usd") or 0
+        ))
+        extra["current_price_usd"] = float(current_price_usd)
+        extra["initial_value_usd"] = float(avg_price_usd * quantity)
+        extra["current_value_usd"] = float(current_price_usd * quantity)
+        extra["current_price"] = float(current_price)
 
     asset = await asset_service.create_asset(
         db, user.id,

@@ -62,3 +62,26 @@ def test_net_worth_uses_current_not_initial():
     out = format_asset_added(asset, net_worth=Decimal(10_000_000))
     assert "10,000,000đ" in out
     assert "1,000,000đ" not in out
+
+
+def test_foreign_stock_shows_usd_and_tam_tinh_line():
+    """Foreign-stock confirmation must surface both the USD amount the
+    user typed and a 'tạm tính' note explaining the VND figure is
+    derived via the bundled FX rate."""
+    asset = _stock(initial=37_500_000, current=41_250_000)
+    asset.subtype = "foreign_stock"
+    asset.name = "AAPL"
+    asset.extra = {
+        "ticker": "AAPL",
+        "quantity": 10,
+        "currency": "USD",
+        "fx_rate_vnd": 25000,
+        "avg_price_usd": 150.0,
+        "current_price_usd": 165.0,
+        "initial_value_usd": 1500.0,
+        "current_value_usd": 1650.0,
+    }
+    out = format_asset_added(asset, net_worth=Decimal(41_250_000))
+    assert "$1,650" in out  # current USD value
+    assert "tạm tính" in out
+    assert "25,000 VND/USD" in out
