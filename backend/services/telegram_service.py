@@ -3,6 +3,7 @@
 All Telegram API interactions go through this service.
 Routers should never call Telegram API directly.
 """
+import asyncio
 import logging
 
 import httpx
@@ -18,6 +19,42 @@ from backend.services.menu_service import (
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Singleton httpx client. Creating a fresh AsyncClient per request paid the
+# full TCP+TLS handshake to api.telegram.org every time (~300-500ms per call
+# over the WAN), which compounded badly because each callback handler issues
+# at least two sequential requests (answerCallbackQuery + sendMessage).
+# Holding one client lets keep-alive reuse the connection so subsequent
+# calls land in the 50-150ms range. See the asset-wizard latency fix.
+_client: httpx.AsyncClient | None = None
+_client_lock = asyncio.Lock()
+
+
+async def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        async with _client_lock:
+            if _client is None:
+                _client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(10.0, connect=5.0),
+                    limits=httpx.Limits(
+                        max_keepalive_connections=20,
+                        max_connections=50,
+                        keepalive_expiry=60.0,
+                    ),
+                )
+    return _client
+
+
+async def close_client() -> None:
+    """Close the shared httpx client. Called from the FastAPI lifespan
+    on shutdown so we don't leak sockets."""
+    global _client
+    if _client is not None:
+        try:
+            await _client.aclose()
+        finally:
+            _client = None
+
 
 async def send_telegram(method: str, payload: dict) -> dict | None:
     """Send a request to the Telegram Bot API."""
@@ -26,12 +63,12 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
         return None
 
     url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/{method}"
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, timeout=10)
-        if resp.status_code == 200:
-            return resp.json()
-        logger.error("Telegram API error: %s %s", resp.status_code, resp.text)
-        return None
+    client = await _get_client()
+    resp = await client.post(url, json=payload)
+    if resp.status_code == 200:
+        return resp.json()
+    logger.error("Telegram API error: %s %s", resp.status_code, resp.text)
+    return None
 
 
 async def send_message(
@@ -74,12 +111,12 @@ async def send_photo(
 
     files = {"photo": (filename, photo_bytes, "image/png")}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, data=data, files=files, timeout=30)
-        if resp.status_code == 200:
-            return resp.json()
-        logger.error("Telegram sendPhoto error: %s %s", resp.status_code, resp.text)
-        return None
+    client = await _get_client()
+    resp = await client.post(url, data=data, files=files, timeout=30)
+    if resp.status_code == 200:
+        return resp.json()
+    logger.error("Telegram sendPhoto error: %s %s", resp.status_code, resp.text)
+    return None
 
 
 async def send_menu(chat_id: int) -> dict | None:
@@ -165,9 +202,9 @@ async def download_file(file_id: str) -> bytes | None:
         return None
 
     url = f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}"
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url, timeout=30)
-        if resp.status_code != 200:
-            logger.error("Telegram file download error: %s", resp.status_code)
-            return None
-        return resp.content
+    client = await _get_client()
+    resp = await client.get(url, timeout=30)
+    if resp.status_code != 200:
+        logger.error("Telegram file download error: %s", resp.status_code)
+        return None
+    return resp.content

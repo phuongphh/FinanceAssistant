@@ -22,17 +22,24 @@ def mock_settings():
 
 @pytest.fixture
 def mock_httpx():
-    with patch("backend.services.telegram_service.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"ok": True, "result": True}
-        mock_response.text = '{"ok": true}'
-        mock_client.post.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+    # send_telegram() now reuses a singleton AsyncClient (see the asset-wizard
+    # latency fix). Patch the getter directly so each test gets a fresh mock
+    # without leaking the singleton across tests.
+    import backend.services.telegram_service as ts
+
+    mock_client = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"ok": True, "result": True}
+    mock_response.text = '{"ok": true}'
+    mock_client.post.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    saved_client = ts._client
+    ts._client = None
+    with patch.object(ts, "_get_client", AsyncMock(return_value=mock_client)):
         yield mock_client
+    ts._client = saved_client
 
 
 class TestSendTelegram:
