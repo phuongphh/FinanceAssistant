@@ -17,7 +17,7 @@ UI section hiển thị tiến trình tới wealth milestone tiếp theo. Chỉ 
 - [ ] Milestone achieved celebration:
   - Pass threshold → confetti animation (lightweight library)
   - Trigger Phase 2 milestone event `wealth_level_up`
-- [ ] Confetti library <10KB gzipped
+- [x] Confetti library <10KB gzipped
 
 ## Estimate
 ~0.5 day
