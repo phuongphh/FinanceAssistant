@@ -34,11 +34,17 @@ async def _get_client() -> httpx.AsyncClient:
     if _client is None:
         async with _client_lock:
             if _client is None:
+                # HTTP/2 lets one TCP connection multiplex many concurrent
+                # requests to api.telegram.org, which removes the 6-stream
+                # head-of-line bottleneck under callback-storm load (each
+                # callback handler fires answerCallbackQuery + sendMessage,
+                # so 100 concurrent users = 200 in-flight requests).
                 _client = httpx.AsyncClient(
+                    http2=True,
                     timeout=httpx.Timeout(10.0, connect=5.0),
                     limits=httpx.Limits(
-                        max_keepalive_connections=20,
-                        max_connections=50,
+                        max_keepalive_connections=50,
+                        max_connections=100,
                         keepalive_expiry=60.0,
                     ),
                 )

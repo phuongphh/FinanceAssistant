@@ -25,6 +25,7 @@ never commits — the worker owns the transaction boundary.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import date
@@ -781,6 +782,90 @@ async def handle_asset_text_input(
     return True
 
 
+async def _dispatch_asset_action(
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    action: str,
+    arg: str | None,
+) -> None:
+    """Body of the asset-callback dispatcher.
+
+    Split out from ``handle_asset_callback`` so we can run it in parallel
+    with ``answer_callback`` via ``asyncio.gather`` — Telegram needs the
+    callback acked to dismiss the loading spinner, but that ack is
+    independent of any send_message/edit_message_text the action produces.
+    Running them sequentially paid one full RTT to api.telegram.org for
+    no business reason; gather halves perceived latency on every tap.
+    """
+    # Top-level entry / restart.
+    if action == "start" or (action == "more"):
+        await start_asset_wizard(db, chat_id, user)
+        return
+
+    if action == "cancel":
+        await wizard_service.clear(db, user.id)
+        analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
+        await send_message(chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋")
+        return
+
+    if action == "undo" and arg:
+        await _handle_undo(db, chat_id, user, arg)
+        return
+
+    if action == "done":
+        await wizard_service.clear(db, user.id)
+        # Mark first-asset onboarding step done if this was their first asset.
+        await _mark_onboarding_first_asset_done(db, user)
+        await send_message(
+            chat_id=chat_id,
+            text="✅ Xong! Gõ /menu để xem các tính năng khác.",
+        )
+        return
+
+    if action == "type" and arg:
+        analytics.track(
+            AssetEvent.TYPE_PICKED,
+            user_id=user.id,
+            properties={"asset_type": arg},
+        )
+        starters = {
+            AssetType.CASH.value: _start_cash_subtype_pick,
+            AssetType.STOCK.value: _start_stock_subtype_pick,
+            AssetType.REAL_ESTATE.value: _start_real_estate_subtype_pick,
+        }
+        starter = starters.get(arg)
+        if starter is None:
+            # Crypto / Gold / Other: not yet wired in Epic 1.
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    "Loại này sẽ có sớm 🙏 Tạm thời bạn dùng "
+                    "💵 / 📈 / 🏠 nhé."
+                ),
+            )
+            return
+        await starter(db, chat_id, user)
+        return
+
+    if action == "cash_subtype" and arg:
+        await _handle_cash_subtype_pick(db, chat_id, user, arg)
+        return
+
+    if action == "stock_subtype" and arg:
+        await _handle_stock_subtype_pick(db, chat_id, user, arg)
+        return
+
+    if action == "re_subtype" and arg:
+        await _handle_re_subtype_pick(db, chat_id, user, arg)
+        return
+
+    if action == "stock_price" and arg in ("same", "new"):
+        draft = wizard_service.get_draft(user.wizard_state)
+        await _handle_stock_current_price_choice(db, chat_id, user, arg, draft)
+        return
+
+
 async def handle_asset_callback(
     db: AsyncSession, callback_query: dict
 ) -> bool:
@@ -806,75 +891,11 @@ async def handle_asset_callback(
     action = parts[0] if parts else "start"
     arg = parts[1] if len(parts) > 1 else None
 
-    await answer_callback(callback_id)
-
-    # Top-level entry / restart.
-    if action == "start" or (action == "more"):
-        await start_asset_wizard(db, chat_id, user)
-        return True
-
-    if action == "cancel":
-        await wizard_service.clear(db, user.id)
-        analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
-        await send_message(chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋")
-        return True
-
-    if action == "undo" and arg:
-        await _handle_undo(db, chat_id, user, arg)
-        return True
-
-    if action == "done":
-        await wizard_service.clear(db, user.id)
-        # Mark first-asset onboarding step done if this was their first asset.
-        await _mark_onboarding_first_asset_done(db, user)
-        await send_message(
-            chat_id=chat_id,
-            text="✅ Xong! Gõ /menu để xem các tính năng khác.",
-        )
-        return True
-
-    if action == "type" and arg:
-        analytics.track(
-            AssetEvent.TYPE_PICKED,
-            user_id=user.id,
-            properties={"asset_type": arg},
-        )
-        starters = {
-            AssetType.CASH.value: _start_cash_subtype_pick,
-            AssetType.STOCK.value: _start_stock_subtype_pick,
-            AssetType.REAL_ESTATE.value: _start_real_estate_subtype_pick,
-        }
-        starter = starters.get(arg)
-        if starter is None:
-            # Crypto / Gold / Other: not yet wired in Epic 1.
-            await send_message(
-                chat_id=chat_id,
-                text=(
-                    "Loại này sẽ có sớm 🙏 Tạm thời bạn dùng "
-                    "💵 / 📈 / 🏠 nhé."
-                ),
-            )
-            return True
-        await starter(db, chat_id, user)
-        return True
-
-    if action == "cash_subtype" and arg:
-        await _handle_cash_subtype_pick(db, chat_id, user, arg)
-        return True
-
-    if action == "stock_subtype" and arg:
-        await _handle_stock_subtype_pick(db, chat_id, user, arg)
-        return True
-
-    if action == "re_subtype" and arg:
-        await _handle_re_subtype_pick(db, chat_id, user, arg)
-        return True
-
-    if action == "stock_price" and arg in ("same", "new"):
-        draft = wizard_service.get_draft(user.wizard_state)
-        await _handle_stock_current_price_choice(db, chat_id, user, arg, draft)
-        return True
-
+    # Run the ack and the action in parallel — see _dispatch_asset_action.
+    await asyncio.gather(
+        answer_callback(callback_id),
+        _dispatch_asset_action(db, chat_id, user, action, arg),
+    )
     return True  # consumed (any asset_add:* payload), even if no-op.
 
 
