@@ -37,6 +37,7 @@ def _fake_asset(
     *,
     name: str = "VCB tiết kiệm",
     asset_type: str = "cash",
+    subtype: str | None = None,
     current_value: Decimal = Decimal("100000000"),
     initial_value: Decimal | None = None,
     extra: dict | None = None,
@@ -45,7 +46,7 @@ def _fake_asset(
     asset.id = uuid.uuid4()
     asset.name = name
     asset.asset_type = asset_type
-    asset.subtype = None
+    asset.subtype = subtype
     asset.current_value = current_value
     asset.initial_value = initial_value if initial_value is not None else current_value
     asset.extra = extra or {}
@@ -218,6 +219,49 @@ async def test_query_portfolio_handler_shows_positions_and_pnl():
     assert "100 cổ" in response
     # P&L was +12.5% so the green emoji should appear.
     assert "🟢" in response
+
+
+@pytest.mark.asyncio
+async def test_query_portfolio_handler_renders_funds_with_ccq_unit():
+    """Funds (subtype='fund') must show 'ccq', not 'cổ'."""
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    holdings = [
+        _fake_asset(
+            name="TCEF",
+            asset_type="stock",
+            subtype="fund",
+            current_value=Decimal("21599500"),
+            initial_value=Decimal("20000000"),
+            extra={"ticker": "TCEF", "quantity": 21599.5},
+        ),
+        _fake_asset(
+            name="VNM",
+            asset_type="stock",
+            subtype="vn_stock",
+            current_value=Decimal("4500000"),
+            initial_value=Decimal("4000000"),
+            extra={"ticker": "VNM", "quantity": 100},
+        ),
+    ]
+    with patch(
+        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+        AsyncMock(return_value=holdings),
+    ), patch(
+        "backend.intent.handlers.query_portfolio.resolve_style",
+        AsyncMock(return_value=_young_prof_style()),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_PORTFOLIO,
+            confidence=0.95,
+            raw_text="portfolio",
+        )
+        response = await QueryPortfolioHandler().handle(intent, _user(), _fake_db())
+
+    assert "21599.5 ccq" in response
+    assert "21599.5 cổ" not in response
+    # Stocks still use "cổ".
+    assert "100 cổ" in response
 
 
 @pytest.mark.asyncio

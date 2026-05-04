@@ -105,3 +105,16 @@ def get_subtype_label(subtype: str | None) -> str | None:
     if not subtype:
         return None
     return _SUBTYPE_SHORT_LABELS.get(subtype)
+
+
+def get_quantity_unit(asset_type: str, subtype: str | None) -> str:
+    """Return the unit shown after a quantity in portfolio listings.
+
+    Funds trade in chứng chỉ quỹ (CCQ), regular stocks in cổ phiếu —
+    the wizard prompts and the portfolio report must agree on wording.
+    Defaults to "cổ" so unknown stock-like subtypes still render
+    sensibly.
+    """
+    if asset_type == "stock" and subtype == "fund":
+        return "ccq"
+    return "cổ"
