@@ -9,9 +9,9 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: P3A-21, P3A-22
 UI section hiển thị tiến trình tới wealth milestone tiếp theo. Chỉ hiện cho Starter level.
 
 ## Acceptance Criteria
-- [ ] Section "🎯 Mục tiêu tiếp theo" visible only when `level === 'starter'`
+- [x] Section "🎯 Mục tiêu tiếp theo" visible only when `level === 'starter'`
 - [x] Progress bar animated: fill % = current_net_worth / target_milestone
-- [ ] Text: "X.Xtr / Y.Ytr để đạt [Level Name]"
+- [x] Text: "X.Xtr / Y.Ytr để đạt [Level Name]"
 - [x] CSS transition 0.5s khi bar fills
 - [x] Motivational text: "Tiếp tục thêm Xtr nữa!"
 - [x] Milestone achieved celebration:
