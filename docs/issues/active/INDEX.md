@@ -24,5 +24,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #166 | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [issue-166.md](issue-166.md) |
 | #167 | [Story] P3.6-S7: Add wealth-level detection to MenuFormatter | [issue-167.md](issue-167.md) |
 | #168 | [Story] P3.6-S8: Update Telegram bot menu button commands | [issue-168.md](issue-168.md) |
+| #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 
-**Total active:** 20
+**Total active:** 21
