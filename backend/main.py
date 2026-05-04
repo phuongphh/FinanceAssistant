@@ -12,6 +12,7 @@ from backend.config import get_settings
 from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
+from backend.services.telegram_service import close_client as close_telegram_client
 from backend.services.telegram_service import register_bot_commands
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
@@ -124,6 +125,8 @@ async def lifespan(app: FastAPI):
                 "their telegram_updates rows will be recovered on next startup",
                 len(still_pending),
             )
+
+    await close_telegram_client()
 
     logger.info("Finance Assistant API shutting down")
 
