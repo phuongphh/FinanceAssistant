@@ -44,6 +44,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #79 | Pre-Phase | [P3A-21] Build Mini App net worth dashboard HTML/CSS | [pre-phase/issue-79.md](by-phase/pre-phase/issue-79.md) |
 | #80 | Pre-Phase | [P3A-22] Implement /api/wealth/overview endpoint | [pre-phase/issue-80.md](by-phase/pre-phase/issue-80.md) |
 | #81 | Pre-Phase | [P3A-23] Chart.js integration: pie chart + trend line chart | [pre-phase/issue-81.md](by-phase/pre-phase/issue-81.md) |
+| #82 | Pre-Phase | [P3A-24] Milestone progress display for Starter level | [pre-phase/issue-82.md](by-phase/pre-phase/issue-82.md) |
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
@@ -74,5 +75,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #153 | Pre-Phase | [Bug] Monthly report advice section không phù hợp với định hướng Personal CFO và data thực tế của user HNW | [pre-phase/issue-153.md](by-phase/pre-phase/issue-153.md) |
 | #155 | Phase 3A | [Wealth] Celebrate wealth level transitions + Vietnamese theme labels | [phase-3a/issue-155.md](by-phase/phase-3a/issue-155.md) |
 
-**Total:** 69 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 52 Pre-Phase)
+**Total:** 70 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 53 Pre-Phase)
