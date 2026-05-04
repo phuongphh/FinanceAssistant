@@ -10,7 +10,7 @@ Triage và fix bugs từ user testing. Gate review trước khi ship Phase 3A ra
 
 ## Acceptance Criteria
 - [ ] Bug list từ P3A-25 triage thành: Critical / High / Medium / Low
-- [ ] 100% Critical bugs fixed
+- [x] 100% Critical bugs fixed
 - [ ] ≥80% High bugs fixed
 - [ ] Medium/Low: documented, deferred to next sprint
 - [ ] Regression test: re-test all P3A-25 success criteria
