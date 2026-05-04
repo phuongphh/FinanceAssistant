@@ -28,6 +28,34 @@ class WealthLevel(str, Enum):
     HIGH_NET_WORTH = "hnw"
 
 
+# User-facing Vietnamese labels (Issue #155). Theme nông nghiệp/giàu sang —
+# "short" form xuất hiện trong tin chúc mừng, "full" form cho UI dài hơn.
+LEVEL_LABELS: dict[WealthLevel, dict[str, str]] = {
+    WealthLevel.STARTER: {"short": "Trồng lúa", "full": "Bắt đầu tích luỹ"},
+    WealthLevel.YOUNG_PROFESSIONAL: {"short": "Kho thóc", "full": "Có chút tiết kiệm"},
+    WealthLevel.MASS_AFFLUENT: {"short": "Phú hộ", "full": "Của ăn của để"},
+    WealthLevel.HIGH_NET_WORTH: {"short": "Vương giả", "full": "Giàu sang phú quý"},
+}
+
+
+# Order of levels for "higher than" comparisons. STARTER < YOUNG_PROF < ...
+LEVEL_ORDER: list[WealthLevel] = [
+    WealthLevel.STARTER,
+    WealthLevel.YOUNG_PROFESSIONAL,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+]
+
+
+def format_level(level: WealthLevel, style: str = "short") -> str:
+    """Return the Vietnamese label for ``level``.
+
+    ``style="short"`` → "Kho thóc" (themed, used in messages).
+    ``style="full"`` → "Có chút tiết kiệm" (descriptive, used in dashboards).
+    """
+    return LEVEL_LABELS[level][style]
+
+
 _BAND_30M = Decimal("30_000_000")
 _BAND_200M = Decimal("200_000_000")
 _BAND_1B = Decimal("1_000_000_000")

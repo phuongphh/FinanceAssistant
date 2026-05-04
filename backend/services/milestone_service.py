@@ -36,6 +36,8 @@ from backend.models.expense import Expense
 from backend.models.streak import UserStreak
 from backend.models.user import User
 from backend.models.user_milestone import MilestoneType, UserMilestone
+from backend.wealth import ladder
+from backend.wealth.services.net_worth_calculator import calculate as calculate_net_worth
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +94,7 @@ async def detect_and_record(
     new_rows.extend(await _check_first_transaction(db, user_id))
     new_rows.extend(await _check_time_milestones(db, user_id))
     new_rows.extend(await _check_streak_milestones(db, user_id))
+    new_rows.extend(await _check_wealth_level_changes(db, user_id))
     # Savings + behavior detection deferred — see module docstring.
     new_rows.extend(await _check_savings_milestones(db, user_id))
     new_rows.extend(await _check_behavior_milestones(db, user_id))
@@ -234,6 +237,76 @@ async def _check_streak_milestones(
     return out
 
 
+# Mapping: each non-Starter level has its own UP milestone code; each
+# non-HNW level has its own DOWN milestone code. Lookup tables keep
+# `_check_wealth_level_changes` linear and obvious.
+_UP_MILESTONE_BY_LEVEL: dict[ladder.WealthLevel, str] = {
+    ladder.WealthLevel.YOUNG_PROFESSIONAL: MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,
+    ladder.WealthLevel.MASS_AFFLUENT: MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT,
+    ladder.WealthLevel.HIGH_NET_WORTH: MilestoneType.WEALTH_LEVEL_UP_HNW,
+}
+_DOWN_MILESTONE_BY_LEVEL: dict[ladder.WealthLevel, str] = {
+    ladder.WealthLevel.STARTER: MilestoneType.WEALTH_LEVEL_DOWN_STARTER,
+    ladder.WealthLevel.YOUNG_PROFESSIONAL: MilestoneType.WEALTH_LEVEL_DOWN_YOUNG_PROF,
+    ladder.WealthLevel.MASS_AFFLUENT: MilestoneType.WEALTH_LEVEL_DOWN_MASS_AFFLUENT,
+}
+
+
+async def _check_wealth_level_changes(
+    db: AsyncSession, user_id: uuid.UUID
+) -> list[UserMilestone]:
+    """Detect wealth-band crossings (Issue #155).
+
+    Strategy:
+    - User's *highest level ever* is reconstructed from existing UP
+      milestones (Starter is the implicit floor).
+    - If current level > highest_ever → fire UP milestone for current.
+    - If current level < highest_ever → fire DOWN milestone for current.
+      Done with empathy in YAML — never blame.
+    - Yo-yo across a boundary is dedup'd by ``(user_id, milestone_type)``
+      unique constraint, so re-crossing fires no second message.
+
+    Net worth is recomputed here (rather than trusting the persisted
+    ``user.wealth_level``) so the milestone reflects truth at job time —
+    asset values may have drifted since the last write.
+    """
+    user = await db.get(User, user_id)
+    if user is None:
+        return []
+
+    breakdown = await calculate_net_worth(db, user_id)
+    current_level = ladder.detect_level(breakdown.total)
+
+    existing = await _existing_types(db, user_id)
+    highest_idx = ladder.LEVEL_ORDER.index(ladder.WealthLevel.STARTER)
+    for level, m_type in _UP_MILESTONE_BY_LEVEL.items():
+        if m_type in existing:
+            highest_idx = max(highest_idx, ladder.LEVEL_ORDER.index(level))
+
+    current_idx = ladder.LEVEL_ORDER.index(current_level)
+    if current_idx == highest_idx:
+        return []
+
+    if current_idx > highest_idx:
+        m_type = _UP_MILESTONE_BY_LEVEL.get(current_level)
+    else:
+        m_type = _DOWN_MILESTONE_BY_LEVEL.get(current_level)
+
+    if not m_type:
+        return []  # Defensive: STARTER has no UP, HNW has no DOWN.
+
+    target_amount, target_level = ladder.next_milestone(breakdown.total)
+    extra = {
+        "new_level": current_level.value,
+        "next_target_amount": str(target_amount),
+        "next_level": target_level.value,
+    }
+    row = await _create_if_missing(
+        db, user_id, m_type, extra=extra, existing=existing
+    )
+    return [row] if row else []
+
+
 async def _check_savings_milestones(
     db: AsyncSession, user_id: uuid.UUID
 ) -> list[UserMilestone]:
@@ -287,12 +360,42 @@ def _render_context(milestone: UserMilestone, user: User) -> dict:
     amount_str = (
         format_money_full(float(amount_raw)) if amount_raw is not None else ""
     )
+
+    # Wealth-level placeholders (Issue #155). Empty strings when missing
+    # so non-wealth templates that don't reference them still render.
+    level_label = level_full = next_target = next_level_label = ""
+    new_level_raw = extra.get("new_level")
+    next_level_raw = extra.get("next_level")
+    next_target_raw = extra.get("next_target_amount")
+    if new_level_raw:
+        try:
+            level = ladder.WealthLevel(new_level_raw)
+            level_label = ladder.format_level(level, "short")
+            level_full = ladder.format_level(level, "full")
+        except ValueError:
+            logger.warning("Unknown wealth level %s in milestone extra", new_level_raw)
+    if next_level_raw:
+        try:
+            n_level = ladder.WealthLevel(next_level_raw)
+            next_level_label = ladder.format_level(n_level, "short")
+        except ValueError:
+            logger.warning("Unknown next level %s in milestone extra", next_level_raw)
+    if next_target_raw is not None:
+        try:
+            next_target = format_money_full(float(next_target_raw))
+        except (TypeError, ValueError):
+            pass
+
     return {
         "name": user.get_greeting_name(),
         "days": extra.get("days", 0),
         "count": extra.get("count", 0),
         "amount": amount_str,
         "goal_progress": extra.get("goal_progress", ""),
+        "level_label": level_label,
+        "level_full": level_full,
+        "next_target": next_target,
+        "next_level_label": next_level_label,
     }
 
 
