@@ -11,7 +11,7 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: All P3A issues | Bloc
 Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A có đủ tiêu chuẩn go-to-production không.
 
 ## User Recruitment
-- [ ] 2 users — Starter level (22-25 tuổi, vừa đi làm)
+- [x] 2 users — Starter level (22-25 tuổi, vừa đi làm)
 - [ ] 3 users — Young Professional (26-32 tuổi)
 - [ ] 2 users — Mass Affluent (35-45 tuổi)
 
