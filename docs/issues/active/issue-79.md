@@ -19,7 +19,7 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: Phase 1 Mini App | Bl
   5. **Milestone section** (Starter only)
   6. **Assets list** với edit button
 - [x] Responsive: iPhone SE (375px) → Pro Max (430px)
-- [ ] Loading skeleton state (trước khi data về)
+- [x] Loading skeleton state (trước khi data về)
 - [ ] Empty state: "Bắt đầu bằng việc thêm tài sản đầu tiên" + CTA button
 - [ ] Dark mode: read `Telegram.WebApp.themeParams` and apply CSS variables
 - [ ] `Telegram.WebApp.expand()` để full screen
