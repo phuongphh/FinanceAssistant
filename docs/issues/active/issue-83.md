@@ -13,7 +13,7 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 ## User Recruitment
 - [x] 2 users — Starter level (22-25 tuổi, vừa đi làm)
 - [ ] 3 users — Young Professional (26-32 tuổi)
-- [ ] 2 users — Mass Affluent (35-45 tuổi)
+- [x] 2 users — Mass Affluent (35-45 tuổi)
 
 ## Test Protocol
 - [ ] Consent form (privacy, right to delete data)
