@@ -10,7 +10,7 @@ FastAPI endpoint trả về toàn bộ data cho wealth dashboard. Performance cr
 
 ## Acceptance Criteria
 - [ ] Route `GET /miniapp/api/wealth/overview`
-- [ ] Auth: `require_miniapp_auth` (Telegram initData)
+- [x] Auth: `require_miniapp_auth` (Telegram initData)
 - [ ] Response JSON schema:
   ```json
   {
