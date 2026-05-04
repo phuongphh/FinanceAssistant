@@ -16,16 +16,16 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 - [x] 2 users — Mass Affluent (35-45 tuổi)
 
 ## Test Protocol
-- [x] Consent form (privacy, right to delete data)
+- [ ] Consent form (privacy, right to delete data)
 - [x] **Day 1:** Guided 30-min onboarding call, add first assets together
 - [x] **Day 2-6:** Organic use, receive morning briefing at 7h
 - [x] **Daily:** 1-sentence check-in text ("Hôm nay briefing có hữu ích không?")
-- [ ] **Day 7:** 30-min interview call
+- [x] **Day 7:** 30-min interview call
 
 ## Analytics to Track
-- [ ] `briefing_opened` per user (7 days)
-- [ ] `dashboard_viewed` count
-- [ ] `storytelling_completed` count
+- [x] `briefing_opened` per user (7 days)
+- [x] `dashboard_viewed` count
+- [x] `storytelling_completed` count
 - [ ] `asset_added` count
 
 ## ✅ Success Criteria (ALL must check)
