@@ -17,9 +17,9 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 
 ## Test Protocol
 - [x] Consent form (privacy, right to delete data)
-- [ ] **Day 1:** Guided 30-min onboarding call, add first assets together
-- [ ] **Day 2-6:** Organic use, receive morning briefing at 7h
-- [ ] **Daily:** 1-sentence check-in text ("Hôm nay briefing có hữu ích không?")
+- [x] **Day 1:** Guided 30-min onboarding call, add first assets together
+- [x] **Day 2-6:** Organic use, receive morning briefing at 7h
+- [x] **Daily:** 1-sentence check-in text ("Hôm nay briefing có hữu ích không?")
 - [ ] **Day 7:** 30-min interview call
 
 ## Analytics to Track
