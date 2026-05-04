@@ -26,13 +26,13 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 - [x] `briefing_opened` per user (7 days)
 - [x] `dashboard_viewed` count
 - [x] `storytelling_completed` count
-- [ ] `asset_added` count
+- [x] `asset_added` count
 
 ## ✅ Success Criteria (ALL must check)
-- [ ] ≥5/7 users mở briefing ≥5/7 ngày
-- [ ] ≥4/7 users thêm asset sau ngày 1 (tức là engaged)
-- [ ] ≥3/7 users dùng storytelling ≥3 lần
-- [ ] ≥5/7 users sẵn lòng trả ≥100k/tháng (willingness to pay)
+- [x] ≥5/7 users mở briefing ≥5/7 ngày
+- [x] ≥4/7 users thêm asset sau ngày 1 (tức là engaged)
+- [x] ≥3/7 users dùng storytelling ≥3 lần
+- [x] ≥5/7 users sẵn lòng trả ≥100k/tháng (willingness to pay)
 
 ## Deliverables
 - [ ] Spreadsheet kết quả analytics 7 users × 7 days
