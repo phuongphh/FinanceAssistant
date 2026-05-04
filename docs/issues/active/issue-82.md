@@ -10,10 +10,10 @@ UI section hiển thị tiến trình tới wealth milestone tiếp theo. Chỉ 
 
 ## Acceptance Criteria
 - [ ] Section "🎯 Mục tiêu tiếp theo" visible only when `level === 'starter'`
-- [ ] Progress bar animated: fill % = current_net_worth / target_milestone
+- [x] Progress bar animated: fill % = current_net_worth / target_milestone
 - [ ] Text: "X.Xtr / Y.Ytr để đạt [Level Name]"
-- [ ] CSS transition 0.5s khi bar fills
-- [ ] Motivational text: "Tiếp tục thêm Xtr nữa!"
+- [x] CSS transition 0.5s khi bar fills
+- [x] Motivational text: "Tiếp tục thêm Xtr nữa!"
 - [x] Milestone achieved celebration:
   - Pass threshold → confetti animation (lightweight library)
   - Trigger Phase 2 milestone event `wealth_level_up`
