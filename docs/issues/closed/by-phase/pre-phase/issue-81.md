@@ -18,7 +18,7 @@ Interactive charts với Chart.js. Vietnamese money format. Smooth animations.
 - [x] Responsive: charts resize theo screen width
 - [x] Click pie slice → highlight + show detail tooltip
 - [x] Charts load async sau page render (không block UI)
-- [ ] Skeleton placeholder khi loading
+- [x] Skeleton placeholder khi loading
 
 ## Technical Notes
 - Chart.js 4.4.0
