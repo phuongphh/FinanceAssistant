@@ -1,9 +1,6 @@
-# Issue #79: [P3A-21] Build Mini App net worth dashboard HTML/CSS
+# Issue #79
 
-**GitHub:** https://github.com/phuongphh/FinanceAssistant/issues/79  
-**Status:** Open
-
----
+[P3A-21] Build Mini App net worth dashboard HTML/CSS
 
 ## Epic
 Epic 4 — Visualization & Testing | **Week 4** | Depends: Phase 1 Mini App | Blocks: P3A-23
@@ -12,7 +9,7 @@ Epic 4 — Visualization & Testing | **Week 4** | Depends: Phase 1 Mini App | Bl
 "North Star" screen — nơi user xem tổng tài sản. Phải đẹp, fast load, mobile-first.
 
 ## Acceptance Criteria
-- [ ] File `app/miniapp/templates/net_worth_dashboard.html`
+- [x] File `app/miniapp/templates/net_worth_dashboard.html`
 - [ ] File `app/miniapp/static/css/wealth.css`
 - [ ] 6 sections:
   1. **Hero card**: Net worth total + change vs yesterday
