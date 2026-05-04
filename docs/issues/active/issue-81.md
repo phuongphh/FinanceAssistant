@@ -16,7 +16,7 @@ Interactive charts với Chart.js. Vietnamese money format. Smooth animations.
 - [x] Period selector: [30 ngày] [90 ngày] [365 ngày] — re-fetch và re-render
 - [x] Colors map từ `asset_categories.yaml`
 - [x] Responsive: charts resize theo screen width
-- [ ] Click pie slice → highlight + show detail tooltip
+- [x] Click pie slice → highlight + show detail tooltip
 - [ ] Charts load async sau page render (không block UI)
 - [ ] Skeleton placeholder khi loading
 
