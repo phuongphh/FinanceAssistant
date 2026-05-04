@@ -10,6 +10,7 @@ from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
+from backend.wealth.asset_types import get_quantity_unit
 from backend.wealth.services import asset_service
 
 
@@ -55,7 +56,8 @@ class QueryPortfolioHandler(IntentHandler):
         for asset in ordered:
             ticker = (asset.extra or {}).get("ticker") or asset.name
             quantity = (asset.extra or {}).get("quantity")
-            qty_str = f" ({quantity:g} cổ)" if isinstance(quantity, (int, float)) else ""
+            unit = get_quantity_unit(asset.asset_type, asset.subtype)
+            qty_str = f" ({quantity:g} {unit})" if isinstance(quantity, (int, float)) else ""
             value = format_money_short(asset.current_value)
             # Hide P&L percentage for Starter — too much information for
             # a user with their first few thousand VND in stocks.
