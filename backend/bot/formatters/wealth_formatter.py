@@ -20,6 +20,10 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
     where user gave a different "current" estimate), shows an unrealised
     gain/loss line. Skipped when current == initial so the cash flow and
     "use same price" stock flow stay one-line.
+
+    Foreign-currency assets get an extra "≈ $X (FX rate, tạm tính)"
+    line so the user sees both the native USD value they typed and the
+    estimated VND that's actually stored.
     """
     icon = get_subtype_icon(asset.asset_type, asset.subtype)
     label = get_label(asset.asset_type)
@@ -29,6 +33,17 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
         f"✅ Đã ghi {icon} {asset.name}",
         f"   {label}: {format_money_full(current)}",
     ]
+
+    extra = asset.extra or {}
+    if extra.get("currency") == "USD":
+        current_usd = extra.get("current_value_usd")
+        fx_rate = extra.get("fx_rate_vnd")
+        if current_usd is not None and fx_rate:
+            usd_str = _format_usd_short(Decimal(str(current_usd)))
+            lines.append(
+                f"   ≈ {usd_str} USD (FX {int(fx_rate):,} VND/USD, tạm tính)"
+            )
+
     diff = current - initial
     if diff > 0:
         lines.append(f"   📈 +{format_money_short(diff)}")
@@ -38,6 +53,14 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
     lines.append("")
     lines.append(f"💎 Tổng tài sản: <b>{format_money_full(net_worth)}</b>")
     return "\n".join(lines)
+
+
+def _format_usd_short(amount: Decimal) -> str:
+    """Render USD with US thousands separator; drop ``.00`` on whole values."""
+    value = float(amount)
+    if value == int(value):
+        return f"${int(value):,}"
+    return f"${value:,.2f}"
 
 
 def format_asset_list(assets: list[Asset]) -> str:
