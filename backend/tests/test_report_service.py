@@ -1,10 +1,19 @@
 """Tests for report_service — intent detection, month parsing, and orchestration."""
 from datetime import date
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.services.report_service import extract_month_key, is_report_query, process_report_request
+from backend.services.report_service import (
+    _LEVEL_GUIDANCE,
+    _LEVEL_LABEL_VI,
+    _build_report_prompt,
+    extract_month_key,
+    is_report_query,
+    process_report_request,
+)
+from backend.wealth.ladder import WealthLevel
 
 
 class TestIsReportQuery:
@@ -166,3 +175,77 @@ class TestProcessReportRequest:
             await process_report_request(db, telegram_id=99, text="báo cáo tháng trước")
 
         mock_gen.assert_called_once_with(db, mock_user.id, "2026-03")
+
+
+class TestBuildReportPrompt:
+    """Issue #153 — monthly-report prompt must be ladder-aware so the LLM
+    doesn't lecture an HNW user about "20tr/tháng đầu tư là rất lớn"."""
+
+    def _ctx(self, level: WealthLevel, **overrides) -> dict:
+        base = {
+            "level": level,
+            "level_label_vi": _LEVEL_LABEL_VI[level],
+            "guidance": _LEVEL_GUIDANCE[level],
+            "net_worth": Decimal("120_000_000_000"),
+            "net_worth_str": "120,000,000,000đ",
+            "asset_count": 4,
+            "breakdown_str": "  • BĐS: 100 tỷ (83.3%)\n  • Cash: 20 tỷ (16.7%)",
+            "income_total": Decimal(0),
+            "income_str": "  (chưa khai báo)",
+            "expense_pct_of_nw": 0.016,
+        }
+        base.update(overrides)
+        return base
+
+    def test_includes_wealth_level_label(self):
+        ctx = self._ctx(WealthLevel.HIGH_NET_WORTH)
+        prompt = _build_report_prompt("Tổng chi tiêu: 20tr", ctx)
+        assert "High Net Worth" in prompt
+
+    def test_hnw_prompt_carries_personal_cfo_framing(self):
+        ctx = self._ctx(WealthLevel.HIGH_NET_WORTH)
+        prompt = _build_report_prompt("Tổng chi tiêu: 20tr", ctx)
+        # Must explicitly forbid the "rất lớn" framing that issue #153
+        # cited as broken.
+        assert "rất lớn" in prompt
+        assert "Personal CFO" in prompt
+        assert "% tổng tài sản" in prompt or "% net worth" in prompt
+
+    def test_hnw_prompt_forbids_paternalistic_reminder(self):
+        ctx = self._ctx(WealthLevel.HIGH_NET_WORTH)
+        prompt = _build_report_prompt("any context", ctx)
+        # The bug example ended with "để mình nhắc cuối tháng" — that
+        # exact pattern must be banned in the HNW guidance.
+        assert "nhắc cuối tháng" in prompt
+
+    def test_starter_guidance_differs_from_hnw(self):
+        starter = _build_report_prompt(
+            "x", self._ctx(WealthLevel.STARTER, net_worth=Decimal("5_000_000"))
+        )
+        hnw = _build_report_prompt(
+            "x", self._ctx(WealthLevel.HIGH_NET_WORTH)
+        )
+        assert _LEVEL_GUIDANCE[WealthLevel.STARTER] in starter
+        assert _LEVEL_GUIDANCE[WealthLevel.HIGH_NET_WORTH] in hnw
+        assert _LEVEL_GUIDANCE[WealthLevel.STARTER] not in hnw
+
+    def test_includes_breakdown_and_expense_ratio(self):
+        ctx = self._ctx(WealthLevel.MASS_AFFLUENT)
+        prompt = _build_report_prompt("Tổng chi tiêu: 5tr", ctx)
+        assert "BĐS: 100 tỷ" in prompt
+        assert "Cash: 20 tỷ" in prompt
+        assert "0.016% tổng tài sản" in prompt
+
+    def test_no_assets_falls_back_gracefully(self):
+        ctx = self._ctx(
+            WealthLevel.STARTER,
+            net_worth=Decimal(0),
+            net_worth_str="chưa có dữ liệu",
+            asset_count=0,
+            breakdown_str="  (chưa khai báo tài sản nào)",
+            expense_pct_of_nw=None,
+        )
+        prompt = _build_report_prompt("Tổng chi tiêu: 500k", ctx)
+        # Doesn't crash, doesn't fabricate a percentage.
+        assert "không tính được" in prompt
+        assert "Starter" in prompt
