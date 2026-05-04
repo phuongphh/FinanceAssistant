@@ -36,8 +36,8 @@ Validation experiment với 7 real users trong 7 ngày. Quyết định Phase 3A
 
 ## Deliverables
 - [x] Spreadsheet kết quả analytics 7 users × 7 days
-- [ ] Summary insights document
-- [ ] Bug list from feedback
+- [x] Summary insights document
+- [x] Bug list from feedback
 
 ## Estimate
 ~5 days (trọn tuần 4)
