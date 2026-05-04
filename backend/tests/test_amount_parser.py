@@ -36,6 +36,40 @@ class TestParseAmount:
     def test_recognised_formats(self, raw, expected):
         assert parse_amount(raw) == expected
 
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            # "rưỡi" after a unit means "and a half of that unit".
+            ("2 tỷ rưỡi", Decimal("2500000000")),
+            ("2 ty ruoi", Decimal("2500000000")),
+            ("1 tỷ rưỡi", Decimal("1500000000")),
+            ("3 triệu rưỡi", Decimal("3500000")),
+            ("3 trieu ruoi", Decimal("3500000")),
+            ("3tr rưỡi", Decimal("3500000")),
+            ("3trrưỡi", Decimal("3500000")),
+            ("500 nghìn rưỡi", Decimal("500500")),
+            ("500 ngan ruoi", Decimal("500500")),
+            ("2 TỶ RƯỠI", Decimal("2500000000")),
+            # Diacritic-less + spaced variant.
+            ("10 ty ruoi", Decimal("10500000000")),
+        ],
+    )
+    def test_ruoi_adds_half_unit(self, raw, expected):
+        assert parse_amount(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            # "rưỡi" without a real unit (or with đ) is nonsensical for
+            # VND — we ignore it rather than adding 0.5đ.
+            ("100 rưỡi", Decimal("100")),
+            ("100đ rưỡi", Decimal("100")),
+            ("100 d ruoi", Decimal("100")),
+        ],
+    )
+    def test_ruoi_ignored_without_real_unit(self, raw, expected):
+        assert parse_amount(raw) == expected
+
     def test_empty_returns_none(self):
         assert parse_amount("") is None
         assert parse_amount(None) is None  # type: ignore[arg-type]
@@ -92,6 +126,26 @@ class TestParseLabelAndAmount:
     def test_label_only_no_amount_returns_none(self):
         # "VCB-001" alone has digits but no free-standing amount — reject.
         assert parse_label_and_amount("VCB-001") is None
+
+    @pytest.mark.parametrize(
+        "raw,expected_label,expected_amount",
+        [
+            # Real-estate wizard regression: "Nhà 2 tỷ rưỡi" = 2.5 tỷ.
+            ("Nhà 2 tỷ rưỡi", "Nhà", Decimal("2500000000")),
+            ("Nhà phố 2 ty ruoi", "Nhà phố", Decimal("2500000000")),
+            ("Đất Long An 1 tỷ rưỡi", "Đất Long An", Decimal("1500000000")),
+            ("VCB 100 triệu rưỡi", "VCB", Decimal("100500000")),
+            ("2 tỷ rưỡi", "", Decimal("2500000000")),
+        ],
+    )
+    def test_ruoi_in_labeled_amount(
+        self, raw, expected_label, expected_amount
+    ):
+        result = parse_label_and_amount(raw)
+        assert result is not None, f"parser returned None for {raw!r}"
+        label, amount = result
+        assert label == expected_label
+        assert amount == expected_amount
 
 
 class TestHasNegativeSign:

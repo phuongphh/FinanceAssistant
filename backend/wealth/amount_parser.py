@@ -4,6 +4,8 @@ Accepts the way Vietnamese users actually type amounts:
 
     "100 triệu", "100tr", "100tr5"      → 100_000_000 / 100_500_000
     "1.5 tỷ", "1,5 tỷ", "1.5ty"         → 1_500_000_000
+    "2 tỷ rưỡi", "2 ty ruoi"            → 2_500_000_000
+    "3 triệu rưỡi"                      → 3_500_000
     "500k", "500 nghìn", "500 ngàn"     → 500_000
     "VCB 100 triệu"                     → ("VCB", 100_000_000)
     "Techcom 50tr"                      → ("Techcom", 50_000_000)
@@ -34,6 +36,7 @@ _AMOUNT_RE = re.compile(
     (?:[.,](?P<frac>\d+))?                        # optional .5 or ,5
     \s*
     (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:\s*(?P<half>rưỡi|ruoi))?                   # "rưỡi" → +0.5 of unit
     \s*
     (?P<tail>.*)                                  # any trailing crumbs
     $
@@ -120,6 +123,12 @@ def parse_amount(text: str) -> Decimal | None:
     multiplier = _UNIT_MULTIPLIERS.get(unit, Decimal("1"))
 
     amount = base * multiplier
+    # "rưỡi" after a unit means "and a half of that unit": "2 tỷ rưỡi" =
+    # 2.5 tỷ. Only meaningful when the unit has a real multiplier — for
+    # đồng (multiplier 1) "rưỡi" would imply half a đồng, which doesn't
+    # exist in VND, so we silently ignore it there.
+    if m.group("half") and multiplier > 1:
+        amount += multiplier / Decimal("2")
     return amount
 
 
@@ -136,6 +145,7 @@ _LABELED_AMOUNT_RE = re.compile(
     (?P<num>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)
     \s*
     (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:\s*(?P<half>rưỡi|ruoi))?
     """,
     re.IGNORECASE | re.VERBOSE,
 )
