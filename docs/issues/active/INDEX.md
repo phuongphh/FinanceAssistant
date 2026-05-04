@@ -22,5 +22,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #164 | [Story] P3.6-S4: Implement menu callback router | [issue-164.md](issue-164.md) |
 | #165 | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [issue-165.md](issue-165.md) |
 | #166 | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [issue-166.md](issue-166.md) |
+| #168 | [Story] P3.6-S8: Update Telegram bot menu button commands | [issue-168.md](issue-168.md) |
 
-**Total active:** 18
+**Total active:** 19
