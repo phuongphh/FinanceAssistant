@@ -25,7 +25,7 @@ FastAPI endpoint trả về toàn bộ data cho wealth dashboard. Performance cr
   }
   ```
 - [x] Performance: <500ms cho user có 10+ assets
-- [ ] Sub-endpoint: `GET /miniapp/api/wealth/trend?days=30|90|365`
+- [x] Sub-endpoint: `GET /miniapp/api/wealth/trend?days=30|90|365`
 - [ ] Cache response 30 giây (Redis hoặc in-memory)
 - [ ] Error: 401 auth fail, 500 graceful với message
 
