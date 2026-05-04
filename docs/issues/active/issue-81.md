@@ -12,7 +12,7 @@ Interactive charts với Chart.js. Vietnamese money format. Smooth animations.
 - [x] File `app/miniapp/static/js/wealth_dashboard.js`
 - [x] Doughnut chart cho asset type breakdown
 - [x] Line chart cho net worth trend
-- [ ] Tooltips format tiền Việt: "1.5tr" thay vì "1,500,000"
+- [x] Tooltips format tiền Việt: "1.5tr" thay vì "1,500,000"
 - [ ] Period selector: [30 ngày] [90 ngày] [365 ngày] — re-fetch và re-render
 - [ ] Colors map từ `asset_categories.yaml`
 - [ ] Responsive: charts resize theo screen width
