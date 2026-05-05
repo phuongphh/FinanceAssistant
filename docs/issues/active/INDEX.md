@@ -16,5 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #180 | [Epic] Phase 3.7 — Epic 1: Tool Foundation & DB-Agent (Tier 2) | [issue-180.md](issue-180.md) |
 | #181 | [Epic] Phase 3.7 — Epic 2: Premium Reasoning & Orchestrator (Tier 3) | [issue-181.md](issue-181.md) |
 | #182 | [Epic] Phase 3.7 — Epic 3: Polish, Audit & Testing | [issue-182.md](issue-182.md) |
+| #184 | [Story] P3.7-S2: Implement GetAssets and GetTransactions tools | [issue-184.md](issue-184.md) |
 
-**Total active:** 12
+**Total active:** 13
