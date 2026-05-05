@@ -22,6 +22,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #186 | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [issue-186.md](issue-186.md) |
 | #187 | [Story] P3.7-S5: Implement Tier 2 response formatters | [issue-187.md](issue-187.md) |
 | #188 | [Story] P3.7-S6: Build Reasoning Agent with Claude Sonnet (Tier 3) | [issue-188.md](issue-188.md) |
+| #190 | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [issue-190.md](issue-190.md) |
 | #191 | [Story] P3.7-S9: Add rate limiting and cost caps | [issue-191.md](issue-191.md) |
 
-**Total active:** 19
+**Total active:** 20
