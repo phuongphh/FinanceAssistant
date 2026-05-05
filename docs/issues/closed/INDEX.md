@@ -90,9 +90,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #171 | Pre-Phase | [Story] P3.6-S11: Prepare and execute hard cutover deploy | [pre-phase/issue-171.md](by-phase/pre-phase/issue-171.md) |
 | #172 | Pre-Phase | [Story] P3.6-S12: User testing with 3 users post-deploy | [pre-phase/issue-172.md](by-phase/pre-phase/issue-172.md) |
 | #173 | Pre-Phase | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [pre-phase/issue-173.md](by-phase/pre-phase/issue-173.md) |
+| #183 | Pre-Phase | [Story] P3.7-S1: Define tool schemas with Pydantic | [pre-phase/issue-183.md](by-phase/pre-phase/issue-183.md) |
 | #184 | Pre-Phase | [Story] P3.7-S2: Implement GetAssets and GetTransactions tools | [pre-phase/issue-184.md](by-phase/pre-phase/issue-184.md) |
 | #186 | Pre-Phase | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [pre-phase/issue-186.md](by-phase/pre-phase/issue-186.md) |
 | #187 | Pre-Phase | [Story] P3.7-S5: Implement Tier 2 response formatters | [pre-phase/issue-187.md](by-phase/pre-phase/issue-187.md) |
 
-**Total:** 89 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 72 Pre-Phase)
+**Total:** 90 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 73 Pre-Phase)
