@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #171 | [Story] P3.6-S11: Prepare and execute hard cutover deploy | [issue-171.md](issue-171.md) |
 | #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 
-**Total active:** 11
+**Total active:** 10
