@@ -16,7 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #180 | [Epic] Phase 3.7 — Epic 1: Tool Foundation & DB-Agent (Tier 2) | [issue-180.md](issue-180.md) |
 | #181 | [Epic] Phase 3.7 — Epic 2: Premium Reasoning & Orchestrator (Tier 3) | [issue-181.md](issue-181.md) |
 | #182 | [Epic] Phase 3.7 — Epic 3: Polish, Audit & Testing | [issue-182.md](issue-182.md) |
-| #185 | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [issue-185.md](issue-185.md) |
 | #188 | [Story] P3.7-S6: Build Reasoning Agent with Claude Sonnet (Tier 3) | [issue-188.md](issue-188.md) |
 | #189 | [Story] P3.7-S7: Implement Telegram streaming for long responses | [issue-189.md](issue-189.md) |
 | #190 | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [issue-190.md](issue-190.md) |
@@ -25,4 +24,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #193 | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [issue-193.md](issue-193.md) |
 | #194 | [Story] P3.7-S12: Comprehensive testing + user trial | [issue-194.md](issue-194.md) |
 
-**Total active:** 20
+**Total active:** 19
