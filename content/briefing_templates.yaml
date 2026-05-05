@@ -75,13 +75,13 @@ young_prof:
 
   net_worth_display:
     template: |
-      💰 Net worth: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       {change_emoji} {change} ({pct}%) so với {period}
 
       📊 Phân bổ:
       {breakdown_lines}
     no_change: |
-      💰 Net worth: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       Chưa đổi so với {period}.
 
       📊 Phân bổ:
@@ -110,13 +110,13 @@ mass_affluent:
 
   net_worth_display:
     template: |
-      💰 Giá trị ròng: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       {change_emoji} {change} ({pct}%) so với {period}
 
       📊 Phân bổ tài sản:
       {breakdown_lines}
     no_change: |
-      💰 Giá trị ròng: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       Chưa đổi so với {period}.
 
       📊 Phân bổ tài sản:
@@ -146,17 +146,17 @@ mass_affluent:
 hnw:
   greeting:
     - "🌅 Chào buổi sáng, {name}."
-    - "🌅 Good morning {name}."
+    - "🌅 Kính chào {name}."
 
   net_worth_display:
     template: |
-      💰 Tổng giá trị ròng: {net_worth}
+      💰 Tổng tài sản: {net_worth}
       {change_emoji} Biến động: {change} ({pct}%) {period}
 
       📊 Phân bổ:
       {breakdown_lines}
     no_change: |
-      💰 Tổng giá trị ròng: {net_worth}
+      💰 Tổng tài sản: {net_worth}
       Chưa đổi so với {period}.
 
       📊 Phân bổ:
@@ -164,11 +164,11 @@ hnw:
 
   detailed_breakdown:
     template: |
-      📈 Performance:
-      • YTD return: {ytd_return}
-      • Volatility: {volatility}
-      • Diversification: {div_score}
-    placeholder: "📈 Performance metrics — sắp ra mắt ở Phase 3B."
+      📈 Hiệu quả danh mục:
+      • Lợi nhuận từ đầu năm: {ytd_return}
+      • Mức biến động: {volatility}
+      • Đa dạng hóa: {div_score}
+    placeholder: "📈 Chỉ số hiệu quả danh mục — sắp ra mắt ở Phase 3B."
 
 # ─────────────────────────────────────────────────────────────
 # Common — không phụ thuộc level

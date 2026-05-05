@@ -589,3 +589,20 @@ class TestActionCoverage:
         assert coming_soon == [], (
             f"Unwired actions (coming-soon stub will fire): {coming_soon}"
         )
+
+    def test_assets_net_worth_and_report_intents_are_not_swapped(self):
+        """User feedback caught these inverted: ``📊 Tổng tài sản``
+        should fire the SHORT summary (``QUERY_NET_WORTH``) and
+        ``📈 Báo cáo chi tiết`` should fire the per-asset list
+        (``QUERY_ASSETS``). This test pins the orientation so a
+        well-meaning refactor can't silently re-swap them.
+        """
+        from backend.bot.handlers.menu_handler import _INTENT_MAP
+        from backend.intent.intents import IntentType
+
+        assert _INTENT_MAP[("assets", "net_worth")] == (
+            IntentType.QUERY_NET_WORTH, {}
+        ), "📊 Tổng tài sản must show the short net-worth summary"
+        assert _INTENT_MAP[("assets", "report")] == (
+            IntentType.QUERY_ASSETS, {}
+        ), "📈 Báo cáo chi tiết must list every asset"

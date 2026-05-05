@@ -335,9 +335,11 @@ async def _navigate(
 # single source of truth — the dispatcher does the rest (handler call,
 # personality wrap, follow-up keyboard).
 _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
-    # Tài sản
-    ("assets", "net_worth"): (IntentType.QUERY_ASSETS, {}),
-    ("assets", "report"): (IntentType.QUERY_NET_WORTH, {}),
+    # Tài sản — "Tổng tài sản" = short summary; "Báo cáo chi tiết" = list
+    # of every asset grouped by type. The mapping was swapped before
+    # Phase 3.6 user feedback called out the mismatch.
+    ("assets", "net_worth"): (IntentType.QUERY_NET_WORTH, {}),
+    ("assets", "report"): (IntentType.QUERY_ASSETS, {}),
     # Chi tiêu
     ("expenses", "report"): (IntentType.QUERY_EXPENSES, {}),
     ("expenses", "by_category"): (IntentType.QUERY_EXPENSES_BY_CATEGORY, {}),

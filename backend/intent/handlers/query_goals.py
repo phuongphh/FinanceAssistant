@@ -41,11 +41,10 @@ class QueryGoalsHandler(IntentHandler):
         if not goals:
             return (
                 f"{name} chưa đặt mục tiêu nào 🌱\n\n"
-                "Đặt mục tiêu giúp track tiến độ rõ ràng hơn — gõ /muctieu để bắt đầu."
+                "Đặt mục tiêu giúp theo dõi tiến độ rõ ràng hơn — gõ /muctieu để bắt đầu."
             )
         lines = [
             f"🎯 Mục tiêu của {name}:",
-            "━━━━━━━━━━━━━━━━━━━━",
             "",
         ]
         for g in goals:
@@ -66,7 +65,7 @@ class QueryGoalProgressHandler(IntentHandler):
         if not goals:
             name = user.display_name or "bạn"
             return (
-                f"{name} chưa có mục tiêu nào để track 🌱\n\n"
+                f"{name} chưa có mục tiêu nào để theo dõi 🌱\n\n"
                 "Tap /muctieu để đặt mục tiêu đầu tiên."
             )
 

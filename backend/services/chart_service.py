@@ -132,10 +132,11 @@ def render_donut_chart(
         labelcolor="white",
     )
 
-    # Net worth footer
+    # Net worth footer — ``Tổng tài sản`` is the canonical Vietnamese
+    # label across the bot (matches the briefing template + menu copy).
     footer_parts = []
     if net_worth is not None:
-        footer_parts.append(f"Tài sản ròng: {_format_vnd(net_worth)}")
+        footer_parts.append(f"Tổng tài sản: {_format_vnd(net_worth)}")
     if timestamp:
         footer_parts.append(f"Cập nhật: {timestamp}")
     if footer_parts:

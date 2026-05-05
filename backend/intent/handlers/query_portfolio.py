@@ -49,7 +49,6 @@ class QueryPortfolioHandler(IntentHandler):
 
         lines = [
             f"📈 Danh mục đầu tư của {name}:",
-            "━━━━━━━━━━━━━━━━━━━━",
             f"Tổng giá trị: *{format_money_full(total)}*",
             "",
         ]

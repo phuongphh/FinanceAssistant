@@ -57,15 +57,14 @@ class QueryIncomeHandler(IntentHandler):
         monthly = getattr(user, "monthly_income", None)
         if monthly:
             return (
-                f"💼 Thu nhập của {name} (theo onboarding):\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💼 Thu nhập của {name} (theo lúc đăng ký):\n"
                 f"Lương: *{format_money_full(monthly)}*/tháng\n\n"
-                "Muốn thêm nguồn thu nhập (cổ tức, lãi, cho thuê...) "
+                "Muốn thêm nguồn thu nhập (cổ tức, lãi, cho thuê…) "
                 "thì gõ /thunhap nhé."
             )
         return (
             f"{name} chưa thêm nguồn thu nhập nào.\n\n"
-            "Mình giúp bạn track thu nhập đa nguồn — gõ /thunhap để bắt đầu."
+            "Mình giúp bạn theo dõi thu nhập đa nguồn — gõ /thunhap để bắt đầu."
         )
 
     def _format(self, streams: list[IncomeStream], user: User) -> str:
@@ -74,7 +73,6 @@ class QueryIncomeHandler(IntentHandler):
 
         lines = [
             f"💼 Thu nhập hàng tháng của {name}:",
-            "━━━━━━━━━━━━━━━━━━━━",
             f"Tổng: *{format_money_full(total)}*/tháng",
             "",
         ]

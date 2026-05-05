@@ -42,7 +42,7 @@ class QueryAssetsHandler(IntentHandler):
         name = user.display_name or "bạn"
         return (
             f"💎 {name} chưa thêm tài sản nào cả!\n\n"
-            "Mình giúp bạn track tài sản — tiền mặt, chứng khoán, BĐS, vàng...\n"
+            "Mình giúp bạn theo dõi tài sản — tiền mặt, chứng khoán, BĐS, vàng…\n"
             "Tap vào /themtaisan để bắt đầu nhé 🚀"
         )
 
@@ -78,7 +78,6 @@ class QueryAssetsHandler(IntentHandler):
 
         lines = [
             header,
-            "━━━━━━━━━━━━━━━━━━━━",
             f"Tổng: *{format_money_full(total)}*",
             "",
         ]

@@ -159,11 +159,16 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
 
 
 def _level_to_vi(level: str) -> str:
+    # Bilingual labels keep the LLM grounded (it knows the standard
+    # finance-industry tier names in English) while exposing the
+    # Vietnamese half to the user-visible report. Without the second
+    # part the LLM has been observed to echo "Mass Affluent" verbatim
+    # into the Vietnamese-language report — the parenthetical anchors it.
     return {
-        "starter": "Starter (mới bắt đầu)",
-        "young_prof": "Young Professional",
-        "mass_affluent": "Mass Affluent",
-        "hnw": "High Net Worth",
+        "starter": "Mới bắt đầu (Starter)",
+        "young_prof": "Người trẻ đi làm (Young Professional)",
+        "mass_affluent": "Trung lưu khá giả (Mass Affluent)",
+        "hnw": "Tài sản lớn (High Net Worth)",
     }.get(level, level)
 
 
