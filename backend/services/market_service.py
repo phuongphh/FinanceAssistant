@@ -190,7 +190,7 @@ _INVEST_LEVEL_GUIDANCE = {
         "với user này, investable wealth là cash position trong tài sản."
     ),
     WealthLevel.HIGH_NET_WORTH: (
-        "Tone: Personal CFO advisor strategic.\n"
+        "Tone: Trợ lý Tài sản advisor strategic.\n"
         "Focus: portfolio allocation (% theo asset class), passive "
         "income / chi tiêu coverage, dòng tiền từ BĐS/cổ tức/lãi, "
         "rebalancing thresholds, tax planning.\n"
@@ -306,7 +306,7 @@ Hồ sơ tài chính:
   • Chi tiêu tháng này: {float(total_expense):,.0f} VND
   • Mục tiêu: {', '.join(f'{g.goal_name} ({float(g.current_amount):,.0f}/{float(g.target_amount):,.0f})' for g in goals) if goals else 'Chưa có'}"""
 
-    prompt = f"""Bạn là Personal CFO advisor. Dựa trên context dưới đây, đưa ra gợi ý đầu tư cho user tại Việt Nam.
+    prompt = f"""Bạn là Trợ lý Tài sản advisor. Dựa trên context dưới đây, đưa ra gợi ý đầu tư cho user tại Việt Nam.
 
 {context}
 

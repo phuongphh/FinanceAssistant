@@ -216,7 +216,7 @@ class TestBuildReportPrompt:
         # Must explicitly forbid the "rất lớn" framing that issue #153
         # cited as broken.
         assert "rất lớn" in prompt
-        assert "Personal CFO" in prompt
+        assert "Trợ lý Tài sản" in prompt
         assert "% tổng tài sản" in prompt or "% net worth" in prompt
 
     def test_hnw_prompt_forbids_paternalistic_reminder(self):
