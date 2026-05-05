@@ -82,19 +82,21 @@ def _make_fake_session() -> MagicMock:
 
 class TestRouteUpdate:
     @pytest.mark.asyncio
-    async def test_menu_message_calls_send_menu(self):
-        """A plain /menu message (no ``from``) should only trigger the
-        menu sender — no user lookup happens when we can't resolve a
-        Telegram id."""
+    async def test_menu_message_calls_cmd_menu(self):
+        """A plain /menu message should trigger the Phase 3.6 menu
+        handler. When the message has no ``from`` field the user lookup
+        returns None — the handler still renders the (un-personalised)
+        main menu so the bot doesn't go silent on edge cases.
+        """
         fake_session = _make_fake_session()
         factory = MagicMock(return_value=fake_session)
 
         with patch.object(
             telegram_worker, "get_session_factory", return_value=factory
         ), patch(
-            "backend.services.telegram_service.send_menu",
+            "backend.bot.handlers.menu_handler.cmd_menu",
             new_callable=AsyncMock,
-        ) as mock_send_menu, patch(
+        ) as mock_cmd_menu, patch(
             "backend.bot.handlers.onboarding.handle_onboarding_callback",
             new_callable=AsyncMock,
         ):
@@ -105,7 +107,12 @@ class TestRouteUpdate:
                 }
             )
 
-        mock_send_menu.assert_awaited_once_with(123)
+        # Handler is awaited with (db, chat_id, user). User is None here
+        # because the message had no ``from`` field for telegram_id.
+        mock_cmd_menu.assert_awaited_once()
+        args, _ = mock_cmd_menu.await_args
+        assert args[1] == 123
+        assert args[2] is None
         fake_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -159,7 +166,7 @@ class TestRouteUpdate:
         with patch.object(
             telegram_worker, "get_session_factory", return_value=factory
         ), patch(
-            "backend.services.telegram_service.send_menu",
+            "backend.bot.handlers.menu_handler.cmd_menu",
             new_callable=AsyncMock,
             side_effect=RuntimeError("telegram down"),
         ):

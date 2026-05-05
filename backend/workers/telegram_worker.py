@@ -59,6 +59,9 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
+    from backend.bot.handlers.menu_handler import (
+        handle_menu_callback as handle_menu_v2_callback,
+    )
     from backend.bot.handlers.message import (
         handle_report_callback,
         handle_report_command,
@@ -69,7 +72,6 @@ async def route_update(data: dict) -> None:
     from backend.services.telegram_service import (
         answer_callback,
         handle_menu_callback,
-        send_menu,
     )
     from backend import analytics
 
@@ -88,7 +90,6 @@ async def route_update(data: dict) -> None:
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
-                    send_menu=send_menu,
                     OnboardingStep=OnboardingStep,
                     analytics=analytics,
                 )
@@ -104,6 +105,7 @@ async def route_update(data: dict) -> None:
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_report_callback=handle_report_callback,
+                        handle_menu_v2_callback=handle_menu_v2_callback,
                         handle_menu_callback=handle_menu_callback,
                         answer_callback=answer_callback,
                     )
@@ -133,7 +135,6 @@ async def _handle_message(
     dashboard_service,
     handle_report_command,
     handle_text_message,
-    send_menu,
     OnboardingStep,
     analytics,
 ):
@@ -175,14 +176,18 @@ async def _handle_message(
         return user.id
 
     if command in ("/menu", "menu"):
-        await send_menu(chat_id)
-        # Resolve user best-effort so we can stamp the row — missing user
-        # means the menu opened for someone not yet registered, which is
-        # fine (they'll be prompted to /start).
-        if telegram_id is not None:
-            user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
-            return user.id if user else None
-        return None
+        # Phase 3.6 — new 5-category menu replaces the V1 flat 8-button.
+        # Resolve user up front so the menu can adapt (Epic 2 wires the
+        # wealth-level lookup; Epic 1 just needs ``display_name``).
+        from backend.bot.handlers.menu_handler import cmd_menu
+
+        resolved_user = (
+            await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            if telegram_id is not None
+            else None
+        )
+        await cmd_menu(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
 
     if command == "/report":
         await handle_report_command(db, message)
@@ -329,6 +334,7 @@ async def _handle_callback(
     dashboard_service,
     handle_transaction_callback,
     handle_report_callback,
+    handle_menu_v2_callback,
     handle_menu_callback,
     answer_callback,
 ):
@@ -383,6 +389,13 @@ async def _handle_callback(
     # Transaction callbacks handle their own answerCallbackQuery so users
     # get richer feedback.
     if await handle_transaction_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Phase 3.6 menu callbacks (menu:main / menu:<category>[:<action>]).
+    # Owns its own answerCallbackQuery + edit-in-place navigation.
+    # Returns False for legacy V1 prefixes like ``menu:ocr`` / ``menu:report``
+    # so they fall through to the original handlers below.
+    if await handle_menu_v2_callback(db, callback_query):
         return await _resolved_user_id()
 
     await answer_callback(callback_id)
