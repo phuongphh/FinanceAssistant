@@ -7,26 +7,20 @@
 > **Type:** Epic | **Week:** 3 | **Stories:** 3
 
 ## Mục tiêu
-Production-ready hardening: audit logging, caching, integration với Phase 3.5, comprehensive testing với critical bug fix verification.
-
-## Tại Sao Epic Này Quan Trọng
-Phase 3.7 introduces complex behavior. Không có audit logs → không debug được. Không có caching → costs tăng vọt. Không có testing → critical bug ("đang lãi" trả về ALL stocks) có thể không được fix đúng.
+Production-ready hardening: audit logging, caching, Phase 3.5 integration, comprehensive testing.
 
 ## Success Definition
 - ✅ Every agent invocation logged với cost + latency
-- ✅ Cache reduces Tier 2 calls 30%+ cho repeat queries
-- ✅ **Critical test passes consistently:** "Mã đang lãi?" → only winners
-- ✅ User testing positive (≥3 users)
-- ✅ Cost dashboard accessible
+- ✅ Cache reduces Tier 2 calls 30%+
+- ✅ **Critical bug fix verified:** "Mã đang lãi?" → only winners (consistently)
+- ✅ ≥3 users tested, positive feedback
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P3.7-S10: Audit logging + cost dashboard
-- [ ] [Story] P3.7-S11: Caching + integration with Phase 3.5
-- [ ] [Story] P3.7-S12: Comprehensive testing + user trial
+- [ ] #192 [Story] P3.7-S10: Audit logging + cost dashboard
+- [ ] #193 [Story] P3.7-S11: Caching + integration with Phase 3.5
+- [ ] #194 [Story] P3.7-S12: Comprehensive testing + user trial
 
 ## Dependencies
-✅ Epic 1 + Epic 2 complete
+✅ Epic 1 (#180) + Epic 2 (#181) complete
 
-## Reference
-`docs/current/phase-3.7-detailed.md` § Tuần 3
+## Parallel: S10 và S11 có thể chạy song song
