@@ -11,7 +11,17 @@ from sqlalchemy import text
 from backend.config import get_settings
 from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
-from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
+from backend.routers import (
+    admin_agent_metrics,
+    expenses,
+    goals,
+    income,
+    ingestion,
+    market,
+    portfolio,
+    reports,
+    telegram,
+)
 from backend.bot.setup_commands import setup_bot_commands
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
@@ -157,6 +167,7 @@ app.include_router(market.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(income.router, prefix="/api/v1")
 app.include_router(telegram.router, prefix="/api/v1")
+app.include_router(admin_agent_metrics.router, prefix="/api/v1")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 

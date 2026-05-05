@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,8 @@ from typing import Any
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.agent import caching
+from backend.agent.audit import RouteAudit, log_route
 from backend.agent.rate_limit import (
     DailyCostTracker,
     RateLimiter,
@@ -65,10 +68,6 @@ TIER_2 = "tier2"
 TIER_3 = "tier3"
 AMBIGUOUS = "ambiguous"
 
-# Re-classify with the LLM intent layer when rule-based confidence is
-# below this. Same value Phase 3.5 dispatcher uses (HIGH_CONFIDENCE_THRESHOLD).
-TIER1_CONFIDENCE_THRESHOLD = 0.8
-
 _HEURISTICS_PATH = (
     Path(__file__).resolve().parents[2] / "content" / "router_heuristics.yaml"
 )
@@ -89,6 +88,11 @@ class RouteResult:
     db_agent_result: DBAgentResult | None = None
     reasoning_trace: ReasoningTrace | None = None
     rate_limited: bool = False
+    # When the orchestrator delegated to Phase 3.5 (Tier 1) we keep
+    # the full DispatchOutcome so callers can render the inline
+    # keyboard / track the right kind without reaching back into
+    # the dispatcher themselves.
+    dispatch_outcome: DispatchOutcome | None = None
 
 
 class Orchestrator:
@@ -111,6 +115,7 @@ class Orchestrator:
         rate_limiter: RateLimiter | None = None,
         cost_tracker: DailyCostTracker | None = None,
         heuristics_path: Path | None = None,
+        cache_enabled: bool = True,
     ) -> None:
         self.registry = registry or build_default_registry()
         self.intent_pipeline = intent_pipeline or IntentPipeline()
@@ -122,6 +127,7 @@ class Orchestrator:
         self.heuristics = self._load_heuristics(
             heuristics_path or _HEURISTICS_PATH
         )
+        self.cache_enabled = cache_enabled
 
     # ------------------------------------------------------------------
     # public
@@ -134,16 +140,46 @@ class Orchestrator:
         db: AsyncSession,
         *,
         streamer: Streamer | None = None,
+        audit: bool = True,
     ) -> RouteResult:
-        """Route ``query`` to the appropriate tier and return the result.
+        """Route ``query``, return the result, fire-and-forget audit log.
 
         ``streamer`` is required for Tier 3 — a Tier 3 query without
         a streamer would silently lose its reasoning output. We
         still allow it (returning ``text=None``) so callers like
-        unit tests can use a fake streamer if they want one. If the
-        query routes to Tier 1/2, the streamer is ignored and the
-        response comes back via ``text``.
+        unit tests can use a fake streamer if they want one.
+
+        ``audit=False`` skips the audit-log write — used by tests
+        that don't want the background task lingering after the test
+        scope ends. Production calls should always leave this on.
         """
+        started = time.monotonic()
+        result = await self._route_inner(query, user, db, streamer=streamer)
+        if audit:
+            try:
+                log_route(
+                    self._build_audit(
+                        query=query,
+                        user=user,
+                        result=result,
+                        latency_ms=int((time.monotonic() - started) * 1000),
+                    )
+                )
+            except Exception:
+                # Audit must never tank a real response.
+                logger.debug("audit log emit failed", exc_info=True)
+        return result
+
+    async def _route_inner(
+        self,
+        query: str,
+        user: User,
+        db: AsyncSession,
+        *,
+        streamer: Streamer | None,
+    ) -> RouteResult:
+        """Core routing logic — extracted so ``route`` can wrap it
+        in an audit boundary without nesting indentation."""
         # Global cost gate. Hit before any LLM dispatch so a runaway
         # day stays bounded.
         if not await self.cost_tracker.can_spend():
@@ -230,17 +266,16 @@ class Orchestrator:
         streamer: Streamer | None,
         reason: str,
     ) -> RouteResult:
-        """Try Tier 1; escalate to Tier 2; escalate to Tier 3.
+        """Try Tier 1; escalate to Tier 2 only when Tier 1 truly
+        can't classify.
 
-        Confidence threshold: the Phase 3.5 pipeline has its own
-        cascade between rule + LLM classifiers; what we check here
-        is whether the classifier *converged* (intent != UNCLEAR with
-        confidence ≥ TIER1_CONFIDENCE_THRESHOLD)."""
+        We hand any non-UNCLEAR intent straight to the dispatcher —
+        even at low confidence — because the dispatcher already
+        handles the clarify/confirm flow for medium-confidence cases.
+        Bypassing it for "low confidence" would skip those flows and
+        send confusing answers to Tier 2."""
         intent_result = await self.intent_pipeline.classify(query)
-        if (
-            intent_result.intent != IntentType.UNCLEAR
-            and intent_result.confidence >= TIER1_CONFIDENCE_THRESHOLD
-        ):
+        if intent_result.intent != IntentType.UNCLEAR:
             outcome = await self.intent_dispatcher.dispatch(
                 intent_result, user, db
             )
@@ -251,6 +286,7 @@ class Orchestrator:
                 text=outcome.text,
                 intent=outcome.intent,
                 confidence=outcome.confidence,
+                dispatch_outcome=outcome,
             )
 
         # Tier 1 didn't converge — escalate.
@@ -266,13 +302,29 @@ class Orchestrator:
         streamer: Streamer | None,
         reason: str,
     ) -> RouteResult:
-        """Try Tier 2; if it can't pick a tool, escalate to Tier 3."""
+        """Try Tier 2; if it can't pick a tool, escalate to Tier 3.
+
+        Cache lookup happens BEFORE the LLM call — a hit replays the
+        same DBAgentResult without spending tokens. Misses execute
+        the agent and write the result back."""
+        cached = await self._cache_get_tier2(db, user.id, query)
+        if cached is not None:
+            text = await format_db_agent_response(cached, user, db, query)
+            await self.rate_limiter.record(user.id, tier=TIER_2)
+            return RouteResult(
+                tier=TIER_2,
+                routing_reason=f"{reason}+cache_hit",
+                text=text,
+                db_agent_result=cached,
+            )
+
         result = await self.db_agent.answer(query, user, db)
         # Track cost regardless of success — a failed call still
         # billed input tokens.
         await self._record_db_agent_cost(result)
 
         if result.success:
+            await self._cache_set_tier2(db, user.id, query, result)
             text = await format_db_agent_response(result, user, db, query)
             await self.rate_limiter.record(user.id, tier=TIER_2)
             return RouteResult(
@@ -345,6 +397,22 @@ class Orchestrator:
                 "Bạn nhắn lại trong Telegram nhé 💚",
             )
 
+        # Cache lookup — replay a recent answer without burning Sonnet
+        # tokens. We still send through the streamer so the user gets
+        # the same UX (typing indicator + message) as a fresh call.
+        cached_text = await self._cache_get_tier3(db, user.id, query)
+        if cached_text is not None:
+            await streamer.start()
+            await streamer.send_chunk(cached_text)
+            await streamer.finish()
+            await self.rate_limiter.record(user.id, tier=TIER_3)
+            return RouteResult(
+                tier=TIER_3,
+                routing_reason=f"{reason}+cache_hit",
+                text=None,
+                streamed=True,
+            )
+
         await streamer.start()
         chunks: list[str] = []
 
@@ -360,6 +428,11 @@ class Orchestrator:
         # Cost & rate accounting (after the call so we capture real tokens).
         await self.cost_tracker.add(trace.cost_usd)
         await self.rate_limiter.record(user.id, tier=TIER_3)
+
+        # Cache the assembled response only when the call succeeded —
+        # caching error messages would just lock the user out for an hour.
+        if trace.success and trace.final_text:
+            await self._cache_set_tier3(db, user.id, query, trace.final_text)
 
         return RouteResult(
             tier=TIER_3,
@@ -385,6 +458,69 @@ class Orchestrator:
         )
         await self.cost_tracker.add(cost)
 
+    # ----- cache helpers (failures are non-fatal) ---------------------
+
+    async def _cache_get_tier2(
+        self, db: AsyncSession, user_id, query: str
+    ) -> DBAgentResult | None:
+        if not self.cache_enabled:
+            return None
+        try:
+            raw = await caching.get_tier2(db, user_id=user_id, query=query)
+        except Exception:
+            logger.debug("tier2 cache lookup failed", exc_info=True)
+            return None
+        if raw is None:
+            return None
+        # The stored shape is the dataclass dict — reconstruct so the
+        # downstream formatter sees the same type a fresh call would.
+        return DBAgentResult(
+            success=raw.get("success", False),
+            tool_called=raw.get("tool_called"),
+            tool_args=raw.get("tool_args"),
+            result=raw.get("result"),
+            error=raw.get("error"),
+            fallback_text=raw.get("fallback_text"),
+            latency_ms=raw.get("latency_ms", 0),
+            input_tokens=raw.get("input_tokens"),
+            output_tokens=raw.get("output_tokens"),
+        )
+
+    async def _cache_set_tier2(
+        self, db: AsyncSession, user_id, query: str, result: DBAgentResult
+    ) -> None:
+        if not self.cache_enabled:
+            return
+        try:
+            await caching.set_tier2(
+                db, user_id=user_id, query=query, result=result.to_dict()
+            )
+        except Exception:
+            logger.debug("tier2 cache set failed", exc_info=True)
+
+    async def _cache_get_tier3(
+        self, db: AsyncSession, user_id, query: str
+    ) -> str | None:
+        if not self.cache_enabled:
+            return None
+        try:
+            return await caching.get_tier3(db, user_id=user_id, query=query)
+        except Exception:
+            logger.debug("tier3 cache lookup failed", exc_info=True)
+            return None
+
+    async def _cache_set_tier3(
+        self, db: AsyncSession, user_id, query: str, response: str
+    ) -> None:
+        if not self.cache_enabled:
+            return
+        try:
+            await caching.set_tier3(
+                db, user_id=user_id, query=query, response=response
+            )
+        except Exception:
+            logger.debug("tier3 cache set failed", exc_info=True)
+
     def _unclear_message(self) -> str:
         return (
             "Mình chưa hiểu rõ ý bạn. Có thể hỏi lại cụ thể hơn được không? 🤔"
@@ -403,6 +539,83 @@ class Orchestrator:
         return (
             "Mình đã trả lời nhiều câu hỏi sâu hôm nay rồi. "
             "Trong lúc đợi, bạn xem qua dữ liệu nhanh ở trên nhé 💚"
+        )
+
+    def _build_audit(
+        self,
+        *,
+        query: str,
+        user: User,
+        result: RouteResult,
+        latency_ms: int,
+    ) -> RouteAudit:
+        """Pack a RouteResult into the dataclass the audit writer wants.
+
+        Pulls model / token / cost fields out of whichever sub-result
+        is populated (tier 2 → DBAgentResult, tier 3 → ReasoningTrace,
+        tier 1 → none of either since intent layer accounts separately
+        via analytics events)."""
+        tools_called: list[dict[str, Any]] = []
+        tool_call_count = 0
+        llm_model: str | None = None
+        input_tokens: int | None = None
+        output_tokens: int | None = None
+        cost_usd: float | None = None
+        success = bool(result.text or result.streamed)
+        error: str | None = None
+
+        if result.db_agent_result is not None:
+            r = result.db_agent_result
+            tool_call_count = 1 if r.tool_called else 0
+            if r.tool_called:
+                tools_called = [
+                    {"name": r.tool_called, "args": r.tool_args or {}}
+                ]
+            llm_model = "deepseek-chat"
+            input_tokens = r.input_tokens
+            output_tokens = r.output_tokens
+            from backend.agent.limits import estimate_cost_usd
+
+            cost_usd = estimate_cost_usd(
+                model=llm_model,
+                input_tokens=r.input_tokens or 0,
+                output_tokens=r.output_tokens or 0,
+            )
+            success = r.success
+            error = r.error
+
+        if result.reasoning_trace is not None:
+            t = result.reasoning_trace
+            tools_called = list(t.tool_calls)
+            tool_call_count = t.tool_call_count
+            llm_model = "claude-sonnet"
+            input_tokens = t.input_tokens
+            output_tokens = t.output_tokens
+            cost_usd = t.cost_usd
+            success = t.success
+            error = t.error
+
+        response_preview = result.text or (
+            result.reasoning_trace.final_text
+            if result.reasoning_trace
+            else None
+        )
+
+        return RouteAudit(
+            user_id=getattr(user, "id", None),
+            query_text=query,
+            tier_used=result.tier,
+            routing_reason=result.routing_reason,
+            tools_called=tools_called,
+            tool_call_count=tool_call_count,
+            llm_model=llm_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=cost_usd,
+            success=success,
+            response_preview=response_preview,
+            error=error,
+            total_latency_ms=latency_ms,
         )
 
     @staticmethod
