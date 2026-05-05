@@ -33,7 +33,10 @@ _REPORT_KEYWORDS = frozenset([
     "tôi xài bao", "toi xai bao",
     "tôi đã chi", "toi da chi",
     "spending", "report",
-    "tháng trước tôi", "thang truoc toi",
+    # Removed "tháng trước tôi" / "thang truoc toi": too greedy, swallowed
+    # natural-language expense queries like "tháng trước tôi chi tiêu bao
+    # nhiêu?" that the Phase 3.5 intent pipeline routes to query_expenses
+    # with time_range=last_month.
 ])
 
 
