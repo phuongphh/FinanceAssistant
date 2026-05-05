@@ -57,6 +57,14 @@ class TestIsReportQuery:
     def test_does_not_match_greeting(self):
         assert is_report_query("xin chào") is False
 
+    def test_does_not_match_natural_last_month_expense_query(self):
+        # Regression: this exact phrasing used to be intercepted by the
+        # legacy fast-path keyword "tháng trước tôi" and produce a full
+        # LLM Personal CFO report. It must now fall through to the
+        # Phase 3.5 intent pipeline (query_expenses, time_range=last_month).
+        assert is_report_query("tháng trước tôi chi tiêu bao nhiêu?") is False
+        assert is_report_query("thang truoc toi chi tieu bao nhieu") is False
+
 
 class TestExtractMonthKey:
     def test_defaults_to_current_month(self):
