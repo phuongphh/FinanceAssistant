@@ -27,7 +27,11 @@ from backend.bot.personality.onboarding_flow import OnboardingStep
 from backend.workers import telegram_worker
 
 
-def _fake_user(step: int = 0, is_onboarded: bool = False):
+def _fake_user(
+    step: int = 0,
+    is_onboarded: bool = False,
+    wizard_state: dict | None = None,
+):
     user = MagicMock()
     user.id = uuid.uuid4()
     user.telegram_id = 999
@@ -37,6 +41,14 @@ def _fake_user(step: int = 0, is_onboarded: bool = False):
     user.onboarding_completed_at = None
     user.onboarding_skipped = False
     user.is_onboarded = is_onboarded
+    # Phase 3A added ``wizard_state`` (storytelling / asset-entry); the
+    # worker's text dispatch peeks at it BEFORE falling through to the
+    # NL parser. MagicMock auto-mocks any attribute as truthy, so
+    # without an explicit ``None`` here every text path gets routed
+    # through the asset-wizard branch and ``handle_text_message`` is
+    # never reached. Default to ``None`` so tests opt in explicitly
+    # when they want to exercise the wizard branches.
+    user.wizard_state = wizard_state
     user.get_greeting_name.return_value = (
         user.display_name if user.display_name else "bạn"
     )

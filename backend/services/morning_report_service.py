@@ -154,6 +154,16 @@ def _build_text_summary(
     for asset_type in sorted_types:
         icon = get_icon(asset_type)
         label = get_label(asset_type)
+        # ``get_label`` returns the raw key when an asset_type isn't in
+        # ``content/asset_categories.yaml``. That happens if a row was
+        # written via the legacy V1 portfolio API (plurals like
+        # "stocks") and never migrated. Log so we can spot the drift
+        # in production without surfacing ugly text to the user.
+        if label == asset_type:
+            logger.warning(
+                "morning_report: asset_type %r missing from asset_categories.yaml — "
+                "rendered as raw key", asset_type,
+            )
         value = allocation_values[asset_type]
         pct = allocation_pct.get(asset_type, 0)
         lines.append(f"{icon} {label}: {_format_vnd_text(value)} ({pct:.1f}%)")

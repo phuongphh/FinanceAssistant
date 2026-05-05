@@ -1,6 +1,16 @@
-"""Tests for morning report — chart rendering, text building, and orchestration."""
+"""Tests for morning report — chart rendering, text building, and orchestration.
+
+The morning report aggregates Phase 3A V2 ``Asset`` rows (``current_value``
++ ``asset_type`` from ``content/asset_categories.yaml``) and renders
+labels via ``wealth.asset_types.get_label`` / ``get_icon``. Tests
+therefore must use the V2 canonical ``asset_type`` vocabulary
+(``stock`` / ``cash`` / ``real_estate`` / ``crypto`` / ``gold`` /
+``other``) — V1 plurals like ``stocks`` would miss the YAML lookup
+and fall back to the raw key.
+"""
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,24 +24,48 @@ from backend.services.morning_report_service import (
 )
 
 
-def _make_asset(**kwargs):
-    defaults = {
-        "id": uuid.uuid4(),
-        "user_id": uuid.uuid4(),
-        "asset_type": "stocks",
-        "name": "VNM",
-        "quantity": None,
-        "purchase_price": None,
-        "current_price": None,
-        "metadata_": None,
-        "created_at": datetime(2026, 1, 1),
-        "updated_at": datetime(2026, 1, 1),
-        "deleted_at": None,
-    }
-    defaults.update(kwargs)
-    asset = MagicMock()
-    for k, v in defaults.items():
-        setattr(asset, k, v)
+def _make_asset(
+    *,
+    asset_type: str = "stock",
+    name: str = "VNM",
+    quantity: float | None = None,
+    purchase_price: float | None = None,
+    current_price: float | None = None,
+):
+    """Mock a V2 Asset row.
+
+    V1-style kwargs (quantity / purchase_price / current_price) stay in
+    the signature for readable assertions but are translated into V2
+    columns the production morning_report code reads:
+    ``initial_value`` (cost basis) and ``current_value`` (mark-to-market).
+    Pass ``asset_type`` from the V2 vocabulary (``stock``, ``gold``…) so
+    YAML label lookups succeed.
+    """
+    if quantity is not None and purchase_price is not None:
+        initial_value = Decimal(str(quantity)) * Decimal(str(purchase_price))
+    else:
+        initial_value = Decimal(str(purchase_price or 0))
+
+    if quantity is not None and current_price is not None:
+        current_value = Decimal(str(quantity)) * Decimal(str(current_price))
+    else:
+        current_value = Decimal(str(current_price or 0))
+
+    asset = MagicMock(spec_set=[
+        "id", "user_id", "asset_type", "name",
+        "initial_value", "current_value", "extra",
+        "created_at", "updated_at", "deleted_at",
+    ])
+    asset.id = uuid.uuid4()
+    asset.user_id = uuid.uuid4()
+    asset.asset_type = asset_type
+    asset.name = name
+    asset.initial_value = initial_value
+    asset.current_value = current_value
+    asset.extra = None
+    asset.created_at = datetime(2026, 1, 1)
+    asset.updated_at = datetime(2026, 1, 1)
+    asset.deleted_at = None
     return asset
 
 
@@ -150,8 +184,8 @@ class TestBuildNoAssetsMessage:
 class TestBuildTextSummary:
     def test_basic_summary(self):
         text = _build_text_summary(
-            allocation_values={"stocks": 300_000_000, "gold": 200_000_000},
-            allocation_pct={"stocks": 60.0, "gold": 40.0},
+            allocation_values={"stock": 300_000_000, "gold": 200_000_000},
+            allocation_pct={"stock": 60.0, "gold": 40.0},
             total_value=500_000_000,
             change_pct=None,
         )
@@ -163,8 +197,8 @@ class TestBuildTextSummary:
 
     def test_with_positive_change(self):
         text = _build_text_summary(
-            allocation_values={"stocks": 100_000_000},
-            allocation_pct={"stocks": 100.0},
+            allocation_values={"stock": 100_000_000},
+            allocation_pct={"stock": 100.0},
             total_value=100_000_000,
             change_pct=9.6,
         )
@@ -183,8 +217,8 @@ class TestBuildTextSummary:
 
     def test_sorted_by_value_desc(self):
         text = _build_text_summary(
-            allocation_values={"gold": 100_000_000, "stocks": 400_000_000},
-            allocation_pct={"gold": 20.0, "stocks": 80.0},
+            allocation_values={"gold": 100_000_000, "stock": 400_000_000},
+            allocation_pct={"gold": 20.0, "stock": 80.0},
             total_value=500_000_000,
             change_pct=None,
         )
@@ -201,7 +235,12 @@ class TestBuildMorningReport:
         db = AsyncMock()
         user_id = uuid.uuid4()
 
-        with patch("backend.services.morning_report_service.list_assets", return_value=[]):
+        # ``build_morning_report`` calls ``asset_service.get_user_assets``
+        # — patch it via the module attribute the service imports.
+        with patch(
+            "backend.services.morning_report_service.asset_service.get_user_assets",
+            return_value=[],
+        ):
             chart, text, has_assets = await build_morning_report(db, user_id)
 
         assert chart is None
@@ -214,12 +253,17 @@ class TestBuildMorningReport:
         user_id = uuid.uuid4()
 
         assets = [
-            _make_asset(asset_type="stocks", quantity=100, purchase_price=80000, current_price=90000),
+            _make_asset(asset_type="stock", quantity=100, purchase_price=80000, current_price=90000),
             _make_asset(asset_type="gold", quantity=5, purchase_price=7000000, current_price=7500000),
         ]
 
-        with patch("backend.services.morning_report_service.list_assets", return_value=assets), \
-             patch("backend.services.morning_report_service._get_previous_month_total", return_value=None):
+        with patch(
+            "backend.services.morning_report_service.asset_service.get_user_assets",
+            return_value=assets,
+        ), patch(
+            "backend.services.morning_report_service._get_previous_month_total",
+            return_value=None,
+        ):
             chart, text, has_assets = await build_morning_report(db, user_id)
 
         assert has_assets is True
