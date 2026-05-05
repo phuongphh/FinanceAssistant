@@ -12,8 +12,8 @@ from backend.config import get_settings
 from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import expenses, goals, income, ingestion, market, portfolio, reports, telegram
+from backend.bot.setup_commands import setup_bot_commands
 from backend.services.telegram_service import close_client as close_telegram_client
-from backend.services.telegram_service import register_bot_commands
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
 logger = logging.getLogger(__name__)
@@ -71,9 +71,10 @@ async def lifespan(app: FastAPI):
 
     # Sync the bot's command list with Telegram so the "/" menu always
     # reflects the current BOT_COMMANDS definition without a manual call
-    # to the /set-commands endpoint after each deploy.
+    # to the /set-commands endpoint after each deploy. Phase 3.6 cuts
+    # the list down to 4 core commands — see bot/setup_commands.py.
     try:
-        await register_bot_commands()
+        await setup_bot_commands()
         logger.info("Telegram bot commands registered")
     except Exception:
         logger.exception("Failed to register bot commands at startup; continuing")

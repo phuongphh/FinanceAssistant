@@ -175,18 +175,22 @@ async def _handle_message(
         await onboarding_handlers.resume_or_start(db, chat_id, user)
         return user.id
 
-    if command in ("/menu", "menu"):
-        # Phase 3.6 — new 5-category menu replaces the V1 flat 8-button.
-        # Resolve user up front so the menu can adapt (Epic 2 wires the
-        # wealth-level lookup; Epic 1 just needs ``display_name``).
-        from backend.bot.handlers.menu_handler import cmd_menu
+    if command in ("/menu", "menu", "/dashboard"):
+        # Phase 3.6 — both top-level commands resolve the user up front so
+        # the menu adapts to ``user.wealth_level`` (Epic 2) and
+        # ``/dashboard`` can attribute analytics. ``/menu`` opens the rich
+        # 5-category inline menu; ``/dashboard`` opens the wealth Mini App.
+        from backend.bot.handlers.menu_handler import cmd_dashboard, cmd_menu
 
         resolved_user = (
             await dashboard_service.get_user_by_telegram_id(db, telegram_id)
             if telegram_id is not None
             else None
         )
-        await cmd_menu(db, chat_id, resolved_user)
+        if command == "/dashboard":
+            await cmd_dashboard(db, chat_id, resolved_user)
+        else:
+            await cmd_menu(db, chat_id, resolved_user)
         return resolved_user.id if resolved_user else None
 
     if command == "/report":

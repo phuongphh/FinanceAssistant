@@ -10,6 +10,20 @@ as a NEW message so the sub-menu stays visible above for further
 interaction — tapping multiple actions doesn't require navigating back
 each time.
 
+Coexistence with free-form queries (Epic 2 / Story S9):
+  * Telegram routes commands and callbacks separately from text — the
+    menu and the Phase 3.5 NL pipeline do not collide by design.
+  * Open menu + then typing a free-form query → the query is answered
+    in a NEW message; the menu bubble stays put. Old messages are
+    never auto-deleted.
+  * Open menu while a wizard (``users.wizard_state``) is active →
+    the menu opens normally. The wizard state lives in the DB and
+    survives the menu render; the user can resume by typing the next
+    expected wizard input or tapping ``/huy`` to abort. We deliberately
+    do NOT prompt "cancel wizard first" because most wizard restarts
+    come from the user wanting a different flow anyway, and the extra
+    confirm dialog adds friction.
+
 Layer contract (CLAUDE.md § 0.1):
   * Handler receives an open ``AsyncSession`` from the worker.
   * Services flush only; the worker's ``route_update`` commits.
@@ -49,6 +63,7 @@ from backend.intent.intents import (
     IntentResult,
     IntentType,
 )
+from backend.miniapp.urls import wealth_dashboard_url
 from backend.models.user import User
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
@@ -63,8 +78,51 @@ _dispatcher = IntentDispatcher()
 
 
 # -----------------------------------------------------------------
-# /menu command — fresh main menu as a new message bubble
+# /menu and /dashboard commands — top-level entry points
 # -----------------------------------------------------------------
+
+
+DASHBOARD_NOT_CONFIGURED_TEXT = (
+    "📊 Dashboard chưa sẵn sàng — admin cần cấu hình "
+    "`MINIAPP_BASE_URL` trước nhé."
+)
+
+
+async def cmd_dashboard(
+    db: AsyncSession, chat_id: int, user: User | None
+) -> None:
+    """Handle the ``/dashboard`` command — open the wealth Mini App.
+
+    The Mini App opens in-place inside Telegram, so the user never
+    leaves the chat. When ``MINIAPP_BASE_URL`` is unset (dev / first
+    deploy without a public host) we send a friendly placeholder
+    instead of a broken button — same fallback shape as the briefing
+    keyboard to keep the user UX consistent.
+    """
+    url = wealth_dashboard_url(source="dashboard_command")
+    if url is None:
+        await send_message(
+            chat_id=chat_id,
+            text=DASHBOARD_NOT_CONFIGURED_TEXT,
+            parse_mode="Markdown",
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text="📊 Mở dashboard tài sản:",
+        reply_markup={
+            "inline_keyboard": [[
+                {"text": "Mở Dashboard", "web_app": {"url": url}},
+            ]],
+        },
+    )
+    if user is not None:
+        analytics.track(
+            "dashboard_command_opened",
+            user_id=user.id,
+            properties={"source": "command"},
+        )
 
 
 async def cmd_menu(db: AsyncSession, chat_id: int, user: User | None) -> None:
@@ -73,13 +131,25 @@ async def cmd_menu(db: AsyncSession, chat_id: int, user: User | None) -> None:
     Sends a NEW message (not edit) — the user typed a command, so the
     expected output is a fresh bubble. Subsequent navigation taps
     inside that bubble use edit-in-place.
+
+    Wealth-level adaptive intro: read ``user.wealth_level`` (already
+    persisted by the asset wizard via ``ladder.update_user_level``).
+    No recompute, no in-memory cache — the column is the source of
+    truth and changes only on real life events (asset add/edit), not
+    on transient market noise. ``None`` falls back to YOUNG_PROFESSIONAL
+    via the formatter's default.
     """
-    text, keyboard = format_main_menu(user)
+    level = user.wealth_level if user else None
+    text, keyboard = format_main_menu(user, level=level)
     await send_message(
         chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=keyboard
     )
     user_id = user.id if user else None
-    analytics.track("menu_opened", user_id=user_id, properties={"source": "command"})
+    analytics.track(
+        "menu_opened",
+        user_id=user_id,
+        properties={"source": "command", "level": level},
+    )
 
 
 # -----------------------------------------------------------------
@@ -185,10 +255,11 @@ async def _navigate(
     ``target == "main"`` → main menu. Anything else is treated as a
     sub-menu category (already validated by caller).
     """
+    level = user.wealth_level
     if target == "main":
-        text, keyboard = format_main_menu(user)
+        text, keyboard = format_main_menu(user, level=level)
     else:
-        text, keyboard = format_submenu(user, target)
+        text, keyboard = format_submenu(user, target, level=level)
 
     if message_id is None:
         # Defensive: callbacks should always carry message_id. Fall back
