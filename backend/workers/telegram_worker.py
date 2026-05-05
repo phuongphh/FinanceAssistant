@@ -321,6 +321,57 @@ async def _handle_message(
     return resolved_user.id if resolved_user else None
 
 
+async def _maybe_auto_exit_asset_wizard(
+    db: AsyncSession,
+    *,
+    telegram_id: int | None,
+    callback_data: str,
+    dashboard_service,
+) -> None:
+    """Clear an active asset-entry wizard when the user taps a non-asset
+    callback (menu / dashboard / briefing / transaction / follow-up).
+
+    Button taps are a deliberate context switch — the user chose to
+    navigate elsewhere. Leaving ``wizard_state`` in place would trap
+    their next free-text message in the asset wizard's
+    "👆 Bạn đang trong wizard thêm tài sản" nudge. Free-text input keeps
+    the existing routing because text mid-wizard is most often the
+    answer to a wizard prompt; only deliberate callback selections exit.
+
+    Scope is intentionally narrow — only the asset-entry wizard
+    (``asset_add_*`` flows). The storytelling confirm-pending step holds
+    unsaved transactions in ``draft.pending`` and is resolved by its own
+    ``story:*`` callbacks; the intent pending-action / awaiting-clarify
+    state has its own 10-minute TTL. Auto-clearing either here would
+    risk dropping in-flight user input.
+    """
+    if not callback_data or callback_data.startswith("asset_add"):
+        return
+    if telegram_id is None:
+        return
+    user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        return
+    flow = (user.wizard_state or {}).get("flow") or ""
+    if not flow.startswith("asset_add"):
+        return
+
+    from backend import analytics
+    from backend.services import wizard_service
+
+    step = (user.wizard_state or {}).get("step")
+    await wizard_service.clear(db, user.id)
+    analytics.track(
+        "asset_wizard_auto_exited",
+        user_id=user.id,
+        properties={
+            "flow": flow,
+            "step": step,
+            "callback_data": callback_data,
+        },
+    )
+
+
 async def _handle_callback(
     db: AsyncSession,
     callback_query: dict,
@@ -349,6 +400,16 @@ async def _handle_callback(
             return None
         user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
         return user.id if user else None
+
+    # UX: tapping a non-asset_add callback while mid-wizard means the
+    # user wants to switch context — exit the asset wizard so we don't
+    # strand them in the "tap a button" nudge on their next message.
+    await _maybe_auto_exit_asset_wizard(
+        db,
+        telegram_id=telegram_id,
+        callback_data=callback_data,
+        dashboard_service=dashboard_service,
+    )
 
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
