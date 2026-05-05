@@ -58,6 +58,16 @@ def _fake_execute_scalar(value):
     return result
 
 
+def _fake_execute_insert(rowcount: int = 1):
+    """Mock the result of ``pg_insert(...).on_conflict_do_nothing(...)`` —
+    ``_create_if_missing`` only inspects ``.rowcount`` to decide whether
+    the insert hit a conflict. ``rowcount=1`` means the row was created.
+    """
+    result = MagicMock()
+    result.rowcount = rowcount
+    return result
+
+
 # -- _check_time_milestones ------------------------------------------
 
 @pytest.mark.asyncio
@@ -168,8 +178,9 @@ class TestCheckFirstTransaction:
     async def test_creates_milestone_after_first_expense(self):
         db = MagicMock()
         db.execute = AsyncMock(side_effect=[
-            _fake_execute_rows([]),      # existing_types
-            _fake_execute_scalar(3),      # count expenses
+            _fake_execute_rows([]),      # existing_types query
+            _fake_execute_scalar(3),     # count expenses
+            _fake_execute_insert(1),     # ON CONFLICT INSERT inside _create_if_missing
         ])
         db.add = MagicMock()
         db.commit = AsyncMock()

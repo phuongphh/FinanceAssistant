@@ -44,6 +44,23 @@ async def get_user_by_telegram_id(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def get_user_by_id(
+    db: AsyncSession, user_id: uuid.UUID
+) -> User | None:
+    """Look up a user by primary key, honouring soft-delete.
+
+    Used by handlers that have an internal ``user_id`` (e.g. from an
+    Expense row) and need to resolve back to ``User`` for things like
+    Telegram ID — replaces ad-hoc ``select(User)`` queries inside
+    handlers, which violate the layer contract in CLAUDE.md § 0.1.
+    """
+    stmt = select(User).where(
+        User.id == user_id,
+        User.deleted_at.is_(None),
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def get_or_create_user(
     db: AsyncSession,
     telegram_id: int,

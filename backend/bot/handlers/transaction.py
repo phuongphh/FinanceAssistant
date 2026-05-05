@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.formatters.templates import format_transaction_confirmation
 from backend.bot.keyboards.transaction_keyboard import transaction_actions_keyboard
 from backend.models.expense import Expense
-from backend.models.user import User
+from backend.services.dashboard_service import get_user_by_id
 from backend.services.telegram_service import send_message
 
 # Legacy category codes (from earlier phases) → new shared codes.
@@ -38,9 +38,7 @@ async def send_transaction_confirmation(
     daily_budget: float | None = None,
 ) -> None:
     """Gửi tin nhắn xác nhận + inline keyboard cho user owning this expense."""
-    user = (
-        await db.execute(select(User).where(User.id == expense.user_id))
-    ).scalar_one_or_none()
+    user = await get_user_by_id(db, expense.user_id)
     if not user or not user.telegram_id:
         return
 
