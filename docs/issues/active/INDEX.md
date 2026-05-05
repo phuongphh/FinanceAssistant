@@ -20,7 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #162 | [Story] P3.6-S2: Build MenuFormatter with basic intros | [issue-162.md](issue-162.md) |
 | #163 | [Story] P3.6-S3: Implement /menu command handler | [issue-163.md](issue-163.md) |
 | #165 | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [issue-165.md](issue-165.md) |
-| #166 | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [issue-166.md](issue-166.md) |
 | #167 | [Story] P3.6-S7: Add wealth-level detection to MenuFormatter | [issue-167.md](issue-167.md) |
 | #168 | [Story] P3.6-S8: Update Telegram bot menu button commands | [issue-168.md](issue-168.md) |
 | #169 | [Story] P3.6-S9: Verify menu + free-form coexistence | [issue-169.md](issue-169.md) |
@@ -29,4 +28,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 | #173 | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [issue-173.md](issue-173.md) |
 
-**Total active:** 24
+**Total active:** 23
