@@ -20,7 +20,8 @@ from backend.config import get_settings
 from backend.database import get_db
 from backend.models.telegram_update import TelegramUpdate
 from backend.services.menu_service import get_features_json, get_menu_text
-from backend.services.telegram_service import register_bot_commands, send_menu
+from backend.bot.setup_commands import setup_bot_commands
+from backend.services.telegram_service import send_menu
 from backend.workers.telegram_worker import process_update_safely
 
 logger = logging.getLogger(__name__)
@@ -118,7 +119,7 @@ async def trigger_send_menu(chat_id: int = Query(...)):
 
 @router.post("/set-commands")
 async def set_bot_commands():
-    result = await register_bot_commands()
+    result = await setup_bot_commands()
     if result:
         return {"data": {"registered": True}, "error": None}
     return {"data": None, "error": {"code": "REGISTER_FAILED", "message": "Failed to register commands"}}

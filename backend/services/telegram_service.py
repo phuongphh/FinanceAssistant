@@ -10,7 +10,6 @@ import httpx
 
 from backend.config import get_settings
 from backend.services.menu_service import (
-    BOT_COMMANDS,
     get_callback_response,
     get_telegram_buttons,
     get_telegram_menu_text,
@@ -182,10 +181,6 @@ async def handle_menu_callback(chat_id: int, callback_data: str) -> dict | None:
     if response_text:
         return await send_message(chat_id, response_text)
     return None
-
-
-async def register_bot_commands() -> dict | None:
-    return await send_telegram("setMyCommands", {"commands": BOT_COMMANDS})
 
 
 async def download_file(file_id: str) -> bytes | None:

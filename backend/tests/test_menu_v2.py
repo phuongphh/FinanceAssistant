@@ -264,6 +264,242 @@ class TestHandleMenuCallback:
 
 
 # ============================================================
+# Wealth-level adaptive intros — Story S7 (Epic 2)
+# ============================================================
+
+
+# Wealth-tier mock users — the four bands the menu adapts to.
+def _starter_user(name: str = "Minh"):
+    """Net worth 17tr → wealth_level='starter'."""
+    return SimpleNamespace(
+        display_name=name,
+        id="user-starter",
+        wealth_level="starter",
+        get_greeting_name=lambda: name,
+    )
+
+
+def _young_prof_user(name: str = "Hà"):
+    """Net worth 140tr → wealth_level='young_prof'."""
+    return SimpleNamespace(
+        display_name=name,
+        id="user-yp",
+        wealth_level="young_prof",
+        get_greeting_name=lambda: name,
+    )
+
+
+def _mass_affluent_user(name: str = "Phương"):
+    """Net worth 4.5 tỷ → wealth_level='mass_affluent'."""
+    return SimpleNamespace(
+        display_name=name,
+        id="user-ma",
+        wealth_level="mass_affluent",
+        get_greeting_name=lambda: name,
+    )
+
+
+def _hnw_user(name: str = "Tùng"):
+    """Net worth 13 tỷ → wealth_level='hnw'."""
+    return SimpleNamespace(
+        display_name=name,
+        id="user-hnw",
+        wealth_level="hnw",
+        get_greeting_name=lambda: name,
+    )
+
+
+class TestAdaptiveIntros:
+    """Same buttons across wealth levels, distinct intro copy.
+
+    Mirrors the manual screenshot matrix in the issue (4 personas × 5
+    sub-menus). Tests assert on **structural** properties (rendering
+    matches the YAML, levels differ from each other, buttons match)
+    rather than specific Vietnamese phrases — copy tweaks shouldn't
+    flake the test, only behaviour changes should.
+    """
+
+    @pytest.mark.parametrize(
+        "user_factory,level",
+        [
+            (_starter_user, "starter"),
+            (_young_prof_user, "young_prof"),
+            (_mass_affluent_user, "mass_affluent"),
+            (_hnw_user, "hnw"),
+        ],
+    )
+    def test_main_menu_renders_yaml_for_each_level(self, user_factory, level):
+        from backend.bot.formatters.menu_formatter import _load_copy
+
+        user = user_factory()
+        text, _ = format_main_menu(user, level=level)
+
+        # The level's YAML title + intro must appear verbatim (after
+        # the {name} placeholder is substituted) in the rendered text.
+        copy = _load_copy()["main_menu"]
+        expected_title = copy["title"][level].format(name=user.display_name)
+        expected_intro = copy["intro"][level].format(name=user.display_name)
+        assert expected_title in text
+        assert expected_intro in text
+
+    def test_each_level_produces_distinct_main_menu_text(self):
+        # All 4 levels must render different text — otherwise the
+        # adaptive layer is a no-op. Compare pairwise (6 pairs).
+        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        renders = {
+            lvl: format_main_menu(_user(), level=lvl)[0] for lvl in levels
+        }
+        for i, a in enumerate(levels):
+            for b in levels[i + 1:]:
+                assert renders[a] != renders[b], (
+                    f"Levels {a} and {b} render identical main menu text"
+                )
+
+    @pytest.mark.parametrize(
+        "category", ["assets", "expenses", "cashflow", "goals", "market"]
+    )
+    def test_each_level_produces_distinct_submenu_text(self, category):
+        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        renders = {
+            lvl: format_submenu(_user(), category, level=lvl)[0]
+            for lvl in levels
+        }
+        for i, a in enumerate(levels):
+            for b in levels[i + 1:]:
+                assert renders[a] != renders[b], (
+                    f"{category}: levels {a} and {b} render identically"
+                )
+
+    def test_buttons_identical_across_levels(self):
+        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        keyboards = [
+            format_main_menu(_user(), level=lvl)[1]["inline_keyboard"]
+            for lvl in levels
+        ]
+        button_lists = [
+            [(btn["text"], btn["callback_data"]) for row in kb for btn in row]
+            for kb in keyboards
+        ]
+        for other in button_lists[1:]:
+            assert other == button_lists[0]
+
+    def test_invalid_level_falls_back_to_default(self):
+        # Defensive: future migration adding a new band shouldn't crash
+        # users whose wealth_level column hasn't been recomputed.
+        text, _ = format_main_menu(_user(), level="legendary")
+        default_text, _ = format_main_menu(_user(), level=None)
+        assert text == default_text
+
+
+# ============================================================
+# Coexistence — Story S9
+# ============================================================
+
+
+class TestMenuCoexistence:
+    """Menu and free-form queries must not interfere.
+
+    Phase 3.5 routes text via ``handle_text_message``; Phase 3.6 routes
+    callbacks via ``handle_menu_callback``. They share no state. These
+    tests pin the boundary so a future refactor can't accidentally
+    couple them.
+    """
+
+    @pytest.mark.asyncio
+    async def test_legacy_menu_callback_does_not_raise(self):
+        """Stale V1 callbacks (deployed before the cutover) must
+        return False quietly so the legacy handler in the worker can
+        respond. Anything else risks a stuck spinner for users whose
+        chat history still has old menu bubbles.
+        """
+        from backend.bot.handlers.menu_handler import handle_menu_callback
+
+        for legacy in ("menu:gmail_scan", "menu:add_expense", "menu:advice"):
+            assert (
+                await handle_menu_callback(
+                    db=None, callback_query={"data": legacy, "id": "x"}
+                )
+                is False
+            )
+
+    @pytest.mark.asyncio
+    async def test_unknown_top_level_returns_false(self):
+        # Future V3 menus might use ``menu:dashboard`` etc. — until then,
+        # the new handler stays out of their way.
+        from backend.bot.handlers.menu_handler import handle_menu_callback
+
+        assert (
+            await handle_menu_callback(
+                db=None, callback_query={"data": "menu:future", "id": "x"}
+            )
+            is False
+        )
+
+
+# ============================================================
+# /dashboard command — Story S8
+# ============================================================
+
+
+class TestCmdDashboard:
+    @pytest.mark.asyncio
+    async def test_sends_placeholder_when_miniapp_url_unset(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+
+        sent = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+
+        # Force unset miniapp_base_url — emulates first-deploy / dev.
+        from backend.config import get_settings
+
+        settings = get_settings()
+        original = settings.miniapp_base_url
+        settings.miniapp_base_url = ""
+        try:
+            await menu_handler.cmd_dashboard(db=None, chat_id=42, user=None)
+        finally:
+            settings.miniapp_base_url = original
+
+        # Assert against the exported constant — copy tweaks shouldn't
+        # break the test, only behaviour changes should.
+        assert sent["text"] == menu_handler.DASHBOARD_NOT_CONFIGURED_TEXT
+        assert sent["chat_id"] == 42
+        # No keyboard rendered — placeholder is the whole message.
+        assert "reply_markup" not in sent
+
+    @pytest.mark.asyncio
+    async def test_sends_web_app_button_when_url_configured(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+
+        sent = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+
+        from backend.config import get_settings
+
+        settings = get_settings()
+        original = settings.miniapp_base_url
+        settings.miniapp_base_url = "https://example.com"
+        try:
+            await menu_handler.cmd_dashboard(db=None, chat_id=42, user=None)
+        finally:
+            settings.miniapp_base_url = original
+
+        keyboard = sent["reply_markup"]["inline_keyboard"]
+        url = keyboard[0][0]["web_app"]["url"]
+        # Pin the path + the analytics-attribution query param so the
+        # briefing funnel and the /dashboard funnel stay distinguishable.
+        assert url == "https://example.com/miniapp/wealth?source=dashboard_command"
+
+
+# ============================================================
 # Cross-check: every submenu action has a wired handler or fallback
 # ============================================================
 

@@ -315,7 +315,7 @@ async def test_dashboard_tap_sends_web_app_button_when_url_configured():
     ), patch(
         "backend.bot.handlers.briefing.send_message", send_mock,
     ), patch(
-        "backend.bot.handlers.briefing.get_settings", return_value=settings,
+        "backend.miniapp.urls.get_settings", return_value=settings,
     ):
         handled = await h.handle_briefing_callback(db, _callback("dashboard"))
 
@@ -363,7 +363,7 @@ async def test_dashboard_tap_falls_back_to_placeholder_without_url():
     ), patch(
         "backend.bot.handlers.briefing.send_message", send_mock,
     ), patch(
-        "backend.bot.handlers.briefing.get_settings", return_value=settings,
+        "backend.miniapp.urls.get_settings", return_value=settings,
     ):
         await h.handle_briefing_callback(db, _callback("dashboard"))
 

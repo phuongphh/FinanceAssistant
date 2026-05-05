@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from backend.bot.setup_commands import setup_bot_commands
 from backend.services.telegram_service import (
     answer_callback,
     handle_menu_callback,
-    register_bot_commands,
     send_menu,
     send_message,
     send_telegram,
@@ -107,9 +107,20 @@ class TestHandleMenuCallback:
         assert result is None
 
 
-class TestRegisterBotCommands:
+class TestSetupBotCommands:
     @pytest.mark.asyncio
     async def test_calls_set_my_commands(self, mock_settings, mock_httpx):
-        await register_bot_commands()
+        await setup_bot_commands()
         call_url = mock_httpx.post.call_args[0][0]
         assert "setMyCommands" in call_url
+
+    @pytest.mark.asyncio
+    async def test_sends_4_phase_36_commands(self, mock_settings, mock_httpx):
+        await setup_bot_commands()
+        payload = mock_httpx.post.call_args[1]["json"]
+        commands = payload["commands"]
+        names = [c["command"] for c in commands]
+        assert names == ["start", "menu", "help", "dashboard"]
+        # No deprecated V1 commands surfaced — Phase 3.6 cuts the list.
+        for legacy in ("themtaisan", "taisan", "report", "goals", "market"):
+            assert legacy not in names

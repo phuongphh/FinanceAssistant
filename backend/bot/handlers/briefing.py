@@ -36,7 +36,7 @@ from backend.bot.keyboards.briefing_keyboard import (
     CB_BRIEFING,
 )
 from backend.bot.keyboards.common import parse_callback
-from backend.config import get_settings
+from backend.miniapp.urls import wealth_dashboard_url
 from backend.models.event import Event
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import answer_callback, send_message
@@ -74,14 +74,10 @@ _ACTION_PLACEHOLDER = {
 def _wealth_dashboard_url() -> str | None:
     """Return the public Mini App URL for the wealth dashboard, or None.
 
-    Append ``?source=briefing`` so the dashboard's analytics know the
-    open came from this funnel — matches the JS-side query-string
-    handling in ``wealth_dashboard.js``.
+    ``?source=briefing`` lets the dashboard's analytics attribute opens
+    to this funnel — see ``wealth_dashboard.js`` for the JS-side parse.
     """
-    base = (get_settings().miniapp_base_url or "").rstrip("/")
-    if not base:
-        return None
-    return f"{base}/miniapp/wealth?source=briefing"
+    return wealth_dashboard_url(source="briefing")
 
 
 async def _record_open_if_first(
