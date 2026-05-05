@@ -87,6 +87,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #168 | Pre-Phase | [Story] P3.6-S8: Update Telegram bot menu button commands | [pre-phase/issue-168.md](by-phase/pre-phase/issue-168.md) |
 | #169 | Pre-Phase | [Story] P3.6-S9: Verify menu + free-form coexistence | [pre-phase/issue-169.md](by-phase/pre-phase/issue-169.md) |
 | #170 | Pre-Phase | [Story] P3.6-S10: Run regression tests on existing flows | [pre-phase/issue-170.md](by-phase/pre-phase/issue-170.md) |
+| #173 | Pre-Phase | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [pre-phase/issue-173.md](by-phase/pre-phase/issue-173.md) |
 
-**Total:** 83 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 66 Pre-Phase)
+**Total:** 84 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 67 Pre-Phase)
