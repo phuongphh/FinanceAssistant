@@ -1,0 +1,353 @@
+# Phase 3.6 — Menu copy (all user-facing text)
+#
+# Structure:
+#   main_menu:
+#     title:    {starter, young_prof, mass_affluent, hnw}  # adaptive (Epic 2)
+#     intro:    {starter, young_prof, mass_affluent, hnw}  # adaptive
+#     buttons:  [{label, callback}]                        # SAME for all levels
+#     hint:     str — free-form alternative reminder
+#
+#   submenu_<category>:
+#     title:    str (uppercase + emoji)
+#     intro:    {starter, young_prof, mass_affluent, hnw}  # adaptive
+#     buttons:  [{label, callback, description?}] + back-button
+#     hint:     str — category-specific free-form examples
+#
+# Conventions:
+#   - {name} placeholder for user's display_name
+#   - Button labels ≤16 chars (mobile readability)
+#   - callback_data ≤64 bytes (Telegram limit) — format: menu:<cat>:<action>
+#   - Intros ≤200 words (avoid Telegram message length issues)
+#   - Buttons identical across levels — only intros adapt
+#   - Each sub-menu MUST have "◀️ Quay về" with callback "menu:main"
+
+# ============================================================
+# MAIN MENU (Level 1) — entry point via /menu
+# ============================================================
+
+main_menu:
+  title:
+    starter: "👋 Bé Tiền — Trợ lý tài chính của {name}"
+    young_prof: "👋 Bé Tiền — Trợ lý tài chính của {name}"
+    mass_affluent: "👋 Bé Tiền — Trợ lý CFO cá nhân của {name}"
+    hnw: "👋 Bé Tiền — Personal CFO của anh/chị {name}"
+
+  intro:
+    starter: |-
+      Mình giúp {name} theo dõi tài sản, chi tiêu, và xây kế hoạch
+      tài chính từng bước.
+
+      Bạn muốn xem gì hôm nay?
+
+    young_prof: |-
+      Mình giúp {name} quản lý tài sản và xây danh mục đầu tư
+      vững mạnh.
+
+      Bạn muốn xem gì hôm nay?
+
+    mass_affluent: |-
+      Mình giúp {name} tối ưu hóa tài sản và đưa ra quyết định
+      tài chính thông minh.
+
+      Bạn muốn làm gì hôm nay?
+
+    hnw: |-
+      Tổng quan tài chính cá nhân của anh/chị {name}.
+
+      Anh/chị muốn xem mục nào?
+
+  buttons:
+    - label: "💎 Tài sản"
+      callback: "menu:assets"
+    - label: "💸 Chi tiêu"
+      callback: "menu:expenses"
+    - label: "💰 Dòng tiền"
+      callback: "menu:cashflow"
+    - label: "🎯 Mục tiêu"
+      callback: "menu:goals"
+    - label: "📊 Thị trường"
+      callback: "menu:market"
+
+  hint: |-
+    💡 _Mẹo:_ bạn có thể hỏi mình thẳng — không cần menu:
+    • "tài sản của tôi có gì?"
+    • "tháng này tiêu bao nhiêu?"
+    • "VNM giá hôm nay?"
+
+# ============================================================
+# SUB-MENU: TÀI SẢN (Level 2)
+# ============================================================
+
+submenu_assets:
+  title: "💎 *TÀI SẢN*"
+
+  intro:
+    starter: |-
+      Đây là nơi mình giúp {name} theo dõi tài sản — tiền mặt,
+      đầu tư, BĐS, vàng…
+
+      Mỗi tài sản bạn thêm sẽ giúp mình tính tổng giá trị và
+      theo dõi sự thay đổi qua thời gian.
+
+    young_prof: |-
+      Theo dõi tổng tài sản và phân bổ đầu tư của {name}.
+
+      Mỗi loại tài sản đều được track riêng để bạn biết
+      đâu đang tăng, đâu đang giảm.
+
+    mass_affluent: |-
+      Quản lý tổng giá trị ròng và phân bổ tài sản của {name}.
+
+      Bao gồm tư vấn rebalance dựa trên portfolio hiện tại.
+
+    hnw: |-
+      Tổng quan tài sản và performance metrics của anh/chị.
+
+      Bao gồm tư vấn tối ưu hóa allocation.
+
+  buttons:
+    - label: "📊 Tổng tài sản"
+      callback: "menu:assets:net_worth"
+      description: "Net worth hiện tại + breakdown theo loại"
+
+    - label: "📈 Báo cáo chi tiết"
+      callback: "menu:assets:report"
+      description: "Trend 30/90/365 ngày, top performer, history"
+
+    - label: "➕ Thêm tài sản"
+      callback: "menu:assets:add"
+      description: "Wizard thêm cash, stock, BĐS, crypto, vàng"
+
+    - label: "✏️ Sửa tài sản"
+      callback: "menu:assets:edit"
+      description: "Cập nhật giá trị, xóa, đánh dấu đã bán"
+
+    - label: "💡 Tư vấn tối ưu"
+      callback: "menu:assets:advisor"
+      description: "Phân tích allocation, gợi ý rebalance"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 _Hoặc hỏi nhanh:_
+    • "tài sản của tôi có gì?"
+    • "tổng tài sản tôi bao nhiêu?"
+    • "portfolio chứng khoán của tôi"
+
+# ============================================================
+# SUB-MENU: CHI TIÊU (Level 2)
+# ============================================================
+
+submenu_expenses:
+  title: "💸 *CHI TIÊU*"
+
+  intro:
+    starter: |-
+      Theo dõi chi tiêu hàng ngày của {name}.
+
+      Mình chỉ track những khoản đáng kể (>200k) để không
+      làm phiền bạn với từng ly cafe nhỏ.
+
+    young_prof: |-
+      Quản lý chi tiêu và phát hiện pattern không hợp lý.
+
+      Mình focus vào khoản từ 200k trở lên — vừa đủ để
+      hiểu cashflow mà không phải ghi mọi thứ.
+
+    mass_affluent: |-
+      Theo dõi cashflow categories và identify large expenses.
+
+      Bot tự động extract từ storytelling và OCR hóa đơn.
+
+    hnw: |-
+      Quản lý chi tiêu lớn và analytics theo loại.
+
+  buttons:
+    - label: "➕ Thêm chi tiêu"
+      callback: "menu:expenses:add"
+      description: "Ghi giao dịch mới — text hoặc voice"
+
+    - label: "📷 OCR hóa đơn"
+      callback: "menu:expenses:ocr"
+      description: "Chụp hóa đơn, mình tự đọc"
+
+    - label: "📊 Báo cáo chi tiêu"
+      callback: "menu:expenses:report"
+      description: "Tổng quan tháng này, theo loại, trend"
+
+    - label: "🏷️ Theo phân loại"
+      callback: "menu:expenses:by_category"
+      description: "Ăn uống, di chuyển, sức khỏe…"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 _Hoặc hỏi nhanh:_
+    • "chi tiêu tháng này"
+    • "chi cho ăn uống tuần qua"
+    • "vừa chi 200k cafe"
+
+# ============================================================
+# SUB-MENU: DÒNG TIỀN (Level 2)
+# ============================================================
+
+submenu_cashflow:
+  title: "💰 *DÒNG TIỀN*"
+
+  intro:
+    starter: |-
+      Dòng tiền = thu nhập − chi tiêu của {name}.
+
+      Đây là chỉ số quan trọng nhất để biết bạn có đang
+      tiết kiệm được tiền không.
+
+    young_prof: |-
+      Theo dõi thu − chi và tỷ lệ tiết kiệm của {name}.
+
+      Tỷ lệ tiết kiệm 20–30% là healthy cho phần lớn người trẻ.
+
+    mass_affluent: |-
+      Quản lý dòng tiền tổng và optimize savings rate.
+
+      Bao gồm passive income (dividend, lãi tiết kiệm).
+
+    hnw: |-
+      Dòng tiền active + passive, runway analysis.
+
+  buttons:
+    - label: "📊 Tổng quan"
+      callback: "menu:cashflow:overview"
+      description: "Thu, chi, tiết kiệm tháng này"
+
+    - label: "💼 Thu nhập"
+      callback: "menu:cashflow:income"
+      description: "Lương, thụ động, các nguồn khác"
+
+    - label: "📉 Thu vs Chi"
+      callback: "menu:cashflow:compare"
+      description: "Biểu đồ so sánh 6 tháng qua"
+
+    - label: "💎 Tỷ lệ tiết kiệm"
+      callback: "menu:cashflow:saving_rate"
+      description: "% thu nhập bạn tiết kiệm được"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 _Hoặc hỏi nhanh:_
+    • "thu nhập của tôi"
+    • "tháng này dư bao nhiêu?"
+    • "tỷ lệ tiết kiệm của tôi"
+
+# ============================================================
+# SUB-MENU: MỤC TIÊU (Level 2)
+# ============================================================
+
+submenu_goals:
+  title: "🎯 *MỤC TIÊU*"
+
+  intro:
+    starter: |-
+      Đặt mục tiêu tài chính giúp {name} có động lực
+      và roadmap rõ ràng.
+
+      Bắt đầu nhỏ — tiết kiệm 10tr, mua xe máy, du lịch…
+
+    young_prof: |-
+      Quản lý mục tiêu trung-dài hạn của {name}.
+
+      Mình giúp tính toán cần tiết kiệm bao nhiêu/tháng
+      để đạt được trong thời gian mong muốn.
+
+    mass_affluent: |-
+      Theo dõi mục tiêu và optimize lộ trình đạt được.
+
+      Bao gồm tư vấn investment strategy phù hợp với từng goal.
+
+    hnw: |-
+      Mục tiêu dài hạn, retirement planning, estate planning.
+
+  buttons:
+    - label: "📋 Mục tiêu hiện tại"
+      callback: "menu:goals:list"
+      description: "Tất cả goals đang active + tiến độ"
+
+    - label: "➕ Thêm mục tiêu"
+      callback: "menu:goals:add"
+      description: "Đặt mục tiêu mới với deadline"
+
+    - label: "✏️ Cập nhật tiến độ"
+      callback: "menu:goals:update"
+      description: "Thêm tiền vào goal đang track"
+
+    - label: "💡 Gợi ý lộ trình"
+      callback: "menu:goals:advisor"
+      description: "Cần tiết kiệm bao nhiêu/tháng?"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 _Hoặc hỏi nhanh:_
+    • "mục tiêu của tôi"
+    • "muốn mua xe cần làm gì?"
+    • "lộ trình mua nhà"
+
+# ============================================================
+# SUB-MENU: THỊ TRƯỜNG (Level 2)
+# ============================================================
+
+submenu_market:
+  title: "📊 *THỊ TRƯỜNG*"
+
+  intro:
+    starter: |-
+      Cập nhật giá thị trường và học hỏi về đầu tư.
+
+      Bắt đầu xem những mã phổ biến: VNM, VIC, BTC…
+
+    young_prof: |-
+      Theo dõi market data và tìm cơ hội đầu tư phù hợp.
+
+      Bao gồm gợi ý cho người mới bắt đầu.
+
+    mass_affluent: |-
+      Market intelligence và investment opportunities.
+
+      Tin tức được lọc theo holdings hiện tại của {name}.
+
+    hnw: |-
+      Phân tích thị trường chuyên sâu và investment ideas.
+
+  buttons:
+    - label: "🇻🇳 VN-Index"
+      callback: "menu:market:vnindex"
+      description: "Chỉ số chính, top gainer/loser"
+
+    - label: "📈 Cổ phiếu"
+      callback: "menu:market:stocks"
+      description: "Mã bạn sở hữu + watchlist"
+
+    - label: "₿ Crypto"
+      callback: "menu:market:crypto"
+      description: "BTC, ETH, top coins"
+
+    - label: "🥇 Vàng SJC"
+      callback: "menu:market:gold"
+      description: "Giá vàng SJC, PNJ"
+
+    - label: "💡 Cơ hội đầu tư"
+      callback: "menu:market:advisor"
+      description: "Gợi ý đầu tư mới dựa trên thị trường"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 _Hoặc hỏi nhanh:_
+    • "VNM giá bao nhiêu?"
+    • "BTC hôm nay thế nào?"
+    • "nên đầu tư gì?"
