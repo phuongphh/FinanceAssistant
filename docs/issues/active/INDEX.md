@@ -25,5 +25,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #189 | [Story] P3.7-S7: Implement Telegram streaming for long responses | [issue-189.md](issue-189.md) |
 | #190 | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [issue-190.md](issue-190.md) |
 | #191 | [Story] P3.7-S9: Add rate limiting and cost caps | [issue-191.md](issue-191.md) |
+| #193 | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [issue-193.md](issue-193.md) |
 
-**Total active:** 21
+**Total active:** 22
