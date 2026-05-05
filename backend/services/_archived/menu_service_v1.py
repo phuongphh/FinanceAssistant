@@ -1,7 +1,24 @@
-"""Menu service — single source of truth for all menu data.
+"""DEPRECATED — V1 flat menu data (archived in Phase 3.6 Epic 3, 2026-05-05).
 
-All menu text, buttons, and feature descriptions are defined here.
-Both the Telegram router and OpenClaw skill consume this via API.
+The Phase 3.6 menu revamp replaced the V1 8-button flat menu with a
+3-level wealth-adaptive hierarchy (see ``content/menu_copy.yaml`` and
+``backend/bot/handlers/menu_handler.py``). This module survives only
+because the OpenClaw ``finance-menu`` skill still calls
+``GET /telegram/menu`` (in ``routers/telegram.py``) for a JSON
+description of bot capabilities.
+
+What's still live:
+  * ``FEATURES`` — list consumed by ``get_menu_text`` / ``get_features_json``
+  * ``get_menu_text`` / ``get_features_json`` — used by ``/telegram/menu``
+
+What was removed (moved into Epic 1/2 modules):
+  * ``BOT_COMMANDS`` — replaced by ``backend/bot/setup_commands.py``
+  * ``get_telegram_menu_text`` / ``get_telegram_buttons`` /
+    ``get_callback_response`` — V1 inline-keyboard helpers, replaced by
+    ``backend/bot/formatters/menu_formatter.py`` + ``menu_handler.py``
+
+When OpenClaw skills are sunset (or migrated to the V2 endpoint), this
+file can be deleted in full. Tracked as a follow-up to Phase 3.6.
 """
 
 FEATURES = [
@@ -85,17 +102,6 @@ FEATURES = [
     },
 ]
 
-BOT_COMMANDS = [
-    {"command": "menu", "description": "Hiển thị menu tính năng"},
-    {"command": "start", "description": "Bắt đầu sử dụng bot"},
-    {"command": "themtaisan", "description": "Thêm tài sản mới (cash, cổ phiếu, BĐS...)"},
-    {"command": "taisan", "description": "Xem danh sách tài sản"},
-    {"command": "report", "description": "Báo cáo chi tiêu tháng này"},
-    {"command": "goals", "description": "Xem mục tiêu tài chính"},
-    {"command": "market", "description": "Thông tin thị trường"},
-]
-
-
 def get_menu_text() -> str:
     """Plain text menu (for OpenClaw / non-Telegram clients)."""
     lines = ["\U0001f3e6 Finance Assistant — Menu\n", "Chọn tính năng bạn muốn sử dụng:\n"]
@@ -104,39 +110,6 @@ def get_menu_text() -> str:
         lines.append(f'{f["emoji"]} {f["label"]} — {examples}')
     lines.append("\nNhập lệnh hoặc mô tả nhu cầu bằng tiếng Việt tự nhiên.")
     return "\n".join(lines)
-
-
-def get_telegram_menu_text() -> str:
-    """Markdown menu header for Telegram (used with inline keyboard)."""
-    return "\U0001f3e6 *Finance Assistant — Menu*\n\nChọn tính năng bạn muốn sử dụng:"
-
-
-def get_telegram_buttons() -> list[list[dict]]:
-    """Inline keyboard button layout for Telegram."""
-    pairs = []
-    for i in range(0, len(FEATURES), 2):
-        row = []
-        for f in FEATURES[i : i + 2]:
-            row.append({
-                "text": f'{f["emoji"]} {f["short_label"]}',
-                "callback_data": f'menu:{f["key"]}',
-            })
-        pairs.append(row)
-    return pairs
-
-
-def get_callback_response(callback_key: str) -> str | None:
-    """Markdown response for a Telegram inline keyboard callback."""
-    # callback_key format: "menu:<feature_key>"
-    feature_key = callback_key.removeprefix("menu:")
-    for f in FEATURES:
-        if f["key"] == feature_key:
-            examples = "\n".join(f'• "{e}"' for e in f["trigger_examples"])
-            return (
-                f'{f["emoji"]} *{f["label"]}*\n\n'
-                f"Gửi:\n{examples}\n\n{f['description']}"
-            )
-    return None
 
 
 def get_features_json() -> list[dict]:

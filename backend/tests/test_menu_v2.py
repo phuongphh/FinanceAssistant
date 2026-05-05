@@ -235,16 +235,42 @@ class TestHandleMenuCallback:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_returns_false_for_legacy_menu_prefix(self):
-        # ``menu:ocr`` belongs to the V1 flat menu — Epic 1 must defer
-        # to the legacy handler (returns False) so the cutover stays safe.
-        from backend.bot.handlers.menu_handler import handle_menu_callback
+    async def test_legacy_menu_prefix_redirects_gracefully(self, monkeypatch):
+        """Phase 3.6 Epic 3 hard cutover: the new handler now owns every
+        ``menu:*`` callback. Legacy V1 prefixes (e.g. ``menu:ocr``) get
+        the upgrade-redirect message instead of falling through to a
+        silent or 404 path."""
+        from backend.bot.handlers import menu_handler
 
-        result = await handle_menu_callback(
+        sent: dict = {}
+        ack: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        async def fake_answer_callback(callback_id, **kwargs):
+            ack["called"] = True
+
+        async def fake_get_user(db, telegram_id):
+            return None  # No user — test that redirect still works.
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler, "answer_callback", fake_answer_callback)
+        monkeypatch.setattr(menu_handler, "get_user_by_telegram_id", fake_get_user)
+
+        result = await menu_handler.handle_menu_callback(
             db=None,
-            callback_query={"data": "menu:ocr", "id": "x"},
+            callback_query={
+                "data": "menu:ocr",
+                "id": "x",
+                "message": {"chat": {"id": 42}, "message_id": 7},
+                "from": {"id": 100},
+            },
         )
-        assert result is False
+        assert result is True
+        assert ack.get("called") is True
+        assert sent["text"] == menu_handler.LEGACY_REDIRECT_TEXT
+        assert sent["chat_id"] == 42
 
     @pytest.mark.asyncio
     async def test_returns_false_when_data_missing(self):
@@ -406,31 +432,56 @@ class TestMenuCoexistence:
     """
 
     @pytest.mark.asyncio
-    async def test_legacy_menu_callback_does_not_raise(self):
-        """Stale V1 callbacks (deployed before the cutover) must
-        return False quietly so the legacy handler in the worker can
-        respond. Anything else risks a stuck spinner for users whose
-        chat history still has old menu bubbles.
+    async def test_legacy_menu_callbacks_redirect_to_new_menu(self, monkeypatch):
+        """Stale V1 callbacks (deployed before Epic 3 cutover) all get
+        the upgrade-redirect message so the user understands the UI
+        moved. Idempotent — same redirect for any legacy prefix.
         """
-        from backend.bot.handlers.menu_handler import handle_menu_callback
+        from backend.bot.handlers import menu_handler
+
+        sent_messages: list[dict] = []
+
+        async def fake_send_message(**kwargs):
+            sent_messages.append(kwargs)
+
+        async def fake_answer_callback(*a, **kw):
+            return None
+
+        async def fake_get_user(db, telegram_id):
+            return None
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler, "answer_callback", fake_answer_callback)
+        monkeypatch.setattr(menu_handler, "get_user_by_telegram_id", fake_get_user)
 
         for legacy in ("menu:gmail_scan", "menu:add_expense", "menu:advice"):
-            assert (
-                await handle_menu_callback(
-                    db=None, callback_query={"data": legacy, "id": "x"}
-                )
-                is False
+            handled = await menu_handler.handle_menu_callback(
+                db=None,
+                callback_query={
+                    "data": legacy,
+                    "id": "x",
+                    "message": {"chat": {"id": 42}, "message_id": 7},
+                    "from": {"id": 100},
+                },
             )
+            assert handled is True
+
+        # All three taps got the same redirect text.
+        assert len(sent_messages) == 3
+        for sent in sent_messages:
+            assert sent["text"] == menu_handler.LEGACY_REDIRECT_TEXT
 
     @pytest.mark.asyncio
-    async def test_unknown_top_level_returns_false(self):
-        # Future V3 menus might use ``menu:dashboard`` etc. — until then,
-        # the new handler stays out of their way.
+    async def test_non_menu_prefix_returns_false(self):
+        """``intent_*`` and other non-``menu:`` callbacks must not be
+        swallowed by the menu handler — the worker's other dispatchers
+        own those prefixes.
+        """
         from backend.bot.handlers.menu_handler import handle_menu_callback
 
         assert (
             await handle_menu_callback(
-                db=None, callback_query={"data": "menu:future", "id": "x"}
+                db=None, callback_query={"data": "intent_confirm:yes", "id": "x"}
             )
             is False
         )

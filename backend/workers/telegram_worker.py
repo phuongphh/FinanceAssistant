@@ -63,16 +63,12 @@ async def route_update(data: dict) -> None:
         handle_menu_callback as handle_menu_v2_callback,
     )
     from backend.bot.handlers.message import (
-        handle_report_callback,
         handle_report_command,
         handle_text_message,
     )
     from backend.bot.personality.onboarding_flow import OnboardingStep
     from backend.services import dashboard_service
-    from backend.services.telegram_service import (
-        answer_callback,
-        handle_menu_callback,
-    )
+    from backend.services.telegram_service import answer_callback
     from backend import analytics
 
     update_id = data.get("update_id")
@@ -104,9 +100,7 @@ async def route_update(data: dict) -> None:
                         storytelling_handlers=storytelling_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
-                        handle_report_callback=handle_report_callback,
                         handle_menu_v2_callback=handle_menu_v2_callback,
-                        handle_menu_callback=handle_menu_callback,
                         answer_callback=answer_callback,
                     )
 
@@ -337,9 +331,7 @@ async def _handle_callback(
     storytelling_handlers,
     dashboard_service,
     handle_transaction_callback,
-    handle_report_callback,
     handle_menu_v2_callback,
-    handle_menu_callback,
     answer_callback,
 ):
     """Dispatch a callback_query update. Returns the resolved internal
@@ -395,21 +387,15 @@ async def _handle_callback(
     if await handle_transaction_callback(db, callback_query):
         return await _resolved_user_id()
 
-    # Phase 3.6 menu callbacks (menu:main / menu:<category>[:<action>]).
-    # Owns its own answerCallbackQuery + edit-in-place navigation.
-    # Returns False for legacy V1 prefixes like ``menu:ocr`` / ``menu:report``
-    # so they fall through to the original handlers below.
+    # Phase 3.6 menu callbacks own the entire ``menu:*`` namespace —
+    # main / category / action callbacks render the new UX, legacy V1
+    # prefixes (``menu:gmail_scan`` etc.) get a graceful "menu has been
+    # upgraded" redirect.
     if await handle_menu_v2_callback(db, callback_query):
         return await _resolved_user_id()
 
+    # No handler matched — acknowledge so the user's spinner clears.
     await answer_callback(callback_id)
-
-    # "Báo cáo" button → generate report immediately instead of showing help.
-    if callback_data == "menu:report":
-        await handle_report_callback(db, callback_query)
-        return await _resolved_user_id()
-
-    await handle_menu_callback(chat_id, callback_data)
     return await _resolved_user_id()
 
 

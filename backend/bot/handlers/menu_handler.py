@@ -157,16 +157,35 @@ async def cmd_menu(db: AsyncSession, chat_id: int, user: User | None) -> None:
 # -----------------------------------------------------------------
 
 
+LEGACY_REDIRECT_TEXT = (
+    "✨ Menu đã được nâng cấp với 5 mảng rõ ràng hơn:\n"
+    "💎 Tài sản • 💸 Chi tiêu • 💰 Dòng tiền • 🎯 Mục tiêu • 📊 Thị trường\n\n"
+    "Gõ /menu để xem giao diện mới nhé!"
+)
+
+
 async def handle_menu_callback(
     db: AsyncSession, callback_query: dict[str, Any]
 ) -> bool:
-    """Route a ``menu:*`` callback. Returns ``True`` if handled.
+    """Route every ``menu:*`` callback. Returns ``True`` once handled.
 
-    Returning ``False`` lets the worker fall through to legacy menu
-    callbacks (the V1 flat menu) so the cutover is non-destructive —
-    Epic 3 archives the legacy paths. Anything matching the new
-    schema (``menu:main`` / ``menu:<known_cat>`` / ``menu:<cat>:<act>``)
-    is owned by this handler.
+    Phase 3.6 Epic 3 migration: this handler now owns the entire
+    ``menu:*`` namespace. Three buckets:
+
+      * ``menu:main`` / ``menu:<v2_category>`` / ``menu:<cat>:<action>``
+        — the new 5-category UX from Epic 1/2.
+      * ``menu:<anything_else>`` — V1 flat-menu callbacks fired from
+        chat history bubbles deployed before the cutover (e.g.
+        ``menu:gmail_scan``, ``menu:ocr``, ``menu:report``). They get
+        a friendly redirect to ``/menu`` so the user understands the
+        UI moved without thinking the bot is broken.
+      * Anything not starting with ``menu:`` — return False so the
+        worker keeps dispatching its own prefixes (intent_, asset_,
+        briefing:, etc.).
+
+    The redirect path stays for ~1 month post-deploy to cover stale
+    chat-history bubbles, then becomes dead code — see the follow-up
+    issue noted in ``phase-3.6-retrospective.md``.
     """
     data: str = callback_query.get("data") or ""
     if not data.startswith("menu:"):
@@ -176,12 +195,6 @@ async def handle_menu_callback(
     if len(parts) < 2:
         return False
 
-    target = parts[1]
-    if target != "main" and target not in known_categories():
-        # Legacy flat-menu callback (e.g. ``menu:ocr``, ``menu:report``).
-        # Defer to the legacy handler in the worker.
-        return False
-
     callback_id = callback_query["id"]
     message = callback_query.get("message") or {}
     chat_id = message.get("chat", {}).get("id")
@@ -189,7 +202,33 @@ async def handle_menu_callback(
     from_user = callback_query.get("from") or {}
     telegram_id = from_user.get("id")
 
+    # Resolve the user once up front. The legacy-redirect branch needs
+    # ``user_id`` for analytics (so we can group stale-bubble taps by
+    # wealth tier) and the V2 branch needs the User row for adaptive
+    # rendering. One lookup serves both.
     user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+
+    target = parts[1]
+    is_v2 = target == "main" or target in known_categories()
+
+    if not is_v2:
+        # Legacy V1 callback. Acknowledge + send redirect; do NOT
+        # surface as an error (users tapped a real button that worked
+        # last week — that experience shouldn't change suddenly).
+        await answer_callback(callback_id)
+        if chat_id is not None:
+            await send_message(
+                chat_id=chat_id,
+                text=LEGACY_REDIRECT_TEXT,
+                parse_mode="Markdown",
+            )
+        analytics.track(
+            "menu_legacy_redirect",
+            user_id=user.id if user else None,
+            properties={"callback": data},
+        )
+        return True
+
     if user is None:
         # Edge case: Telegram delivered an old menu bubble after the user
         # was removed from the DB. Friendly nudge instead of a silent fail.

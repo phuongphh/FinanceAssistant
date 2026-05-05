@@ -19,9 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import get_settings
 from backend.database import get_db
 from backend.models.telegram_update import TelegramUpdate
-from backend.services.menu_service import get_features_json, get_menu_text
 from backend.bot.setup_commands import setup_bot_commands
-from backend.services.telegram_service import send_menu
+from backend.services._archived.menu_service_v1 import (
+    get_features_json,
+    get_menu_text,
+)
 from backend.workers.telegram_worker import process_update_safely
 
 logger = logging.getLogger(__name__)
@@ -107,14 +109,6 @@ async def get_menu():
         },
         "error": None,
     }
-
-
-@router.post("/send-menu")
-async def trigger_send_menu(chat_id: int = Query(...)):
-    result = await send_menu(chat_id)
-    if result:
-        return {"data": {"sent": True}, "error": None}
-    return {"data": None, "error": {"code": "SEND_FAILED", "message": "Failed to send menu"}}
 
 
 @router.post("/set-commands")

@@ -27,7 +27,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "3.5"
+current_phase: "3.6"
 
 roadmap:
   - id: "1"
@@ -68,6 +68,16 @@ roadmap:
     issues_doc: "docs/current/phase-3.5-issues.md"
     description: "Rule + LLM intent classifier, confirm/clarify, advisory, voice queries"
     completed_date: "2026-05-02"
+    icon: "✅"
+
+  - id: "3.6"
+    name: "Menu UX Revamp"
+    status: done
+    duration: "1.5 tuần"
+    detailed_doc: "docs/current/phase-3.6-detailed.md"
+    issues_doc: "docs/current/phase-3.6-issues.md"
+    description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
+    completed_date: "2026-05-05"
     icon: "✅"
 
   - id: "3B"

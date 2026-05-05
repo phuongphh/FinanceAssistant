@@ -25,7 +25,6 @@ from backend.services import dashboard_service, onboarding_service
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
-    send_menu,
     send_message,
 )
 
@@ -487,7 +486,7 @@ async def resume_or_start(
 ) -> None:
     """Entry point for /start — drops the user at the correct step."""
     if user.is_onboarded:
-        await send_welcome_back(chat_id, user)
+        await send_welcome_back(db, chat_id, user)
         return
 
     step = OnboardingStep(user.onboarding_step)
@@ -516,16 +515,19 @@ async def resume_or_start(
     elif step == OnboardingStep.FIRST_ASSET:
         await step_6_first_asset(db, chat_id, user)
     else:  # COMPLETED shouldn't reach here (is_onboarded catches it)
-        await send_welcome_back(chat_id, user)
+        await send_welcome_back(db, chat_id, user)
 
 
-async def send_welcome_back(chat_id: int, user: User) -> None:
+async def send_welcome_back(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
     """Short, friendly re-entry message for users already past onboarding.
 
-    Also shows the main feature menu so behaviour matches the existing
-    `/start` UX for pre-Phase-2 users (PR #46) — we don't want the bot
-    to feel emptier just because they're past onboarding.
+    Phase 3.6: hands off to ``cmd_menu`` so returning users land on the
+    new wealth-adaptive menu instead of the V1 flat list.
     """
+    from backend.bot.handlers.menu_handler import cmd_menu
+
     name = user.get_greeting_name()
     text = (
         f"Chào lại {name}! 👋\n\n"
@@ -533,7 +535,7 @@ async def send_welcome_back(chat_id: int, user: User) -> None:
         "mục bên dưới."
     )
     await send_message(chat_id=chat_id, text=text, parse_mode="HTML")
-    await send_menu(chat_id)
+    await cmd_menu(db, chat_id, user)
 
 
 async def handle_onboarding_callback(

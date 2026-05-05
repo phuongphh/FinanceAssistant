@@ -9,11 +9,6 @@ import logging
 import httpx
 
 from backend.config import get_settings
-from backend.services.menu_service import (
-    get_callback_response,
-    get_telegram_buttons,
-    get_telegram_menu_text,
-)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -124,16 +119,6 @@ async def send_photo(
     return None
 
 
-async def send_menu(chat_id: int) -> dict | None:
-    """Send the interactive menu with inline keyboard."""
-    return await send_telegram("sendMessage", {
-        "chat_id": chat_id,
-        "text": get_telegram_menu_text(),
-        "parse_mode": "Markdown",
-        "reply_markup": {"inline_keyboard": get_telegram_buttons()},
-    })
-
-
 async def answer_callback(
     callback_id: str,
     text: str | None = None,
@@ -173,14 +158,6 @@ async def edit_message_reply_markup(
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     return await send_telegram("editMessageReplyMarkup", payload)
-
-
-async def handle_menu_callback(chat_id: int, callback_data: str) -> dict | None:
-    """Look up the callback response and send it."""
-    response_text = get_callback_response(callback_data)
-    if response_text:
-        return await send_message(chat_id, response_text)
-    return None
 
 
 async def download_file(file_id: str) -> bytes | None:
