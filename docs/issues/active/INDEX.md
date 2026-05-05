@@ -13,11 +13,10 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #181 | [Epic] Phase 3.7 — Epic 2: Premium Reasoning & Orchestrator (Tier 3) | [issue-181.md](issue-181.md) |
 | #182 | [Epic] Phase 3.7 — Epic 3: Polish, Audit & Testing | [issue-182.md](issue-182.md) |
 | #190 | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [issue-190.md](issue-190.md) |
 | #192 | [Story] P3.7-S10: Audit logging + cost dashboard | [issue-192.md](issue-192.md) |
 | #193 | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [issue-193.md](issue-193.md) |
 | #194 | [Story] P3.7-S12: Comprehensive testing + user trial | [issue-194.md](issue-194.md) |
 
-**Total active:** 15
+**Total active:** 14

@@ -91,6 +91,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #172 | Pre-Phase | [Story] P3.6-S12: User testing with 3 users post-deploy | [pre-phase/issue-172.md](by-phase/pre-phase/issue-172.md) |
 | #173 | Pre-Phase | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [pre-phase/issue-173.md](by-phase/pre-phase/issue-173.md) |
 | #180 | Pre-Phase | [Epic] Phase 3.7 — Epic 1: Tool Foundation & DB-Agent (Tier 2) | [pre-phase/issue-180.md](by-phase/pre-phase/issue-180.md) |
+| #181 | Pre-Phase | [Epic] Phase 3.7 — Epic 2: Premium Reasoning & Orchestrator (Tier 3) | [pre-phase/issue-181.md](by-phase/pre-phase/issue-181.md) |
 | #183 | Pre-Phase | [Story] P3.7-S1: Define tool schemas with Pydantic | [pre-phase/issue-183.md](by-phase/pre-phase/issue-183.md) |
 | #184 | Pre-Phase | [Story] P3.7-S2: Implement GetAssets and GetTransactions tools | [pre-phase/issue-184.md](by-phase/pre-phase/issue-184.md) |
 | #185 | Pre-Phase | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [pre-phase/issue-185.md](by-phase/pre-phase/issue-185.md) |
@@ -100,5 +101,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #189 | Pre-Phase | [Story] P3.7-S7: Implement Telegram streaming for long responses | [pre-phase/issue-189.md](by-phase/pre-phase/issue-189.md) |
 | #191 | Pre-Phase | [Story] P3.7-S9: Add rate limiting and cost caps | [pre-phase/issue-191.md](by-phase/pre-phase/issue-191.md) |
 
-**Total:** 95 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 78 Pre-Phase)
+**Total:** 96 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 79 Pre-Phase)
