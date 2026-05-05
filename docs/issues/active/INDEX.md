@@ -21,5 +21,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #185 | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [issue-185.md](issue-185.md) |
 | #186 | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [issue-186.md](issue-186.md) |
 | #187 | [Story] P3.7-S5: Implement Tier 2 response formatters | [issue-187.md](issue-187.md) |
+| #191 | [Story] P3.7-S9: Add rate limiting and cost caps | [issue-191.md](issue-191.md) |
 
-**Total active:** 17
+**Total active:** 18
