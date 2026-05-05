@@ -19,7 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #161 | [Story] P3.6-S1: Create menu copy YAML with all 5 categories | [issue-161.md](issue-161.md) |
 | #162 | [Story] P3.6-S2: Build MenuFormatter with basic intros | [issue-162.md](issue-162.md) |
 | #163 | [Story] P3.6-S3: Implement /menu command handler | [issue-163.md](issue-163.md) |
-| #164 | [Story] P3.6-S4: Implement menu callback router | [issue-164.md](issue-164.md) |
 | #165 | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [issue-165.md](issue-165.md) |
 | #166 | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [issue-166.md](issue-166.md) |
 | #167 | [Story] P3.6-S7: Add wealth-level detection to MenuFormatter | [issue-167.md](issue-167.md) |
@@ -30,4 +29,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 | #173 | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [issue-173.md](issue-173.md) |
 
-**Total active:** 25
+**Total active:** 24
