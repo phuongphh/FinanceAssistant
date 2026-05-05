@@ -80,6 +80,10 @@ class Phase:
     description: str
     completed_date: str
     icon: str
+    # Skeleton flag: auto-inserted entries that the dev hasn't yet
+    # filled in. ``--check`` mode treats any ``skeleton: true`` entry
+    # as drift so CI fails until the dev curates name/duration/etc.
+    skeleton: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,11 +101,111 @@ class PhaseStatus:
 def load_status(path: Path = PHASE_STATUS_FILE) -> PhaseStatus:
     with path.open(encoding="utf-8") as f:
         raw = yaml.safe_load(f)
-    roadmap = [Phase(**entry) for entry in raw.get("roadmap", [])]
+    # Coerce id to str so phases like ``3.5`` (which YAML parses as
+    # float) match the file-system glob ``phase-3.5-*``.
+    roadmap: list[Phase] = []
+    for entry in raw.get("roadmap", []):
+        coerced = dict(entry)
+        coerced["id"] = str(coerced["id"])
+        roadmap.append(Phase(**coerced))
     return PhaseStatus(
         current_phase=str(raw["current_phase"]),
         roadmap=roadmap,
     )
+
+
+# ---------------------- skeleton auto-insert ----------------------
+
+
+# Filenames look like ``phase-<id>-detailed.md`` or
+# ``phase-<id>-issues.md``. ``<id>`` can contain dots (3.5), letters
+# (3a) or digits (1). Other suffixes (-retrospective, -user-testing,
+# -perf-report …) are ignored — only detailed/issues seed a skeleton.
+_PHASE_FILE_RE = re.compile(
+    r"^phase-(?P<id>[A-Za-z0-9.]+)-(?P<kind>detailed|issues)\.md$"
+)
+
+
+def _discover_phase_docs() -> dict[str, dict[str, str]]:
+    """Scan ``docs/current/`` for phase-{id}-detailed.md /
+    phase-{id}-issues.md. Return {id_lower: {detailed: path,
+    issues: path}}.
+    """
+    found: dict[str, dict[str, str]] = {}
+    current_dir = REPO_ROOT / "docs" / "current"
+    if not current_dir.is_dir():
+        return found
+    for entry in current_dir.iterdir():
+        if not entry.is_file():
+            continue
+        m = _PHASE_FILE_RE.match(entry.name)
+        if not m:
+            continue
+        pid = m.group("id").lower()
+        kind = m.group("kind")
+        relpath = str(entry.relative_to(REPO_ROOT))
+        found.setdefault(pid, {})[kind] = relpath
+    return found
+
+
+def _render_skeleton_yaml(
+    phase_id: str, detailed_doc: str, issues_doc: str
+) -> str:
+    """YAML block for a freshly-inserted skeleton. Hand-formatted
+    rather than via ``yaml.safe_dump`` so we preserve the indentation
+    + quoting style used by the rest of the file."""
+    issues_line = f'    issues_doc: "{issues_doc}"' if issues_doc else '    issues_doc: ""'
+    return (
+        f'\n'
+        f'  - id: "{phase_id}"\n'
+        f'    name: "TODO (skeleton — please update)"\n'
+        f'    status: planned\n'
+        f'    duration: "TBD"\n'
+        f'    detailed_doc: "{detailed_doc}"\n'
+        f'{issues_line}\n'
+        f'    description: "TODO: 1-line summary"\n'
+        f'    completed_date: ""\n'
+        f'    icon: "🔮"\n'
+        f'    skeleton: true\n'
+    )
+
+
+def auto_insert_skeletons(
+    yaml_path: Path = PHASE_STATUS_FILE,
+) -> list[str]:
+    """Append a skeleton entry to ``yaml_path`` for every
+    phase-{id}-detailed.md that has no roadmap entry yet. Returns the
+    list of phase ids inserted (empty if none)."""
+    discovered = _discover_phase_docs()
+    if not discovered:
+        return []
+
+    raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    existing_ids = {str(p["id"]).lower() for p in raw.get("roadmap", [])}
+
+    missing = [
+        (pid, paths)
+        for pid, paths in sorted(discovered.items())
+        if "detailed" in paths and pid not in existing_ids
+    ]
+    if not missing:
+        return []
+
+    # Append skeleton blocks at end of file. The roadmap is the last
+    # top-level key, so EOF is inside it. Confirmed by the simple
+    # structure of phase-status.yaml — single ``current_phase`` then
+    # ``roadmap:`` to EOF.
+    text = yaml_path.read_text(encoding="utf-8")
+    if not text.endswith("\n"):
+        text += "\n"
+    inserted: list[str] = []
+    for pid, paths in missing:
+        text += _render_skeleton_yaml(
+            pid, paths["detailed"], paths.get("issues", "")
+        )
+        inserted.append(pid)
+    yaml_path.write_text(text, encoding="utf-8")
+    return inserted
 
 
 # ---------------------- renderers ----------------------
@@ -157,7 +261,8 @@ def render_roadmap_table(status: PhaseStatus) -> str:
     rows: list[str] = []
     for p in status.roadmap:
         marker = "**" if p.id == status.current_phase else ""
-        name_cell = f"{marker}Phase {p.id}: {p.name}{marker}"
+        skeleton_tag = " 🚧 _skeleton_" if p.skeleton else ""
+        name_cell = f"{marker}Phase {p.id}: {p.name}{marker}{skeleton_tag}"
         status_cell = f"{p.icon} {p.status}"
         detail_cell = (
             f"[{p.detailed_doc.split('/')[-1]}]({_relpath(p.detailed_doc)})"
@@ -266,11 +371,47 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # Step 1: detect phase-{id}-detailed.md files with no roadmap
+    # entry. In write-mode, append a skeleton; in --check mode, just
+    # report (CI will fail).
+    discovered = _discover_phase_docs()
+    existing_ids = {p.id.lower() for p in load_status().roadmap}
+    missing_ids = sorted(
+        pid for pid, paths in discovered.items()
+        if "detailed" in paths and pid not in existing_ids
+    )
+    if args.check:
+        for pid in missing_ids:
+            print(
+                f"  ⚠️  --check: phase-{pid}-detailed.md exists but "
+                f"has no roadmap entry in phase-status.yaml",
+                file=sys.stderr,
+            )
+    elif missing_ids:
+        inserted = auto_insert_skeletons()
+        for pid in inserted:
+            print(
+                f"  ✓ Auto-inserted skeleton for Phase {pid} — "
+                f"please curate name/duration/description in "
+                f"docs/current/phase-status.yaml"
+            )
+
     status = load_status()
     print(
         f"Phase status loaded: {len(status.roadmap)} phases, "
         f"current = {status.current_phase}"
     )
+
+    # Step 2: in --check mode, any unfilled skeleton is drift.
+    skeleton_ids = [p.id for p in status.roadmap if p.skeleton]
+    if args.check and skeleton_ids:
+        for pid in skeleton_ids:
+            print(
+                f"  ⚠️  --check: Phase {pid} has skeleton: true — "
+                f"dev must fill in name/duration/description and "
+                f"remove the skeleton flag",
+                file=sys.stderr,
+            )
 
     drift: list[Path] = []
     for path in TARGET_FILES:
@@ -286,16 +427,17 @@ def main() -> int:
         else:
             print(f"  · No change to {path.relative_to(REPO_ROOT)}")
 
-    if args.check and drift:
-        # Restore originals so --check doesn't leave the tree dirty.
-        # In CI we usually run without --check and let the workflow
-        # commit the result; --check is for local pre-push verification.
-        for path in drift:
-            print(
-                f"  ⚠️  --check: {path.relative_to(REPO_ROOT)} would change",
-                file=sys.stderr,
-            )
-        return 1
+    if args.check:
+        if drift:
+            for path in drift:
+                print(
+                    f"  ⚠️  --check: {path.relative_to(REPO_ROOT)} would change",
+                    file=sys.stderr,
+                )
+        # Fail on any drift signal: missing roadmap entries,
+        # unfilled skeletons, or marker-section drift.
+        if drift or skeleton_ids or missing_ids:
+            return 1
 
     return 0
 

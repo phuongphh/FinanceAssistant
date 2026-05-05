@@ -6,8 +6,12 @@
 # auto-sync workflow propagates to the rest.
 #
 # Workflow: ``.github/workflows/sync-phase-status.yml`` reruns the
-# sync on every push that touches this file or adds a new
-# ``phase-*-detailed.md`` document.
+# sync on every push that touches this file (or the consumer
+# files / the script itself). When a new ``phase-*-detailed.md``
+# is added without a matching roadmap entry, the sync script
+# auto-inserts a skeleton entry (status=planned, skeleton=true)
+# that the dev must manually fill in before re-pushing — the
+# ``--check`` mode fails CI while ``skeleton: true`` is present.
 #
 # Schema:
 #   current_phase     — id of the phase the team is actively working on
@@ -21,13 +25,19 @@
 #     description     — 1-line summary that goes into roadmap tables
 #     completed_date  — ISO date OR empty; populated when status flips to "done"
 #     icon            — emoji shown next to the name in tables
+#     skeleton        — OPTIONAL bool. Auto-set true by sync script when it
+#                       inserts a placeholder for a phase-*-detailed.md
+#                       that has no entry yet. Dev must hand-fill the real
+#                       fields and remove this key. CI --check fails while
+#                       any entry has skeleton: true.
 #
 # Adding a new phase:
-#   1. Append an entry under roadmap.
+#   1. Append an entry under roadmap (or let sync auto-insert a skeleton
+#      placeholder, then hand-fill the real fields).
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "3.6"
+current_phase: "3.7"
 
 roadmap:
   - id: "1"
@@ -65,7 +75,7 @@ roadmap:
     status: done
     duration: "3 tuần"
     detailed_doc: "docs/current/phase-3.5-detailed.md"
-    issues_doc: "docs/current/phase-3.5-issues.md"
+    issues_doc: "docs/archive/phase-3.5-issues.md"
     description: "Rule + LLM intent classifier, confirm/clarify, advisory, voice queries"
     completed_date: "2026-05-02"
     icon: "✅"
@@ -79,6 +89,16 @@ roadmap:
     description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
     completed_date: "2026-05-05"
     icon: "✅"
+
+  - id: "3.7"
+    name: "Agent Architecture"
+    status: current
+    duration: "3 tuần"
+    detailed_doc: "docs/current/phase-3.7-detailed.md"
+    issues_doc: "docs/current/phase-3.7-issues.md"
+    description: "Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing"
+    completed_date: ""
+    icon: "🔨"
 
   - id: "3B"
     name: "Market Intelligence"
