@@ -99,7 +99,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #187 | Pre-Phase | [Story] P3.7-S5: Implement Tier 2 response formatters | [pre-phase/issue-187.md](by-phase/pre-phase/issue-187.md) |
 | #188 | Pre-Phase | [Story] P3.7-S6: Build Reasoning Agent with Claude Sonnet (Tier 3) | [pre-phase/issue-188.md](by-phase/pre-phase/issue-188.md) |
 | #189 | Pre-Phase | [Story] P3.7-S7: Implement Telegram streaming for long responses | [pre-phase/issue-189.md](by-phase/pre-phase/issue-189.md) |
+| #190 | Pre-Phase | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [pre-phase/issue-190.md](by-phase/pre-phase/issue-190.md) |
 | #191 | Pre-Phase | [Story] P3.7-S9: Add rate limiting and cost caps | [pre-phase/issue-191.md](by-phase/pre-phase/issue-191.md) |
 
-**Total:** 96 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 79 Pre-Phase)
+**Total:** 97 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 80 Pre-Phase)
