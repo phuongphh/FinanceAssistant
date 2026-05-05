@@ -113,7 +113,6 @@ def _format_listing(
 
     lines = [
         header,
-        "━━━━━━━━━━━━━━━━━━━━",
         f"Tổng: *{format_money_full(total)}* ({count} giao dịch)",
         "",
     ]

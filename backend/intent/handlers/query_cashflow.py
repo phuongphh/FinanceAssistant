@@ -64,7 +64,7 @@ class QueryCashflowHandler(IntentHandler):
         if income <= 0 and spend <= 0:
             return (
                 f"{name} chưa có dữ liệu thu / chi {label_vi} 🌱\n"
-                "Mình cần ít nhất một nguồn thu và vài giao dịch để tính cashflow."
+                "Mình cần ít nhất một nguồn thu và vài giao dịch để tính dòng tiền."
             )
 
         arrow = "💚" if net >= 0 else "🟥"
@@ -73,20 +73,17 @@ class QueryCashflowHandler(IntentHandler):
         if style.is_starter:
             if net >= 0:
                 return (
-                    f"💸 Cashflow {label_vi}:\n"
-                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Dòng tiền {label_vi}:\n"
                     f"Bạn dư *{format_money_short(net)}* {label_vi} 💚"
                 )
             return (
-                f"💸 Cashflow {label_vi}:\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"💰 Dòng tiền {label_vi}:\n"
                 f"Tháng này hơi căng — đang vượt thu {format_money_short(abs(net))} 🟥"
             )
 
         # Young Pro+: breakdown + savings rate when income > 0.
         lines = [
-            f"💸 Cashflow {label_vi}:",
-            "━━━━━━━━━━━━━━━━━━━━",
+            f"💰 Dòng tiền {label_vi}:",
             f"Thu: *{format_money_full(income)}*",
             f"Chi: *{format_money_full(spend)}*",
             f"{arrow} Dư: *{sign}{format_money_full(abs(net))}*",

@@ -78,7 +78,6 @@ class QueryAssetsHandler(IntentHandler):
 
         lines = [
             header,
-            "━━━━━━━━━━━━━━━━━━━━",
             f"Tổng: *{format_money_full(total)}*",
             "",
         ]

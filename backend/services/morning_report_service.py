@@ -138,9 +138,12 @@ def _build_text_summary(
         arrow = "↑" if change_pct >= 0 else "↓"
         change_str = f" {arrow} {abs(change_pct):.1f}%"
 
+    # One headline: ``Tổng tài sản`` is the canonical Vietnamese label for
+    # net worth across the bot. The redundant "Tài sản ròng" line that
+    # showed the same number was confusing — re-introduce only when the
+    # liabilities model lands and the two values can actually differ.
     lines = [
         f"💰 Tổng tài sản: {_format_vnd_text(total_value)}{change_str}",
-        f"📊 Tài sản ròng: {_format_vnd_text(total_value)}",
         "",
     ]
 

@@ -245,7 +245,7 @@ def _build_report_prompt(report_context: str, wealth_ctx: dict) -> str:
         "Viết báo cáo tài chính tháng cho user Telegram dưới đây.\n\n"
         "=== HỒ SƠ USER ===\n"
         f"Wealth level: {wealth_ctx['level_label_vi']}\n"
-        f"Tổng tài sản (net worth): {wealth_ctx['net_worth_str']}\n"
+        f"Tổng tài sản: {wealth_ctx['net_worth_str']}\n"
         f"Số tài sản đang theo dõi: {wealth_ctx['asset_count']}\n"
         f"Phân bổ tài sản:\n{wealth_ctx['breakdown_str']}\n"
         f"Income streams:\n{wealth_ctx['income_str']}\n"

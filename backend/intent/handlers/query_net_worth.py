@@ -21,7 +21,7 @@ class QueryNetWorthHandler(IntentHandler):
             name = user.display_name or "bạn"
             return (
                 f"💎 {name} chưa có tài sản nào trong hệ thống.\n\n"
-                "Tap /themtaisan để mình tính net worth giúp nhé 🚀"
+                "Tap /themtaisan để mình tính tổng tài sản giúp nhé 🚀"
             )
 
         # Detect level from the same breakdown we already fetched —
@@ -36,7 +36,6 @@ class QueryNetWorthHandler(IntentHandler):
         name = user.display_name or "bạn"
         lines = [
             f"💰 Tổng tài sản của {name}:",
-            "━━━━━━━━━━━━━━━━━━━━",
             f"*{format_money_full(breakdown.total)}*",
         ]
         if style.show_percent_change and change.previous > 0:
@@ -64,7 +63,7 @@ class QueryNetWorthHandler(IntentHandler):
             if yearly is not None and yearly.previous > 0:
                 sign = "+" if yearly.change_percentage >= 0 else ""
                 lines.append(
-                    f"_YTD approx: {sign}{yearly.change_percentage:.1f}%_"
+                    f"_Lợi nhuận năm (ước tính): {sign}{yearly.change_percentage:.1f}%_"
                 )
 
         return decorate("\n".join(lines), style)

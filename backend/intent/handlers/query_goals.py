@@ -45,7 +45,6 @@ class QueryGoalsHandler(IntentHandler):
             )
         lines = [
             f"🎯 Mục tiêu của {name}:",
-            "━━━━━━━━━━━━━━━━━━━━",
             "",
         ]
         for g in goals:

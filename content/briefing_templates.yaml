@@ -75,13 +75,13 @@ young_prof:
 
   net_worth_display:
     template: |
-      💰 Net worth: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       {change_emoji} {change} ({pct}%) so với {period}
 
       📊 Phân bổ:
       {breakdown_lines}
     no_change: |
-      💰 Net worth: {net_worth_short}
+      💰 Tổng tài sản: {net_worth_short}
       Chưa đổi so với {period}.
 
       📊 Phân bổ:
