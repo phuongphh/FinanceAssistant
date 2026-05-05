@@ -2,7 +2,7 @@
 
 > **Purpose:** 4 Epics chứa 22 User Stories — sẵn sàng copy-paste vào GitHub.  
 > **Format:** Epic = issue cha có task list link tới Stories. Stories = issue con với AC chi tiết.  
-> **Reference:** Mỗi story link về [phase-3.5-detailed.md](./phase-3.5-detailed.md)
+> **Reference:** Mỗi story link về [phase-3.5-detailed.md](../current/phase-3.5-detailed.md)
 
 ---
 
@@ -114,7 +114,7 @@ When Epic 1 is complete:
 
 ## Reference
 
-📖 [phase-3.5-detailed.md § Tuần 1](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Tuần 1](../current/phase-3.5-detailed.md)
 
 ### Labels
 `phase-3.5` `epic` `intent-classifier` `priority-critical`
@@ -126,7 +126,7 @@ When Epic 1 is complete:
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~0.5 day | **Depends on:** None
 
 ### Reference
-📖 [phase-3.5-detailed.md § 1.1](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 1.1](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -186,7 +186,7 @@ def test_intent_result_default_params():
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~0.5 day | **Depends on:** P3.5-S1
 
 ### Reference
-📖 [phase-3.5-detailed.md § Tuần 3 — User Testing Protocol](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Tuần 3 — User Testing Protocol](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -261,7 +261,7 @@ queries:
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** P3.5-S1
 
 ### Reference
-📖 [phase-3.5-detailed.md § 1.3 — Parameter Extractors](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 1.3 — Parameter Extractors](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -339,7 +339,7 @@ def test_amount_vietnamese():
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1.5 days | **Depends on:** P3.5-S1, P3.5-S2, P3.5-S3
 
 ### Reference
-📖 [phase-3.5-detailed.md § 1.2 — Pattern Matching Engine](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 1.2 — Pattern Matching Engine](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -405,7 +405,7 @@ As Bé Tiền, I need to recognize common Vietnamese query patterns (e.g., "tài
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~2 days | **Depends on:** P3.5-S1, P3.5-S4
 
 ### Reference
-📖 [phase-3.5-detailed.md § 1.4 — Action Handlers](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 1.4 — Action Handlers](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -480,7 +480,7 @@ As a user asking "tài sản của tôi có gì?", I expect Bé Tiền to fetch 
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** P3.5-S4, P3.5-S5
 
 ### Reference
-📖 [phase-3.5-detailed.md § 1.5 — Pipeline & Free-Form Handler, § 1.6 — Integration](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 1.5 — Pipeline & Free-Form Handler, § 1.6 — Integration](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -597,7 +597,7 @@ When Epic 2 is complete:
 
 ## Reference
 
-📖 [phase-3.5-detailed.md § Tuần 2](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Tuần 2](../current/phase-3.5-detailed.md)
 
 ### Labels
 `phase-3.5` `epic` `intent-classifier` `ai-llm` `priority-high`
@@ -609,7 +609,7 @@ When Epic 2 is complete:
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~1 day | **Depends on:** Epic 1 complete
 
 ### Reference
-📖 [phase-3.5-detailed.md § 2.1](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 2.1](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -680,7 +680,7 @@ As Bé Tiền, when I see a query that no rule pattern matches, I need a cheap a
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~1.5 days | **Depends on:** P3.5-S7
 
 ### Reference
-📖 [phase-3.5-detailed.md § 2.2 — Clarification System](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 2.2 — Clarification System](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -746,7 +746,7 @@ Normal → (low conf) → Awaiting Clarification → (user replies) → Re-class
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~0.5 day | **Depends on:** P3.5-S8
 
 ### Reference
-📖 [phase-3.5-detailed.md § 2.2 — Content YAML](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 2.2 — Content YAML](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -812,7 +812,7 @@ ambiguous_amount:
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~0.5 day | **Depends on:** P3.5-S7
 
 ### Reference
-📖 [phase-3.5-detailed.md § Triết Lý — "Out of Scope Polite Decline"](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Triết Lý — "Out of Scope Polite Decline"](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -883,7 +883,7 @@ out_of_scope_chitchat:
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~1 day | **Depends on:** P3.5-S7, P3.5-S8
 
 ### Reference
-📖 [phase-3.5-detailed.md § Metrics Phase 3.5](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Metrics Phase 3.5](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -977,7 +977,7 @@ When Epic 3 is complete:
 
 ## Reference
 
-📖 [phase-3.5-detailed.md § Tuần 3](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Tuần 3](../current/phase-3.5-detailed.md)
 
 ### Labels
 `phase-3.5` `epic` `personality` `ai-llm` `priority-high`
@@ -989,7 +989,7 @@ When Epic 3 is complete:
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~1 day | **Depends on:** Epic 2 complete
 
 ### Reference
-📖 [phase-3.5-detailed.md § 3.1 — Personality Layer](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 3.1 — Personality Layer](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1042,7 +1042,7 @@ As a user, when I ask "tài sản của tôi có gì?", I don't want a sterile d
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~1 day | **Depends on:** P3.5-S12
 
 ### Reference
-📖 [phase-3.5-detailed.md § 2.3 — Context-Aware Intent](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 2.3 — Context-Aware Intent](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1128,7 +1128,7 @@ HNW (Anh Phương, 5.2 tỷ):
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~1.5 days | **Depends on:** Epic 2 complete
 
 ### Reference
-📖 [phase-3.5-detailed.md § 3.2 — Advisory Handler](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 3.2 — Advisory Handler](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1215,7 +1215,7 @@ _Đây là gợi ý dựa trên data cá nhân, không phải lời khuyên đ�
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~0.5 day | **Depends on:** P3.5-S12
 
 ### Reference
-📖 [phase-3.5-detailed.md § 3.1 — `_get_suggestion()`](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 3.1 — `_get_suggestion()`](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1258,7 +1258,7 @@ As a user who got an answer, I want Bé Tiền to suggest natural next questions
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~0.5 day | **Depends on:** Phase 3A's voice infrastructure
 
 ### Reference
-📖 [phase-3.5-detailed.md § Bẫy Thường Gặp #8](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Bẫy Thường Gặp #8](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1332,7 +1332,7 @@ When Epic 4 is complete, all exit criteria from phase-3.5-detailed.md are verifi
 
 ## Reference
 
-📖 [phase-3.5-detailed.md § Exit Criteria, § Metrics, § Tuần 3 Testing](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Exit Criteria, § Metrics, § Tuần 3 Testing](../current/phase-3.5-detailed.md)
 
 ### Labels
 `phase-3.5` `epic` `testing` `priority-high`
@@ -1383,7 +1383,7 @@ As a user who relied on Phase 3A features (asset wizards, briefing, storytelling
 **Type:** Story | **Epic:** Epic 4 | **Estimate:** ~1 day | **Depends on:** Epic 3 complete
 
 ### Reference
-📖 [phase-3.5-detailed.md § 3.3 — User Testing Protocol](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 3.3 — User Testing Protocol](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1483,7 +1483,7 @@ As a product owner, I need data confirming Phase 3.5 stays within performance an
 **Type:** Story | **Epic:** Epic 4 | **Estimate:** ~3 days (1 week elapsed) | **Depends on:** P3.5-S17, P3.5-S18
 
 ### Reference
-📖 [phase-3.5-detailed.md § 3.3 — User Testing Protocol](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § 3.3 — User Testing Protocol](../current/phase-3.5-detailed.md)
 
 ### User Story
 
@@ -1538,7 +1538,7 @@ As a product owner, I need real user feedback to verify Phase 3.5 actually deliv
 **Type:** Story | **Epic:** Epic 4 | **Estimate:** ~1 day | **Depends on:** P3.5-S20
 
 ### Reference
-📖 [phase-3.5-detailed.md § Bẫy #6 — No Analytics](./phase-3.5-detailed.md)
+📖 [phase-3.5-detailed.md § Bẫy #6 — No Analytics](../current/phase-3.5-detailed.md)
 
 ### User Story
 

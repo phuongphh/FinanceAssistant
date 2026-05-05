@@ -3,7 +3,7 @@
 > **Story:** [#133](../issues/active/issue-133.md)  
 > **Status:** ⚠️ Gate issue — quyết định ship to public beta hay iterate  
 > **Duration:** 7 calendar days × 5 recruited users  
-> **Reference:** [`phase-3.5-detailed.md`](phase-3.5-detailed.md) § Tuần 3
+> **Reference:** [`phase-3.5-detailed.md`](../current/phase-3.5-detailed.md) § Tuần 3
 
 This protocol structures the human-in-the-loop validation that the
 intent layer (Epics 1-3) actually delivers a "feel intelligent" UX.

@@ -1,5 +1,13 @@
 # Phase 3A — Epic 1 Test Cases (Telegram-only)
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next sync-phase-status workflow run will move every
+  phase-3a-* doc (except phase-3a-detailed.md) into docs/archive/.
+-->
+
 > **Epic:** Asset Data Model & Manual Entry (Tuần 1)
 > **Goal:** User nhập được 5 loại asset (cash, stock, real_estate, crypto, gold), xem tổng net worth tính đúng.
 > **Issues covered:** P3A-6 → P3A-9 (các flow user thao tác qua Telegram bot)

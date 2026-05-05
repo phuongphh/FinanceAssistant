@@ -1,5 +1,13 @@
 # Phase 3.7 — Manual Test Cases (Telegram Bot)
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next sync-phase-status workflow run will move every
+  phase-3.7-* doc (except phase-3.7-detailed.md) into docs/archive/.
+-->
+
 > **Purpose:** Comprehensive test cases for manual tester to validate Phase 3.7 (Agent Architecture) on Telegram bot.  
 > **Tester Profile:** No source code access. Tests via Telegram chat interface + admin dashboard.  
 > **Reference:** [phase-3.7-detailed.md](./phase-3.7-detailed.md), [phase-3.7-issues.md](./phase-3.7-issues.md)
