@@ -96,6 +96,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #185 | Pre-Phase | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [pre-phase/issue-185.md](by-phase/pre-phase/issue-185.md) |
 | #186 | Pre-Phase | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [pre-phase/issue-186.md](by-phase/pre-phase/issue-186.md) |
 | #187 | Pre-Phase | [Story] P3.7-S5: Implement Tier 2 response formatters | [pre-phase/issue-187.md](by-phase/pre-phase/issue-187.md) |
+| #191 | Pre-Phase | [Story] P3.7-S9: Add rate limiting and cost caps | [pre-phase/issue-191.md](by-phase/pre-phase/issue-191.md) |
 
-**Total:** 92 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 75 Pre-Phase)
+**Total:** 93 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 76 Pre-Phase)
