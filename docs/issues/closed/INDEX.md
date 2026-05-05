@@ -76,6 +76,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #155 | Phase 3A | [Wealth] Celebrate wealth level transitions + Vietnamese theme labels | [phase-3a/issue-155.md](by-phase/phase-3a/issue-155.md) |
 | #158 | Pre-Phase | [Epic] Phase 3.6 — Epic 1: Menu Structure & Content | [pre-phase/issue-158.md](by-phase/pre-phase/issue-158.md) |
 | #159 | Pre-Phase | [Epic] Phase 3.6 — Epic 2: Adaptive Polish & Integration | [pre-phase/issue-159.md](by-phase/pre-phase/issue-159.md) |
+| #160 | Pre-Phase | [Epic] Phase 3.6 — Epic 3: Migration & Quality Assurance | [pre-phase/issue-160.md](by-phase/pre-phase/issue-160.md) |
 | #161 | Pre-Phase | [Story] P3.6-S1: Create menu copy YAML with all 5 categories | [pre-phase/issue-161.md](by-phase/pre-phase/issue-161.md) |
 | #162 | Pre-Phase | [Story] P3.6-S2: Build MenuFormatter with basic intros | [pre-phase/issue-162.md](by-phase/pre-phase/issue-162.md) |
 | #163 | Pre-Phase | [Story] P3.6-S3: Implement /menu command handler | [pre-phase/issue-163.md](by-phase/pre-phase/issue-163.md) |
@@ -87,5 +88,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #169 | Pre-Phase | [Story] P3.6-S9: Verify menu + free-form coexistence | [pre-phase/issue-169.md](by-phase/pre-phase/issue-169.md) |
 | #170 | Pre-Phase | [Story] P3.6-S10: Run regression tests on existing flows | [pre-phase/issue-170.md](by-phase/pre-phase/issue-170.md) |
 
-**Total:** 82 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 65 Pre-Phase)
+**Total:** 83 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 66 Pre-Phase)
