@@ -102,6 +102,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #189 | Pre-Phase | [Story] P3.7-S7: Implement Telegram streaming for long responses | [pre-phase/issue-189.md](by-phase/pre-phase/issue-189.md) |
 | #190 | Pre-Phase | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [pre-phase/issue-190.md](by-phase/pre-phase/issue-190.md) |
 | #191 | Pre-Phase | [Story] P3.7-S9: Add rate limiting and cost caps | [pre-phase/issue-191.md](by-phase/pre-phase/issue-191.md) |
+| #192 | Pre-Phase | [Story] P3.7-S10: Audit logging + cost dashboard | [pre-phase/issue-192.md](by-phase/pre-phase/issue-192.md) |
 
-**Total:** 98 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 81 Pre-Phase)
+**Total:** 99 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 82 Pre-Phase)
