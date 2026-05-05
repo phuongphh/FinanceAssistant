@@ -92,6 +92,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #173 | Pre-Phase | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [pre-phase/issue-173.md](by-phase/pre-phase/issue-173.md) |
 | #180 | Pre-Phase | [Epic] Phase 3.7 — Epic 1: Tool Foundation & DB-Agent (Tier 2) | [pre-phase/issue-180.md](by-phase/pre-phase/issue-180.md) |
 | #181 | Pre-Phase | [Epic] Phase 3.7 — Epic 2: Premium Reasoning & Orchestrator (Tier 3) | [pre-phase/issue-181.md](by-phase/pre-phase/issue-181.md) |
+| #182 | Pre-Phase | [Epic] Phase 3.7 — Epic 3: Polish, Audit & Testing | [pre-phase/issue-182.md](by-phase/pre-phase/issue-182.md) |
 | #183 | Pre-Phase | [Story] P3.7-S1: Define tool schemas with Pydantic | [pre-phase/issue-183.md](by-phase/pre-phase/issue-183.md) |
 | #184 | Pre-Phase | [Story] P3.7-S2: Implement GetAssets and GetTransactions tools | [pre-phase/issue-184.md](by-phase/pre-phase/issue-184.md) |
 | #185 | Pre-Phase | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [pre-phase/issue-185.md](by-phase/pre-phase/issue-185.md) |
@@ -102,5 +103,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #190 | Pre-Phase | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [pre-phase/issue-190.md](by-phase/pre-phase/issue-190.md) |
 | #191 | Pre-Phase | [Story] P3.7-S9: Add rate limiting and cost caps | [pre-phase/issue-191.md](by-phase/pre-phase/issue-191.md) |
 
-**Total:** 97 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 80 Pre-Phase)
+**Total:** 98 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 81 Pre-Phase)
