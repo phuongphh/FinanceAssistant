@@ -79,7 +79,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #162 | Pre-Phase | [Story] P3.6-S2: Build MenuFormatter with basic intros | [pre-phase/issue-162.md](by-phase/pre-phase/issue-162.md) |
 | #163 | Pre-Phase | [Story] P3.6-S3: Implement /menu command handler | [pre-phase/issue-163.md](by-phase/pre-phase/issue-163.md) |
 | #164 | Pre-Phase | [Story] P3.6-S4: Implement menu callback router | [pre-phase/issue-164.md](by-phase/pre-phase/issue-164.md) |
+| #165 | Pre-Phase | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [pre-phase/issue-165.md](by-phase/pre-phase/issue-165.md) |
 | #166 | Pre-Phase | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [pre-phase/issue-166.md](by-phase/pre-phase/issue-166.md) |
 
-**Total:** 76 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 59 Pre-Phase)
+**Total:** 77 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 60 Pre-Phase)
