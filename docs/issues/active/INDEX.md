@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #158 | [Epic] Phase 3.6 — Epic 1: Menu Structure & Content | [issue-158.md](issue-158.md) |
 | #159 | [Epic] Phase 3.6 — Epic 2: Adaptive Polish & Integration | [issue-159.md](issue-159.md) |
 | #160 | [Epic] Phase 3.6 — Epic 3: Migration & Quality Assurance | [issue-160.md](issue-160.md) |
 | #165 | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [issue-165.md](issue-165.md) |
@@ -25,4 +24,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 | #173 | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [issue-173.md](issue-173.md) |
 
-**Total active:** 20
+**Total active:** 19

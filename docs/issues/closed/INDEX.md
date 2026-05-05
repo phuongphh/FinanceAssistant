@@ -74,11 +74,12 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #135 | Pre-Phase | [Story] P3.5-S22: Document Phase 3.5 lessons learned (retrospective) | [pre-phase/issue-135.md](by-phase/pre-phase/issue-135.md) |
 | #153 | Pre-Phase | [Bug] Monthly report advice section không phù hợp với định hướng Personal CFO và data thực tế của user HNW | [pre-phase/issue-153.md](by-phase/pre-phase/issue-153.md) |
 | #155 | Phase 3A | [Wealth] Celebrate wealth level transitions + Vietnamese theme labels | [phase-3a/issue-155.md](by-phase/phase-3a/issue-155.md) |
+| #158 | Pre-Phase | [Epic] Phase 3.6 — Epic 1: Menu Structure & Content | [pre-phase/issue-158.md](by-phase/pre-phase/issue-158.md) |
 | #161 | Pre-Phase | [Story] P3.6-S1: Create menu copy YAML with all 5 categories | [pre-phase/issue-161.md](by-phase/pre-phase/issue-161.md) |
 | #162 | Pre-Phase | [Story] P3.6-S2: Build MenuFormatter with basic intros | [pre-phase/issue-162.md](by-phase/pre-phase/issue-162.md) |
 | #163 | Pre-Phase | [Story] P3.6-S3: Implement /menu command handler | [pre-phase/issue-163.md](by-phase/pre-phase/issue-163.md) |
 | #164 | Pre-Phase | [Story] P3.6-S4: Implement menu callback router | [pre-phase/issue-164.md](by-phase/pre-phase/issue-164.md) |
 | #166 | Pre-Phase | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [pre-phase/issue-166.md](by-phase/pre-phase/issue-166.md) |
 
-**Total:** 75 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 58 Pre-Phase)
+**Total:** 76 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 59 Pre-Phase)
