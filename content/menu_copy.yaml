@@ -31,8 +31,8 @@ main_menu:
   title:
     starter: "👋 Bé Tiền — Trợ lý tài chính của {name}"
     young_prof: "👋 Bé Tiền — Trợ lý tài chính của {name}"
-    mass_affluent: "👋 Bé Tiền — Trợ lý CFO cá nhân của {name}"
-    hnw: "👋 Bé Tiền — Trợ lý CFO cá nhân của anh/chị {name}"
+    mass_affluent: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
+    hnw: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
 
   intro:
     starter: |-
@@ -54,9 +54,9 @@ main_menu:
       Bạn muốn làm gì hôm nay?
 
     hnw: |-
-      Tổng quan tài chính cá nhân của anh/chị {name}.
+      Tổng quan tài chính cá nhân của {name}.
 
-      Anh/chị muốn xem mục nào?
+      {name} muốn xem mục nào?
 
   buttons:
     - label: "💎 Tài sản"
@@ -103,7 +103,7 @@ submenu_assets:
       Bao gồm tư vấn tái cân bằng dựa trên danh mục hiện tại.
 
     hnw: |-
-      Tổng quan tài sản và chỉ số hiệu quả của anh/chị.
+      Tổng quan tài sản và chỉ số hiệu quả của {name}.
 
       Bao gồm tư vấn tối ưu hóa phân bổ.
 
