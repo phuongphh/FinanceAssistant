@@ -81,6 +81,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #164 | Pre-Phase | [Story] P3.6-S4: Implement menu callback router | [pre-phase/issue-164.md](by-phase/pre-phase/issue-164.md) |
 | #165 | Pre-Phase | [Story] P3.6-S5: Wire menu actions for Tài sản and Chi tiêu | [pre-phase/issue-165.md](by-phase/pre-phase/issue-165.md) |
 | #166 | Pre-Phase | [Story] P3.6-S6: Wire menu actions for Dòng tiền, Mục tiêu, Thị trường | [pre-phase/issue-166.md](by-phase/pre-phase/issue-166.md) |
+| #170 | Pre-Phase | [Story] P3.6-S10: Run regression tests on existing flows | [pre-phase/issue-170.md](by-phase/pre-phase/issue-170.md) |
 
-**Total:** 77 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 60 Pre-Phase)
+**Total:** 78 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 61 Pre-Phase)
