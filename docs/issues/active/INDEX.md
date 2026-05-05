@@ -17,9 +17,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #160 | [Epic] Phase 3.6 — Epic 3: Migration & Quality Assurance | [issue-160.md](issue-160.md) |
 | #167 | [Story] P3.6-S7: Add wealth-level detection to MenuFormatter | [issue-167.md](issue-167.md) |
 | #168 | [Story] P3.6-S8: Update Telegram bot menu button commands | [issue-168.md](issue-168.md) |
-| #169 | [Story] P3.6-S9: Verify menu + free-form coexistence | [issue-169.md](issue-169.md) |
 | #171 | [Story] P3.6-S11: Prepare and execute hard cutover deploy | [issue-171.md](issue-171.md) |
 | #172 | [Story] P3.6-S12: User testing with 3 users post-deploy | [issue-172.md](issue-172.md) |
 | #173 | [Story] P3.6-S13: Cleanup, archive, and documentation updates | [issue-173.md](issue-173.md) |
 
-**Total active:** 17
+**Total active:** 16
