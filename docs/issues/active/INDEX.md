@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #182 | [Epic] Phase 3.7 — Epic 3: Polish, Audit & Testing | [issue-182.md](issue-182.md) |
 | #184 | [Story] P3.7-S2: Implement GetAssets and GetTransactions tools | [issue-184.md](issue-184.md) |
 | #186 | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [issue-186.md](issue-186.md) |
+| #187 | [Story] P3.7-S5: Implement Tier 2 response formatters | [issue-187.md](issue-187.md) |
 
-**Total active:** 14
+**Total active:** 15
