@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.agent.tools.base import ToolRegistry
 from backend.agent.tier2.prompts import build_db_agent_prompt
 from backend.config import get_settings
+from backend.models.conversation_context import ROLE_ASSISTANT, ROLE_USER
 from backend.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -115,8 +116,15 @@ class DBAgent:
         query: str,
         user: User,
         db: AsyncSession,
+        *,
+        history: list | None = None,
     ) -> DBAgentResult:
         """Translate ``query`` to a tool call, execute, return result.
+
+        ``history`` is the user's recent conversation buffer (oldest
+        → newest). When provided, the prior turns are injected as
+        chat-completion messages so a follow-up like "so với tháng 3
+        thì sao?" carries context from the previous answer.
 
         On any exception we still return a ``DBAgentResult`` (with
         ``success=False`` and an ``error`` string) so the orchestrator
@@ -125,7 +133,7 @@ class DBAgent:
         the agent is the right place to consolidate that."""
         started = time.monotonic()
         try:
-            return await self._answer_inner(query, user, db, started)
+            return await self._answer_inner(query, user, db, started, history)
         except Exception as e:  # noqa: BLE001
             logger.exception("DBAgent unexpected failure: %s", e)
             return DBAgentResult(
@@ -144,6 +152,7 @@ class DBAgent:
         user: User,
         db: AsyncSession,
         started: float,
+        history: list | None,
     ) -> DBAgentResult:
         client = self._get_client()
         if client is None:
@@ -153,12 +162,22 @@ class DBAgent:
                 latency_ms=int((time.monotonic() - started) * 1000),
             )
 
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": build_db_agent_prompt()},
+        ]
+        # Inject prior turns so follow-up questions carry context.
+        # OpenAI chat-completions accepts free-form user/assistant
+        # text alongside tools; the model uses it for grounding only.
+        for turn in history or []:
+            role = turn.role
+            if role not in (ROLE_USER, ROLE_ASSISTANT):
+                continue
+            messages.append({"role": role, "content": turn.content})
+        messages.append({"role": "user", "content": query})
+
         response = await client.chat.completions.create(
             model=_DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": build_db_agent_prompt()},
-                {"role": "user", "content": query},
-            ],
+            messages=messages,
             tools=self._tool_specs,
             tool_choice="auto",
             max_tokens=_MAX_TOKENS,

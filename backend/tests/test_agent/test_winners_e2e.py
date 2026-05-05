@@ -80,7 +80,7 @@ def _stub_db_agent_picks_winners_filter():
 
     db_agent = MagicMock()
 
-    async def fake_answer(query, user, db):
+    async def fake_answer(query, user, db, *, history=None):
         # Mimic what a healthy DeepSeek call would emit: tool name,
         # validated args, and the actual executed tool result. We
         # call the real GetAssetsTool to keep the filter logic in
@@ -167,7 +167,7 @@ class TestWinnersOnlyE2E:
             AssetFilter, GetAssetsInput, NumericFilter, SortOrder,
         )
 
-        async def loser_answer(query, user, db):
+        async def loser_answer(query, user, db, *, history=None):
             tool = GetAssetsTool()
             input_obj = GetAssetsInput(
                 filter=AssetFilter(
@@ -220,7 +220,7 @@ class TestWinnersOnlyE2E:
             AssetFilter, GetAssetsInput, SortOrder,
         )
 
-        async def top3_answer(query, user, db):
+        async def top3_answer(query, user, db, *, history=None):
             tool = GetAssetsTool()
             input_obj = GetAssetsInput(
                 filter=AssetFilter(asset_type="stock"),

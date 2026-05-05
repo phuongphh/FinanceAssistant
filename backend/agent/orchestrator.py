@@ -59,7 +59,9 @@ from backend.intent.dispatcher import (
     OUTCOME_UNCLEAR,
 )
 from backend.intent.intents import IntentType
+from backend.models.conversation_context import ROLE_ASSISTANT, ROLE_USER
 from backend.models.user import User
+from backend.services import conversation_context_service
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +156,19 @@ class Orchestrator:
         scope ends. Production calls should always leave this on.
         """
         started = time.monotonic()
-        result = await self._route_inner(query, user, db, streamer=streamer)
+        # Load prior conversation turns BEFORE routing so the LLM call
+        # in Tier 2/3 can see the history. Saving the current turn
+        # (user message + assistant reply) happens AFTER routing so
+        # this turn doesn't appear in its own history.
+        history = await conversation_context_service.get_recent_messages(
+            db, user_id=user.id
+        )
+        result = await self._route_inner(
+            query, user, db, streamer=streamer, history=history
+        )
+        await self._record_conversation_turn(
+            db, user=user, query=query, result=result
+        )
         if audit:
             try:
                 log_route(
@@ -177,6 +191,7 @@ class Orchestrator:
         db: AsyncSession,
         *,
         streamer: Streamer | None,
+        history: list | None = None,
     ) -> RouteResult:
         """Core routing logic — extracted so ``route`` can wrap it
         in an audit boundary without nesting indentation."""
@@ -206,16 +221,19 @@ class Orchestrator:
 
         if tier_hint == TIER_3:
             return await self._handle_tier3(
-                query, user, db, streamer, reason="heuristic_tier3"
+                query, user, db, streamer,
+                reason="heuristic_tier3", history=history,
             )
         if tier_hint == TIER_2:
             return await self._cascade_tier2_then_3(
-                query, user, db, streamer, reason="heuristic_tier2"
+                query, user, db, streamer,
+                reason="heuristic_tier2", history=history,
             )
 
         # Ambiguous — try Tier 1 first.
         return await self._cascade_tier1_then_up(
-            query, user, db, streamer, reason="cascade"
+            query, user, db, streamer,
+            reason="cascade", history=history,
         )
 
     # ------------------------------------------------------------------
@@ -265,6 +283,7 @@ class Orchestrator:
         db: AsyncSession,
         streamer: Streamer | None,
         reason: str,
+        history: list | None = None,
     ) -> RouteResult:
         """Try Tier 1; escalate to Tier 2 only when Tier 1 truly
         can't classify.
@@ -291,7 +310,8 @@ class Orchestrator:
 
         # Tier 1 didn't converge — escalate.
         return await self._cascade_tier2_then_3(
-            query, user, db, streamer, reason="cascade_from_tier1"
+            query, user, db, streamer,
+            reason="cascade_from_tier1", history=history,
         )
 
     async def _cascade_tier2_then_3(
@@ -301,6 +321,7 @@ class Orchestrator:
         db: AsyncSession,
         streamer: Streamer | None,
         reason: str,
+        history: list | None = None,
     ) -> RouteResult:
         """Try Tier 2; if it can't pick a tool, escalate to Tier 3.
 
@@ -318,7 +339,7 @@ class Orchestrator:
                 db_agent_result=cached,
             )
 
-        result = await self.db_agent.answer(query, user, db)
+        result = await self.db_agent.answer(query, user, db, history=history)
         # Track cost regardless of success — a failed call still
         # billed input tokens.
         await self._record_db_agent_cost(result)
@@ -348,6 +369,7 @@ class Orchestrator:
         return await self._handle_tier3(
             query, user, db, streamer,
             reason=f"escalate_from_tier2:{result.error or 'no_tool'}",
+            history=history,
         )
 
     async def _handle_tier3(
@@ -357,6 +379,7 @@ class Orchestrator:
         db: AsyncSession,
         streamer: Streamer | None,
         reason: str,
+        history: list | None = None,
     ) -> RouteResult:
         """Run Tier 3 with rate-limit gating.
 
@@ -370,7 +393,7 @@ class Orchestrator:
                 user.id,
             )
             # Re-route through Tier 2 only (no further escalation).
-            result = await self.db_agent.answer(query, user, db)
+            result = await self.db_agent.answer(query, user, db, history=history)
             await self._record_db_agent_cost(result)
             text = (
                 await format_db_agent_response(result, user, db, query)
@@ -421,7 +444,7 @@ class Orchestrator:
             await streamer.send_chunk(chunk)
 
         trace = await self.reasoning_agent.answer_streaming(
-            query, user, db, on_chunk
+            query, user, db, on_chunk, history=history
         )
         await streamer.finish()
 
@@ -441,6 +464,46 @@ class Orchestrator:
             streamed=True,
             reasoning_trace=trace,
         )
+
+    # ------------------------------------------------------------------
+    # conversation context (short-term buffer)
+    # ------------------------------------------------------------------
+
+    async def _record_conversation_turn(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        query: str,
+        result: RouteResult,
+    ) -> None:
+        """Append the user/assistant pair to the rolling buffer.
+
+        Skips rate-limit / kill-switch outcomes — those aren't real
+        turns and the user will retry, so storing them just clutters
+        the next prompt's window. Truncation happens inside the service.
+        """
+        if result.tier in ("rate_limited", "kill_switch"):
+            return
+        intent_value = (
+            result.intent.value if result.intent is not None else None
+        )
+        await conversation_context_service.save_message(
+            db, user_id=user.id, role=ROLE_USER,
+            content=query, intent=intent_value,
+        )
+        assistant_text = result.text
+        if not assistant_text and result.reasoning_trace is not None:
+            # Tier 3 streamed its answer — pull the full text from the
+            # trace so the buffer has something useful for next-turn
+            # prompts. Fine if final_text is empty (e.g. timeout); the
+            # service skips empty content.
+            assistant_text = result.reasoning_trace.final_text
+        if assistant_text:
+            await conversation_context_service.save_message(
+                db, user_id=user.id, role=ROLE_ASSISTANT,
+                content=assistant_text, intent=intent_value,
+            )
 
     # ------------------------------------------------------------------
     # cost / messages helpers

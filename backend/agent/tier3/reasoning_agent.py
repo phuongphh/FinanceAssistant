@@ -37,6 +37,7 @@ from backend.agent.limits import (
 from backend.agent.tier3.prompts import DISCLAIMER, build_reasoning_prompt
 from backend.agent.tools.base import ToolRegistry
 from backend.config import get_settings
+from backend.models.conversation_context import ROLE_ASSISTANT, ROLE_USER
 from backend.models.user import User
 from backend.wealth.ladder import detect_level
 from backend.wealth.services import net_worth_calculator
@@ -101,8 +102,15 @@ class ReasoningAgent:
         user: User,
         db: AsyncSession,
         on_chunk: OnChunk,
+        *,
+        history: list | None = None,
     ) -> ReasoningTrace:
         """Process ``query`` with multi-tool reasoning, stream output.
+
+        ``history`` is the user's recent conversation buffer (oldest
+        → newest). When provided, prior turns are prepended to the
+        Anthropic messages list so the model can resolve follow-up
+        questions ("so với tháng 3 thì sao?") against earlier turns.
 
         Wraps the inner loop in ``asyncio.wait_for`` so a hung Claude
         call or runaway tool sequence can't block the worker forever.
@@ -111,7 +119,7 @@ class ReasoningAgent:
         started = time.monotonic()
         trace = ReasoningTrace(success=False)
         try:
-            inner = self._answer_inner(query, user, db, on_chunk, trace)
+            inner = self._answer_inner(query, user, db, on_chunk, trace, history)
             await asyncio.wait_for(inner, timeout=QUERY_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             trace.timed_out = True
@@ -147,6 +155,7 @@ class ReasoningAgent:
         db: AsyncSession,
         on_chunk: OnChunk,
         trace: ReasoningTrace,
+        history: list | None,
     ) -> None:
         client = self._get_client()
         if client is None:
@@ -169,7 +178,23 @@ class ReasoningAgent:
         )
 
         claude_tools = self._to_claude_tools()
-        messages: list[dict[str, Any]] = [{"role": "user", "content": query}]
+        messages: list[dict[str, Any]] = []
+        # Prepend prior turns. Anthropic requires the first message to
+        # be ``user`` and roles to alternate, so we drop leading
+        # assistant rows (can happen if TTL filter trimmed the older
+        # half of a pair) and skip any consecutive duplicates.
+        prev_role: str | None = None
+        for turn in _normalize_history_for_anthropic(history or []):
+            role = turn.role
+            if role not in (ROLE_USER, ROLE_ASSISTANT):
+                continue
+            if role == prev_role:
+                # Anthropic rejects two consecutive same-role messages.
+                # Drop the older to keep alternation; should be rare.
+                messages.pop()
+            messages.append({"role": role, "content": turn.content})
+            prev_role = role
+        messages.append({"role": "user", "content": query})
 
         for round_idx in range(MAX_TOOL_CALLS_PER_QUERY + 1):
             response = await client.messages.create(
@@ -382,3 +407,16 @@ async def _emit(on_chunk: OnChunk, text: str) -> None:
         await on_chunk(text)
     except Exception as e:  # noqa: BLE001
         logger.warning("on_chunk callback raised: %s", e)
+
+
+def _normalize_history_for_anthropic(history: list) -> list:
+    """Drop leading assistant rows so the first injected message is
+    a ``user`` turn — Anthropic's API requires ``messages[0].role ==
+    'user'``. The TTL filter on the buffer can occasionally produce
+    a list whose oldest survivor is an assistant reply (its paired
+    user turn fell off the window); without this trim we'd send
+    those messages and the API would 400."""
+    out = list(history or [])
+    while out and out[0].role != ROLE_USER:
+        out.pop(0)
+    return out
