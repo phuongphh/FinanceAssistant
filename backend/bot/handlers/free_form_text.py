@@ -13,7 +13,13 @@ Pending-state precedence:
   2. If the user has an active ``intent_awaiting_clarify`` state, the
      incoming message is treated as the clarification and re-classified
      against the original intent.
-  3. Otherwise, normal classification.
+  3. Otherwise, route through the Phase 3.7 ``Orchestrator``, which
+     cascades Tier 1 (this very pipeline) → Tier 2 (DB-Agent) →
+     Tier 3 (reasoning). Tier 1 keeps the existing behaviour bit-
+     for-bit; Tier 2/3 only fire when Tier 1 can't answer.
+
+The orchestrator bridge is feature-flagged via
+``set_use_agent_orchestrator(False)`` for tests / rollback.
 
 Pipeline + dispatcher are module-level singletons so the YAML
 patterns load exactly once per worker process.
@@ -53,6 +59,22 @@ _pipeline = IntentPipeline(
     llm_classifier=LLMClassifier(),
 )
 _dispatcher = IntentDispatcher()
+
+# Phase 3.7 orchestrator integration. Default ON; tests / rollback
+# can flip to False to short-circuit back to Phase 3.5 behaviour.
+_use_agent_orchestrator: bool = True
+
+
+def set_use_agent_orchestrator(enabled: bool) -> None:
+    """Test / rollback hook — disable Tier 2/3 cascade.
+
+    When False, ``classify_and_dispatch`` skips the orchestrator and
+    runs the legacy ``classify → dispatch`` flow directly. Useful
+    for tests that want to assert against the intent layer in
+    isolation, or for an emergency rollback if the agent path
+    misbehaves in production."""
+    global _use_agent_orchestrator
+    _use_agent_orchestrator = enabled
 
 
 # Analytics event names — kept as module constants so tests can assert
@@ -280,6 +302,14 @@ async def classify_and_dispatch(
         )
 
     # Normal path.
+    if _use_agent_orchestrator:
+        outcome = await _route_via_orchestrator(
+            db=db, chat_id=chat_id, user=user, text=text, started=started
+        )
+        return outcome
+
+    # Legacy Phase 3.5 path — fallback when the orchestrator is
+    # disabled (tests / rollback).
     result = await _pipeline.classify(text)
     latency_ms = int((time.perf_counter() - started) * 1000)
     await _track_classification(user, result, latency_ms)
@@ -288,6 +318,113 @@ async def classify_and_dispatch(
     await _send_outcome(chat_id, outcome)
     await _track_outcome(user, outcome)
     return outcome
+
+
+async def _route_via_orchestrator(
+    *,
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    text: str,
+    started: float,
+) -> DispatchOutcome:
+    """Route through the Phase 3.7 Orchestrator and adapt the result
+    back into a ``DispatchOutcome`` so existing callers keep working.
+
+    Tier 1 hits return their original DispatchOutcome (with the
+    keyboard hint preserved). Tier 2 returns a synthetic
+    DispatchOutcome carrying the formatted text. Tier 3 streamed
+    the response itself; we still return a DispatchOutcome so the
+    caller's "outcome is None" branches don't trip.
+    """
+    # Imported lazily so test envs without the agent stack still
+    # import this module.
+    from backend.agent.orchestrator import (
+        Orchestrator, TIER_1, TIER_2, TIER_3,
+    )
+    from backend.agent.streaming import TelegramStreamer
+
+    # Build per-call so the orchestrator picks up whatever
+    # ``set_pipeline`` / ``set_dispatcher`` has currently installed
+    # (existing intent-layer tests rely on this). Construction is
+    # cheap — no LLM clients are eagerly created.
+    orchestrator = Orchestrator(
+        intent_pipeline=_pipeline,
+        intent_dispatcher=_dispatcher,
+    )
+    streamer = TelegramStreamer(chat_id=chat_id)
+
+    route = await orchestrator.route(text, user, db, streamer=streamer)
+    latency_ms = int((time.perf_counter() - started) * 1000)
+
+    if route.tier == TIER_1 and route.dispatch_outcome is not None:
+        # Preserve the original Phase 3.5 behaviour exactly: same
+        # outcome object, same analytics events, same keyboard.
+        outcome = route.dispatch_outcome
+        # Synthesise an IntentResult-shaped object for analytics.
+        synthetic = IntentResult(
+            intent=outcome.intent,
+            confidence=outcome.confidence,
+            raw_text=text,
+            classifier_used="agent_tier1",
+        )
+        await _track_classification(user, synthetic, latency_ms)
+        await _send_outcome(chat_id, outcome)
+        await _track_outcome(user, outcome)
+        return outcome
+
+    if route.tier == TIER_2:
+        # The DB-Agent already produced a formatted, user-ready string.
+        # Send directly; no inline keyboard for now (could attach
+        # follow-ups later).
+        if route.text:
+            await send_message(chat_id, route.text)
+        analytics.track(
+            "agent_tier_used",
+            user_id=user.id,
+            properties={
+                "tier": route.tier,
+                "routing_reason": route.routing_reason,
+                "latency_ms": latency_ms,
+            },
+        )
+        return DispatchOutcome(
+            text=route.text or "",
+            kind="agent_tier2",
+            intent=IntentType.UNCLEAR,
+            confidence=1.0,
+        )
+
+    if route.tier == TIER_3:
+        # Streamer already rendered the answer in-chat; nothing to
+        # send here. Return a non-None outcome so message.py doesn't
+        # fall through to the legacy LLM transaction parser.
+        analytics.track(
+            "agent_tier_used",
+            user_id=user.id,
+            properties={
+                "tier": route.tier,
+                "routing_reason": route.routing_reason,
+                "latency_ms": latency_ms,
+            },
+        )
+        return DispatchOutcome(
+            text="",  # already streamed
+            kind="agent_tier3",
+            intent=IntentType.UNCLEAR,
+            confidence=1.0,
+        )
+
+    # Rate-limited or kill-switch — orchestrator already produced a
+    # user-friendly message in route.text.
+    if route.text:
+        await send_message(chat_id, route.text)
+    return DispatchOutcome(
+        text=route.text or "",
+        kind="agent_blocked",
+        intent=IntentType.UNCLEAR,
+        confidence=0.0,
+    )
 
 
 async def _resolve_clarification(

@@ -16,6 +16,7 @@ from backend.models.telegram_update import (
     STATUS_PROCESSING,
     TelegramUpdate,
 )
+from backend.models.agent_audit_log import AgentAuditLog
 
 __all__ = [
     "User",
@@ -35,4 +36,5 @@ __all__ = [
     "STATUS_PROCESSING",
     "STATUS_DONE",
     "STATUS_FAILED",
+    "AgentAuditLog",
 ]
