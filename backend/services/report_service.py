@@ -150,7 +150,7 @@ _LEVEL_GUIDANCE = {
         "passive income, fill data gap)."
     ),
     WealthLevel.HIGH_NET_WORTH: (
-        "Tone: Personal CFO advisor, strategic, không 'nhắc nhở'.\n"
+        "Tone: Trợ lý Tài sản advisor, strategic, không 'nhắc nhở'.\n"
         "Focus: portfolio allocation %, passive income coverage, "
         "tỷ lệ chi tiêu / net worth, gaps trong data (passive income, "
         "cổ tức, lãi BĐS chưa được ghi nhận).\n"
@@ -248,7 +248,7 @@ def _build_report_prompt(report_context: str, wealth_ctx: dict) -> str:
     )
 
     return (
-        "Bạn là Personal CFO — không phải finance app cho người mới đi làm.\n"
+        "Bạn là Trợ lý Tài sản — không phải finance app cho người mới đi làm.\n"
         "Viết báo cáo tài chính tháng cho user Telegram dưới đây.\n\n"
         "=== HỒ SƠ USER ===\n"
         f"Wealth level: {wealth_ctx['level_label_vi']}\n"

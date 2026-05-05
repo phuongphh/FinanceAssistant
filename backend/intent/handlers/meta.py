@@ -20,7 +20,7 @@ class GreetingHandler(IntentHandler):
         name = user.display_name or "bạn"
         return (
             f"Chào {name}! 👋\n\n"
-            "Mình là Bé Tiền — Personal CFO của bạn. Hôm nay mình giúp gì được?\n"
+            f"Mình là Bé Tiền — Trợ lý Tài sản của {name}. Hôm nay mình giúp gì được?\n"
             "• 'tài sản của tôi'\n"
             "• 'chi tiêu tháng này'\n"
             "• 'VNM giá bao nhiêu'\n\n"

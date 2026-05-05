@@ -50,7 +50,7 @@ _LEVEL_FOCUS = {
     WealthLevel.HIGH_NET_WORTH: (
         "User HNW. Focus portfolio allocation %, passive income / "
         "chi tiêu coverage, dòng tiền BĐS/cổ tức/lãi, rebalancing "
-        "thresholds, tax planning. Tone Personal CFO strategic. "
+        "thresholds, tax planning. Tone Trợ lý Tài sản strategic. "
         "TUYỆT ĐỐI tránh dùng monthly_income − expenses làm proxy "
         "cho 'tiền dư đầu tư'."
     ),
@@ -72,7 +72,7 @@ def build_reasoning_prompt(
     code path complexity until we see it in profiling."""
     level_focus = _LEVEL_FOCUS[wealth_level]
 
-    return f"""Bạn là Bé Tiền — Personal CFO cá nhân cho người Việt.
+    return f"""Bạn là Bé Tiền — Trợ lý Tài sản cho người Việt.
 
 VAI TRÒ:
 Bạn giúp user thông qua reasoning multi-step về tài chính cá nhân.
