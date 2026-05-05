@@ -37,6 +37,7 @@ from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.user import User
+from backend.services import conversation_context_service
 from backend.services.llm_service import LLMError, call_llm
 from backend.wealth.models.income_stream import IncomeStream
 from backend.wealth.services import asset_service
@@ -57,7 +58,7 @@ DISCLAIMER = (
 
 ADVISORY_PROMPT = """Bạn là Bé Tiền — trợ lý tài chính cá nhân thân thiện cho người Việt.
 
-User vừa hỏi: "{query}"
+{conversation_history}User vừa hỏi: "{query}"
 
 Context về user:
 - Tên: {name}
@@ -146,6 +147,7 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
     income_str = await _format_income(db, user)
     goals_str = await _format_goals(db, user)
     recent_str = await _format_recent_spend(db, user)
+    history_str = await _format_conversation_history(db, user)
 
     return {
         "name": (user.display_name or "bạn"),
@@ -155,7 +157,25 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
         "income": income_str,
         "goals": goals_str,
         "recent_spend": recent_str,
+        "conversation_history": history_str,
     }
+
+
+async def _format_conversation_history(db: AsyncSession, user: User) -> str:
+    """Render recent conversation as a prelude block.
+
+    Returns "" when the buffer is empty so the prompt template
+    collapses cleanly. Otherwise wraps the rendered transcript in a
+    labelled section the LLM can clearly distinguish from the current
+    query.
+    """
+    history = await conversation_context_service.get_recent_messages(
+        db, user_id=user.id
+    )
+    if not history:
+        return ""
+    transcript = conversation_context_service.format_history_for_prompt(history)
+    return f"Cuộc hội thoại gần đây (theo thứ tự thời gian):\n{transcript}\n\n"
 
 
 def _level_to_vi(level: str) -> str:

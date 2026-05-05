@@ -263,7 +263,7 @@ class TestTier3StreamingPath:
     async def test_tier3_invokes_streamer_lifecycle(self):
         orch = _orch_with_streamable()
         # Stub the reasoning agent to emit one chunk + return success.
-        async def fake_answer(query, user, db, on_chunk):
+        async def fake_answer(query, user, db, on_chunk, *, history=None):
             await on_chunk("Đây là phân tích.")
             return ReasoningTrace(
                 success=True, final_text="Đây là phân tích.",
