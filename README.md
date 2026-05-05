@@ -10,14 +10,15 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-✅ **Phase 3.5: Intent Understanding Layer** (done) — [detail](docs/current/phase-3.5-detailed.md)
+✅ **Phase 3.6: Menu UX Revamp** (done) — [detail](docs/current/phase-3.6-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
 - ✅ Phase 1: UX Foundation
 - ✅ Phase 2: Personality & Care
 - ✅ Phase 3A: Wealth Foundation
-- ✅ Phase 3.5: Intent Understanding Layer ← **just shipped**
+- ✅ Phase 3.5: Intent Understanding Layer
+- ✅ Phase 3.6: Menu UX Revamp ← **just shipped**
 - 📋 Phase 3B: Market Intelligence
 - 🔮 Phase 4: Investment Intelligence
 - 🔮 Phase 5: Behavioral Engine

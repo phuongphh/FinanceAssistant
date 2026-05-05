@@ -79,13 +79,6 @@ async def handle_report_command(db: AsyncSession, message: dict) -> None:
     await _send_report(db, chat_id, telegram_id)
 
 
-async def handle_report_callback(db: AsyncSession, callback_query: dict) -> None:
-    """Handle menu:report callback — extracts Telegram data, delegates to service."""
-    chat_id = callback_query["message"]["chat"]["id"]
-    telegram_id = (callback_query.get("from") or {}).get("id", chat_id)
-    await _send_report(db, chat_id, telegram_id)
-
-
 async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     """Route a plain-text message through the Phase 3.5 intent pipeline,
     falling back to the LLM transaction parser, then to the unclear/OOS
