@@ -183,6 +183,170 @@ class TestRouteUpdate:
 
 
 # ---------------------------------------------------------------------------
+# _maybe_auto_exit_asset_wizard — UX: button taps that aren't asset_add:*
+# clear an active asset-entry wizard so the user isn't trapped on their
+# next free-text message.
+# ---------------------------------------------------------------------------
+
+
+def _wizard_user(*, flow: str | None, step: str | None = None) -> MagicMock:
+    """Build a fake user with the given wizard_state shape."""
+    import uuid as _uuid
+
+    user = MagicMock()
+    user.id = _uuid.uuid4()
+    user.wizard_state = (
+        {"flow": flow, "step": step, "draft": {}} if flow else None
+    )
+    return user
+
+
+class TestAutoExitAssetWizard:
+    @pytest.mark.asyncio
+    async def test_clears_when_callback_is_menu_and_user_in_asset_wizard(self):
+        """Menu tap mid asset-wizard → wizard_service.clear() called."""
+        user = _wizard_user(flow="asset_add_picker", step="type")
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="menu:assets:advisor",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_awaited_once_with(fake_db, user.id)
+
+    @pytest.mark.asyncio
+    async def test_no_clear_for_asset_add_callback(self):
+        """asset_add:* callbacks belong to the wizard itself — never clear."""
+        user = _wizard_user(flow="asset_add_cash", step="amount")
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="asset_add:cancel",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_clear_when_no_wizard_state(self):
+        user = _wizard_user(flow=None)
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="menu:assets:advisor",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_clear_for_storytelling_flow(self):
+        """Storytelling state is owned by story:* callbacks and may hold
+        unsaved transactions in draft.pending. Don't touch it."""
+        user = _wizard_user(flow="storytelling", step="confirm_pending")
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="menu:assets:advisor",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_clear_for_pending_intent_flow(self):
+        """intent_pending_action / intent_awaiting_clarify have their own
+        TTL + handlers — leave them alone."""
+        user = _wizard_user(flow="intent_pending_action")
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="menu:assets:advisor",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_clears_for_briefing_callback(self):
+        """Tapping a briefing button (e.g. "💎 Thêm tài sản") while mid
+        wizard should also exit — the briefing handler will spin up its
+        own flow if needed."""
+        user = _wizard_user(flow="asset_add_stock", step="ticker")
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock(return_value=user)
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=999,
+                callback_data="briefing:add_asset",
+                dashboard_service=dashboard_service,
+            )
+
+        mock_clear.assert_awaited_once_with(fake_db, user.id)
+
+    @pytest.mark.asyncio
+    async def test_no_clear_when_telegram_id_missing(self):
+        """Anonymous callbacks (no `from.id`) can't be tied to a user."""
+        fake_db = MagicMock()
+        dashboard_service = MagicMock()
+        dashboard_service.get_user_by_telegram_id = AsyncMock()
+
+        with patch(
+            "backend.services.wizard_service.clear", new_callable=AsyncMock
+        ) as mock_clear:
+            await telegram_worker._maybe_auto_exit_asset_wizard(
+                fake_db,
+                telegram_id=None,
+                callback_data="menu:main",
+                dashboard_service=dashboard_service,
+            )
+
+        dashboard_service.get_user_by_telegram_id.assert_not_awaited()
+        mock_clear.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
 # recover_orphaned_updates — picks up stuck rows at startup.
 # ---------------------------------------------------------------------------
 
