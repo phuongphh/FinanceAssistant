@@ -35,10 +35,10 @@ class HelpHandler(IntentHandler):
         name = user.display_name or "bạn"
         return (
             f"{name} có thể hỏi mình bằng tiếng Việt tự nhiên 💬\n\n"
-            "*Tài sản & wealth:*\n"
+            "*Tài sản:*\n"
             "• 'tài sản của tôi có gì'\n"
             "• 'tổng tài sản bao nhiêu'\n"
-            "• 'portfolios chứng khoán'\n\n"
+            "• 'danh mục cổ phiếu của tôi'\n\n"
             "*Chi tiêu:*\n"
             "• 'chi tiêu tháng này'\n"
             "• 'chi tiêu cho ăn uống tháng trước'\n\n"

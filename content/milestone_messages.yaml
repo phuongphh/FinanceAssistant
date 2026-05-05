@@ -220,7 +220,7 @@ wealth_level_up_mass_affluent:
     🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
   - |-
     🍚 {name} ơi, Phú hộ rồi đấy!
-    Giờ là lúc tối ưu thuế và rebalance danh mục — không chỉ tích luỹ nữa.
+    Giờ là lúc tối ưu thuế và tái cân bằng danh mục — không chỉ tích luỹ nữa.
     🎯 Mục tiêu tiếp: {next_target} → {next_level_label}
 
 wealth_level_up_hnw:

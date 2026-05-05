@@ -63,7 +63,7 @@ class QueryMarketHandler(IntentHandler):
                 lines.extend(
                     [
                         "",
-                        f"_Bạn có *{ticker}* trong portfolio "
+                        f"_Bạn có *{ticker}* trong danh mục "
                         f"(giá trị {owned.current_value:,.0f}đ)_",
                     ]
                 )

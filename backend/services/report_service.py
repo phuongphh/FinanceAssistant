@@ -110,11 +110,15 @@ def _prev_month_key(month_key: str) -> str:
 # Mass Affluent / HNW) và data thực tế (net worth, asset breakdown,
 # income streams), không chỉ cashflow tháng đó.
 
+# Vietnamese-first bilingual labels — same convention as
+# ``advisory._level_to_vi``. The English half stays in the parenthetical
+# so the LLM stays grounded in the standard finance tier names without
+# echoing English at the user.
 _LEVEL_LABEL_VI = {
-    WealthLevel.STARTER: "Starter (mới bắt đầu, <30tr)",
-    WealthLevel.YOUNG_PROFESSIONAL: "Young Professional (30tr – 200tr)",
-    WealthLevel.MASS_AFFLUENT: "Mass Affluent (200tr – 1 tỷ)",
-    WealthLevel.HIGH_NET_WORTH: "High Net Worth (>1 tỷ)",
+    WealthLevel.STARTER: "Mới bắt đầu (<30tr, Starter)",
+    WealthLevel.YOUNG_PROFESSIONAL: "Người trẻ đi làm (30tr – 200tr, Young Professional)",
+    WealthLevel.MASS_AFFLUENT: "Trung lưu khá giả (200tr – 1 tỷ, Mass Affluent)",
+    WealthLevel.HIGH_NET_WORTH: "Tài sản lớn (>1 tỷ, High Net Worth)",
 }
 
 # Per-level guidance for the LLM. Keyed on WealthLevel; controls the tone
