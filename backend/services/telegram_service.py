@@ -160,6 +160,19 @@ async def edit_message_reply_markup(
     return await send_telegram("editMessageReplyMarkup", payload)
 
 
+async def send_chat_action(chat_id: int, action: str = "typing") -> dict | None:
+    """Send a chat action (typing indicator, etc.).
+
+    Telegram clears the action after 5 seconds, so for long-running
+    operations the caller should either re-send periodically or
+    follow up with an actual message before then. Used by the Tier 3
+    streamer to give immediate feedback while Claude is reasoning.
+    """
+    return await send_telegram(
+        "sendChatAction", {"chat_id": chat_id, "action": action}
+    )
+
+
 async def download_file(file_id: str) -> bytes | None:
     """Download a Telegram file (voice, photo, document) by file_id.
 
