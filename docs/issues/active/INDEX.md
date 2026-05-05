@@ -19,7 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #183 | [Story] P3.7-S1: Define tool schemas with Pydantic | [issue-183.md](issue-183.md) |
 | #185 | [Story] P3.7-S3: Implement ComputeMetric, ComparePeriods, GetMarketData tools | [issue-185.md](issue-185.md) |
 | #186 | [Story] P3.7-S4: Build DB-Agent with DeepSeek function calling | [issue-186.md](issue-186.md) |
-| #187 | [Story] P3.7-S5: Implement Tier 2 response formatters | [issue-187.md](issue-187.md) |
 | #188 | [Story] P3.7-S6: Build Reasoning Agent with Claude Sonnet (Tier 3) | [issue-188.md](issue-188.md) |
 | #189 | [Story] P3.7-S7: Implement Telegram streaming for long responses | [issue-189.md](issue-189.md) |
 | #190 | [Story] P3.7-S8: Build Orchestrator with heuristic routing | [issue-190.md](issue-190.md) |
@@ -28,4 +27,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #193 | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [issue-193.md](issue-193.md) |
 | #194 | [Story] P3.7-S12: Comprehensive testing + user trial | [issue-194.md](issue-194.md) |
 
-**Total active:** 23
+**Total active:** 22
