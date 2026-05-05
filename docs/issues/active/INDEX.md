@@ -27,5 +27,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #191 | [Story] P3.7-S9: Add rate limiting and cost caps | [issue-191.md](issue-191.md) |
 | #192 | [Story] P3.7-S10: Audit logging + cost dashboard | [issue-192.md](issue-192.md) |
 | #193 | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [issue-193.md](issue-193.md) |
+| #194 | [Story] P3.7-S12: Comprehensive testing + user trial | [issue-194.md](issue-194.md) |
 
-**Total active:** 23
+**Total active:** 24
