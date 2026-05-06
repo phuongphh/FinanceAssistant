@@ -110,7 +110,7 @@ class IncomeStream(Base):
 
     __table_args__ = (
         Index("idx_income_user_active_streams", "user_id", "is_active"),
-        Index("idx_income_user_type", "user_id", "stream_type", "is_active"),
+        Index("idx_income_streams_user_type", "user_id", "stream_type", "is_active"),
         # Partial index — only rental streams populate source_asset_id.
         Index(
             "idx_income_source_asset",

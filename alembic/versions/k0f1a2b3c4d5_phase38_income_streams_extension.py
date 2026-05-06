@@ -53,8 +53,10 @@ representations. Calling code is updated in the same PR.
 Indexes:
 - ``idx_income_user_active_streams`` (``user_id, is_active``) — kept
   for "list active streams" path.
-- ``idx_income_user_type`` (``user_id, stream_type, is_active``) — new,
-  optimises agent's "thu nhập từ thuê BĐS" / type-filter queries.
+- ``idx_income_streams_user_type`` (``user_id, stream_type, is_active``) — new,
+  optimises agent's "thu nhập từ thuê BĐS" / type-filter queries. Named
+  with the ``_streams_`` infix to avoid colliding with the legacy
+  ``idx_income_user_type`` on ``income_records`` (Phase 2).
 - ``idx_income_source_asset`` (``source_asset_id``) WHERE NOT NULL —
   partial; only rental streams populate this column.
 """
@@ -161,7 +163,7 @@ def upgrade() -> None:
 
     # 5. New indexes for the agent's filtered queries.
     op.create_index(
-        "idx_income_user_type",
+        "idx_income_streams_user_type",
         "income_streams",
         ["user_id", "stream_type", "is_active"],
     )
@@ -181,7 +183,7 @@ def downgrade() -> None:
     and annual streams are converted back to a monthly equivalent
     so downgrade still produces a coherent ``amount_monthly``."""
     op.drop_index("idx_income_source_asset", table_name="income_streams")
-    op.drop_index("idx_income_user_type", table_name="income_streams")
+    op.drop_index("idx_income_streams_user_type", table_name="income_streams")
 
     op.add_column(
         "income_streams",
