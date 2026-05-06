@@ -332,16 +332,17 @@ async def generate_monthly_report(
         savings_amount = monthly_income - total_expense
         savings_rate = round((savings_amount / monthly_income) * 100, 2)
 
-    # Goal progress snapshot
+    # Goal progress snapshot — Phase 3.8 Epic 5: is_active → status,
+    # goal_name → name.
     goals_stmt = select(Goal).where(
         Goal.user_id == user_id,
-        Goal.is_active.is_(True),
+        Goal.status == "active",
         Goal.deleted_at.is_(None),
     )
     goals = (await db.execute(goals_stmt)).scalars().all()
     goal_progress = [
         {
-            "name": g.goal_name,
+            "name": g.name,
             "target": float(g.target_amount),
             "current": float(g.current_amount),
             "pct": round((float(g.current_amount) / float(g.target_amount)) * 100, 1) if g.target_amount else 0,

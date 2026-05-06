@@ -229,11 +229,13 @@ async def _format_income(db: AsyncSession, user: User) -> str:
 
 
 async def _format_goals(db: AsyncSession, user: User) -> str:
+    # Phase 3.8 Epic 5: ``is_active`` → ``status='active'``,
+    # ``goal_name`` → ``name``.
     stmt = (
         select(Goal)
         .where(
             Goal.user_id == user.id,
-            Goal.is_active.is_(True),
+            Goal.status == "active",
             Goal.deleted_at.is_(None),
         )
         .order_by(Goal.created_at.desc())
@@ -243,7 +245,7 @@ async def _format_goals(db: AsyncSession, user: User) -> str:
     if not goals:
         return "chưa đặt mục tiêu"
     return "; ".join(
-        f"{g.goal_name} ({format_money_short(g.current_amount)}/{format_money_short(g.target_amount)})"
+        f"{g.name} ({format_money_short(g.current_amount)}/{format_money_short(g.target_amount)})"
         for g in goals
     )
 

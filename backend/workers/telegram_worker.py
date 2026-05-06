@@ -56,6 +56,7 @@ async def route_update(data: dict) -> None:
     # HTTP clients which open sockets on import).
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
+    from backend.bot.handlers import goal_entry as goal_entry_handlers
     from backend.bot.handlers import income_entry as income_entry_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers import recurring_entry as recurring_entry_handlers
@@ -86,6 +87,7 @@ async def route_update(data: dict) -> None:
                     asset_entry_handlers=asset_entry_handlers,
                     income_entry_handlers=income_entry_handlers,
                     recurring_entry_handlers=recurring_entry_handlers,
+                    goal_entry_handlers=goal_entry_handlers,
                     storytelling_handlers=storytelling_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
@@ -102,6 +104,7 @@ async def route_update(data: dict) -> None:
                         asset_entry_handlers=asset_entry_handlers,
                         income_entry_handlers=income_entry_handlers,
                         recurring_entry_handlers=recurring_entry_handlers,
+                        goal_entry_handlers=goal_entry_handlers,
                         briefing_handlers=briefing_handlers,
                         storytelling_handlers=storytelling_handlers,
                         dashboard_service=dashboard_service,
@@ -133,6 +136,7 @@ async def _handle_message(
     asset_entry_handlers,
     income_entry_handlers,
     recurring_entry_handlers,
+    goal_entry_handlers,
     storytelling_handlers,
     dashboard_service,
     handle_report_command,
@@ -340,6 +344,13 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+        # Phase 3.8 Epic 5 — goals wizard mid-flow text.
+        consumed = await goal_entry_handlers.handle_goals_text_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+
     # Natural-language message → NL expense parser / report intent / menu fallback.
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
@@ -384,7 +395,10 @@ async def _maybe_auto_exit_asset_wizard(
     is_asset_flow = flow.startswith("asset_add")
     is_income_flow = flow.startswith("income_")
     is_recurring_flow = flow.startswith("recurring_")
-    if not (is_asset_flow or is_income_flow or is_recurring_flow):
+    is_goal_flow = flow.startswith("goal_")
+    if not (
+        is_asset_flow or is_income_flow or is_recurring_flow or is_goal_flow
+    ):
         return
 
     cb_belongs_to_asset = callback_data.startswith("asset_add") or callback_data.startswith("asset_rental")
@@ -392,11 +406,14 @@ async def _maybe_auto_exit_asset_wizard(
     cb_belongs_to_recurring = (
         callback_data.startswith("recurring") or callback_data.startswith("reminder")
     )
+    cb_belongs_to_goal = callback_data.startswith("goals")
     if is_asset_flow and cb_belongs_to_asset:
         return
     if is_income_flow and cb_belongs_to_income:
         return
     if is_recurring_flow and cb_belongs_to_recurring:
+        return
+    if is_goal_flow and cb_belongs_to_goal:
         return
 
     from backend import analytics
@@ -406,8 +423,10 @@ async def _maybe_auto_exit_asset_wizard(
         event = "asset_wizard_auto_exited"
     elif is_income_flow:
         event = "income_wizard_auto_exited"
-    else:
+    elif is_recurring_flow:
         event = "recurring_wizard_auto_exited"
+    else:
+        event = "goal_wizard_auto_exited"
     step = (user.wizard_state or {}).get("step")
     await wizard_service.clear(db, user.id)
     analytics.track(
@@ -428,6 +447,7 @@ async def _handle_callback(
     asset_entry_handlers,
     income_entry_handlers,
     recurring_entry_handlers,
+    goal_entry_handlers,
     briefing_handlers,
     storytelling_handlers,
     dashboard_service,
@@ -483,6 +503,10 @@ async def _handle_callback(
     if await recurring_entry_handlers.handle_recurring_callback(
         db, callback_query
     ):
+        return await _resolved_user_id()
+
+    # Phase 3.8 Epic 5 — goals wizard + list (goals:*).
+    if await goal_entry_handlers.handle_goals_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Morning-briefing button taps (briefing:*). Handled before the

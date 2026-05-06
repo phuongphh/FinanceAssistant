@@ -358,10 +358,15 @@ async def test_query_market_handler_no_ticker():
 async def test_query_goals_lists_with_progress_bars():
     from backend.intent.handlers.query_goals import QueryGoalsHandler
 
+    # Phase 3.8 Epic 5: ``goal_name`` → ``name``, ``deadline`` →
+    # ``target_date`` on the model.
     goals = [
-        MagicMock(goal_name="Mua xe", target_amount=Decimal("500000000"),
-                  current_amount=Decimal("100000000"), deadline=None),
+        MagicMock(name="Mua xe", target_amount=Decimal("500000000"),
+                  current_amount=Decimal("100000000"), target_date=None),
     ]
+    # ``MagicMock(name=...)`` sets the mock's *repr* name, not the
+    # ``.name`` attribute. Set explicitly so the handler reads it.
+    goals[0].name = "Mua xe"
     with patch(
         "backend.intent.handlers.query_goals.goal_service.list_goals",
         AsyncMock(return_value=goals),
@@ -395,12 +400,16 @@ async def test_query_goals_empty_state():
 async def test_query_goal_progress_finds_named_goal():
     from backend.intent.handlers.query_goals import QueryGoalProgressHandler
 
-    goals = [
-        MagicMock(goal_name="Mua xe", target_amount=Decimal("500000000"),
-                  current_amount=Decimal("100000000"), deadline=date(2027, 12, 31)),
-        MagicMock(goal_name="Mua nhà", target_amount=Decimal("3000000000"),
-                  current_amount=Decimal("0"), deadline=None),
-    ]
+    # Phase 3.8 Epic 5 renames; explicit .name= because MagicMock's
+    # ``name`` kwarg sets repr, not the attribute.
+    g1 = MagicMock(target_amount=Decimal("500000000"),
+                   current_amount=Decimal("100000000"),
+                   target_date=date(2027, 12, 31))
+    g1.name = "Mua xe"
+    g2 = MagicMock(target_amount=Decimal("3000000000"),
+                   current_amount=Decimal("0"), target_date=None)
+    g2.name = "Mua nhà"
+    goals = [g1, g2]
     with patch(
         "backend.intent.handlers.query_goals.goal_service.list_goals",
         AsyncMock(return_value=goals),

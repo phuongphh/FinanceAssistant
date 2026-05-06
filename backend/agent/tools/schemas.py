@@ -19,6 +19,7 @@ Design rules:
 """
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from decimal import Decimal
 from enum import Enum
@@ -375,6 +376,77 @@ class ComparisonResult(BaseModel):
     diff_percent: float
     period_a_label: str
     period_b_label: str
+
+
+class GoalStatusFilter(str, Enum):
+    """Filter values for ``get_goals.status``. Matches Goal.status
+    enum from ``backend.schemas.goal.GoalStatus``."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    PAUSED = "paused"
+    ABANDONED = "abandoned"
+
+
+class GetGoalsInput(_StrictBase):
+    """Input for ``get_goals`` (Phase 3.8 Epic 5).
+
+    Empty input returns active goals + projection. ``include_projection``
+    is on by default — agent queries about goals almost always need
+    "cần X/tháng" or "đạt khi nào". Set False for the rare list-only
+    case to skip the per-goal projection compute."""
+
+    status: Optional[GoalStatusFilter] = Field(
+        None,
+        description=(
+            "Filter by goal lifecycle. Default = active. Use 'completed' "
+            "for 'mục tiêu đã đạt được', 'paused' for paused goals."
+        ),
+    )
+    include_projection: bool = Field(
+        True,
+        description=(
+            "Include feasibility + ETA projection per goal. Default True. "
+            "Set False when the user only wants a name list (rare)."
+        ),
+    )
+    limit: Optional[int] = Field(
+        None, ge=1, le=20,
+        description="Cap result count. Use 1 for 'mục tiêu hàng đầu'.",
+    )
+
+
+class GoalProjectionItem(BaseModel):
+    """Per-goal projection inside ``GetGoalsOutput``.
+
+    ``feasibility`` is a stable token (easy/feasible/stretch/
+    ambitious/needs_revision/unknown); the LLM picks user-facing
+    phrasing in Vietnamese. ``required_monthly_savings`` is set
+    only when ``target_date`` is known; ``estimated_completion_date``
+    is set only for open-ended goals with positive saving rate."""
+
+    goal_id: uuid.UUID
+    name: str
+    icon: Optional[str] = None
+    template_id: Optional[str] = None
+    target_amount: Decimal
+    current_amount: Decimal
+    target_date: Optional[date] = None
+    progress_pct: float
+    remaining_amount: Decimal
+    status: str
+    priority: int
+    months_remaining: Optional[int] = None
+    required_monthly_savings: Optional[Decimal] = None
+    feasibility: Optional[str] = None
+    avg_monthly_savings: Optional[Decimal] = None
+    estimated_completion_date: Optional[date] = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class GetGoalsOutput(BaseModel):
+    goals: list[GoalProjectionItem]
+    count: int
 
 
 class IncomeStreamItem(BaseModel):
