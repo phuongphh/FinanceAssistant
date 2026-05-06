@@ -9,9 +9,22 @@ import logging
 import httpx
 
 from backend.config import get_settings
+from backend.utils.markdown_sanitizer import sanitize_markdown
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Telegram methods whose payload carries user-facing body text we may
+# need to sanitize. ``sendMessage`` / ``editMessageText`` use ``text``;
+# ``sendPhoto`` / ``editMessageCaption`` use ``caption``. Anything else
+# (answerCallbackQuery, sendChatAction, getFile, setMyCommands…) is
+# either structured or short enough that sanitization isn't relevant.
+_MARKDOWN_TEXT_FIELDS = {
+    "sendMessage": "text",
+    "editMessageText": "text",
+    "sendPhoto": "caption",
+    "editMessageCaption": "caption",
+}
 
 # Singleton httpx client. Creating a fresh AsyncClient per request paid the
 # full TCP+TLS handshake to api.telegram.org every time (~300-500ms per call
@@ -56,19 +69,49 @@ async def close_client() -> None:
             _client = None
 
 
+def _sanitize_payload(method: str, payload: dict) -> dict:
+    """Pre-process Markdown bodies so Telegram's parser doesn't reject them.
+
+    Only touches payloads where ``parse_mode == "Markdown"`` — HTML mode
+    has its own escaping rules (handled at the formatter layer), and
+    bodies without ``parse_mode`` are plain text already. Returns a
+    shallow copy with the relevant text field replaced; the input dict
+    is not mutated so callers can safely re-use it.
+    """
+    if payload.get("parse_mode") != "Markdown":
+        return payload
+    field = _MARKDOWN_TEXT_FIELDS.get(method)
+    if not field:
+        return payload
+    body = payload.get(field)
+    if not isinstance(body, str) or not body:
+        return payload
+    sanitized = sanitize_markdown(body)
+    if sanitized == body:
+        return payload
+    return {**payload, field: sanitized}
+
+
 async def send_telegram(method: str, payload: dict) -> dict | None:
     """Send a request to the Telegram Bot API.
 
-    If Telegram returns 400 with "can't parse entities" (the LLM produced
-    a body with unbalanced ``*`` / ``_`` / ``[`` markdown), retry once
-    without ``parse_mode`` so the user still receives the raw text rather
-    than a silently-dropped message. Without this fallback, advisory
-    responses with stray markdown chars look like "no response" — the
-    spinner clears but no message arrives.
+    Two layers of protection against the "can't parse entities" failure
+    where unbalanced LLM-generated markdown silently drops the message:
+
+    1. **Sanitize on the way out.** When ``parse_mode`` is ``Markdown``,
+       we run the body through :func:`sanitize_markdown` to escape any
+       unbalanced ``*`` / ``_`` / ``[`` / ``\\``` so Telegram parses
+       cleanly the first time. This is the root-cause fix.
+    2. **Plain-text retry on 400.** If a malformed body slips past the
+       sanitizer and Telegram still rejects it, retry once without
+       ``parse_mode`` so the user sees the raw text instead of nothing.
+       Other 400s (chat not found, etc.) still fail fast.
     """
     if not settings.telegram_bot_token:
         logger.warning("TELEGRAM_BOT_TOKEN not configured")
         return None
+
+    payload = _sanitize_payload(method, payload)
 
     url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/{method}"
     client = await _get_client()
@@ -132,6 +175,11 @@ async def send_photo(
     url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendPhoto"
     data: dict = {"chat_id": str(chat_id)}
     if caption:
+        # Mirror send_telegram's sanitization for the multipart path so
+        # captions with LLM-generated markdown (e.g. briefing photos)
+        # don't silently fail with "can't parse entities".
+        if parse_mode == "Markdown":
+            caption = sanitize_markdown(caption)
         data["caption"] = caption
         data["parse_mode"] = parse_mode
     if reply_markup:
