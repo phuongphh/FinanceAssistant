@@ -106,6 +106,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #193 | Pre-Phase | [Story] P3.7-S11: Caching + integration with Phase 3.5 | [pre-phase/issue-193.md](by-phase/pre-phase/issue-193.md) |
 | #194 | Pre-Phase | [Story] P3.7-S12: Comprehensive testing + user trial | [pre-phase/issue-194.md](by-phase/pre-phase/issue-194.md) |
 | #204 | Pre-Phase | [Epic] Phase 3.8 — Epic 1: Rental Property Tracking | [pre-phase/issue-204.md](by-phase/pre-phase/issue-204.md) |
+| #210 | Pre-Phase | [Story] P3.8-S2: Build RentalService + business logic | [pre-phase/issue-210.md](by-phase/pre-phase/issue-210.md) |
 
-**Total:** 102 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 85 Pre-Phase)
+**Total:** 103 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 86 Pre-Phase)

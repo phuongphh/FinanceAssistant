@@ -18,7 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #207 | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [issue-207.md](issue-207.md) |
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 | #209 | [Story] P3.8-S1: Extend Asset model with rental fields | [issue-209.md](issue-209.md) |
-| #210 | [Story] P3.8-S2: Build RentalService + business logic | [issue-210.md](issue-210.md) |
 | #211 | [Story] P3.8-S3: Update asset wizard to capture rental data | [issue-211.md](issue-211.md) |
 | #212 | [Story] P3.8-S4: IncomeStream model + service | [issue-212.md](issue-212.md) |
 | #213 | [Story] P3.8-S5: Income wizard via Telegram menu | [issue-213.md](issue-213.md) |
@@ -33,4 +32,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
 | #223 | [Story] P3.8-S15: Goal wizard + full CRUD via Telegram | [issue-223.md](issue-223.md) |
 
-**Total active:** 28
+**Total active:** 27
