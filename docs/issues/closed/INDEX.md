@@ -108,6 +108,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #204 | Pre-Phase | [Epic] Phase 3.8 — Epic 1: Rental Property Tracking | [pre-phase/issue-204.md](by-phase/pre-phase/issue-204.md) |
 | #209 | Pre-Phase | [Story] P3.8-S1: Extend Asset model with rental fields | [pre-phase/issue-209.md](by-phase/pre-phase/issue-209.md) |
 | #210 | Pre-Phase | [Story] P3.8-S2: Build RentalService + business logic | [pre-phase/issue-210.md](by-phase/pre-phase/issue-210.md) |
+| #211 | Pre-Phase | [Story] P3.8-S3: Update asset wizard to capture rental data | [pre-phase/issue-211.md](by-phase/pre-phase/issue-211.md) |
 
-**Total:** 104 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 87 Pre-Phase)
+**Total:** 105 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 88 Pre-Phase)
