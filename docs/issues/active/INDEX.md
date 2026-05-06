@@ -30,5 +30,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #218 | [Story] P3.8-S10: Reminder action handlers (paid/delay/disable) | [issue-218.md](issue-218.md) |
 | #219 | [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer | [issue-219.md](issue-219.md) |
 | #221 | [Story] P3.8-S13: Goal model + 7 templates YAML | [issue-221.md](issue-221.md) |
+| #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
 
-**Total active:** 26
+**Total active:** 27
