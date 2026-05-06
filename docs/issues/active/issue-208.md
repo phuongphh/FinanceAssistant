@@ -6,26 +6,21 @@
 
 > **Type:** Epic | **Week:** 2 | **Stories:** 3
 
-## Tại Sao Epic Này Quan Trọng
-Phase 3.6 menu có goals actions nhưng đang là **stubs** ("Tính năng đang phát triển"). Epic này replace toàn bộ stubs bằng full CRUD với 7 goal templates + projection service.
+## Mục tiêu
+Replace Phase 3.6 goal stubs với full CRUD. 7 templates + projection + feasibility levels.
 
-## "Templates > Wizards"
-User goals thường fall vào 5-7 patterns (mua xe, mua nhà, du lịch, hưu trí, học vấn, đám cưới, quỹ khẩn cấp). Templates nhanh hơn blank wizard.
+## Feasibility Levels
+easy → feasible → stretch → ambitious → needs_revision (supportive framing)
 
 ## Success Definition
-- ✅ User chọn từ 7 templates HOẶC tạo custom goal
-- ✅ Projection: months_remaining, required_monthly_savings, feasibility level
-- ✅ Phase 3.6 menu actions ALL functional (no more stubs)
-- ✅ Phase 3.7 agent query được goals
+- ✅ 7 templates OR custom goal
+- ✅ Projection với feasibility level + supportive advice
+- ✅ Phase 3.6 menu goals actions: ZERO stubs
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P3.8-S13: Goal model + templates YAML
-- [ ] [Story] P3.8-S14: GoalProjectionService + feasibility analysis
-- [ ] [Story] P3.8-S15: Goal wizard + CRUD via Telegram
+- [ ] #221 [Story] P3.8-S13: Goal model + 7 templates YAML
+- [ ] #222 [Story] P3.8-S14: GoalProjectionService + feasibility analysis
+- [ ] #223 [Story] P3.8-S15: Goal wizard + full CRUD via Telegram
 
 ## Dependencies
-✅ Epic 4 (cashflow data needed for saving rate calculation)
-
-## Reference
-`docs/current/phase-3.8/phase-3.8-detailed.md` § 2.2
+✅ Epic 4 (#207) complete
