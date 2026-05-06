@@ -123,6 +123,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #219 | Pre-Phase | [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer | [pre-phase/issue-219.md](by-phase/pre-phase/issue-219.md) |
 | #220 | Pre-Phase | [Story] P3.8-S12: ForecastCashflow tool + agent integration | [pre-phase/issue-220.md](by-phase/pre-phase/issue-220.md) |
 | #221 | Pre-Phase | [Story] P3.8-S13: Goal model + 7 templates YAML | [pre-phase/issue-221.md](by-phase/pre-phase/issue-221.md) |
+| #222 | Pre-Phase | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [pre-phase/issue-222.md](by-phase/pre-phase/issue-222.md) |
 
-**Total:** 119 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 102 Pre-Phase)
+**Total:** 120 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 103 Pre-Phase)
