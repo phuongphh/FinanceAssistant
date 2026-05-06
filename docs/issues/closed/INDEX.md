@@ -114,7 +114,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #213 | Pre-Phase | [Story] P3.8-S5: Income wizard via Telegram menu | [pre-phase/issue-213.md](by-phase/pre-phase/issue-213.md) |
 | #214 | Pre-Phase | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [pre-phase/issue-214.md](by-phase/pre-phase/issue-214.md) |
 | #215 | Pre-Phase | [Story] P3.8-S7: RecurringPattern model + manual entry | [pre-phase/issue-215.md](by-phase/pre-phase/issue-215.md) |
+| #216 | Pre-Phase | [Story] P3.8-S8: Auto-detection job for recurring patterns | [pre-phase/issue-216.md](by-phase/pre-phase/issue-216.md) |
 | #218 | Pre-Phase | [Story] P3.8-S10: Reminder action handlers (paid/delay/disable) | [pre-phase/issue-218.md](by-phase/pre-phase/issue-218.md) |
 
-**Total:** 111 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 94 Pre-Phase)
+**Total:** 112 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 95 Pre-Phase)
