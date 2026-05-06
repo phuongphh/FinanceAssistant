@@ -66,8 +66,15 @@ class TestSendTelegram:
     async def test_retries_without_parse_mode_on_parse_entities_error(
         self, mock_settings, mock_httpx
     ):
-        """When Telegram rejects bad markdown, retry as plain text so the
-        user still sees the message instead of a silent "no response"."""
+        """Last-resort retry: even if the sanitizer (#231) misses a case
+        and Telegram still rejects, we drop ``parse_mode`` so the user
+        sees raw text instead of nothing.
+
+        Uses input the sanitizer leaves alone (already-balanced) so the
+        body Telegram rejects is identical to the body we sent. This
+        keeps the test focused on the retry behaviour, not the sanitizer
+        (which has its own dedicated tests).
+        """
         from unittest.mock import MagicMock
 
         bad_response = MagicMock()
@@ -85,7 +92,11 @@ class TestSendTelegram:
 
         result = await send_telegram(
             "sendMessage",
-            {"chat_id": 123, "text": "hi *unbalanced", "parse_mode": "Markdown"},
+            {
+                "chat_id": 123,
+                "text": "hi *balanced* text",
+                "parse_mode": "Markdown",
+            },
         )
 
         assert result == {"ok": True, "result": {"message_id": 1}}
@@ -93,7 +104,7 @@ class TestSendTelegram:
         # Retry payload must NOT carry parse_mode anymore.
         retry_payload = mock_httpx.post.call_args_list[1][1]["json"]
         assert "parse_mode" not in retry_payload
-        assert retry_payload["text"] == "hi *unbalanced"
+        assert retry_payload["text"] == "hi *balanced* text"
         assert retry_payload["chat_id"] == 123
 
     @pytest.mark.asyncio
@@ -128,6 +139,114 @@ class TestSendMessage:
         assert payload["chat_id"] == 123
         assert payload["text"] == "hello"
         assert payload["parse_mode"] == "Markdown"
+
+
+class TestPreSendSanitization:
+    """The sanitizer must run BEFORE the HTTP call so unbalanced markdown
+    never reaches Telegram in the first place. The plain-text retry
+    (#230) stays as a fallback, but should rarely fire after this.
+    """
+
+    @pytest.mark.asyncio
+    async def test_unbalanced_bold_is_escaped_before_send(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "Mua *VinHomes",  # truncated mid-bold
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        # Sanitizer escaped the stray ``*`` so Telegram parses cleanly.
+        assert sent_payload["text"] == "Mua \\*VinHomes"
+        # Single API call — no retry needed because the body is now valid.
+        assert mock_httpx.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_list_bullets_are_escaped_before_send(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "Gợi ý:\n* Mục 1\n* Mục 2",
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert "\\* Mục 1" in sent_payload["text"]
+        assert "\\* Mục 2" in sent_payload["text"]
+
+    @pytest.mark.asyncio
+    async def test_balanced_markdown_passes_through_unchanged(
+        self, mock_settings, mock_httpx
+    ):
+        original = "Hôm nay *quan trọng* và _gợi ý_ cho bạn."
+        await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": original, "parse_mode": "Markdown"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_html_mode_is_not_touched_by_sanitizer(
+        self, mock_settings, mock_httpx
+    ):
+        # The sanitizer only knows Markdown; HTML has its own escaping.
+        original = "<b>Hello *world*</b>"
+        await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": original, "parse_mode": "HTML"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_no_parse_mode_skips_sanitizer(
+        self, mock_settings, mock_httpx
+    ):
+        # Plain text doesn't need sanitization.
+        original = "Mua *VinHomes (raw text, no parser)"
+        await send_telegram(
+            "sendMessage", {"chat_id": 123, "text": original}
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_also_sanitized(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "editMessageText",
+            {
+                "chat_id": 123,
+                "message_id": 456,
+                "text": "Cập nhật *truncated",
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == "Cập nhật \\*truncated"
+
+    @pytest.mark.asyncio
+    async def test_non_text_method_payload_untouched(
+        self, mock_settings, mock_httpx
+    ):
+        # answerCallbackQuery has no body; sanitizer must be a no-op.
+        await send_telegram(
+            "answerCallbackQuery",
+            {"callback_query_id": "cb-1", "text": "Stray *marker"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        # No parse_mode means the sanitizer's gate skips this anyway,
+        # and we don't have answerCallbackQuery in the field map.
+        assert sent_payload["text"] == "Stray *marker"
 
 
 class TestAnswerCallback:
