@@ -57,7 +57,15 @@ async def close_client() -> None:
 
 
 async def send_telegram(method: str, payload: dict) -> dict | None:
-    """Send a request to the Telegram Bot API."""
+    """Send a request to the Telegram Bot API.
+
+    If Telegram returns 400 with "can't parse entities" (the LLM produced
+    a body with unbalanced ``*`` / ``_`` / ``[`` markdown), retry once
+    without ``parse_mode`` so the user still receives the raw text rather
+    than a silently-dropped message. Without this fallback, advisory
+    responses with stray markdown chars look like "no response" — the
+    spinner clears but no message arrives.
+    """
     if not settings.telegram_bot_token:
         logger.warning("TELEGRAM_BOT_TOKEN not configured")
         return None
@@ -67,6 +75,27 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
     resp = await client.post(url, json=payload)
     if resp.status_code == 200:
         return resp.json()
+
+    if (
+        resp.status_code == 400
+        and "can't parse entities" in resp.text
+        and payload.get("parse_mode")
+    ):
+        logger.warning(
+            "Telegram parse_entities error on %s; retrying as plain text",
+            method,
+        )
+        plain = {k: v for k, v in payload.items() if k != "parse_mode"}
+        retry = await client.post(url, json=plain)
+        if retry.status_code == 200:
+            return retry.json()
+        logger.error(
+            "Telegram API error (plain retry): %s %s",
+            retry.status_code,
+            retry.text,
+        )
+        return None
+
     logger.error("Telegram API error: %s %s", resp.status_code, resp.text)
     return None
 
