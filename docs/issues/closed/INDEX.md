@@ -119,7 +119,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #216 | Pre-Phase | [Story] P3.8-S8: Auto-detection job for recurring patterns | [pre-phase/issue-216.md](by-phase/pre-phase/issue-216.md) |
 | #217 | Pre-Phase | [Story] P3.8-S9: Reminder scheduler + Telegram notifications | [pre-phase/issue-217.md](by-phase/pre-phase/issue-217.md) |
 | #218 | Pre-Phase | [Story] P3.8-S10: Reminder action handlers (paid/delay/disable) | [pre-phase/issue-218.md](by-phase/pre-phase/issue-218.md) |
+| #219 | Pre-Phase | [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer | [pre-phase/issue-219.md](by-phase/pre-phase/issue-219.md) |
 | #220 | Pre-Phase | [Story] P3.8-S12: ForecastCashflow tool + agent integration | [pre-phase/issue-220.md](by-phase/pre-phase/issue-220.md) |
 
-**Total:** 116 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 99 Pre-Phase)
+**Total:** 117 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 100 Pre-Phase)
