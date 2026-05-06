@@ -108,6 +108,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #204 | Pre-Phase | [Epic] Phase 3.8 — Epic 1: Rental Property Tracking | [pre-phase/issue-204.md](by-phase/pre-phase/issue-204.md) |
 | #205 | Pre-Phase | [Epic] Phase 3.8 — Epic 2: Multi-Income Streams | [pre-phase/issue-205.md](by-phase/pre-phase/issue-205.md) |
 | #206 | Pre-Phase | [Epic] Phase 3.8 — Epic 3: Recurring Transactions + Reminders | [pre-phase/issue-206.md](by-phase/pre-phase/issue-206.md) |
+| #207 | Pre-Phase | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [pre-phase/issue-207.md](by-phase/pre-phase/issue-207.md) |
 | #209 | Pre-Phase | [Story] P3.8-S1: Extend Asset model with rental fields | [pre-phase/issue-209.md](by-phase/pre-phase/issue-209.md) |
 | #210 | Pre-Phase | [Story] P3.8-S2: Build RentalService + business logic | [pre-phase/issue-210.md](by-phase/pre-phase/issue-210.md) |
 | #211 | Pre-Phase | [Story] P3.8-S3: Update asset wizard to capture rental data | [pre-phase/issue-211.md](by-phase/pre-phase/issue-211.md) |
@@ -120,5 +121,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #218 | Pre-Phase | [Story] P3.8-S10: Reminder action handlers (paid/delay/disable) | [pre-phase/issue-218.md](by-phase/pre-phase/issue-218.md) |
 | #220 | Pre-Phase | [Story] P3.8-S12: ForecastCashflow tool + agent integration | [pre-phase/issue-220.md](by-phase/pre-phase/issue-220.md) |
 
-**Total:** 115 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 98 Pre-Phase)
+**Total:** 116 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 99 Pre-Phase)
