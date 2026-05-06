@@ -12,6 +12,9 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
+APP_VERSION = "1.3.8.01"
+
+
 class Settings(BaseSettings):
     # Backend
     environment: str = "development"
@@ -81,4 +84,4 @@ def get_settings() -> Settings:
     return Settings()
 
 
-__all__ = ["Settings", "get_settings"]
+__all__ = ["APP_VERSION", "Settings", "get_settings"]

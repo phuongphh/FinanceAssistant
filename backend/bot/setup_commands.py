@@ -1,4 +1,4 @@
-"""Phase 3.6 bot menu commands — the 4 entries that show up under the
+"""Phase 3.6 bot menu commands — the key entries that show up under the
 Telegram bot menu button (corner of the chat input).
 
 These are **shortcuts**, not the rich /menu inline UI:
@@ -7,6 +7,7 @@ These are **shortcuts**, not the rich /menu inline UI:
   /menu      — opens the rich 5-category inline menu (the real UX)
   /help      — short usage guide (handled via Phase 3.5 HELP intent)
   /dashboard — opens the wealth Mini App in-place
+  /about    — product version, privacy and support info
 
 The bot menu button is a Telegram-native list of slash commands — tapping
 one inserts the command into the input and sends it. So each command
@@ -18,10 +19,11 @@ Routing of these slash commands lives in ``workers/telegram_worker._handle_messa
   - ``/help`` matches the rule-based pattern in ``intent_patterns.yaml``
     and resolves through the normal text path
   - ``/dashboard`` is wired in the worker as part of Epic 2
+  - ``/about`` is wired in the worker and renders static product info
 
 Old Phase 3A commands (``/themtaisan``, ``/taisan``, ``/report``, ``/goals``,
 ``/market``) still work as text — they just no longer appear in the menu
-button list. Surfacing 4 high-leverage entry points reduces decision
+button list. Surfacing a small set of high-leverage entry points reduces decision
 friction; the rich /menu is one tap away for everything else.
 """
 from __future__ import annotations
@@ -38,6 +40,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "menu", "description": "Menu chính"},
     {"command": "help", "description": "Hướng dẫn sử dụng"},
     {"command": "dashboard", "description": "Mở Mini App dashboard"},
+    {"command": "about", "description": "Thông tin ứng dụng"},
 ]
 
 

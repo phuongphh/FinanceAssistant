@@ -181,6 +181,14 @@ async def _handle_message(
         await onboarding_handlers.resume_or_start(db, chat_id, user)
         return user.id
 
+    if command == "/about":
+        # Product metadata is static and does not require a user lookup,
+        # keeping the command fast even for first-time users.
+        from backend.bot.handlers.about_handler import cmd_about
+
+        await cmd_about(chat_id)
+        return None
+
     if command in ("/menu", "menu", "/dashboard"):
         # Phase 3.6 — both top-level commands resolve the user up front so
         # the menu adapts to ``user.wealth_level`` (Epic 2) and
