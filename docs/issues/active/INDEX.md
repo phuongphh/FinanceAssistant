@@ -24,5 +24,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #212 | [Story] P3.8-S4: IncomeStream model + service | [issue-212.md](issue-212.md) |
 | #213 | [Story] P3.8-S5: Income wizard via Telegram menu | [issue-213.md](issue-213.md) |
 | #214 | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [issue-214.md](issue-214.md) |
+| #216 | [Story] P3.8-S8: Auto-detection job for recurring patterns | [issue-216.md](issue-216.md) |
 
-**Total active:** 20
+**Total active:** 21
