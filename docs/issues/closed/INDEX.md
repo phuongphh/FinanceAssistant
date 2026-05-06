@@ -113,6 +113,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #212 | Pre-Phase | [Story] P3.8-S4: IncomeStream model + service | [pre-phase/issue-212.md](by-phase/pre-phase/issue-212.md) |
 | #213 | Pre-Phase | [Story] P3.8-S5: Income wizard via Telegram menu | [pre-phase/issue-213.md](by-phase/pre-phase/issue-213.md) |
 | #214 | Pre-Phase | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [pre-phase/issue-214.md](by-phase/pre-phase/issue-214.md) |
+| #215 | Pre-Phase | [Story] P3.8-S7: RecurringPattern model + manual entry | [pre-phase/issue-215.md](by-phase/pre-phase/issue-215.md) |
 
-**Total:** 109 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 92 Pre-Phase)
+**Total:** 110 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 93 Pre-Phase)
