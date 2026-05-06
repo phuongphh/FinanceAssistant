@@ -290,6 +290,35 @@ class GetMarketDataInput(_StrictBase):
     )
 
 
+class ForecastCashflowInput(_StrictBase):
+    """Input for ``forecast_cashflow`` (Phase 3.8 Epic 4).
+
+    Default ``months_ahead=3`` matches the spec's default forecast
+    horizon — confidence drops below 0.55 past month 3 so we don't
+    encourage longer queries.
+
+    ``include_runway=True`` returns the "if income stops today, how
+    long can I survive?" figure alongside the forecast. Costs a few
+    extra DB queries; off by default."""
+
+    months_ahead: int = Field(
+        3, ge=1, le=12,
+        description=(
+            "Number of months to forecast (1-12). Defaults to 3. Use "
+            "1 for 'tháng tới', 3 for 'cashflow 3 tháng tới', 6 for "
+            "'nửa năm tới'."
+        ),
+    )
+    include_runway: bool = Field(
+        False,
+        description=(
+            "Set true for runway queries ('bao giờ tôi âm tài khoản?', "
+            "'tôi có thể sống được bao lâu nếu mất việc?'). Returns "
+            "an extra ``runway`` field with months + warning."
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tool output models
 # ---------------------------------------------------------------------------
@@ -376,6 +405,41 @@ class GetIncomeOutput(BaseModel):
     # literal 0% which would mislead the user.
     passive_ratio: Optional[float]
     count: int
+
+
+class MonthlyForecastItem(BaseModel):
+    """One month inside a ``forecast_cashflow`` response.
+
+    ``confidence`` 0-1; LLM formatter shows it as ``%`` after
+    rounding. ``breakdown`` is an explainability trace the LLM can
+    cite when the user asks "tại sao tháng này thấp/cao?"."""
+
+    month: date
+    expected_income: Decimal
+    expected_expense: Decimal
+    expected_savings: Decimal
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    breakdown: dict[str, Decimal] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+class RunwayInfo(BaseModel):
+    """Runway figures returned when ``include_runway=True``.
+
+    ``months=None`` means we couldn't compute one (no essential
+    expenses tracked). The agent should NOT fabricate a number in
+    that case — instead say "chưa đủ dữ liệu"."""
+
+    months: Optional[float]
+    liquid_assets: Decimal
+    monthly_burn: Decimal
+    warning: Optional[str] = None
+    band: Literal["critical", "tight", "comfortable", "unknown"] = "unknown"
+
+
+class ForecastCashflowOutput(BaseModel):
+    forecasts: list[MonthlyForecastItem]
+    runway: Optional[RunwayInfo] = None
 
 
 class MarketDataPoint(BaseModel):
