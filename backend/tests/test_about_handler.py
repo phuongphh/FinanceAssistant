@@ -24,6 +24,7 @@ async def test_cmd_about_sends_versioned_about_page():
     )
     assert APP_VERSION in about_handler.ABOUT_TEXT
     assert "© 2026 Nui Truc AI. All rights reserved." in about_handler.ABOUT_TEXT
+    assert about_handler.ABOUT_SUPPORT_EMAIL in about_handler.ABOUT_TEXT
 
 
 @pytest.mark.asyncio
@@ -54,9 +55,46 @@ def test_about_keyboard_has_required_buttons_one_per_row():
     assert rows == [
         [{"text": "🌐 Website Công Ty", "url": "https://nuitruc.ai"}],
         [{"text": "🔏 Chính Sách Bảo Mật", "url": "https://nuitruc.ai/privacy"}],
-        [{"text": "📧 Hỗ Trợ", "url": "mailto:admin@nuitruc.ai"}],
+        [{"text": "📧 Hỗ Trợ", "callback_data": about_handler.ABOUT_SUPPORT_CALLBACK}],
     ]
     assert all(len(row) == 1 for row in rows)
+
+
+def test_about_keyboard_uses_telegram_safe_urls():
+    for row in about_handler.ABOUT_KEYBOARD["inline_keyboard"]:
+        button = row[0]
+        if "url" in button:
+            assert button["url"].startswith(("https://", "http://"))
+
+
+@pytest.mark.asyncio
+async def test_about_support_callback_shows_support_email():
+    callback_query = {"id": "cb-1", "data": about_handler.ABOUT_SUPPORT_CALLBACK}
+
+    with patch.object(
+        about_handler, "answer_callback", new_callable=AsyncMock
+    ) as answer:
+        handled = await about_handler.handle_about_callback(callback_query)
+
+    assert handled is True
+    answer.assert_awaited_once_with(
+        "cb-1",
+        text=about_handler.ABOUT_SUPPORT_ALERT,
+        show_alert=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_about_callback_ignores_other_callbacks():
+    with patch.object(
+        about_handler, "answer_callback", new_callable=AsyncMock
+    ) as answer:
+        handled = await about_handler.handle_about_callback(
+            {"id": "cb-2", "data": "menu:main"}
+        )
+
+    assert handled is False
+    answer.assert_not_awaited()
 
 
 def test_about_command_is_in_bot_menu():

@@ -70,6 +70,7 @@ async def route_update(data: dict) -> None:
     # Imports are local to avoid a module-import cycle with routers/
     # and to keep worker startup cheap (handlers pull in Telegram SDK
     # HTTP clients which open sockets on import).
+    from backend.bot.handlers import about_handler as about_handlers
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
     from backend.bot.handlers import goal_entry as goal_entry_handlers
@@ -116,6 +117,7 @@ async def route_update(data: dict) -> None:
                 if callback_query:
                     user_id = await _handle_callback(
                         db, callback_query,
+                        about_handlers=about_handlers,
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
                         income_entry_handlers=income_entry_handlers,
@@ -467,6 +469,7 @@ async def _handle_callback(
     db: AsyncSession,
     callback_query: dict,
     *,
+    about_handlers,
     onboarding_handlers,
     asset_entry_handlers,
     income_entry_handlers,
@@ -484,7 +487,6 @@ async def _handle_callback(
     telegram_updates row.
     """
     callback_data = callback_query.get("data", "")
-    chat_id = callback_query["message"]["chat"]["id"]
     callback_id = callback_query["id"]
     from_user = callback_query.get("from") or {}
     telegram_id = from_user.get("id")
@@ -504,6 +506,10 @@ async def _handle_callback(
         callback_data=callback_data,
         dashboard_service=dashboard_service,
     )
+
+    # About-page callbacks are static and do not need a user lookup.
+    if await about_handlers.handle_about_callback(callback_query):
+        return await _resolved_user_id()
 
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
