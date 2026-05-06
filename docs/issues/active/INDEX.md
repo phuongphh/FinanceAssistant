@@ -26,5 +26,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #214 | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [issue-214.md](issue-214.md) |
 | #216 | [Story] P3.8-S8: Auto-detection job for recurring patterns | [issue-216.md](issue-216.md) |
 | #217 | [Story] P3.8-S9: Reminder scheduler + Telegram notifications | [issue-217.md](issue-217.md) |
+| #218 | [Story] P3.8-S10: Reminder action handlers (paid/delay/disable) | [issue-218.md](issue-218.md) |
 
-**Total active:** 22
+**Total active:** 23
