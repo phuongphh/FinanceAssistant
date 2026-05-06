@@ -831,6 +831,68 @@ async def test_mark_rental_pick_starts_subwizard():
 
 
 @pytest.mark.asyncio
+async def test_mark_existing_rental_does_not_expose_undo_button():
+    """Codex P1 (PR #225): the mark-existing flow used to call
+    ``_post_save`` which renders ``add_more_keyboard(undo_asset_id=...)``
+    — and that undo callback HARD-DELETES the referenced asset. For a
+    pre-existing real-estate row, tapping undo would silently destroy
+    actual financial state. The fix routes mark-existing through
+    ``_post_mark_existing`` instead, which never offers an undo
+    button.
+    """
+    user = _user({
+        "flow": asset_entry.FLOW_MARK_RENTAL,
+        "step": "rental_extra",
+        "draft": {
+            "mode": "mark_existing",
+            "target_asset_id": str(uuid.uuid4()),
+            "rental": {
+                "monthly_rent": float(Decimal("15000000")),
+                "monthly_expenses": float(Decimal("1500000")),
+                "occupancy_status": "rented",
+            },
+        },
+    })
+    db = _db(user)
+    marked = _asset(asset_type="real_estate", value=2_500_000_000)
+    marked.is_rental = True
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.rental_service, "mark_as_rental",
+                      AsyncMock(return_value=marked)), \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("2_500_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "_mark_onboarding_first_asset_done",
+                      AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:rental_extra:done",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    # Inspect every send_message: none of them should attach a
+    # reply_markup that contains an "asset_add:undo:*" callback.
+    for call in send.call_args_list:
+        markup = call.kwargs.get("reply_markup") or {}
+        for row in markup.get("inline_keyboard", []):
+            for btn in row:
+                cb = btn.get("callback_data", "")
+                assert "undo" not in cb, (
+                    f"mark_existing flow leaked undo button: {cb!r}"
+                )
+
+
+@pytest.mark.asyncio
 async def test_mark_rental_pick_already_rental_rejected():
     """Picking an asset that's already a rental shows a friendly
     "already marked" message and does NOT start a wizard.
