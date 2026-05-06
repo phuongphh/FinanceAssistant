@@ -44,6 +44,22 @@ ORPHAN_CUTOFF = timedelta(minutes=5)
 ORPHAN_BATCH_LIMIT = 100
 
 
+def _normalize_text_command(text: str) -> str:
+    """Return a comparable Telegram command token from message text.
+
+    Telegram can deliver bot-menu commands as ``/about@BotUsername`` in
+    group-like contexts, and deep links can arrive as ``/start payload``.
+    Routing should match the command name, not the mention suffix or args.
+    """
+    stripped = text.strip().lower()
+    if not stripped.startswith("/"):
+        return stripped
+
+    command_token = stripped.split(maxsplit=1)[0]
+    command_name, _, _bot_username = command_token.partition("@")
+    return command_name
+
+
 async def route_update(data: dict) -> None:
     """Dispatch one Telegram update to the right handler.
 
@@ -54,6 +70,7 @@ async def route_update(data: dict) -> None:
     # Imports are local to avoid a module-import cycle with routers/
     # and to keep worker startup cheap (handlers pull in Telegram SDK
     # HTTP clients which open sockets on import).
+    from backend.bot.handlers import about_handler as about_handlers
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
     from backend.bot.handlers import goal_entry as goal_entry_handlers
@@ -100,6 +117,7 @@ async def route_update(data: dict) -> None:
                 if callback_query:
                     user_id = await _handle_callback(
                         db, callback_query,
+                        about_handlers=about_handlers,
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
                         income_entry_handlers=income_entry_handlers,
@@ -150,7 +168,7 @@ async def _handle_message(
     """
     text = message.get("text", "")
     chat_id = message["chat"]["id"]
-    command = text.strip().lower()
+    command = _normalize_text_command(text)
     from_user = message.get("from") or {}
     telegram_id = from_user.get("id")
 
@@ -451,6 +469,7 @@ async def _handle_callback(
     db: AsyncSession,
     callback_query: dict,
     *,
+    about_handlers,
     onboarding_handlers,
     asset_entry_handlers,
     income_entry_handlers,
@@ -468,7 +487,6 @@ async def _handle_callback(
     telegram_updates row.
     """
     callback_data = callback_query.get("data", "")
-    chat_id = callback_query["message"]["chat"]["id"]
     callback_id = callback_query["id"]
     from_user = callback_query.get("from") or {}
     telegram_id = from_user.get("id")
@@ -488,6 +506,10 @@ async def _handle_callback(
         callback_data=callback_data,
         dashboard_service=dashboard_service,
     )
+
+    # About-page callbacks are static and do not need a user lookup.
+    if await about_handlers.handle_about_callback(callback_query):
+        return await _resolved_user_id()
 
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
