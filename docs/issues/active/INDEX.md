@@ -32,5 +32,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #220 | [Story] P3.8-S12: ForecastCashflow tool + agent integration | [issue-220.md](issue-220.md) |
 | #221 | [Story] P3.8-S13: Goal model + 7 templates YAML | [issue-221.md](issue-221.md) |
 | #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
+| #223 | [Story] P3.8-S15: Goal wizard + full CRUD via Telegram | [issue-223.md](issue-223.md) |
 
-**Total active:** 28
+**Total active:** 29
