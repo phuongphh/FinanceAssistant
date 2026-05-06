@@ -110,6 +110,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #209 | Pre-Phase | [Story] P3.8-S1: Extend Asset model with rental fields | [pre-phase/issue-209.md](by-phase/pre-phase/issue-209.md) |
 | #210 | Pre-Phase | [Story] P3.8-S2: Build RentalService + business logic | [pre-phase/issue-210.md](by-phase/pre-phase/issue-210.md) |
 | #211 | Pre-Phase | [Story] P3.8-S3: Update asset wizard to capture rental data | [pre-phase/issue-211.md](by-phase/pre-phase/issue-211.md) |
+| #214 | Pre-Phase | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [pre-phase/issue-214.md](by-phase/pre-phase/issue-214.md) |
 
-**Total:** 106 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 89 Pre-Phase)
+**Total:** 107 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 90 Pre-Phase)

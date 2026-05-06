@@ -18,7 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 | #212 | [Story] P3.8-S4: IncomeStream model + service | [issue-212.md](issue-212.md) |
 | #213 | [Story] P3.8-S5: Income wizard via Telegram menu | [issue-213.md](issue-213.md) |
-| #214 | [Story] P3.8-S6: Add GetIncome tool to Phase 3.7 agent | [issue-214.md](issue-214.md) |
 | #215 | [Story] P3.8-S7: RecurringPattern model + manual entry | [issue-215.md](issue-215.md) |
 | #216 | [Story] P3.8-S8: Auto-detection job for recurring patterns | [issue-216.md](issue-216.md) |
 | #217 | [Story] P3.8-S9: Reminder scheduler + Telegram notifications | [issue-217.md](issue-217.md) |
@@ -29,4 +28,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
 | #223 | [Story] P3.8-S15: Goal wizard + full CRUD via Telegram | [issue-223.md](issue-223.md) |
 
-**Total active:** 24
+**Total active:** 23
