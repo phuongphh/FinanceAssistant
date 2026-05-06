@@ -1,16 +1,24 @@
 """Asset-entry wizard handler.
 
 Three flows — cash, stock, real-estate — share a common entry point and
-dispatcher. State lives on ``users.wizard_state`` (JSONB) so the bot
-can survive process restarts mid-wizard.
+dispatcher, plus a Phase 3.8 "mark existing as rental" flow. State
+lives on ``users.wizard_state`` (JSONB) so the bot can survive process
+restarts mid-wizard.
 
 Flow names (stored in ``wizard_state.flow``):
 
     asset_add_cash         — 2 questions: subtype → "name + amount"
     asset_add_stock        — 4 questions: subtype → ticker → quantity
                              → avg_price → (same|new current_price)
-    asset_add_real_estate  — 4 questions: subtype → name → initial_value
-                             → current_value
+    asset_add_real_estate  — 4 questions + optional rental sub-wizard:
+                             subtype → name → initial_value →
+                             current_value → rental_ask (Y/N) →
+                             [rental_rent → rental_expenses →
+                              rental_status → rental_extra]
+    asset_add_mark_rental  — Phase 3.8: pick existing real-estate
+                             then run only the rental sub-wizard
+                             (rental_rent → rental_expenses →
+                              rental_status → rental_extra).
 
 Each step name (``wizard_state.step``) is checked by the worker so the
 NL expense parser doesn't swallow text that should advance the wizard.
@@ -35,12 +43,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.bot.formatters.money import format_money_short
-from backend.bot.formatters.wealth_formatter import format_asset_added, format_asset_list
+from backend.bot.formatters.wealth_formatter import (
+    format_asset_added,
+    format_asset_list,
+    format_rental_marked,
+)
 from backend.bot.keyboards.asset_keyboard import (
     add_more_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
     real_estate_subtype_keyboard,
+    rental_ask_keyboard,
+    rental_extra_keyboard,
+    rental_pick_existing_keyboard,
+    rental_status_keyboard,
     stock_current_price_keyboard,
     stock_subtype_keyboard,
 )
@@ -61,7 +77,8 @@ from backend.wealth.amount_parser import (
 from backend.wealth.asset_types import AssetType, get_subtypes
 from backend.wealth.fx import USD_VND_RATE, parse_usd_amount, usd_to_vnd
 from backend.wealth.ladder import update_user_level
-from backend.wealth.services import asset_service, net_worth_calculator
+from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
+from backend.wealth.services import asset_service, net_worth_calculator, rental_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +91,10 @@ class AssetEvent:
     ASSET_UNDONE = "asset_undone"
     WIZARD_CANCELED = "asset_wizard_canceled"
     PARSE_FAILED = "asset_wizard_parse_failed"
+    # Phase 3.8 Epic 1
+    RENTAL_MARKED = "rental_marked"
+    RENTAL_DECLINED = "rental_declined"
+    RENTAL_FLOW_OPENED = "rental_flow_opened"
 
 
 # Flow names persisted in wizard_state.
@@ -83,6 +104,10 @@ FLOW_PICKER = "asset_add_picker"  # 6-button type picker shown, nothing chosen
 FLOW_CASH = "asset_add_cash"
 FLOW_STOCK = "asset_add_stock"
 FLOW_REAL_ESTATE = "asset_add_real_estate"
+# Phase 3.8 — "mark existing real-estate as rental" flow. Distinct from
+# FLOW_REAL_ESTATE because it skips the create-asset path and only
+# attaches rental data to an existing row.
+FLOW_MARK_RENTAL = "asset_add_mark_rental"
 
 
 # ---------- Entry point ----------------------------------------------
@@ -120,7 +145,9 @@ async def cancel_wizard(
 
     Returns True if there was an asset wizard to cancel. Used by the
     ``/huy`` and ``/cancel`` commands so the user has a text-based escape
-    hatch in addition to the inline ❌ Hủy button.
+    hatch in addition to the inline ❌ Hủy button. Covers both the
+    standard add-asset flow and the Phase 3.8 mark-as-rental flow,
+    since both share the ``asset_add_*`` prefix.
     """
     flow = (user.wizard_state or {}).get("flow") or ""
     if not flow.startswith("asset_add"):
@@ -650,14 +677,14 @@ async def _handle_re_name_input(
         return
 
     if any(word in name.lower() for word in _RENTAL_HINT_WORDS):
+        # Phase 3.8: rental tracking is live. Nudge the user that
+        # they'll get the rental Y/N step at the end of this wizard.
         await send_message(
             chat_id=chat_id,
             text=(
-                "ℹ️ Mình ghi nhận. Tính năng <b>cho thuê</b> "
-                "(track tenant, dòng tiền) sẽ có ở Phase 4 — "
-                "tạm thời mình lưu như BĐS thường nhé."
+                "💡 Cuối wizard mình sẽ hỏi đây có phải BĐS cho thuê — "
+                "bấm 'Có' để track tiền thuê + yield nhé."
             ),
-            parse_mode="HTML",
         )
 
     await wizard_service.update_step(
@@ -730,6 +757,50 @@ async def _handle_re_current_value_input(
     if initial <= 0:
         initial = current
 
+    # Persist current_value/initial_value into the draft and advance to
+    # the rental Y/N question. We save the asset only after the user
+    # answers, so the wizard can attach rental_metadata in one
+    # transaction rather than create → mutate. This also makes "❌ Hủy"
+    # at the rental step a clean abort: no orphan asset rows.
+    await wizard_service.update_step(
+        db, user.id, step="rental_ask",
+        draft_patch={
+            "initial_value": float(initial),
+            "current_value": float(current),
+        },
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Giá hiện tại: <b>{int(current):,}đ</b>\n\n"
+            "🏠 <b>Đây có phải là BĐS cho thuê không?</b>"
+        ),
+        parse_mode="HTML",
+        reply_markup=rental_ask_keyboard(),
+    )
+
+
+async def _save_real_estate_no_rental(
+    db: AsyncSession, chat_id: int, user: User, draft: dict
+) -> None:
+    """Save the real-estate asset without rental data — the "no" branch
+    of the rental Y/N prompt and also the path used when the rental
+    sub-wizard is not entered."""
+    initial = Decimal(str(draft.get("initial_value") or 0))
+    current = Decimal(str(draft.get("current_value") or 0))
+    if current <= 0:
+        # Defensive — should never happen because the previous step
+        # validates current_value, but if state got corrupted (e.g.
+        # process restart mid-flow on stale draft) abort cleanly
+        # instead of crashing.
+        await wizard_service.clear(db, user.id)
+        await send_message(
+            chat_id=chat_id, text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
+        )
+        return
+    if initial <= 0:
+        initial = current
+
     extra = dict(draft.get("extra") or {})
     asset = await asset_service.create_asset(
         db, user.id,
@@ -748,6 +819,441 @@ async def _handle_re_current_value_input(
         ),
     )
     await _post_save(db, chat_id, user, asset)
+
+
+# ---------- Rental sub-wizard ---------------------------------------
+#
+# Re-used by two entry points:
+#   1. FLOW_REAL_ESTATE — appended after the current_value step. The
+#      asset is created at the end of the rental flow with rental
+#      metadata attached in the same transaction.
+#   2. FLOW_MARK_RENTAL — entered from the menu "Đánh dấu BĐS cho
+#      thuê" action. The asset already exists; the rental flow only
+#      attaches rental metadata to it.
+#
+# Step names are identical across both flows so the dispatcher can
+# share text-input handlers; the only divergence is in the final
+# "save" step which checks ``draft.mode``.
+
+
+async def _handle_rental_ask_choice(
+    db: AsyncSession, chat_id: int, user: User, choice: str, draft: dict
+) -> None:
+    """User answered the "Is this a rental?" yes/no prompt."""
+    if choice == "no":
+        analytics.track(AssetEvent.RENTAL_DECLINED, user_id=user.id)
+        await _save_real_estate_no_rental(db, chat_id, user, draft)
+        return
+
+    if choice == "yes":
+        analytics.track(AssetEvent.RENTAL_FLOW_OPENED, user_id=user.id)
+        await wizard_service.update_step(
+            db, user.id, step="rental_rent", draft_patch={"rental": {}},
+        )
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "💰 <b>Tiền thuê hàng tháng?</b>\n\n"
+                "Ví dụ: <code>15tr</code>, <code>15 triệu</code>"
+            ),
+            parse_mode="HTML",
+        )
+
+
+async def _handle_rental_rent_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
+        )
+        return
+    rent = parse_amount(text)
+    if rent is None or rent <= 0:
+        analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
+                        properties={"flow": "rental", "field": "monthly_rent"})
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "Mình chưa hiểu số tiền 😅\n"
+                "Ví dụ: <code>15tr</code> hoặc <code>15000000</code>"
+            ),
+            parse_mode="HTML",
+        )
+        return
+
+    rental = dict(draft.get("rental") or {})
+    rental["monthly_rent"] = float(rent)
+    await wizard_service.update_step(
+        db, user.id, step="rental_expenses", draft_patch={"rental": rental},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Tiền thuê: <b>{int(rent):,}đ</b>/tháng\n\n"
+            "🛠️ <b>Chi phí hàng tháng</b> (thuế, sửa chữa, môi giới)?\n\n"
+            "Gửi <code>0</code> nếu không có."
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def _handle_rental_expenses_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(
+            chat_id=chat_id, text="Chi phí phải ≥ 0 nhé 🙂"
+        )
+        return
+    cleaned = text.strip().lower()
+    if cleaned in ("0", "không", "khong", "ko", "no"):
+        expenses = Decimal(0)
+    else:
+        parsed = parse_amount(text)
+        if parsed is None or parsed < 0:
+            await send_message(
+                chat_id=chat_id,
+                text="Mình chưa hiểu. Ví dụ: <code>1.5tr</code> hoặc <code>0</code>",
+                parse_mode="HTML",
+            )
+            return
+        expenses = parsed
+
+    rental = dict(draft.get("rental") or {})
+    monthly_rent = Decimal(str(rental.get("monthly_rent") or 0))
+    if expenses >= monthly_rent and monthly_rent > 0:
+        # Soft warning — see RentalMetadata._check_expenses_not_silly.
+        # Don't block; the user might intentionally be running a
+        # loss-making rental during renovation. But surface it loudly
+        # so a typo (15tr expenses vs 1.5tr) gets caught.
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                f"⚠️ Chi phí ({int(expenses):,}đ) ≥ tiền thuê "
+                f"({int(monthly_rent):,}đ) — bạn nhập đúng chứ?\n\n"
+                "Nếu typo, gõ lại số. Nếu đúng, bấm trạng thái phía dưới."
+            ),
+        )
+    rental["monthly_expenses"] = float(expenses)
+    await wizard_service.update_step(
+        db, user.id, step="rental_status", draft_patch={"rental": rental},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="📍 <b>Trạng thái hiện tại?</b>",
+        parse_mode="HTML",
+        reply_markup=rental_status_keyboard(),
+    )
+
+
+async def _handle_rental_status_choice(
+    db: AsyncSession, chat_id: int, user: User, choice: str, draft: dict
+) -> None:
+    if choice not in (OccupancyStatus.RENTED.value, OccupancyStatus.VACANT.value):
+        await send_message(chat_id=chat_id, text="Trạng thái không hợp lệ.")
+        return
+
+    rental = dict(draft.get("rental") or {})
+    rental["occupancy_status"] = choice
+    if choice == OccupancyStatus.VACANT.value:
+        # Vacant → no tenant info to collect, save immediately.
+        await wizard_service.update_step(
+            db, user.id, step="rental_save", draft_patch={"rental": rental},
+        )
+        await _commit_rental(db, chat_id, user, draft={**draft, "rental": rental})
+        return
+
+    # Rented → offer tenant / lease extras.
+    await wizard_service.update_step(
+        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="Bạn muốn ghi thêm thông tin gì không?",
+        reply_markup=rental_extra_keyboard(),
+    )
+
+
+async def _handle_rental_extra_choice(
+    db: AsyncSession, chat_id: int, user: User, choice: str, draft: dict
+) -> None:
+    if choice in ("skip", "done"):
+        await _commit_rental(db, chat_id, user, draft=draft)
+        return
+
+    if choice == "tenant":
+        await wizard_service.update_step(db, user.id, step="rental_tenant_input")
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "👤 <b>Tên người thuê?</b>\n\n"
+                "Gõ <code>skip</code> để bỏ qua."
+            ),
+            parse_mode="HTML",
+        )
+        return
+
+    if choice == "lease":
+        await wizard_service.update_step(db, user.id, step="rental_lease_input")
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "📅 <b>Thời hạn hợp đồng thuê?</b>\n\n"
+                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code> "
+                "(ngày bắt đầu - ngày kết thúc)\n"
+                "Ví dụ: <code>2024-01-01 2025-12-31</code>\n\n"
+                "Gõ <code>skip</code> để bỏ qua."
+            ),
+            parse_mode="HTML",
+        )
+        return
+
+
+async def _handle_rental_tenant_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    cleaned = text.strip()
+    if cleaned.lower() in ("skip", "bỏ qua", "bo qua"):
+        rental = dict(draft.get("rental") or {})
+    else:
+        if len(cleaned) > 200:
+            await send_message(
+                chat_id=chat_id, text="Tên người thuê tối đa 200 ký tự."
+            )
+            return
+        rental = dict(draft.get("rental") or {})
+        rental["tenant_name"] = cleaned
+
+    await wizard_service.update_step(
+        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="✅ Đã ghi nhận. Còn thông tin nào khác không?",
+        reply_markup=rental_extra_keyboard(),
+    )
+
+
+async def _handle_rental_lease_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    cleaned = text.strip()
+    if cleaned.lower() in ("skip", "bỏ qua", "bo qua"):
+        rental = dict(draft.get("rental") or {})
+        await wizard_service.update_step(
+            db, user.id, step="rental_extra", draft_patch={"rental": rental},
+        )
+        await send_message(
+            chat_id=chat_id,
+            text="OK, bỏ qua nhé. Còn thông tin nào khác không?",
+            reply_markup=rental_extra_keyboard(),
+        )
+        return
+
+    parts = cleaned.split()
+    if len(parts) != 2:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code>\n"
+                "Ví dụ: <code>2024-01-01 2025-12-31</code>"
+            ),
+            parse_mode="HTML",
+        )
+        return
+    try:
+        start = date.fromisoformat(parts[0])
+        end = date.fromisoformat(parts[1])
+    except ValueError:
+        await send_message(
+            chat_id=chat_id,
+            text="Ngày không hợp lệ. Format: <code>YYYY-MM-DD YYYY-MM-DD</code>",
+            parse_mode="HTML",
+        )
+        return
+    if end <= start:
+        await send_message(
+            chat_id=chat_id,
+            text="Ngày kết thúc phải sau ngày bắt đầu. Thử lại nhé.",
+        )
+        return
+
+    rental = dict(draft.get("rental") or {})
+    rental["lease_start_date"] = start.isoformat()
+    rental["lease_end_date"] = end.isoformat()
+    await wizard_service.update_step(
+        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=f"✅ Đã ghi: <b>{start} → {end}</b>. Còn thông tin nào khác không?",
+        parse_mode="HTML",
+        reply_markup=rental_extra_keyboard(),
+    )
+
+
+async def _commit_rental(
+    db: AsyncSession, chat_id: int, user: User, draft: dict,
+) -> None:
+    """Final step: validate metadata, save asset (or mark existing),
+    create/refresh income stream, send confirmation."""
+    rental = dict(draft.get("rental") or {})
+    try:
+        # Pydantic re-validates everything (rent > 0, expenses ≥ 0,
+        # lease dates ordered) so a corrupted draft can't reach the DB.
+        metadata = RentalMetadata.model_validate(rental)
+    except Exception as exc:
+        logger.warning("rental metadata validation failed: %s", exc)
+        await wizard_service.clear(db, user.id)
+        await send_message(
+            chat_id=chat_id,
+            text="Dữ liệu chưa hợp lệ — bạn thử lại từ /menu nhé.",
+        )
+        return
+
+    mode = draft.get("mode")
+    if mode == "mark_existing":
+        # FLOW_MARK_RENTAL: asset already exists; just attach metadata.
+        asset_id_str = draft.get("target_asset_id")
+        try:
+            asset_id = uuid.UUID(str(asset_id_str))
+        except (TypeError, ValueError):
+            await wizard_service.clear(db, user.id)
+            await send_message(
+                chat_id=chat_id, text="Không tìm thấy BĐS đích.",
+            )
+            return
+        try:
+            asset = await rental_service.mark_as_rental(
+                db, user.id, asset_id, metadata,
+            )
+        except ValueError as exc:
+            logger.warning("mark_as_rental failed: %s", exc)
+            await wizard_service.clear(db, user.id)
+            await send_message(chat_id=chat_id, text=f"Không thể đánh dấu: {exc}")
+            return
+    else:
+        # FLOW_REAL_ESTATE: create asset + mark in same transaction.
+        initial = Decimal(str(draft.get("initial_value") or 0))
+        current = Decimal(str(draft.get("current_value") or 0))
+        if current <= 0:
+            await wizard_service.clear(db, user.id)
+            await send_message(
+                chat_id=chat_id, text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
+            )
+            return
+        if initial <= 0:
+            initial = current
+        extra = dict(draft.get("extra") or {})
+        asset = await asset_service.create_asset(
+            db, user.id,
+            asset_type=AssetType.REAL_ESTATE.value,
+            subtype=draft.get("subtype"),
+            name=draft.get("name") or "Bất động sản",
+            initial_value=initial,
+            current_value=current,
+            extra=extra,
+        )
+        asset = await rental_service.mark_as_rental(
+            db, user.id, asset.id, metadata,
+        )
+
+    analytics.track(
+        AssetEvent.RENTAL_MARKED,
+        user_id=user.id,
+        properties={
+            "asset_id": str(asset.id),
+            "occupancy_status": metadata.occupancy_status,
+            "monthly_rent": float(metadata.monthly_rent),
+            "mode": mode or "create",
+        },
+    )
+
+    monthly_rent = Decimal(metadata.monthly_rent)
+    monthly_expenses = Decimal(metadata.monthly_expenses)
+    yield_pct = metadata.annual_yield_pct(asset.current_value or Decimal(1))
+    await send_message(
+        chat_id=chat_id,
+        text=format_rental_marked(
+            asset, monthly_rent, monthly_expenses, yield_pct,
+            metadata.occupancy_status,
+        ),
+        parse_mode="HTML",
+    )
+    await _post_save(db, chat_id, user, asset)
+
+
+# ---------- Mark-existing-as-rental flow (post-creation entry) -------
+
+
+async def start_mark_rental_wizard(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Menu entry: list non-rental real-estate assets, let user pick."""
+    candidates = await asset_service.get_user_assets(
+        db, user.id, asset_type=AssetType.REAL_ESTATE.value,
+    )
+    candidates = [a for a in candidates if not a.is_rental]
+    if not candidates:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "🏠 Bạn chưa có BĐS nào (hoặc đã đánh dấu cho thuê hết rồi).\n\n"
+                "Thêm BĐS mới qua /menu → 💎 Tài sản → ➕ Thêm tài sản."
+            ),
+        )
+        return
+
+    items = [(a.id, f"🏠 {a.name}") for a in candidates]
+    await send_message(
+        chat_id=chat_id,
+        text="🏠 <b>Đánh dấu BĐS nào là cho thuê?</b>",
+        parse_mode="HTML",
+        reply_markup=rental_pick_existing_keyboard(items),
+    )
+
+
+async def _handle_rental_pick(
+    db: AsyncSession, chat_id: int, user: User, asset_id_str: str
+) -> None:
+    """User picked an existing real-estate asset to mark as rental."""
+    try:
+        asset_id = uuid.UUID(asset_id_str)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy BĐS.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_id)
+    if asset is None or asset.asset_type != AssetType.REAL_ESTATE.value:
+        await send_message(chat_id=chat_id, text="Không tìm thấy BĐS.")
+        return
+    if asset.is_rental:
+        await send_message(
+            chat_id=chat_id,
+            text=f"BĐS '{asset.name}' đã được đánh dấu cho thuê rồi.",
+        )
+        return
+
+    await wizard_service.start_flow(
+        db, user.id, FLOW_MARK_RENTAL, step="rental_rent",
+        draft={
+            "mode": "mark_existing",
+            "target_asset_id": str(asset_id),
+            "rental": {},
+        },
+    )
+    analytics.track(AssetEvent.RENTAL_FLOW_OPENED, user_id=user.id,
+                    properties={"mode": "mark_existing"})
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Đánh dấu <b>{asset.name}</b> là BĐS cho thuê.\n\n"
+            "💰 <b>Tiền thuê hàng tháng?</b>\n"
+            "Ví dụ: <code>15tr</code>"
+        ),
+        parse_mode="HTML",
+    )
 
 
 # ---------- Save / cleanup --------------------------------------------
@@ -849,6 +1355,16 @@ _TEXT_DISPATCH = {
     (FLOW_REAL_ESTATE, "name"): _handle_re_name_input,
     (FLOW_REAL_ESTATE, "initial_value"): _handle_re_initial_value_input,
     (FLOW_REAL_ESTATE, "current_value"): _handle_re_current_value_input,
+    # Phase 3.8 — rental sub-wizard, shared between FLOW_REAL_ESTATE
+    # (creation path) and FLOW_MARK_RENTAL (post-creation path).
+    (FLOW_REAL_ESTATE, "rental_rent"): _handle_rental_rent_input,
+    (FLOW_REAL_ESTATE, "rental_expenses"): _handle_rental_expenses_input,
+    (FLOW_REAL_ESTATE, "rental_tenant_input"): _handle_rental_tenant_input,
+    (FLOW_REAL_ESTATE, "rental_lease_input"): _handle_rental_lease_input,
+    (FLOW_MARK_RENTAL, "rental_rent"): _handle_rental_rent_input,
+    (FLOW_MARK_RENTAL, "rental_expenses"): _handle_rental_expenses_input,
+    (FLOW_MARK_RENTAL, "rental_tenant_input"): _handle_rental_tenant_input,
+    (FLOW_MARK_RENTAL, "rental_lease_input"): _handle_rental_lease_input,
 }
 
 
@@ -1003,6 +1519,66 @@ async def _dispatch_asset_action(
         draft = wizard_service.get_draft(user.wizard_state)
         await _handle_stock_current_price_choice(db, chat_id, user, arg, draft)
         return
+
+    if action == "rental_ask" and arg in ("yes", "no"):
+        draft = wizard_service.get_draft(user.wizard_state)
+        await _handle_rental_ask_choice(db, chat_id, user, arg, draft)
+        return
+
+    if action == "rental_status" and arg:
+        draft = wizard_service.get_draft(user.wizard_state)
+        await _handle_rental_status_choice(db, chat_id, user, arg, draft)
+        return
+
+    if action == "rental_extra" and arg:
+        draft = wizard_service.get_draft(user.wizard_state)
+        await _handle_rental_extra_choice(db, chat_id, user, arg, draft)
+        return
+
+
+async def handle_asset_rental_callback(
+    db: AsyncSession, callback_query: dict
+) -> bool:
+    """Route ``asset_rental:*`` callbacks (mark-existing flow only).
+
+    Distinct from ``asset_add:*`` because the entry point doesn't go
+    through the type picker — the user picked an existing real-estate
+    row from the menu and we land directly in the rental sub-wizard.
+    Returns True iff the callback was consumed.
+    """
+    data: str = callback_query.get("data") or ""
+    if not data.startswith("asset_rental"):
+        return False
+
+    callback_id = callback_query["id"]
+    message = callback_query.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    telegram_id = (callback_query.get("from") or {}).get("id")
+    if chat_id is None or telegram_id is None:
+        await answer_callback(callback_id)
+        return True
+
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        await answer_callback(callback_id, text="Bạn cần /start trước nhé.")
+        return True
+
+    _, parts = parse_callback(data)
+    action = parts[0] if parts else ""
+    arg = parts[1] if len(parts) > 1 else None
+
+    async def _act() -> None:
+        if action == "cancel":
+            await wizard_service.clear(db, user.id)
+            analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
+            await send_message(chat_id=chat_id, text="Đã huỷ. 👋")
+            return
+        if action == "pick" and arg:
+            await _handle_rental_pick(db, chat_id, user, arg)
+            return
+
+    await asyncio.gather(answer_callback(callback_id), _act())
+    return True
 
 
 async def handle_asset_callback(

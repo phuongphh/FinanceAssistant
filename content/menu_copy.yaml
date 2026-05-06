@@ -124,6 +124,10 @@ submenu_assets:
       callback: "menu:assets:edit"
       description: "Cập nhật giá trị, xóa, đánh dấu đã bán"
 
+    - label: "🏠 BĐS cho thuê"
+      callback: "menu:assets:mark_rental"
+      description: "Đánh dấu BĐS hiện có là cho thuê + tracking yield"
+
     - label: "💡 Tư vấn tối ưu"
       callback: "menu:assets:advisor"
       description: "Phân tích phân bổ, gợi ý tái cân bằng"

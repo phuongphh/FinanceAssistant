@@ -499,6 +499,18 @@ async def _action_assets_edit(
     await list_assets(db, chat_id, user)
 
 
+async def _action_assets_mark_rental(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 3.8 Epic 1 — start the "mark existing real-estate as
+    rental" flow. The wizard lists every non-rental real-estate asset
+    and lets the user pick one, then collects rent + expenses + status.
+    """
+    from backend.bot.handlers.asset_entry import start_mark_rental_wizard
+
+    await start_mark_rental_wizard(db, chat_id, user)
+
+
 async def _action_expenses_add(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -564,6 +576,7 @@ async def _action_goals_add(
 _DIRECT_HANDLERS = {
     ("assets", "add"): _action_assets_add,
     ("assets", "edit"): _action_assets_edit,
+    ("assets", "mark_rental"): _action_assets_mark_rental,
     ("expenses", "add"): _action_expenses_add,
     ("expenses", "ocr"): _action_expenses_ocr,
     ("goals", "add"): _action_goals_add,
