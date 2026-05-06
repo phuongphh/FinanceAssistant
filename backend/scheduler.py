@@ -20,6 +20,8 @@ from backend.jobs.daily_snapshot_job import create_daily_snapshots
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
 from backend.jobs.morning_briefing_job import run_morning_briefing_job
+from backend.jobs.recurring_detection_job import run_recurring_detection
+from backend.jobs.reminder_scheduler_job import run_reminder_scheduler
 from backend.jobs.seasonal_notifier import run_seasonal_check
 from backend.jobs.weekly_fun_facts import run_weekly_fun_facts
 from backend.jobs.weekly_goal_reminder import run_weekly_goal_reminder
@@ -84,6 +86,22 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         create_daily_snapshots, "cron",
         hour=23, minute=59, timezone="Asia/Ho_Chi_Minh",
         id="daily_asset_snapshot",
+    )
+    # Phase 3.8 Epic 3 — recurring-pattern auto-detection. Runs at
+    # 02:00 (low-activity window so the Telegram delivery doesn't
+    # compete with morning briefings) once a day.
+    scheduler.add_job(
+        run_recurring_detection, "cron",
+        hour=2, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="recurring_detection",
+    )
+    # Phase 3.8 Epic 3 — daily reminder scheduler. 09:00 — early
+    # enough to fit the user's morning routine, late enough that
+    # overnight bank charges have settled.
+    scheduler.add_job(
+        run_reminder_scheduler, "cron",
+        hour=9, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="recurring_reminders",
     )
 
 
