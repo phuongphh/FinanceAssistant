@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #206 | [Epic] Phase 3.8 — Epic 3: Recurring Transactions + Reminders | [issue-206.md](issue-206.md) |
 | #207 | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [issue-207.md](issue-207.md) |
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 | #217 | [Story] P3.8-S9: Reminder scheduler + Telegram notifications | [issue-217.md](issue-217.md) |
@@ -23,4 +22,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
 | #223 | [Story] P3.8-S15: Goal wizard + full CRUD via Telegram | [issue-223.md](issue-223.md) |
 
-**Total active:** 18
+**Total active:** 17
