@@ -14,6 +14,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #204 | [Epic] Phase 3.8 — Epic 1: Rental Property Tracking | [issue-204.md](issue-204.md) |
+| #205 | [Epic] Phase 3.8 — Epic 2: Multi-Income Streams | [issue-205.md](issue-205.md) |
 | #206 | [Epic] Phase 3.8 — Epic 3: Recurring Transactions + Reminders | [issue-206.md](issue-206.md) |
 
-**Total active:** 11
+**Total active:** 12
