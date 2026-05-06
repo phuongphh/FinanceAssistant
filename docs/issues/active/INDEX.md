@@ -19,5 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #207 | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [issue-207.md](issue-207.md) |
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 | #210 | [Story] P3.8-S2: Build RentalService + business logic | [issue-210.md](issue-210.md) |
+| #213 | [Story] P3.8-S5: Income wizard via Telegram menu | [issue-213.md](issue-213.md) |
 
-**Total active:** 15
+**Total active:** 16
