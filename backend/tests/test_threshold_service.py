@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -95,16 +95,23 @@ def _user(monthly_income: Decimal | None = None) -> User:
 
 
 class TestGetMonthlyIncome:
+    """Phase 3.8 Epic 2: ``get_monthly_income`` now delegates to
+    ``income_service.get_total_monthly_income`` (which iterates streams
+    in Python via ``monthly_equivalent``). We patch that helper so
+    threshold-service tests stay independent of stream loading
+    plumbing."""
+
     @pytest.mark.asyncio
     async def test_sums_active_streams(self):
         user_id = uuid.uuid4()
         db = MagicMock()
-        result = MagicMock()
-        result.scalar_one.return_value = Decimal("25_000_000")
-        db.execute = AsyncMock(return_value=result)
         db.get = AsyncMock(return_value=None)
 
-        income = await threshold_service.get_monthly_income(db, user_id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal("25_000_000")),
+        ):
+            income = await threshold_service.get_monthly_income(db, user_id)
         assert income == Decimal("25_000_000")
 
     @pytest.mark.asyncio
@@ -113,12 +120,13 @@ class TestGetMonthlyIncome:
         user_id = uuid.uuid4()
         user = _user(monthly_income=Decimal("18_000_000"))
         db = MagicMock()
-        result = MagicMock()
-        result.scalar_one.return_value = 0
-        db.execute = AsyncMock(return_value=result)
         db.get = AsyncMock(return_value=user)
 
-        income = await threshold_service.get_monthly_income(db, user_id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal(0)),
+        ):
+            income = await threshold_service.get_monthly_income(db, user_id)
         assert income == Decimal("18_000_000")
 
     @pytest.mark.asyncio
@@ -126,12 +134,13 @@ class TestGetMonthlyIncome:
         user_id = uuid.uuid4()
         user = _user(monthly_income=None)
         db = MagicMock()
-        result = MagicMock()
-        result.scalar_one.return_value = 0
-        db.execute = AsyncMock(return_value=result)
         db.get = AsyncMock(return_value=user)
 
-        income = await threshold_service.get_monthly_income(db, user_id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal(0)),
+        ):
+            income = await threshold_service.get_monthly_income(db, user_id)
         assert income == Decimal(0)
 
 
@@ -139,14 +148,15 @@ class TestUpdateUserThresholds:
     @pytest.mark.asyncio
     async def test_writes_thresholds_to_user(self):
         user = _user()
-        result = MagicMock()
-        result.scalar_one.return_value = Decimal("20_000_000")
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=result)
         db.flush = AsyncMock()
 
-        micro, major = await threshold_service.update_user_thresholds(db, user.id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal("20_000_000")),
+        ):
+            micro, major = await threshold_service.update_user_thresholds(db, user.id)
         assert (micro, major) == (Decimal("200_000"), Decimal("2_000_000"))
         assert user.expense_threshold_micro == 200_000
         assert user.expense_threshold_major == 2_000_000
@@ -155,14 +165,15 @@ class TestUpdateUserThresholds:
     @pytest.mark.asyncio
     async def test_high_income_writes_higher_thresholds(self):
         user = _user()
-        result = MagicMock()
-        result.scalar_one.return_value = Decimal("80_000_000")
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=result)
         db.flush = AsyncMock()
 
-        micro, major = await threshold_service.update_user_thresholds(db, user.id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal("80_000_000")),
+        ):
+            micro, major = await threshold_service.update_user_thresholds(db, user.id)
         assert (micro, major) == (Decimal("500_000"), Decimal("5_000_000"))
         assert user.expense_threshold_micro == 500_000
         assert user.expense_threshold_major == 5_000_000
@@ -171,15 +182,16 @@ class TestUpdateUserThresholds:
     async def test_does_not_commit(self):
         """Service flushes; caller commits — boundary contract."""
         user = _user()
-        result = MagicMock()
-        result.scalar_one.return_value = Decimal("10_000_000")
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=result)
         db.flush = AsyncMock()
         db.commit = AsyncMock()
 
-        await threshold_service.update_user_thresholds(db, user.id)
+        with patch.object(
+            threshold_service.income_service, "get_total_monthly_income",
+            AsyncMock(return_value=Decimal("10_000_000")),
+        ):
+            await threshold_service.update_user_thresholds(db, user.id)
         db.flush.assert_awaited()
         db.commit.assert_not_awaited()
 

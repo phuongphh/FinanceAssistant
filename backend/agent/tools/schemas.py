@@ -108,6 +108,20 @@ class CompareMetric(str, Enum):
     SAVINGS = "savings"
 
 
+class IncomeStreamType(str, Enum):
+    """Income classifications recognised by the agent. Mirrors
+    ``backend.wealth.income_types.StreamType`` so values round-trip.
+
+    Phase 3.8 Epic 2 — used by ``GetIncomeTool``."""
+
+    SALARY = "salary"
+    FREELANCE = "freelance"
+    DIVIDEND = "dividend"
+    RENTAL = "rental"
+    INTEREST = "interest"
+    OTHER = "other"
+
+
 # ---------------------------------------------------------------------------
 # Filter primitives
 # ---------------------------------------------------------------------------
@@ -235,6 +249,35 @@ class ComparePeriodsInput(_StrictBase):
     period_b: ComparePeriod
 
 
+class GetIncomeInput(_StrictBase):
+    """Inputs for ``get_income``. Empty input returns every active
+    stream + headline aggregate. Filters narrow the answer to a
+    specific subset (passive only, salary only, etc.)."""
+
+    stream_type: Optional[IncomeStreamType] = Field(
+        None,
+        description=(
+            "Restrict to a single income type. Use 'rental' for 'thu nhập "
+            "từ thuê BĐS', 'salary' for 'lương'."
+        ),
+    )
+    is_passive: Optional[bool] = Field(
+        None,
+        description=(
+            "Filter active vs passive. true = passive (rental/dividend/"
+            "interest), false = active (salary/freelance/other). Use "
+            "this for 'thu nhập thụ động' / 'thu nhập chủ động' queries."
+        ),
+    )
+    include_inactive: bool = Field(
+        False,
+        description=(
+            "Include paused streams. Default false — most queries want "
+            "the live picture."
+        ),
+    )
+
+
 class GetMarketDataInput(_StrictBase):
     ticker: str = Field(
         ...,
@@ -303,6 +346,36 @@ class ComparisonResult(BaseModel):
     diff_percent: float
     period_a_label: str
     period_b_label: str
+
+
+class IncomeStreamItem(BaseModel):
+    """One income stream row in a tool result.
+
+    Mirrors the ORM model's user-facing fields plus the computed
+    monthly equivalent so the LLM doesn't need to redo the schedule
+    math."""
+
+    name: str
+    stream_type: str
+    is_passive: bool
+    amount: Decimal
+    currency: str = "VND"
+    schedule_type: str
+    monthly_equivalent: Decimal
+    is_active: bool
+    schedule_day: Optional[int] = None
+    schedule_month: Optional[int] = None
+
+
+class GetIncomeOutput(BaseModel):
+    streams: list[IncomeStreamItem]
+    total_monthly: Decimal
+    active_income: Decimal
+    passive_income: Decimal
+    # ``None`` when total == 0 — distinguishes "no streams" from a
+    # literal 0% which would mislead the user.
+    passive_ratio: Optional[float]
+    count: int
 
 
 class MarketDataPoint(BaseModel):

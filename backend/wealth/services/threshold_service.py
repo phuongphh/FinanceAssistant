@@ -25,11 +25,10 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.user import User
-from backend.wealth.models.income_stream import IncomeStream
+from backend.wealth.services import income_service
 
 # Defaults when income is missing/zero — match users.expense_threshold_*
 # DB defaults so a brand-new user with no income setup still gets
@@ -78,18 +77,20 @@ def compute_thresholds(
 async def get_monthly_income(
     db: AsyncSession, user_id: uuid.UUID
 ) -> Decimal:
-    """Sum ``amount_monthly`` across the user's active income streams.
+    """Sum monthly equivalents across the user's active income streams.
 
-    Falls back to the legacy ``users.monthly_income`` field if no
-    streams exist — this keeps users who set up income before the
-    income_streams table arrived working without a backfill.
+    Phase 3.8 Epic 2: streams now carry ``(amount, schedule_type)``
+    instead of a pre-normalised ``amount_monthly``, so we delegate to
+    ``income_service.get_total_monthly_income`` which sums
+    ``stream.monthly_equivalent`` per row. The single-place math
+    keeps quarterly dividends and annual interest from being silently
+    counted at their raw amount.
+
+    Falls back to the legacy ``users.monthly_income`` scalar when the
+    user has no streams — covers Phase 0 / 1 users who entered income
+    before the stream wizard was built.
     """
-    stmt = select(func.coalesce(func.sum(IncomeStream.amount_monthly), 0)).where(
-        IncomeStream.user_id == user_id,
-        IncomeStream.is_active.is_(True),
-    )
-    streams_total = (await db.execute(stmt)).scalar_one()
-    streams_total = Decimal(streams_total or 0)
+    streams_total = await income_service.get_total_monthly_income(db, user_id)
     if streams_total > 0:
         return streams_total
 

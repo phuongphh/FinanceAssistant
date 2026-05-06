@@ -283,7 +283,12 @@ async def generate_investment_advice(
         IncomeStream.is_active.is_(True),
     )
     income_streams = list((await db.execute(income_stmt)).scalars().all())
-    income_total = sum(Decimal(s.amount_monthly or 0) for s in income_streams)
+    # Phase 3.8 Epic 2: aggregate via monthly_equivalent so non-monthly
+    # streams (annual dividend, quarterly interest) get the right
+    # share of the headline income figure.
+    income_total = sum(
+        (s.monthly_equivalent for s in income_streams), Decimal(0)
+    )
     if income_streams:
         income_str = (
             f"{format_money_full(income_total)}/tháng từ "

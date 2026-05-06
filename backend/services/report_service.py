@@ -194,16 +194,18 @@ async def _build_wealth_context(
             )
     breakdown_str = "\n".join(breakdown_lines) if breakdown_lines else "  (chưa khai báo tài sản nào)"
 
-    # Income streams (Phase 3A).
+    # Income streams. Phase 3.8 Epic 2: read monthly_equivalent so
+    # quarterly dividends / annual interest don't double-count.
     stmt = select(IncomeStream).where(
         IncomeStream.user_id == user_id,
         IncomeStream.is_active.is_(True),
     )
     streams = list((await db.execute(stmt)).scalars().all())
-    income_total = sum(Decimal(s.amount_monthly or 0) for s in streams)
+    income_total = sum((s.monthly_equivalent for s in streams), Decimal(0))
     if streams:
         income_lines = [
-            f"  • {s.name} ({s.source_type}): {format_money_short(s.amount_monthly)}/tháng"
+            f"  • {s.name} ({s.stream_type}): "
+            f"{format_money_short(s.monthly_equivalent)}/tháng"
             for s in streams
         ]
         income_str = (

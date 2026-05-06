@@ -51,9 +51,11 @@ from backend.wealth.services import asset_service
 
 REAL_ESTATE_TYPE = "real_estate"
 RENTAL_INCOME_SOURCE = "rental"
-# Stored on IncomeStream.extra so we can find streams by their owning
-# asset without adding a FK migration in Epic 1 (Epic 2 may promote
-# this to a real ``source_asset_id`` column).
+# Phase 3.8 Epic 2 promoted ``source_asset_id`` from JSONB to a real
+# FK column on IncomeStream. The constant lingers for the JSONB
+# ``extra`` payload that still snapshots occupancy / rent / expenses
+# for read-only consumers (briefing, agent tool) that don't want to
+# join through Asset.
 SOURCE_ASSET_ID_KEY = "source_asset_id"
 
 
@@ -272,21 +274,24 @@ async def _sync_rental_income_stream(
     """Ensure exactly one IncomeStream tracks this rental's net income.
 
     - Creates one on first call.
-    - Updates ``amount_monthly`` and ``is_active`` on subsequent
+    - Updates ``amount`` / ``is_active`` / ``extra`` on subsequent
       calls (e.g. rent change, tenant moved out).
     - Re-uses the existing row even if the user previously
       ``unmark_as_rental``-ed and the stream was paused.
 
-    The stream's ``extra`` carries ``source_asset_id`` so we can find
-    it again without name matching (rename-safe). It also stashes
-    occupancy + monthly_rent for read-only consumers that don't want
-    to join through Asset.
+    Linkage: Epic 2 promoted ``source_asset_id`` to a real FK column,
+    so lookups are O(1) via ``idx_income_source_asset`` rather than a
+    Python-side JSONB walk. ``extra`` still carries occupancy +
+    rent/expense snapshot for read-only consumers (briefing, agent)
+    that don't want to round-trip through Asset.
     """
     stream = await _find_stream_for_asset(db, user_id, asset.id)
 
     monthly_amount = metadata.net_monthly_yield
     is_active = metadata.is_income_active()
     name = f"Thuê BĐS — {asset.name}"
+    # Snapshot fields stay in ``extra`` for read-only consumers; the
+    # canonical pointer is now ``source_asset_id`` FK above.
     extra = {
         SOURCE_ASSET_ID_KEY: str(asset.id),
         "occupancy_status": metadata.occupancy_status,
@@ -297,18 +302,29 @@ async def _sync_rental_income_stream(
     if stream is None:
         stream = IncomeStream(
             user_id=user_id,
-            source_type=RENTAL_INCOME_SOURCE,
+            stream_type=RENTAL_INCOME_SOURCE,
+            is_passive=True,
             name=name,
-            amount_monthly=monthly_amount,
+            # Rental cashflow is monthly by definition (Case A); the
+            # raw ``amount`` equals the monthly equivalent.
+            amount=monthly_amount,
+            currency="VND",
+            schedule_type="monthly",
+            start_date=date.today(),
             is_active=is_active,
+            source_asset_id=asset.id,
             extra=extra,
         )
         db.add(stream)
     else:
         stream.name = name
-        stream.amount_monthly = monthly_amount
+        stream.amount = monthly_amount
         stream.is_active = is_active
         stream.extra = extra
+        # Belt-and-braces: enforce the FK on existing rows in case a
+        # legacy stream had only the JSONB pointer set (pre-Epic-2).
+        if stream.source_asset_id is None:
+            stream.source_asset_id = asset.id
 
     return stream
 
@@ -334,27 +350,20 @@ async def _find_stream_for_asset(
     user_id: uuid.UUID,
     asset_id: uuid.UUID,
 ) -> IncomeStream | None:
-    """Locate the IncomeStream linked to ``asset_id`` via JSONB.
+    """Locate the IncomeStream linked to ``asset_id``.
 
-    Filters on ``source_type = 'rental'`` first to use the
-    ``idx_income_user_active_streams`` partial index, then falls
-    back to a Python-side ``extra.source_asset_id`` match. We accept
-    inactive streams here so unmark→remark can revive the same row.
+    Epic 2 made ``source_asset_id`` a real FK column with a partial
+    index (``idx_income_source_asset`` WHERE NOT NULL), so this is
+    now an O(1) indexed lookup instead of the JSONB-walk fallback
+    Epic 1 needed. We accept inactive streams (no ``is_active``
+    filter) so an ``unmark_as_rental`` → ``mark_as_rental`` round-
+    trip revives the same row instead of creating a duplicate.
     """
-    stmt = (
-        select(IncomeStream)
-        .where(
-            IncomeStream.user_id == user_id,
-            IncomeStream.source_type == RENTAL_INCOME_SOURCE,
-        )
+    stmt = select(IncomeStream).where(
+        IncomeStream.user_id == user_id,
+        IncomeStream.source_asset_id == asset_id,
     )
-    rows = (await db.execute(stmt)).scalars().all()
-    target = str(asset_id)
-    for stream in rows:
-        extra = stream.extra or {}
-        if extra.get(SOURCE_ASSET_ID_KEY) == target:
-            return stream
-    return None
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 def _load_metadata(asset: Asset) -> RentalMetadata:
