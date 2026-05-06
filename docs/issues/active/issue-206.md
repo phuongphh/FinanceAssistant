@@ -6,25 +6,18 @@
 
 > **Type:** Epic | **Week:** 1-2 | **Stories:** 4
 
-## Tại Sao Epic Này Quan Trọng
-User explicitly requested reminders ("tôi muốn có reminder cho các khoản chi tiêu hàng tháng"). **Mỗi reminder = 1 daily touchpoint = retention driver.** Đây là engagement strategy, không chỉ utility.
+## Mục tiêu
+Auto-detect + manual recurring patterns + reminders. **Retention driver: mỗi reminder = daily touchpoint.**
 
 ## Success Definition
-- ✅ Bot detects monthly recurring patterns từ 6 tháng history
-- ✅ Bot gợi ý patterns với confirm/reject buttons
-- ✅ User add manual recurring (thuê nhà, internet, gym)
-- ✅ Reminders gửi 2 ngày trước expected date
-- ✅ Reminder buttons: Đã trả / Trễ vài ngày / Tắt nhắc
+- ✅ Auto-detect từ 6 tháng history (heuristic: 3+ occurrences, 25-35 day intervals)
+- ✅ Reminders 2 ngày trước due date
+- ✅ Actions: Đã trả / Trễ vài ngày / Tắt nhắc
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P3.8-S7: RecurringPattern model + manual entry
-- [ ] [Story] P3.8-S8: Auto-detection job for recurring patterns
-- [ ] [Story] P3.8-S9: Reminder scheduler + Telegram notifications
-- [ ] [Story] P3.8-S10: Reminder action handlers (paid/delay/disable)
+- [ ] #215 [Story] P3.8-S7: RecurringPattern model + manual entry
+- [ ] #216 [Story] P3.8-S8: Auto-detection job for recurring patterns
+- [ ] #217 [Story] P3.8-S9: Reminder scheduler + Telegram notifications
+- [ ] #218 [Story] P3.8-S10: Reminder action handlers (paid/delay/disable)
 
-## Note
-Chạy **song song** với Epic 1 và Epic 2 trong Tuần 1.
-
-## Reference
-`docs/current/phase-3.8/phase-3.8-detailed.md` § 1.3
+## Parallel: Song song với Epic 1 (#204) và Epic 2 (#205)
