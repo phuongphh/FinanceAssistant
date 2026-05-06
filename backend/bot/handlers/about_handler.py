@@ -12,8 +12,8 @@ ABOUT_SUPPORT_EMAIL = "admin@nuitruc.ai"
 ABOUT_SUPPORT_CALLBACK = "about:support"
 ABOUT_SUPPORT_ALERT = f"📧 Hỗ trợ: {ABOUT_SUPPORT_EMAIL}"
 
-ABOUT_TEXT = f"""💎 *Bé Tiền — Personal CFO*
-_Trợ lý CFO cá nhân đầu tiên dành cho người Việt_
+ABOUT_TEXT = f"""💎 *Bé Tiền*
+_Trợ lý quản lý Tài sản cá nhân đầu tiên dành cho người Việt_
 
 📦 *Phiên bản:* {APP_VERSION}
 🏢 *Phát triển bởi:* Nui Truc AI
