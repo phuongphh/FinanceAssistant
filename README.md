@@ -24,6 +24,7 @@
 - 🔮 Phase 4: Investment Intelligence
 - 🔮 Phase 5: Behavioral Engine
 - 🔮 Phase 6: Scale & Commercialize
+- 🔮 Phase 3.8: TODO (skeleton — please update)
 <!-- END: phase-status:status-list -->
 
 

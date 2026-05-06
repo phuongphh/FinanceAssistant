@@ -46,6 +46,7 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 | Phase 4: Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
 | Phase 5: Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
 | Phase 6: Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
+| Phase 3.8: TODO (skeleton — please update) 🚧 _skeleton_ | 🔮 planned | TBD | [phase-3.8-detailed.md](docs/current/phase-3.8-detailed.md) | TODO: 1-line summary |
 <!-- END: phase-status:roadmap-table -->
 
 ### Archive

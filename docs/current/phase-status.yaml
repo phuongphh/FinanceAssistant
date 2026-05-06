@@ -139,3 +139,14 @@ roadmap:
     description: "Public beta, subscriptions, multi-region, household mode"
     completed_date: ""
     icon: "🔮"
+
+  - id: "3.8"
+    name: "TODO (skeleton — please update)"
+    status: planned
+    duration: "TBD"
+    detailed_doc: "docs/current/phase-3.8-detailed.md"
+    issues_doc: "docs/current/phase-3.8-issues.md"
+    description: "TODO: 1-line summary"
+    completed_date: ""
+    icon: "🔮"
+    skeleton: true
