@@ -6,27 +6,16 @@
 
 > **Type:** Epic | **Week:** 2 | **Stories:** 2
 
-## Tại Sao Epic Này Quan Trọng
-**"Cashflow Forecast = Twin Foundation"** — forecasting v1 này là seed cho Phase 4 Twin projections. Build đúng từ đầu, Phase 4 mở rộng không cần redesign.
-
-## Methodology
-- Baseline: average last 3 months income + expense
-- Add: known recurring (high confidence)
-- Add: scheduled income (salary day, dividend dates)
-- Confidence decay: Month 1=85%, Month 2=70%, Month 3=55%
+## Mục tiêu
+Simple v1 forecast — seed cho Phase 4 Twin. Methodology: 3-month average + recurring + scheduled income.
 
 ## Success Definition
-- ✅ User hỏi "tháng tới tiết kiệm bao nhiêu?" → forecast shown với confidence
-- ✅ Runway analyzer warns nếu liquid assets <3 tháng expenses
-- ✅ Phase 3.7 agent có `forecast_cashflow` tool mới
+- ✅ "Tháng tới tiết kiệm bao nhiêu?" → forecast + confidence
+- ✅ Runway warnings cho liquid assets <3 tháng
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer
-- [ ] [Story] P3.8-S12: ForecastCashflow tool integration
+- [ ] #219 [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer
+- [ ] #220 [Story] P3.8-S12: ForecastCashflow tool + agent integration
 
 ## Dependencies
-✅ Epic 2 (income data) + Epic 3 (recurring data) complete
-
-## Reference
-`docs/current/phase-3.8/phase-3.8-detailed.md` § 2.1
+✅ Epic 2 (#205) + Epic 3 (#206) complete
