@@ -48,15 +48,27 @@ async def sync_goal_to_notion(goal) -> None:
 
     try:
         client = _get_client()
+        # Phase 3.8 Epic 5 renames: goal_name→name, deadline→target_date,
+        # is_active→status (string), priority str→int. Notion expects
+        # the Priority property to be a select; we map int → low/med/high
+        # at sync-time so the existing Notion DB schema doesn't need a
+        # rebuild on every future priority change.
+        priority_label = (
+            "high" if goal.priority <= 3
+            else "low" if goal.priority >= 8
+            else "medium"
+        )
         properties = {
-            "Goal": {"title": [{"text": {"content": goal.goal_name}}]},
+            "Goal": {"title": [{"text": {"content": goal.name}}]},
             "Target": {"number": float(goal.target_amount)},
             "Current": {"number": float(goal.current_amount)},
-            "Priority": {"select": {"name": goal.priority}},
-            "Active": {"checkbox": goal.is_active},
+            "Priority": {"select": {"name": priority_label}},
+            "Active": {"checkbox": goal.status == "active"},
         }
-        if goal.deadline:
-            properties["Deadline"] = {"date": {"start": goal.deadline.isoformat()}}
+        if goal.target_date:
+            properties["Deadline"] = {
+                "date": {"start": goal.target_date.isoformat()}
+            }
 
         client.pages.create(
             parent={"database_id": settings.notion_goals_db_id},

@@ -11,6 +11,7 @@ from backend.agent.tools.compare_periods import ComparePeriodsTool
 from backend.agent.tools.compute_metric import ComputeMetricTool
 from backend.agent.tools.forecast_cashflow import ForecastCashflowTool
 from backend.agent.tools.get_assets import GetAssetsTool
+from backend.agent.tools.get_goals import GetGoalsTool
 from backend.agent.tools.get_income import GetIncomeTool
 from backend.agent.tools.get_market_data import GetMarketDataTool
 from backend.agent.tools.get_transactions import GetTransactionsTool
@@ -20,11 +21,11 @@ def build_default_registry() -> ToolRegistry:
     """Wire up the agent tools into a fresh registry.
 
     Phase 3.7 shipped 5 tools (assets, transactions, compute_metric,
-    compare_periods, market_data). Phase 3.8 Epic 2 adds
-    ``get_income``; Epic 4 adds ``forecast_cashflow`` so the agent
-    can answer future-tense queries ("tháng tới tiết kiệm bao
-    nhiêu?", "bao giờ tôi âm tài khoản?") without bouncing through
-    the legacy intent path.
+    compare_periods, market_data). Phase 3.8 Epic 2 added
+    ``get_income``; Epic 4 added ``forecast_cashflow``; Epic 5 adds
+    ``get_goals`` so the agent can answer "mục tiêu của tôi" /
+    "cần bao lâu để mua xe?" without bouncing through the legacy
+    intent path.
     """
     registry = ToolRegistry()
     registry.register(GetAssetsTool())
@@ -34,6 +35,7 @@ def build_default_registry() -> ToolRegistry:
     registry.register(GetMarketDataTool())
     registry.register(GetIncomeTool())
     registry.register(ForecastCashflowTool())
+    registry.register(GetGoalsTool())
     return registry
 
 
@@ -47,5 +49,6 @@ __all__ = [
     "GetMarketDataTool",
     "GetIncomeTool",
     "ForecastCashflowTool",
+    "GetGoalsTool",
     "build_default_registry",
 ]

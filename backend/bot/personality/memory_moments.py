@@ -196,16 +196,23 @@ async def _context_reach_goal(
     db: AsyncSession, user_id: uuid.UUID, today: date
 ) -> dict | None:
     """Pick the nearest-deadline active goal. No goal → no message
-    (returning None signals caller to skip)."""
+    (returning None signals caller to skip).
+
+    Phase 3.8 Epic 5: ``is_active`` → ``status='active'``,
+    ``deadline`` → ``target_date``, ``goal_name`` → ``name``. The
+    template-output dict still uses ``goal_name`` as the key because
+    YAML message templates reference ``{goal_name}`` — renaming the
+    key would silently break those.
+    """
     stmt = (
         select(Goal)
         .where(
             Goal.user_id == user_id,
-            Goal.is_active.is_(True),
+            Goal.status == "active",
             Goal.deleted_at.is_(None),
         )
         .order_by(
-            Goal.deadline.asc().nulls_last(),
+            Goal.target_date.asc().nulls_last(),
             Goal.created_at.desc(),
         )
         .limit(1)
@@ -222,7 +229,7 @@ async def _context_reach_goal(
         pct = min(100.0, (current / target) * 100.0)
 
     return {
-        "goal_name": goal.goal_name,
+        "goal_name": goal.name,
         "remaining": format_money_full(remaining),
         "progress_pct": f"{int(round(pct))}",
     }

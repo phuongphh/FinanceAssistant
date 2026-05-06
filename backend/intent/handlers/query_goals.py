@@ -26,7 +26,7 @@ def _format_goal_line(goal: Goal) -> str:
     pct = float(current / target * 100) if target > 0 else 0.0
     bar = _progress_bar(pct)
     return (
-        f"🎯 *{goal.goal_name}*\n"
+        f"🎯 *{goal.name}*\n"
         f"   {bar} {pct:.0f}%\n"
         f"   {format_money_short(current)} / {format_money_short(target)}"
     )
@@ -80,10 +80,10 @@ class QueryGoalProgressHandler(IntentHandler):
     def _best_match(self, goals: list[Goal], needle: str) -> Goal | None:
         n = needle.lower()
         for g in goals:
-            if g.goal_name.lower() == n:
+            if g.name.lower() == n:
                 return g
         for g in goals:
-            if n in g.goal_name.lower() or g.goal_name.lower() in n:
+            if n in g.name.lower() or g.name.lower() in n:
                 return g
         return None
 
@@ -95,7 +95,7 @@ class QueryGoalProgressHandler(IntentHandler):
         bar = _progress_bar(pct, width=12)
 
         lines = [
-            f"🎯 *{goal.goal_name}*",
+            f"🎯 *{goal.name}*",
             f"{bar} {pct:.0f}%",
             "",
             f"Đã có: *{format_money_full(current)}*",
@@ -103,8 +103,9 @@ class QueryGoalProgressHandler(IntentHandler):
         ]
         if remaining > 0:
             lines.append(f"Còn lại: *{format_money_short(remaining)}*")
-            if goal.deadline:
-                lines.append(f"Hạn: {goal.deadline.strftime('%d/%m/%Y')}")
+            # Phase 3.8 Epic 5: ``deadline`` → ``target_date``.
+            if goal.target_date:
+                lines.append(f"Hạn: {goal.target_date.strftime('%d/%m/%Y')}")
         else:
             lines.append("✅ Hoàn thành rồi! Chúc mừng 🎉")
         return "\n".join(lines)

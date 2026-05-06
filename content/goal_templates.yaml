@@ -1,0 +1,69 @@
+# Phase 3.8 Epic 5 — Goal templates
+#
+# 7 presets covering most user goals. Conventions:
+# - YAML keys are stable identifiers stored in DB (Goal.template_id);
+#   never rename. New types = new keys.
+# - ``typical_amount_range`` — [min, max] in VND. Used by the wizard
+#   to pre-fill an example range in the prompt; not a hard cap.
+# - ``typical_timeline_months`` — [min, max] used the same way.
+# - ``description`` — optional 1-line user-facing tagline.
+#
+# Adding an 8th template = YAML edit only (no migration).
+
+templates:
+  - id: buy_car
+    name: "Mua xe"
+    category: vehicle
+    icon: "🚗"
+    typical_amount_range: [200000000, 1500000000]   # 200tr - 1.5 tỷ
+    typical_timeline_months: [12, 60]
+    suggested_questions:
+      - "Loại xe nào? (sedan / SUV / xe máy)"
+      - "Mua mới hay cũ?"
+
+  - id: buy_house
+    name: "Mua nhà"
+    category: housing
+    icon: "🏠"
+    typical_amount_range: [1500000000, 10000000000]  # 1.5 tỷ - 10 tỷ
+    typical_timeline_months: [36, 120]
+    suggested_questions:
+      - "Khu vực nào?"
+      - "Trả 1 lần hay vay ngân hàng?"
+
+  - id: travel
+    name: "Du lịch"
+    category: travel
+    icon: "✈️"
+    typical_amount_range: [10000000, 200000000]
+    typical_timeline_months: [3, 24]
+
+  - id: retirement
+    name: "Hưu trí"
+    category: retirement
+    icon: "🌅"
+    typical_amount_range: [3000000000, 20000000000]
+    typical_timeline_months: [120, 360]            # 10-30 năm
+    description: "25× chi tiêu hàng năm của bạn (theo quy tắc 4%)."
+
+  - id: education
+    name: "Học vấn"
+    category: education
+    icon: "🎓"
+    typical_amount_range: [50000000, 1000000000]
+    typical_timeline_months: [12, 60]
+
+  - id: wedding
+    name: "Đám cưới"
+    category: life_event
+    icon: "💒"
+    typical_amount_range: [200000000, 1000000000]
+    typical_timeline_months: [6, 24]
+
+  - id: emergency_fund
+    name: "Quỹ khẩn cấp"
+    category: safety
+    icon: "🛡️"
+    typical_amount_range: [50000000, 500000000]
+    typical_timeline_months: [6, 24]
+    description: "6 tháng chi tiêu cố định — backstop cho mất việc / ốm đau."

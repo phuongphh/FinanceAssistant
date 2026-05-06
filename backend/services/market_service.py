@@ -250,9 +250,13 @@ async def generate_investment_advice(
     )
     total_expense = (await db.execute(expense_stmt)).scalar() or 0
 
-    # Active goals
+    # Active goals — Phase 3.8 Epic 5 promoted is_active → status enum.
     goals = (await db.execute(
-        select(Goal).where(Goal.user_id == user_id, Goal.is_active.is_(True), Goal.deleted_at.is_(None))
+        select(Goal).where(
+            Goal.user_id == user_id,
+            Goal.status == "active",
+            Goal.deleted_at.is_(None),
+        )
     )).scalars().all()
 
     monthly_income = float(user.monthly_income) if user.monthly_income else 0
@@ -309,7 +313,7 @@ Hồ sơ tài chính:
 {breakdown_str}
   • Income streams: {income_str}
   • Chi tiêu tháng này: {float(total_expense):,.0f} VND
-  • Mục tiêu: {', '.join(f'{g.goal_name} ({float(g.current_amount):,.0f}/{float(g.target_amount):,.0f})' for g in goals) if goals else 'Chưa có'}"""
+  • Mục tiêu: {', '.join(f'{g.name} ({float(g.current_amount):,.0f}/{float(g.target_amount):,.0f})' for g in goals) if goals else 'Chưa có'}"""
 
     prompt = f"""Bạn là Trợ lý Tài sản advisor. Dựa trên context dưới đây, đưa ra gợi ý đầu tư cho user tại Việt Nam.
 
@@ -348,7 +352,14 @@ Viết ngắn gọn (max 200 từ), dùng emoji phù hợp."""
                 k: float(v) for k, v in breakdown.by_type.items()
             },
             "income_streams_total_monthly": float(income_total),
-            "goals": [{"name": g.goal_name, "current": float(g.current_amount), "target": float(g.target_amount)} for g in goals],
+            "goals": [
+                {
+                    "name": g.name,
+                    "current": float(g.current_amount),
+                    "target": float(g.target_amount),
+                }
+                for g in goals
+            ],
         },
         recommendation=advice,
     )

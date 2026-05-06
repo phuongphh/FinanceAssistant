@@ -350,8 +350,10 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     ("cashflow", "compare"): (IntentType.QUERY_CASHFLOW, {"compare_months": 6}),
     ("cashflow", "saving_rate"): (IntentType.QUERY_CASHFLOW, {"focus": "saving_rate"}),
     # Mục tiêu
-    ("goals", "list"): (IntentType.QUERY_GOALS, {}),
-    ("goals", "update"): (IntentType.QUERY_GOAL_PROGRESS, {}),
+    # Phase 3.8 Epic 5 — ``goals:list`` and ``goals:update`` are now
+    # direct handlers (see _DIRECT_HANDLERS). Removed from the
+    # intent map so the dispatch order matches: direct handler
+    # first, intent map second, advisory third, coming-soon last.
     # Thị trường
     ("market", "vnindex"): (IntentType.QUERY_MARKET, {"ticker": "VNINDEX"}),
     ("market", "stocks"): (IntentType.QUERY_PORTFOLIO, {"asset_type": "stock"}),
@@ -584,21 +586,32 @@ async def _action_expenses_ocr(
 async def _action_goals_add(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Add-goal wizard isn't built yet (Phase 4 scope) — guide the
-    user to the free-form path that already works via Phase 3.5.
-    """
-    await send_message(
-        chat_id=chat_id,
-        text=(
-            "🎯 *Thêm mục tiêu mới*\n\n"
-            "Mô tả mục tiêu cho mình, ví dụ:\n"
-            "• _\"muốn tiết kiệm 50tr trong 6 tháng để mua xe\"_\n"
-            "• _\"để dành 200tr cho con đi học năm 2028\"_\n\n"
-            "Mình hiểu được khá tốt — cứ kể tự nhiên nhé."
-        ),
-        parse_mode="Markdown",
-        reply_markup=back_to_main_keyboard(),
-    )
+    """Phase 3.8 Epic 5 — start the template-driven goal wizard."""
+    from backend.bot.handlers.goal_entry import start_goals_wizard
+
+    await start_goals_wizard(db, chat_id, user)
+
+
+async def _action_goals_list(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 3.8 Epic 5 — list active goals with progress + per-row
+    action keyboards. Replaces the previous QUERY_GOALS intent
+    dispatch which produced a read-only summary."""
+    from backend.bot.handlers.goal_entry import show_goals_list
+
+    await show_goals_list(db, chat_id, user)
+
+
+async def _action_goals_update(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 3.8 Epic 5 — same surface as ``goals:list``; user picks
+    a row from the list, the per-row "Cập nhật tiến độ" button
+    opens the actual edit-progress wizard."""
+    from backend.bot.handlers.goal_entry import show_goals_list
+
+    await show_goals_list(db, chat_id, user)
 
 
 _DIRECT_HANDLERS = {
@@ -609,7 +622,13 @@ _DIRECT_HANDLERS = {
     ("expenses", "ocr"): _action_expenses_ocr,
     ("expenses", "recurring"): _action_expenses_recurring,
     ("cashflow", "income"): _action_cashflow_income,
+    # Phase 3.8 Epic 5 — full CRUD via direct handlers (Phase 3A had
+    # stub intents). ``advisor`` still routes via the synthesised
+    # ADVISORY intent so the LLM gets to use the new ``get_goals``
+    # tool + the projection service for free-form follow-ups.
     ("goals", "add"): _action_goals_add,
+    ("goals", "list"): _action_goals_list,
+    ("goals", "update"): _action_goals_update,
 }
 
 
