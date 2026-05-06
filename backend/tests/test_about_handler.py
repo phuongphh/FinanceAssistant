@@ -23,6 +23,13 @@ async def test_cmd_about_sends_versioned_about_page():
         reply_markup=about_handler.ABOUT_KEYBOARD,
     )
     assert APP_VERSION in about_handler.ABOUT_TEXT
+    assert "💎 *Bé Tiền*" in about_handler.ABOUT_TEXT
+    assert "Personal CFO" not in about_handler.ABOUT_TEXT
+    assert (
+        "Trợ lý quản lý Tài sản cá nhân đầu tiên dành cho người Việt"
+        in about_handler.ABOUT_TEXT
+    )
+    assert "Trợ lý CFO cá nhân" not in about_handler.ABOUT_TEXT
     assert "© 2026 Nui Truc AI. All rights reserved." in about_handler.ABOUT_TEXT
     assert about_handler.ABOUT_SUPPORT_EMAIL in about_handler.ABOUT_TEXT
 
