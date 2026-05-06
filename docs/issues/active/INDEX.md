@@ -16,9 +16,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #207 | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [issue-207.md](issue-207.md) |
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 | #219 | [Story] P3.8-S11: CashflowForecaster + RunwayAnalyzer | [issue-219.md](issue-219.md) |
-| #220 | [Story] P3.8-S12: ForecastCashflow tool + agent integration | [issue-220.md](issue-220.md) |
 | #221 | [Story] P3.8-S13: Goal model + 7 templates YAML | [issue-221.md](issue-221.md) |
 | #222 | [Story] P3.8-S14: GoalProjectionService + feasibility analysis | [issue-222.md](issue-222.md) |
 | #223 | [Story] P3.8-S15: Goal wizard + full CRUD via Telegram | [issue-223.md](issue-223.md) |
 
-**Total active:** 16
+**Total active:** 15
