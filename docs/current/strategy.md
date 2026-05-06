@@ -1,7 +1,7 @@
 # Personal CFO Assistant — Product Strategy V2
 
 > **Đây là phiên bản thứ 2 của strategy, reflects quyết định lớn về positioning: chuyển từ "finance assistant" sang "Personal CFO cho người Việt".**
-
+> **⚠️ ARCHIVED (May 2026):** Document này đã được superseded bởi [strategy.md](../current/strategy.md) (V3). Lý do pivot tại [MIGRATION_NOTES_V2_V3.md](./MIGRATION_NOTES_V2_V3.md). Không update nữa.
 ---
 
 ## 🎯 Vision Statement
