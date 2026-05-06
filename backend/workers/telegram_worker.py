@@ -420,6 +420,10 @@ async def _handle_callback(
     if await asset_entry_handlers.handle_asset_callback(db, callback_query):
         return await _resolved_user_id()
 
+    # Phase 3.8 — mark-existing-as-rental callbacks (asset_rental:*).
+    if await asset_entry_handlers.handle_asset_rental_callback(db, callback_query):
+        return await _resolved_user_id()
+
     # Morning-briefing button taps (briefing:*). Handled before the
     # transaction router because the briefing keyboard sits on its own
     # message thread and never overlaps with transaction prefixes.

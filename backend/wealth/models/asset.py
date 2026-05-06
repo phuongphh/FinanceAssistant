@@ -52,6 +52,25 @@ class Asset(Base):
     sold_at: Mapped[date | None] = mapped_column(Date)
     sold_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
 
+    # Phase 3.8 Epic 1 — rental property tracking (Case A: landlord).
+    # Only meaningful when ``asset_type == "real_estate"``; defaulting
+    # ``is_rental`` to False on every other type costs nothing and
+    # avoids a pile of nullable checks downstream.
+    is_rental: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Schema validated by ``backend.wealth.schemas.rental.RentalMetadata``;
+    # the column itself stays permissive so adding fields later doesn't
+    # need a migration. Shape:
+    #   {
+    #     "monthly_rent": 15000000,
+    #     "occupancy_status": "rented" | "vacant" | "self_use",
+    #     "tenant_name": "Anh Tuan" | null,
+    #     "lease_start_date": "YYYY-MM-DD" | null,
+    #     "lease_end_date":   "YYYY-MM-DD" | null,
+    #     "monthly_expenses": 1500000,
+    #     "deposit_held":    30000000,
+    #   }
+    rental_metadata: Mapped[dict | None] = mapped_column(JSONB)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

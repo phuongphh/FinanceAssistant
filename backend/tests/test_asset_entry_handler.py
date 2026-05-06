@@ -542,7 +542,13 @@ async def test_real_estate_initial_value_accepts_ty():
 
 
 @pytest.mark.asyncio
-async def test_real_estate_current_value_creates_asset():
+async def test_real_estate_current_value_advances_to_rental_ask():
+    """Phase 3.8 changed real-estate flow: current_value step no
+    longer creates the asset directly. It stashes both values into
+    the draft and prompts the rental Y/N keyboard. Asset creation
+    happens later in either ``_save_real_estate_no_rental`` (No
+    branch) or ``_commit_rental`` (Yes branch).
+    """
     user = _user({
         "flow": asset_entry.FLOW_REAL_ESTATE,
         "step": "current_value",
@@ -555,11 +561,56 @@ async def test_real_estate_current_value_creates_asset():
         },
     })
     db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock()) as create_mock, \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as advance, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "2.5 tỷ", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    # No asset should have been created yet — wizard pivots to ask.
+    create_mock.assert_not_awaited()
+    advance.assert_awaited_once()
+    advance_kwargs = advance.await_args.kwargs
+    assert advance_kwargs["step"] == "rental_ask"
+    assert advance_kwargs["draft_patch"]["initial_value"] == float(Decimal("2_000_000_000"))
+    assert advance_kwargs["draft_patch"]["current_value"] == float(Decimal("2_500_000_000"))
+    # Confirmation message should mention rental Y/N.
+    send.assert_called()
+    sent_text = send.call_args.kwargs["text"]
+    assert "BĐS cho thuê" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_real_estate_rental_ask_no_creates_asset_no_rental():
+    """User taps 'No' on the rental prompt → asset created without
+    rental_metadata, and ``rental_service.mark_as_rental`` is NOT
+    called.
+    """
+    user = _user({
+        "flow": asset_entry.FLOW_REAL_ESTATE,
+        "step": "rental_ask",
+        "draft": {
+            "asset_type": "real_estate",
+            "subtype": "house_primary",
+            "name": "Nhà Mỹ Đình",
+            "initial_value": float(Decimal("2_000_000_000")),
+            "current_value": float(Decimal("2_500_000_000")),
+            "extra": {},
+        },
+    })
+    db = _db(user)
     created = _asset(asset_type="real_estate", value=2_500_000_000)
     with patch.object(asset_entry, "get_user_by_telegram_id",
                       AsyncMock(return_value=user)), \
          patch.object(asset_entry.asset_service, "create_asset",
                       AsyncMock(return_value=created)) as create_mock, \
+         patch.object(asset_entry.rental_service, "mark_as_rental",
+                      AsyncMock()) as mark_mock, \
          patch.object(asset_entry.net_worth_calculator, "calculate",
                       AsyncMock(return_value=MagicMock(
                           total=Decimal("2_500_000_000"), asset_count=1,
@@ -567,15 +618,246 @@ async def test_real_estate_current_value_creates_asset():
          patch.object(asset_entry, "update_user_level",
                       AsyncMock(return_value=None)), \
          patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:rental_ask:no",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    create_mock.assert_awaited_once()
+    mark_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_real_estate_rental_full_flow_marks_with_metadata():
+    """Yes → rent → expenses → status:rented → done.
+
+    Asserts the final ``_commit_rental`` call goes through and
+    ``mark_as_rental`` receives a validated metadata bundle with
+    rent=15tr, expenses=1.5tr, status=rented.
+    """
+    # We test the final step (rental_extra:done) which collapses all
+    # the previously-collected draft into a save action.
+    user = _user({
+        "flow": asset_entry.FLOW_REAL_ESTATE,
+        "step": "rental_extra",
+        "draft": {
+            "asset_type": "real_estate",
+            "subtype": "house_primary",
+            "name": "Nhà Mỹ Đình",
+            "initial_value": float(Decimal("2_500_000_000")),
+            "current_value": float(Decimal("2_500_000_000")),
+            "extra": {},
+            "rental": {
+                "monthly_rent": float(Decimal("15000000")),
+                "monthly_expenses": float(Decimal("1500000")),
+                "occupancy_status": "rented",
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="real_estate", value=2_500_000_000)
+    marked = _asset(asset_type="real_estate", value=2_500_000_000)
+    marked.is_rental = True
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)), \
+         patch.object(asset_entry.rental_service, "mark_as_rental",
+                      AsyncMock(return_value=marked)) as mark_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("2_500_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:rental_extra:done",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    mark_mock.assert_awaited_once()
+    metadata_arg = mark_mock.await_args.args[3]
+    assert metadata_arg.monthly_rent == Decimal("15000000")
+    assert metadata_arg.monthly_expenses == Decimal("1500000")
+    assert metadata_arg.occupancy_status == "rented"
+
+
+@pytest.mark.asyncio
+async def test_real_estate_rental_status_vacant_skips_extras():
+    """Status=vacant → no tenant/lease prompts, save immediately."""
+    user = _user({
+        "flow": asset_entry.FLOW_REAL_ESTATE,
+        "step": "rental_status",
+        "draft": {
+            "asset_type": "real_estate",
+            "subtype": "house_primary",
+            "name": "Nhà Trống",
+            "initial_value": float(Decimal("3_000_000_000")),
+            "current_value": float(Decimal("3_000_000_000")),
+            "extra": {},
+            "rental": {
+                "monthly_rent": float(Decimal("20000000")),
+                "monthly_expenses": float(Decimal("2000000")),
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="real_estate", value=3_000_000_000)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)), \
+         patch.object(asset_entry.rental_service, "mark_as_rental",
+                      AsyncMock(return_value=created)) as mark_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("3_000_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "wizard_service", asset_entry.wizard_service), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:rental_status:vacant",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    mark_mock.assert_awaited_once()
+    metadata_arg = mark_mock.await_args.args[3]
+    assert metadata_arg.occupancy_status == "vacant"
+
+
+@pytest.mark.asyncio
+async def test_rental_rent_input_negative_rejected():
+    """Negative rent is rejected with a friendly nudge; wizard stays
+    at the rental_rent step (no advance, no save)."""
+    user = _user({
+        "flow": asset_entry.FLOW_REAL_ESTATE,
+        "step": "rental_rent",
+        "draft": {"rental": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as advance, \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "-15tr", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    advance.assert_not_awaited()
+    send.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_rental_expenses_zero_keyword_accepted():
+    """User types '0' for expenses → wizard advances to status step
+    with monthly_expenses=0."""
+    user = _user({
+        "flow": asset_entry.FLOW_REAL_ESTATE,
+        "step": "rental_expenses",
+        "draft": {"rental": {"monthly_rent": float(Decimal("15000000"))}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as advance, \
          patch.object(asset_entry, "send_message", AsyncMock()):
         await asset_entry.handle_asset_text_input(
             db,
-            {"text": "2.5 tỷ", "chat": {"id": 100}, "from": {"id": 100}},
+            {"text": "0", "chat": {"id": 100}, "from": {"id": 100}},
         )
-    create_mock.assert_awaited_once()
-    kwargs = create_mock.await_args.kwargs
-    assert kwargs["initial_value"] == Decimal("2_000_000_000")
-    assert kwargs["current_value"] == Decimal("2_500_000_000")
+    advance.assert_awaited_once()
+    kwargs = advance.await_args.kwargs
+    assert kwargs["step"] == "rental_status"
+    assert kwargs["draft_patch"]["rental"]["monthly_expenses"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_mark_rental_pick_starts_subwizard():
+    """Picking an existing real-estate asset from the menu starts
+    FLOW_MARK_RENTAL at the rental_rent step with mode=mark_existing.
+    """
+    user = _user()
+    db = _db(user)
+    re_asset = _asset(asset_type="real_estate", value=2_500_000_000)
+    re_asset.is_rental = False
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "get_asset_by_id",
+                      AsyncMock(return_value=re_asset)), \
+         patch.object(asset_entry.wizard_service, "start_flow",
+                      AsyncMock()) as start_flow, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        consumed = await asset_entry.handle_asset_rental_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": f"asset_rental:pick:{re_asset.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    assert consumed is True
+    start_flow.assert_awaited_once()
+    args, kwargs = start_flow.await_args.args, start_flow.await_args.kwargs
+    # Handler calls start_flow(db, user_id, FLOW, step=..., draft=...).
+    assert args[2] == asset_entry.FLOW_MARK_RENTAL
+    assert kwargs["step"] == "rental_rent"
+    assert kwargs["draft"]["mode"] == "mark_existing"
+    assert kwargs["draft"]["target_asset_id"] == str(re_asset.id)
+
+
+@pytest.mark.asyncio
+async def test_mark_rental_pick_already_rental_rejected():
+    """Picking an asset that's already a rental shows a friendly
+    "already marked" message and does NOT start a wizard.
+    """
+    user = _user()
+    db = _db(user)
+    re_asset = _asset(asset_type="real_estate", value=2_500_000_000)
+    re_asset.is_rental = True
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "get_asset_by_id",
+                      AsyncMock(return_value=re_asset)), \
+         patch.object(asset_entry.wizard_service, "start_flow",
+                      AsyncMock()) as start_flow, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.handle_asset_rental_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": f"asset_rental:pick:{re_asset.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    start_flow.assert_not_awaited()
+    send.assert_called()
 
 
 # -----------------------------------------------------------------

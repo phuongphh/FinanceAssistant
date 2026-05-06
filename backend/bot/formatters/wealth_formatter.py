@@ -84,6 +84,45 @@ def format_asset_list(assets: list[Asset]) -> str:
     return "\n".join(lines)
 
 
+def format_rental_marked(
+    asset: Asset,
+    monthly_rent: Decimal,
+    monthly_expenses: Decimal,
+    annual_yield_pct: float,
+    occupancy_status: str,
+) -> str:
+    """Confirmation after a real-estate asset is marked as rental.
+
+    Echoes back the four numbers the user just typed so they can spot
+    a typo immediately ("oh I meant 1.5tr expenses, not 15tr"), and
+    surfaces the auto-created income stream so they aren't surprised
+    when "thu nhập" later includes a rental row they didn't add by
+    hand.
+    """
+    net_monthly = monthly_rent - monthly_expenses
+    status_label = {
+        "rented": "🏠 Đang cho thuê",
+        "vacant": "🚪 Đang trống",
+        "self_use": "🏡 Tự dùng",
+    }.get(occupancy_status, occupancy_status)
+    lines = [
+        f"✅ Đã đánh dấu BĐS cho thuê: <b>{asset.name}</b>",
+        f"   • Thuê: <b>{format_money_short(monthly_rent)}</b>/tháng",
+    ]
+    if monthly_expenses > 0:
+        lines.append(f"   • Chi phí: {format_money_short(monthly_expenses)}/tháng")
+    lines.append(
+        f"   • Net yield: <b>{format_money_short(net_monthly)}</b>/tháng"
+        f" (~{annual_yield_pct:.1f}%/năm)"
+    )
+    lines.append(f"   • Trạng thái: {status_label}")
+    lines.append("")
+    lines.append(
+        "🔁 Mình tự động tạo nguồn thu nhập <b>'Thuê BĐS'</b> để theo dõi nhé."
+    )
+    return "\n".join(lines)
+
+
 def format_breakdown_lines(by_type: dict[str, Decimal]) -> str:
     """One line per asset type — icon, label, value, percentage."""
     if not by_type:

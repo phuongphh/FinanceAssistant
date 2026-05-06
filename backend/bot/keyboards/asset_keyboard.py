@@ -12,6 +12,12 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:done                        — finish wizard
     asset_add:cancel                      — abort wizard
     asset_add:undo:<asset_uuid>           — undo last save (hard delete)
+    asset_add:rental_ask:<yes|no>         — Phase 3.8: BĐS cho thuê?
+    asset_add:rental_status:<rented|vacant>  — current occupancy
+    asset_add:rental_extra:<skip|add>     — collect tenant info or skip
+
+    asset_rental:pick:<asset_uuid>        — Phase 3.8: pick existing RE asset
+    asset_rental:cancel                   — abort mark-as-rental flow
 
 Total callback bytes stay well under Telegram's 64-byte cap
 (``asset_add:undo:`` + 36-char UUID = 51 bytes).
@@ -26,6 +32,9 @@ from backend.wealth.asset_types import AssetType, get_subtypes
 InlineKeyboardMarkup = dict
 
 CB_ASSET_ADD = "asset_add"
+# Separate prefix for the "mark existing real-estate as rental" flow
+# so the dispatcher can route by prefix without inspecting the action.
+CB_ASSET_RENTAL = "asset_rental"
 
 
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
@@ -148,6 +157,97 @@ def stock_current_price_keyboard() -> InlineKeyboardMarkup:
             [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
         ]
     }
+
+
+# ---------------------------------------------------------------------
+# Phase 3.8 Epic 1 — rental sub-wizard keyboards
+# ---------------------------------------------------------------------
+
+
+def rental_ask_keyboard() -> InlineKeyboardMarkup:
+    """Yes/No prompt asked at the end of the real-estate wizard.
+
+    Yes path → enter the rental sub-wizard (rent → expenses → status
+    → optional tenant extras). No path → save the asset as-is.
+    """
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "✅ Có",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_ask", "yes"),
+            }],
+            [{
+                "text": "❌ Không",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_ask", "no"),
+            }],
+            [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        ]
+    }
+
+
+def rental_status_keyboard() -> InlineKeyboardMarkup:
+    """Current occupancy status — only ``rented`` flips income on."""
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "🏠 Đang cho thuê",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_status", "rented"),
+            }],
+            [{
+                "text": "🚪 Đang trống",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_status", "vacant"),
+            }],
+            [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        ]
+    }
+
+
+def rental_extra_keyboard() -> InlineKeyboardMarkup:
+    """After status=rented, offer to collect tenant name / lease dates."""
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "⏭️ Bỏ qua",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_extra", "skip"),
+            }],
+            [{
+                "text": "👤 Thêm tên người thuê",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_extra", "tenant"),
+            }],
+            [{
+                "text": "📅 Thêm ngày thuê",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_extra", "lease"),
+            }],
+            [{
+                "text": "✅ Hoàn tất",
+                "callback_data": build_callback(CB_ASSET_ADD, "rental_extra", "done"),
+            }],
+            [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        ]
+    }
+
+
+def rental_pick_existing_keyboard(
+    candidates: list[tuple[uuid.UUID | str, str]],
+) -> InlineKeyboardMarkup:
+    """Layout one button per non-rental real-estate asset.
+
+    ``candidates`` = ``[(asset_id, label), ...]``. Empty list → caller
+    sends an "empty state" message rather than rendering a useless
+    keyboard.
+    """
+    rows = [
+        [{
+            "text": label[:60],  # Telegram caps button labels at 64 bytes
+            "callback_data": build_callback(CB_ASSET_RENTAL, "pick", str(asset_id)),
+        }]
+        for asset_id, label in candidates
+    ]
+    rows.append([{
+        "text": "❌ Hủy",
+        "callback_data": build_callback(CB_ASSET_RENTAL, "cancel"),
+    }])
+    return {"inline_keyboard": rows}
 
 
 def add_more_keyboard(undo_asset_id: uuid.UUID | str | None = None) -> InlineKeyboardMarkup:
