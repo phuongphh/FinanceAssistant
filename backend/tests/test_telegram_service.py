@@ -62,6 +62,63 @@ class TestSendTelegram:
         result = await send_telegram("sendMessage", {"chat_id": 123})
         assert result is None
 
+    @pytest.mark.asyncio
+    async def test_retries_without_parse_mode_on_parse_entities_error(
+        self, mock_settings, mock_httpx
+    ):
+        """When Telegram rejects bad markdown, retry as plain text so the
+        user still sees the message instead of a silent "no response"."""
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: can\'t parse entities: '
+            'Can\'t find end of the entity starting at byte offset 1217"}'
+        )
+        good_response = MagicMock()
+        good_response.status_code = 200
+        good_response.json.return_value = {"ok": True, "result": {"message_id": 1}}
+        good_response.text = '{"ok": true}'
+        mock_httpx.post.side_effect = [bad_response, good_response]
+
+        result = await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": "hi *unbalanced", "parse_mode": "Markdown"},
+        )
+
+        assert result == {"ok": True, "result": {"message_id": 1}}
+        assert mock_httpx.post.call_count == 2
+        # Retry payload must NOT carry parse_mode anymore.
+        retry_payload = mock_httpx.post.call_args_list[1][1]["json"]
+        assert "parse_mode" not in retry_payload
+        assert retry_payload["text"] == "hi *unbalanced"
+        assert retry_payload["chat_id"] == 123
+
+    @pytest.mark.asyncio
+    async def test_no_retry_when_400_is_not_parse_entities(
+        self, mock_settings, mock_httpx
+    ):
+        """Other 400s (chat not found, etc.) must not trigger a retry."""
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}'
+        )
+        mock_httpx.post.side_effect = None
+        mock_httpx.post.return_value = bad_response
+
+        result = await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": "hi", "parse_mode": "Markdown"},
+        )
+
+        assert result is None
+        assert mock_httpx.post.call_count == 1
+
 
 class TestSendMessage:
     @pytest.mark.asyncio
