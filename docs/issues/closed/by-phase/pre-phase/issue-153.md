@@ -67,7 +67,7 @@ Với user HNW (tài sản >1 tỷ, trong case này >120 tỷ), phần insight s
 
 ## Acceptance Criteria
 
-- [ ] Phần insight sau báo cáo tháng phải nhận biết **wealth level** của user và adapt accordingly
+- [x] Phần insight sau báo cáo tháng phải nhận biết **wealth level** của user và adapt accordingly
 - [ ] Với user HNW (>1 tỷ tài sản): lời khuyên phải frame trong context tổng tài sản, không comment tuyệt đối ("20tr là rất lớn")
 - [ ] Logic tạo insight phải sync với **data thực tế của user**: tài sản hiện có, income streams đã khai báo, goals đang active
 - [ ] Không đưa ra lời khuyên dựa trên dữ liệu thiếu mà không acknowledge sự thiếu đó một cách CFO-appropriate
