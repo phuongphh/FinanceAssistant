@@ -72,7 +72,7 @@ Với user HNW (tài sản >1 tỷ, trong case này >120 tỷ), phần insight s
 - [x] Logic tạo insight phải sync với **data thực tế của user**: tài sản hiện có, income streams đã khai báo, goals đang active
 - [x] Không đưa ra lời khuyên dựa trên dữ liệu thiếu mà không acknowledge sự thiếu đó một cách CFO-appropriate
 - [x] Tone phải match wealth level: Starter = encouraging + educational, HNW = CFO advisor + strategic
-- [ ] Mục tiêu active (ví dụ: mua xe 50tr) phải được reference với context tài sản — với HNW, 50tr target là trivial và bot nên acknowledge điều đó
+- [x] Mục tiêu active (ví dụ: mua xe 50tr) phải được reference với context tài sản — với HNW, 50tr target là trivial và bot nên acknowledge điều đó
 
 ---
 
