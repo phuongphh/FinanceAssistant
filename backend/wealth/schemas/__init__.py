@@ -6,10 +6,22 @@ sub-package so import boundaries stay clean: a model can import from
 (would re-introduce the SQLAlchemy → pydantic cycle the v1 codebase
 suffered from).
 """
+from backend.wealth.schemas.income import (
+    IncomeBreakdown,
+    IncomeStreamCreate,
+    IncomeStreamUpdate,
+)
 from backend.wealth.schemas.rental import (
     OccupancyStatus,
     RentalMetadata,
     RentalYieldSummary,
 )
 
-__all__ = ["OccupancyStatus", "RentalMetadata", "RentalYieldSummary"]
+__all__ = [
+    "OccupancyStatus",
+    "RentalMetadata",
+    "RentalYieldSummary",
+    "IncomeBreakdown",
+    "IncomeStreamCreate",
+    "IncomeStreamUpdate",
+]

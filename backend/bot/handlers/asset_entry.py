@@ -1181,7 +1181,18 @@ async def _commit_rental(
         ),
         parse_mode="HTML",
     )
-    await _post_save(db, chat_id, user, asset)
+    # Diverge here: a freshly-created rental came through the asset
+    # wizard so ``_post_save`` (with its add_more_keyboard + undo
+    # button) is the right footer. A pre-existing asset getting
+    # marked must NOT expose the undo button — its callback
+    # (``asset_add:undo:<id>``) hard-deletes the asset, which would
+    # silently destroy a user's real-estate row that they only
+    # wanted to flag as rental. ``_post_mark_existing`` is the
+    # safe completion path.
+    if mode == "mark_existing":
+        await _post_mark_existing(db, chat_id, user, asset)
+    else:
+        await _post_save(db, chat_id, user, asset)
 
 
 # ---------- Mark-existing-as-rental flow (post-creation entry) -------
@@ -1257,6 +1268,44 @@ async def _handle_rental_pick(
 
 
 # ---------- Save / cleanup --------------------------------------------
+
+async def _post_mark_existing(
+    db: AsyncSession, chat_id: int, user: User, asset
+) -> None:
+    """Finalise the FLOW_MARK_RENTAL path.
+
+    Distinct from ``_post_save`` (the create-asset finaliser) to
+    avoid two specific footguns:
+
+    1. ``_post_save`` shows ``add_more_keyboard(undo_asset_id=...)``.
+       The undo callback hard-deletes the referenced asset. In the
+       mark-existing flow that's the user's pre-existing real-estate
+       row — tapping undo would silently destroy actual financial
+       state, not roll back a mis-entered draft. (Codex P1 flagged
+       this on PR #225.)
+
+    2. ``_post_save`` tracks an ``ASSET_ADDED`` analytics event and
+       formats the message as "Đã ghi <asset>". Neither is true here:
+       the asset already existed, only its rental_metadata changed.
+
+    We still clear wizard state, recompute net worth (rental status
+    can affect briefing logic via the income stream), and recompute
+    wealth level — those side effects are correct in both flows.
+    """
+    await wizard_service.clear(db, user.id)
+
+    breakdown = await net_worth_calculator.calculate(db, user.id)
+    await update_user_level(db, user.id, breakdown.total)
+    # Mark first-asset onboarding step done if this somehow IS their
+    # first interaction (rare — would mean they'd added a property
+    # without going through onboarding).
+    await _mark_onboarding_first_asset_done(db, user)
+
+    await send_message(
+        chat_id=chat_id,
+        text="✅ Xong! Gõ /menu để xem các tính năng khác.",
+    )
+
 
 async def _post_save(
     db: AsyncSession, chat_id: int, user: User, asset

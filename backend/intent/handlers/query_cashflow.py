@@ -112,7 +112,10 @@ async def _income_for_period(
     )
     streams = list((await db.execute(stmt)).scalars().all())
     if streams:
-        monthly = sum(Decimal(s.amount_monthly or 0) for s in streams)
+        # Phase 3.8 Epic 2: aggregate via ``monthly_equivalent`` so
+        # non-monthly streams (annual dividend, quarterly interest)
+        # don't get silently treated as monthly amounts.
+        monthly = sum((s.monthly_equivalent for s in streams), Decimal(0))
     elif user.monthly_income:
         monthly = Decimal(user.monthly_income)
     else:

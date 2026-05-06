@@ -35,13 +35,17 @@ class QueryIncomeHandler(IntentHandler):
     async def handle(
         self, intent: IntentResult, user: User, db: AsyncSession
     ) -> str:
+        # Phase 3.8 Epic 2: ``amount_monthly`` was renamed to
+        # ``amount`` and the schedule lives in ``schedule_type``.
+        # Sort by raw ``amount`` so the biggest single payment shows
+        # first (matches Phase 3A intent of "headline number on top").
         stmt = (
             select(IncomeStream)
             .where(
                 IncomeStream.user_id == user.id,
                 IncomeStream.is_active.is_(True),
             )
-            .order_by(IncomeStream.amount_monthly.desc())
+            .order_by(IncomeStream.amount.desc())
         )
         rows = list((await db.execute(stmt)).scalars().all())
 
@@ -68,7 +72,9 @@ class QueryIncomeHandler(IntentHandler):
         )
 
     def _format(self, streams: list[IncomeStream], user: User) -> str:
-        total = sum(Decimal(s.amount_monthly or 0) for s in streams)
+        # Phase 3.8 Epic 2: aggregate via ``monthly_equivalent`` so
+        # quarterly/annual streams contribute the right share.
+        total = sum((s.monthly_equivalent for s in streams), Decimal(0))
         name = user.display_name or "bạn"
 
         lines = [
@@ -77,11 +83,11 @@ class QueryIncomeHandler(IntentHandler):
             "",
         ]
         for s in streams:
-            icon = _SOURCE_ICONS.get(s.source_type, "💰")
-            label = _SOURCE_LABELS.get(s.source_type, s.source_type)
+            icon = _SOURCE_ICONS.get(s.stream_type, "💰")
+            label = _SOURCE_LABELS.get(s.stream_type, s.stream_type)
             lines.append(
                 f"{icon} *{label}* — {s.name}: "
-                f"{format_money_short(s.amount_monthly)}/tháng"
+                f"{format_money_short(s.monthly_equivalent)}/tháng"
             )
 
         return "\n".join(lines)

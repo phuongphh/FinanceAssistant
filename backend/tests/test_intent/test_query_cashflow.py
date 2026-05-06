@@ -34,7 +34,12 @@ def _fake_db_with_streams(streams: list) -> MagicMock:
 
 
 def _stream(amount_monthly: Decimal):
+    """Phase 3.8 Epic 2: handler aggregates via ``monthly_equivalent``.
+    Mock both the new property and the legacy field so tests stay
+    decoupled from which name the handler currently uses."""
     s = MagicMock()
+    s.monthly_equivalent = amount_monthly
+    s.amount = amount_monthly
     s.amount_monthly = amount_monthly
     s.is_active = True
     return s

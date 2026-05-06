@@ -343,9 +343,10 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # Chi tiêu
     ("expenses", "report"): (IntentType.QUERY_EXPENSES, {}),
     ("expenses", "by_category"): (IntentType.QUERY_EXPENSES_BY_CATEGORY, {}),
-    # Dòng tiền
+    # Dòng tiền — Phase 3.8 Epic 2 promoted ``income`` to a direct
+    # handler (CRUD list view); the rest still synthesise an intent
+    # so personality wrap + follow-up keyboards stay consistent.
     ("cashflow", "overview"): (IntentType.QUERY_CASHFLOW, {}),
-    ("cashflow", "income"): (IntentType.QUERY_INCOME, {}),
     ("cashflow", "compare"): (IntentType.QUERY_CASHFLOW, {"compare_months": 6}),
     ("cashflow", "saving_rate"): (IntentType.QUERY_CASHFLOW, {"focus": "saving_rate"}),
     # Mục tiêu
@@ -499,6 +500,19 @@ async def _action_assets_edit(
     await list_assets(db, chat_id, user)
 
 
+async def _action_cashflow_income(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 3.8 Epic 2 — render the income-streams list view with
+    edit/pause/delete buttons + "Add new" entry. Replaces the old
+    ``QUERY_INCOME`` intent dispatch (which returned a read-only
+    formatted summary) so the menu now supports the full CRUD loop
+    without needing a free-form follow-up."""
+    from backend.bot.handlers.income_entry import show_income_list
+
+    await show_income_list(db, chat_id, user)
+
+
 async def _action_assets_mark_rental(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -579,6 +593,7 @@ _DIRECT_HANDLERS = {
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("expenses", "add"): _action_expenses_add,
     ("expenses", "ocr"): _action_expenses_ocr,
+    ("cashflow", "income"): _action_cashflow_income,
     ("goals", "add"): _action_goals_add,
 }
 

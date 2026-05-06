@@ -10,16 +10,21 @@ from backend.agent.tools.base import Tool, ToolRegistry
 from backend.agent.tools.compare_periods import ComparePeriodsTool
 from backend.agent.tools.compute_metric import ComputeMetricTool
 from backend.agent.tools.get_assets import GetAssetsTool
+from backend.agent.tools.get_income import GetIncomeTool
 from backend.agent.tools.get_market_data import GetMarketDataTool
 from backend.agent.tools.get_transactions import GetTransactionsTool
 
 
 def build_default_registry() -> ToolRegistry:
-    """Wire up the five Epic 1 tools into a fresh registry.
+    """Wire up the agent tools into a fresh registry.
 
-    Centralising registration here means callers (DBAgent, future
-    Orchestrator, tests) all see the same tool surface without each
-    re-instantiating the same handful of tools.
+    Phase 3.7 shipped 5 tools (assets, transactions, compute_metric,
+    compare_periods, market_data). Phase 3.8 Epic 2 adds
+    ``get_income`` so the agent can answer "thu nhập thụ động" /
+    "thu nhập từ thuê BĐS" without falling back to the legacy
+    intent path. Centralising registration here means callers
+    (DBAgent, future Orchestrator, tests) all see the same tool
+    surface without each re-instantiating the catalog.
     """
     registry = ToolRegistry()
     registry.register(GetAssetsTool())
@@ -27,6 +32,7 @@ def build_default_registry() -> ToolRegistry:
     registry.register(ComputeMetricTool())
     registry.register(ComparePeriodsTool())
     registry.register(GetMarketDataTool())
+    registry.register(GetIncomeTool())
     return registry
 
 
@@ -38,5 +44,6 @@ __all__ = [
     "ComputeMetricTool",
     "ComparePeriodsTool",
     "GetMarketDataTool",
+    "GetIncomeTool",
     "build_default_registry",
 ]

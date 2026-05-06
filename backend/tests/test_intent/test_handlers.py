@@ -424,11 +424,20 @@ async def test_query_goal_progress_finds_named_goal():
 async def test_query_income_lists_streams():
     from backend.intent.handlers.query_income import QueryIncomeHandler
 
+    # Phase 3.8 Epic 2: ``stream_type``/``amount`` + computed
+    # ``monthly_equivalent``. The handler aggregates via the property,
+    # so we mock it to match the raw amount for monthly streams.
     streams = [
-        MagicMock(source_type="salary", name="Lương FPT",
-                  amount_monthly=Decimal("30000000")),
-        MagicMock(source_type="dividend", name="Cổ tức VNM",
-                  amount_monthly=Decimal("500000")),
+        MagicMock(
+            stream_type="salary", name="Lương FPT",
+            amount=Decimal("30000000"),
+            monthly_equivalent=Decimal("30000000"),
+        ),
+        MagicMock(
+            stream_type="dividend", name="Cổ tức VNM",
+            amount=Decimal("500000"),
+            monthly_equivalent=Decimal("500000"),
+        ),
     ]
     db = _fake_db()
     result_obj = MagicMock()

@@ -56,6 +56,7 @@ async def route_update(data: dict) -> None:
     # HTTP clients which open sockets on import).
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
+    from backend.bot.handlers import income_entry as income_entry_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
@@ -82,6 +83,7 @@ async def route_update(data: dict) -> None:
                     db, message,
                     onboarding_handlers=onboarding_handlers,
                     asset_entry_handlers=asset_entry_handlers,
+                    income_entry_handlers=income_entry_handlers,
                     storytelling_handlers=storytelling_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
@@ -96,6 +98,7 @@ async def route_update(data: dict) -> None:
                         db, callback_query,
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
+                        income_entry_handlers=income_entry_handlers,
                         briefing_handlers=briefing_handlers,
                         storytelling_handlers=storytelling_handlers,
                         dashboard_service=dashboard_service,
@@ -125,6 +128,7 @@ async def _handle_message(
     *,
     onboarding_handlers,
     asset_entry_handlers,
+    income_entry_handlers,
     storytelling_handlers,
     dashboard_service,
     handle_report_command,
@@ -316,6 +320,15 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+        # Phase 3.8 Epic 2 — income wizard mid-flow text. Same defensive
+        # pattern as the asset wizard above: catch the text before the
+        # NL expense parser claims it.
+        consumed = await income_entry_handlers.handle_income_text_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+
     # Natural-language message → NL expense parser / report intent / menu fallback.
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
@@ -345,15 +358,28 @@ async def _maybe_auto_exit_asset_wizard(
     state has its own 10-minute TTL. Auto-clearing either here would
     risk dropping in-flight user input.
     """
-    if not callback_data or callback_data.startswith("asset_add"):
-        return
-    if telegram_id is None:
+    # Phase 3.8 Epic 2 — generalised to also cover the income-stream
+    # wizard (``income_*`` flows). Auto-exit fires only when the
+    # callback belongs to a *different* wizard family than the one
+    # currently active — taps within the same wizard's keyboard
+    # (subtype, schedule pick) are always preserved.
+    if not callback_data or telegram_id is None:
         return
     user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
     if user is None:
         return
     flow = (user.wizard_state or {}).get("flow") or ""
-    if not flow.startswith("asset_add"):
+
+    is_asset_flow = flow.startswith("asset_add")
+    is_income_flow = flow.startswith("income_")
+    if not is_asset_flow and not is_income_flow:
+        return
+
+    cb_belongs_to_asset = callback_data.startswith("asset_add") or callback_data.startswith("asset_rental")
+    cb_belongs_to_income = callback_data.startswith("income")
+    if is_asset_flow and cb_belongs_to_asset:
+        return
+    if is_income_flow and cb_belongs_to_income:
         return
 
     from backend import analytics
@@ -362,7 +388,7 @@ async def _maybe_auto_exit_asset_wizard(
     step = (user.wizard_state or {}).get("step")
     await wizard_service.clear(db, user.id)
     analytics.track(
-        "asset_wizard_auto_exited",
+        "asset_wizard_auto_exited" if is_asset_flow else "income_wizard_auto_exited",
         user_id=user.id,
         properties={
             "flow": flow,
@@ -378,6 +404,7 @@ async def _handle_callback(
     *,
     onboarding_handlers,
     asset_entry_handlers,
+    income_entry_handlers,
     briefing_handlers,
     storytelling_handlers,
     dashboard_service,
@@ -422,6 +449,10 @@ async def _handle_callback(
 
     # Phase 3.8 — mark-existing-as-rental callbacks (asset_rental:*).
     if await asset_entry_handlers.handle_asset_rental_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Phase 3.8 Epic 2 — income-stream wizard + list (income:*).
+    if await income_entry_handlers.handle_income_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Morning-briefing button taps (briefing:*). Handled before the

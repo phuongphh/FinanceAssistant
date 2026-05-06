@@ -35,6 +35,34 @@ from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import rental_service
 
 
+def _make_rental_stream(
+    *,
+    user_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    amount: Decimal,
+    is_active: bool = True,
+    name: str = "rental",
+) -> IncomeStream:
+    """Build an IncomeStream the way Phase 3.8 Epic 2 expects.
+
+    Centralised so old-style ``source_type``/``amount_monthly`` kwargs
+    don't proliferate through tests.
+    """
+    return IncomeStream(
+        user_id=user_id,
+        stream_type="rental",
+        is_passive=True,
+        name=name,
+        amount=amount,
+        currency="VND",
+        schedule_type="monthly",
+        start_date=date.today(),
+        is_active=is_active,
+        source_asset_id=asset_id,
+        extra={rental_service.SOURCE_ASSET_ID_KEY: str(asset_id)},
+    )
+
+
 def _make_asset(
     *,
     user_id: uuid.UUID,
@@ -131,9 +159,14 @@ class TestMarkAsRental:
         streams = [x for x in added if isinstance(x, IncomeStream)]
         assert len(streams) == 1
         stream = streams[0]
-        assert stream.source_type == "rental"
-        assert stream.amount_monthly == Decimal("13_500_000")  # net
+        assert stream.stream_type == "rental"
+        assert stream.is_passive is True
+        assert stream.amount == Decimal("13_500_000")  # net
+        assert stream.schedule_type == "monthly"
         assert stream.is_active is True  # rented → active
+        # Phase 3.8 Epic 2: source_asset_id is now a real FK column.
+        # ``extra`` keeps the snapshot for read-only consumers.
+        assert stream.source_asset_id == asset.id
         assert stream.extra[rental_service.SOURCE_ASSET_ID_KEY] == str(asset.id)
         _assert_flush_only(db)
 
@@ -173,19 +206,16 @@ class TestMarkAsRental:
                 "deposit_held": "0",
             },
         )
-        existing_stream = IncomeStream(
-            user_id=user_id,
-            source_type="rental",
-            name="Old name",
-            amount_monthly=Decimal("13_500_000"),
-            is_active=True,
-            extra={
-                rental_service.SOURCE_ASSET_ID_KEY: str(asset.id),
-                "occupancy_status": "rented",
-                "monthly_rent": "15000000",
-                "monthly_expenses": "1500000",
-            },
+        existing_stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset.id,
+            amount=Decimal("13_500_000"), name="Old name",
         )
+        existing_stream.extra = {
+            rental_service.SOURCE_ASSET_ID_KEY: str(asset.id),
+            "occupancy_status": "rented",
+            "monthly_rent": "15000000",
+            "monthly_expenses": "1500000",
+        }
         db = _mock_session([
             _result_with_scalar(asset),
             _result_with_scalars([existing_stream]),
@@ -204,7 +234,7 @@ class TestMarkAsRental:
         added = [c.args[0] for c in db.add.call_args_list]
         assert not any(isinstance(x, IncomeStream) for x in added)
         # Stream amount updated to new net = 16tr - 1.5tr.
-        assert existing_stream.amount_monthly == Decimal("14_500_000")
+        assert existing_stream.amount == Decimal("14_500_000")
 
 
 @pytest.mark.asyncio
@@ -224,13 +254,9 @@ class TestUpdateOccupancy:
                 "deposit_held": "0",
             },
         )
-        existing_stream = IncomeStream(
-            user_id=user_id,
-            source_type="rental",
-            name="rental",
-            amount_monthly=Decimal("13_500_000"),
-            is_active=True,
-            extra={rental_service.SOURCE_ASSET_ID_KEY: str(asset.id)},
+        existing_stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset.id,
+            amount=Decimal("13_500_000"),
         )
         db = _mock_session([
             _result_with_scalar(asset),
@@ -259,13 +285,9 @@ class TestUpdateOccupancy:
                 "deposit_held": "0",
             },
         )
-        paused_stream = IncomeStream(
-            user_id=user_id,
-            source_type="rental",
-            name="rental",
-            amount_monthly=Decimal("13_500_000"),
-            is_active=False,
-            extra={rental_service.SOURCE_ASSET_ID_KEY: str(asset.id)},
+        paused_stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset.id,
+            amount=Decimal("13_500_000"), is_active=False,
         )
         db = _mock_session([
             _result_with_scalar(asset),
@@ -312,10 +334,9 @@ class TestUnmarkAsRental:
                 "deposit_held": "0",
             },
         )
-        existing_stream = IncomeStream(
-            user_id=user_id, source_type="rental", name="rental",
-            amount_monthly=Decimal("15000000"), is_active=True,
-            extra={rental_service.SOURCE_ASSET_ID_KEY: str(asset.id)},
+        existing_stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset.id,
+            amount=Decimal("15000000"),
         )
         db = _mock_session([
             _result_with_scalar(asset),

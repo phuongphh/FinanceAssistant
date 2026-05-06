@@ -216,7 +216,11 @@ async def _format_income(db: AsyncSession, user: User) -> str:
         IncomeStream.is_active.is_(True),
     )
     streams = list((await db.execute(stmt)).scalars().all())
-    total = sum(Decimal(s.amount_monthly or 0) for s in streams)
+    # Phase 3.8 Epic 2: ``amount_monthly`` was replaced by raw
+    # ``amount`` + ``schedule_type``. Aggregate via the canonical
+    # ``monthly_equivalent`` so quarterly dividends and annual
+    # interest contribute their correct share of the headline.
+    total = sum((s.monthly_equivalent for s in streams), Decimal(0))
     if total > 0:
         return f"{format_money_full(total)}/tháng ({len(streams)} nguồn)"
     if user.monthly_income:
