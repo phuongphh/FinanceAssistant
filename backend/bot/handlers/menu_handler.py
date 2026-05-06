@@ -500,6 +500,20 @@ async def _action_assets_edit(
     await list_assets(db, chat_id, user)
 
 
+async def _action_expenses_recurring(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 3.8 Epic 3 — render the recurring-patterns list view.
+
+    Replaces the default "coming soon" stub for ``menu:expenses:
+    recurring``. Shows existing patterns (with edit/disable/reminder
+    toggle) + an "Add new" entry into the wizard.
+    """
+    from backend.bot.handlers.recurring_entry import show_recurring_list
+
+    await show_recurring_list(db, chat_id, user)
+
+
 async def _action_cashflow_income(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -593,6 +607,7 @@ _DIRECT_HANDLERS = {
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("expenses", "add"): _action_expenses_add,
     ("expenses", "ocr"): _action_expenses_ocr,
+    ("expenses", "recurring"): _action_expenses_recurring,
     ("cashflow", "income"): _action_cashflow_income,
     ("goals", "add"): _action_goals_add,
 }

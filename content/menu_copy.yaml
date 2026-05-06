@@ -186,6 +186,10 @@ submenu_expenses:
       callback: "menu:expenses:by_category"
       description: "Ăn uống, di chuyển, sức khỏe…"
 
+    - label: "🔄 Khoản định kỳ"
+      callback: "menu:expenses:recurring"
+      description: "Thuê nhà, internet, gym… + nhắc nhở"
+
     - label: "◀️ Quay về"
       callback: "menu:main"
 
