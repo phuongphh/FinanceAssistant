@@ -16,6 +16,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #204 | [Epic] Phase 3.8 — Epic 1: Rental Property Tracking | [issue-204.md](issue-204.md) |
 | #205 | [Epic] Phase 3.8 — Epic 2: Multi-Income Streams | [issue-205.md](issue-205.md) |
 | #206 | [Epic] Phase 3.8 — Epic 3: Recurring Transactions + Reminders | [issue-206.md](issue-206.md) |
+| #207 | [Epic] Phase 3.8 — Epic 4: Cashflow Forecasting (Simple v1) | [issue-207.md](issue-207.md) |
 | #208 | [Epic] Phase 3.8 — Epic 5: Goals Management Complete | [issue-208.md](issue-208.md) |
 
-**Total active:** 13
+**Total active:** 14
