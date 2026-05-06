@@ -44,6 +44,22 @@ ORPHAN_CUTOFF = timedelta(minutes=5)
 ORPHAN_BATCH_LIMIT = 100
 
 
+def _normalize_text_command(text: str) -> str:
+    """Return a comparable Telegram command token from message text.
+
+    Telegram can deliver bot-menu commands as ``/about@BotUsername`` in
+    group-like contexts, and deep links can arrive as ``/start payload``.
+    Routing should match the command name, not the mention suffix or args.
+    """
+    stripped = text.strip().lower()
+    if not stripped.startswith("/"):
+        return stripped
+
+    command_token = stripped.split(maxsplit=1)[0]
+    command_name, _, _bot_username = command_token.partition("@")
+    return command_name
+
+
 async def route_update(data: dict) -> None:
     """Dispatch one Telegram update to the right handler.
 
@@ -150,7 +166,7 @@ async def _handle_message(
     """
     text = message.get("text", "")
     chat_id = message["chat"]["id"]
-    command = text.strip().lower()
+    command = _normalize_text_command(text)
     from_user = message.get("from") or {}
     telegram_id = from_user.get("id")
 

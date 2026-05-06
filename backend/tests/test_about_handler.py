@@ -27,7 +27,8 @@ async def test_cmd_about_sends_versioned_about_page():
 
 
 @pytest.mark.asyncio
-async def test_about_command_routes_without_user_lookup():
+@pytest.mark.parametrize("text", ["/about", "/about@BeTienTestBot"])
+async def test_about_command_routes_without_user_lookup(text):
     fake_session = _make_fake_session()
     factory = MagicMock(return_value=fake_session)
 
@@ -40,7 +41,7 @@ async def test_about_command_routes_without_user_lookup():
         new_callable=AsyncMock,
     ) as get_user:
         await telegram_worker.route_update(
-            {"update_id": 233, "message": {"text": "/about", "chat": {"id": 456}}}
+            {"update_id": 233, "message": {"text": text, "chat": {"id": 456}}}
         )
 
     cmd_about.assert_awaited_once_with(456)
