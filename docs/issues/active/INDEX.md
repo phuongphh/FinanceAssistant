@@ -16,7 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #242 | [Epic] Phase 3.8.5 — Epic 2: User Profile (View) | [issue-242.md](issue-242.md) |
 | #243 | [Epic] Phase 3.8.5 — Epic 3: User Profile (Edit) | [issue-243.md](issue-243.md) |
 | #244 | [Story] P3.8.5-S1: Feedback model + /feedback command handler | [issue-244.md](issue-244.md) |
-| #245 | [Story] P3.8.5-S2: Backend auto-classification via DeepSeek | [issue-245.md](issue-245.md) |
 | #246 | [Story] P3.8.5-S3: Active prompts scheduler | [issue-246.md](issue-246.md) |
 | #247 | [Story] P3.8.5-S4: UserProfile model + WealthLevelMapper | [issue-247.md](issue-247.md) |
 | #248 | [Story] P3.8.5-S5: ProfileStatsAggregator — auto-derived stats | [issue-248.md](issue-248.md) |
@@ -24,4 +23,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #250 | [Story] P3.8.5-S7: Edit display name + age range flows | [issue-250.md](issue-250.md) |
 | #251 | [Story] P3.8.5-S8: Notification settings flow | [issue-251.md](issue-251.md) |
 
-**Total active:** 19
+**Total active:** 18
