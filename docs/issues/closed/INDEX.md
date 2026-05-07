@@ -128,6 +128,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #233 | Pre-Phase | [Feature] Add /about command — Product About page with version, privacy policy & company info | [pre-phase/issue-233.md](by-phase/pre-phase/issue-233.md) |
 | #241 | Pre-Phase | [Epic] Phase 3.8.5 — Epic 1: Feedback System | [pre-phase/issue-241.md](by-phase/pre-phase/issue-241.md) |
 | #245 | Pre-Phase | [Story] P3.8.5-S2: Backend auto-classification via DeepSeek | [pre-phase/issue-245.md](by-phase/pre-phase/issue-245.md) |
+| #246 | Pre-Phase | [Story] P3.8.5-S3: Active prompts scheduler | [pre-phase/issue-246.md](by-phase/pre-phase/issue-246.md) |
 
-**Total:** 124 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 107 Pre-Phase)
+**Total:** 125 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 108 Pre-Phase)
