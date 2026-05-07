@@ -144,34 +144,40 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 #### ✅ Phase 3.7: Agent Architecture — DONE (just shipped)
 - 3 tuần, 3-tier orchestrator + 5 tools + streaming
 
-#### 🔥 Phase 3.8: Wealth Completion — STARTING NOW
-**Duration:** ~2 tuần | **Target ship:** Late May / Early June 2026
+#### ✅ Phase 3.8: Wealth Completion — DONE
+**Duration:** ~2 tuần | **Shipped:** Early May 2026
 
-5 Components (all in single phase):
-1. **Rental property tracking (Case A — chủ nhà cho thuê):**
-   - is_rental flag on real_estate
-   - Monthly rent income
-   - Occupancy tracking
-   - Rental expenses
-   - Net yield calculation
-2. **Multi-income streams:**
-   - Income types: salary, freelance, dividend, rental, interest, other
-   - Recurring schedule
-   - Passive vs active classification
-3. **Recurring transactions + reminders:**
-   - Auto-detect monthly patterns
-   - User confirms recurring
-   - **Reminders for recurring expenses (e.g., "thuê nhà 15tr — đến hạn 5/6")**
-   - Budget tracking
-4. **Cashflow forecasting (Simple v1):**
-   - Average last 3 months method
-   - "Tháng 7 dự kiến tiết kiệm: 8tr"
-   - Foundation for Twin
-5. **Goals management complete:**
-   - Replace Phase 3.6 stub
-   - Goal templates (mua xe, mua nhà, du lịch, hưu trí presets)
-   - Single-goal focus first
-   - Multi-goal as future enhancement
+5 Components shipped:
+1. Rental property tracking (Case A — chủ nhà cho thuê)
+2. Multi-income streams (6 types)
+3. Recurring transactions + reminders (user explicit ask)
+4. Cashflow forecasting Simple v1
+5. Goals management complete (7 templates)
+
+#### 🔥 Phase 3.8.5: Pre-Launch Readiness — STARTING NOW
+**Duration:** ~3-4 ngày | **Target ship:** Mid-May 2026 | **Inserted:** May 2026 (post-3.8)
+
+2 Components để chuẩn bị soft launch tháng 6:
+
+1. **Feedback System (passive only):**
+   - `/feedback` command — free-form text only (zero friction)
+   - Backend auto-classification (LLM-based: bug/suggestion/praise/etc.)
+   - Active prompts strict (4-6/year max, post-major-events)
+   - Storage with full context (user state, version, recent actions)
+
+2. **User Profile Minimal (auto-derived):**
+   - Profile view với auto-derived stats (account age, wealth level VN, asset diversity, tracking streak)
+   - Editable: display name, age range (optional), notification prefs
+   - **Wealth Level mapping (Vietnamese):**
+     - Khởi Đầu (0-30tr)
+     - Trẻ Năng Động (30-200tr)
+     - Trung Lưu Vững (200tr-1 tỷ)
+     - Tinh Hoa (1 tỷ+)
+
+**Out of scope (deferred):**
+- ❌ Wealth Badge → Phase 4.5 (sau Twin để có context richer)
+- ❌ Achievement system → Phase 4.5
+- ❌ Share images → Phase 4.5 (note: badges fully private — không share công khai)
 
 ### JUNE 2026 — Soft Launch
 
@@ -209,6 +215,18 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 - Share-able twin image generation
 - A/B test framings
 - Trust-building through transparency
+
+#### Phase 4.5: Achievement System + Wealth Badges (Private)
+**Duration:** ~1-2 tuần | **Target ship:** Late August 2026 | **NEW (May 2026 insertion)**
+
+- Achievement engine (track behaviors + milestones)
+- Wealth Level badges (Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa)
+- Streak tracking, growth markers
+- Personal celebrations với Twin context
+- **Private only — no social sharing** (match Vietnamese mass affluent psychology)
+- Achievement examples: "30 ngày streak tracking", "Diversification master", "Emergency fund champion"
+
+**Why private:** Vietnamese mass affluent culture is "kín tiếng về tiền" — public wealth display creates fraud risk + comparison anxiety. Gamification through personal achievement, not social validation.
 
 ### SEPTEMBER-NOVEMBER 2026 — Behavioral & Social
 
@@ -343,6 +361,28 @@ Following decisions made during strategic review (May 2026):
 8. **Goals** — Templates first (Câu 4: c), single-goal focus (Câu 4: a)
 9. **Peer benchmarking** — Synthetic data initially, real after user base grows
 10. **Household mode** — Move earlier (Phase 6) to match Mass Affluent target
+
+### Phase 3.8.5 Insertion (May 2026, post-Phase 3.8)
+
+**Decision:** Insert Phase 3.8.5 (Pre-Launch Readiness) between Phase 3.8 và Phase 3.9.
+
+**Reason:** Pre-soft-launch (June 2026) cần 2 critical features:
+- Feedback channel để collect early user signals
+- User profile để hỗ trợ user identity (xem/edit thông tin)
+
+**Scope decisions:**
+- Feedback: passive only, free-form text, backend auto-classification (zero friction)
+- Profile: minimal, auto-derived stats, anti-form philosophy
+- Wealth Level mapping (Vietnamese): Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa
+- Wealth Badge: **fully private** — no social sharing (Vietnamese cultural fit)
+- Achievement system: **deferred to Phase 4.5** (sau Twin để có context richer)
+
+**Impact analysis:**
+- Timeline: +3-4 ngày (3.8.5 work) + ~1-2 tuần (Phase 4.5 added) = ~+1.5 tuần total
+- Tết 2027 target: **vẫn safe** (buffer trong roadmap)
+- Risk: minimal — additive, not disruptive
+
+**New Phase 4.5 added:** Achievement System + Wealth Badges (Private), inserted between Phase 4B và Phase 5.
 
 ---
 
