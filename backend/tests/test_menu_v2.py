@@ -289,6 +289,57 @@ class TestHandleMenuCallback:
             is False
         )
 
+    @pytest.mark.asyncio
+    async def test_profile_navigation_tracks_with_snapshotted_user_id(self, monkeypatch):
+        """Profile fallback can rollback the session, which expires ORM users.
+
+        The menu handler must snapshot ``user.id`` before rendering Profile so
+        analytics does not touch an expired ORM object after the rollback.
+        """
+        from backend.bot.handlers import menu_handler
+        from backend.profile.handlers import profile_menu
+
+        expired = False
+
+        class RollbackExpiringUser:
+            wealth_level = "starter"
+
+            @property
+            def id(self):
+                if expired:
+                    raise AssertionError("user.id accessed after profile rollback")
+                return "user-1"
+
+        async def fake_profile_view(*args, **kwargs):
+            nonlocal expired
+            expired = True
+
+        tracked: dict = {}
+
+        def fake_track(event_type, user_id=None, properties=None):
+            tracked.update({
+                "event_type": event_type,
+                "user_id": user_id,
+                "properties": properties,
+            })
+
+        monkeypatch.setattr(profile_menu, "handle_profile_view", fake_profile_view)
+        monkeypatch.setattr(menu_handler.analytics, "track", fake_track)
+
+        await menu_handler._navigate(
+            db=None,
+            user=RollbackExpiringUser(),
+            chat_id=42,
+            message_id=7,
+            target="profile",
+        )
+
+        assert tracked == {
+            "event_type": "profile_viewed",
+            "user_id": "user-1",
+            "properties": {"source": "menu"},
+        }
+
 
 # ============================================================
 # Wealth-level adaptive intros — Story S7 (Epic 2)

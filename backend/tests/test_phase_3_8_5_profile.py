@@ -124,15 +124,28 @@ def test_render_profile_includes_vn_level_and_stats():
 
 @pytest.mark.asyncio
 async def test_handle_profile_view_degrades_when_profile_storage_fails(monkeypatch):
-    user = User()
-    user.id = uuid.uuid4()
-    user.display_name = "Bé Tiền Test"
-    user.briefing_enabled = True
-    user.briefing_time = time(7, 0)
+    expired = False
+
+    class RollbackExpiringUser:
+        id = uuid.uuid4()
+        briefing_enabled = True
+        briefing_time = time(7, 0)
+
+        @property
+        def display_name(self):
+            if expired:
+                raise AssertionError("user ORM object was accessed after rollback")
+            return "Bé Tiền Test"
+
+    user = RollbackExpiringUser()
+
+    async def expire_on_rollback():
+        nonlocal expired
+        expired = True
 
     db = MagicMock()
     db.execute = AsyncMock(side_effect=SQLAlchemyError("missing user_profiles"))
-    db.rollback = AsyncMock()
+    db.rollback = AsyncMock(side_effect=expire_on_rollback)
     sent: dict = {}
 
     async def fake_send_message(**kwargs):
@@ -147,7 +160,7 @@ async def test_handle_profile_view_degrades_when_profile_storage_fails(monkeypat
 
     assert sent["chat_id"] == 42
     assert "Profile của Bé Tiền Test" in sent["text"]
-    assert "chế độ an toàn" in sent["text"]
+    assert "alembic upgrade head" in sent["text"]
     assert sent["reply_markup"]["inline_keyboard"] == [
         [{"text": "◀️ Quay lại", "callback_data": "menu:main"}]
     ]

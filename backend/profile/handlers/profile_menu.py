@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from datetime import time
 from decimal import Decimal
 from typing import Any
@@ -35,6 +36,26 @@ PROFILE_DEGRADED_NOTICE = (
     "_Mình đang hiển thị Profile ở chế độ an toàn; vài số liệu/cài đặt "
     "có thể tạm thời chưa cập nhật._"
 )
+PROFILE_SCHEMA_NOTICE = (
+    "_Profile chưa sẵn sàng vì DB thiếu bảng profile; "
+    "admin chạy `alembic upgrade head` nhé._"
+)
+
+
+@dataclass(frozen=True)
+class ProfileUserSnapshot:
+    """Stable user fields needed to render Profile after DB rollback.
+
+    ``AsyncSession.rollback()`` expires ORM instances. The Profile fallback path
+    must therefore snapshot user fields before any query that can fail; otherwise
+    rendering the degraded profile can trigger another async lazy-load error.
+    """
+
+    id: Any
+    display_name: str | None = None
+    telegram_handle: str | None = None
+    briefing_enabled: bool = True
+    briefing_time: time | None = None
 
 
 def profile_keyboard(
@@ -132,8 +153,8 @@ def time_keyboard(kind: str) -> dict[str, list[list[dict[str, str]]]]:
 
 
 async def get_profile_or_default(
-    db: AsyncSession, user: User
-) -> tuple[UserProfile, bool]:
+    db: AsyncSession, user: User | ProfileUserSnapshot
+) -> tuple[UserProfile, bool, str | None]:
     """Return the saved profile when available, otherwise safe defaults.
 
     The Profile screen is a read path. It should not fail the whole menu just
@@ -145,14 +166,22 @@ async def get_profile_or_default(
         profile = (
             await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
         ).scalar_one_or_none()
-    except SQLAlchemyError:
-        logger.exception("profile lookup failed; rendering degraded profile")
+    except SQLAlchemyError as exc:
+        notice = (
+            PROFILE_SCHEMA_NOTICE
+            if _looks_like_missing_profile_table(exc)
+            else PROFILE_DEGRADED_NOTICE
+        )
+        logger.exception(
+            "profile lookup failed; rendering degraded profile; schema_hint=%s",
+            notice == PROFILE_SCHEMA_NOTICE,
+        )
         await db.rollback()
-        return _default_profile(user), False
+        return _default_profile(user), False, notice
 
     if profile is not None:
-        return profile, True
-    return _default_profile(user), True
+        return profile, True, None
+    return _default_profile(user), True, None
 
 
 async def get_or_create_profile(db: AsyncSession, user_id) -> UserProfile:
@@ -174,11 +203,11 @@ async def handle_profile_view(
     *,
     message_id: int | None = None,
 ) -> None:
-    profile, profile_editable = await get_profile_or_default(db, user)
-    notice = None
+    user_snapshot = _snapshot_user(user)
+    profile, profile_editable, notice = await get_profile_or_default(db, user_snapshot)
     if profile_editable:
         try:
-            stats = await ProfileStatsAggregator().aggregate(db, user.id)
+            stats = await ProfileStatsAggregator().aggregate(db, user_snapshot.id)
         except SQLAlchemyError:
             logger.exception("profile stats aggregation failed; rendering fallback stats")
             await db.rollback()
@@ -190,8 +219,8 @@ async def handle_profile_view(
             notice = PROFILE_DEGRADED_NOTICE
     else:
         stats = _fallback_stats()
-        notice = PROFILE_DEGRADED_NOTICE
-    text = render_profile(profile, user, stats, notice=notice)
+        notice = notice or PROFILE_DEGRADED_NOTICE
+    text = render_profile(profile, user_snapshot, stats, notice=notice)
     if message_id is None:
         await send_message(
             chat_id=chat_id,
@@ -509,7 +538,27 @@ async def _set_notification_time(
     await db.flush()
 
 
-def _default_profile(user: User) -> UserProfile:
+def _looks_like_missing_profile_table(exc: SQLAlchemyError) -> bool:
+    text = str(exc).lower()
+    return "user_profiles" in text and (
+        "does not exist" in text
+        or "undefinedtable" in text
+        or "missing" in text
+        or "no such table" in text
+    )
+
+
+def _snapshot_user(user: User) -> ProfileUserSnapshot:
+    return ProfileUserSnapshot(
+        id=user.id,
+        display_name=user.display_name,
+        telegram_handle=getattr(user, "telegram_handle", None),
+        briefing_enabled=bool(getattr(user, "briefing_enabled", True)),
+        briefing_time=getattr(user, "briefing_time", None),
+    )
+
+
+def _default_profile(user: User | ProfileUserSnapshot) -> UserProfile:
     profile = UserProfile(user_id=user.id)
     profile.display_name = getattr(user, "display_name", None)
     profile.age_range = None
@@ -539,7 +588,7 @@ def _fallback_stats() -> dict[str, Any]:
     }
 
 
-def _display_name(profile: UserProfile, user: User) -> str:
+def _display_name(profile: UserProfile, user: User | ProfileUserSnapshot) -> str:
     for value in (
         profile.display_name,
         user.display_name,
@@ -582,6 +631,9 @@ def _time_menu_text(kind: str) -> str:
 __all__ = [
     "FLOW_PROFILE",
     "STEP_DISPLAY_NAME",
+    "PROFILE_DEGRADED_NOTICE",
+    "PROFILE_SCHEMA_NOTICE",
+    "ProfileUserSnapshot",
     "STEP_NOTIFICATION_TIME",
     "age_keyboard",
     "get_or_create_profile",

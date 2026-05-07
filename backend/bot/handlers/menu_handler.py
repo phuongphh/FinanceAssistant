@@ -295,6 +295,7 @@ async def _navigate(
     sub-menu category (already validated by caller).
     """
     level = user.wealth_level
+    user_id = user.id
     if target == "main":
         text, keyboard = format_main_menu(user, level=level)
     elif target == "profile":
@@ -303,7 +304,7 @@ async def _navigate(
         await handle_profile_view(db, chat_id, user, message_id=message_id)
         analytics.track(
             "profile_viewed",
-            user_id=user.id,
+            user_id=user_id,
             properties={"source": "menu"},
         )
         return
