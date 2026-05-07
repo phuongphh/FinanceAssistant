@@ -15,12 +15,12 @@
 #
 # Schema:
 #   current_phase     — id of the phase the team is actively working on
-#   roadmap[]         — every phase the team plans to ship, in order
+#   phases[]          — every phase the team plans to ship, in order
 #     id              — short tag, used in section headings (e.g. "3.5")
 #     name            — human title (Vietnamese OK)
-#     status          — done | current | next | planned
+#     status          — done | current | testing | next | planned
 #     duration        — informational ("3 tuần", "4 tuần", "TBD")
-#     detailed_doc    — path (relative to repo root); empty if not yet drafted
+#     detail_doc      — path (relative to repo root); empty if not yet drafted
 #     issues_doc      — path; empty if no GitHub-ready issue list
 #     description     — 1-line summary that goes into roadmap tables
 #     completed_date  — ISO date OR empty; populated when status flips to "done"
@@ -32,19 +32,19 @@
 #                       any entry has skeleton: true.
 #
 # Adding a new phase:
-#   1. Append an entry under roadmap (or let sync auto-insert a skeleton
+#   1. Append an entry under phases (or let sync auto-insert a skeleton
 #      placeholder, then hand-fill the real fields).
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "3.7"
+current_phase: "3.8.5"
 
-roadmap:
+phases:
   - id: "1"
     name: "UX Foundation"
     status: done
     duration: "3 tuần"
-    detailed_doc: "docs/current/phase-1-detailed.md"
+    detail_doc: "docs/current/phase-1-detailed.md"
     issues_doc: ""
     description: "Telegram bot + manual entry + monthly report + Notion dashboard"
     completed_date: ""
@@ -54,7 +54,7 @@ roadmap:
     name: "Personality & Care"
     status: done
     duration: "3 tuần"
-    detailed_doc: "docs/current/phase-2-detailed.md"
+    detail_doc: "docs/current/phase-2-detailed.md"
     issues_doc: ""
     description: "Onboarding, Bé Tiền tone, milestone celebration, empathy engine"
     completed_date: ""
@@ -64,7 +64,7 @@ roadmap:
     name: "Wealth Foundation"
     status: done
     duration: "4 tuần"
-    detailed_doc: "docs/current/phase-3a-detailed.md"
+    detail_doc: "docs/current/phase-3a-detailed.md"
     issues_doc: "docs/current/phase-3a-issues.md"
     description: "Asset model, net worth, morning briefing, Mini App dashboard"
     completed_date: ""
@@ -74,7 +74,7 @@ roadmap:
     name: "Intent Understanding Layer"
     status: done
     duration: "3 tuần"
-    detailed_doc: "docs/current/phase-3.5-detailed.md"
+    detail_doc: "docs/current/phase-3.5-detailed.md"
     issues_doc: "docs/archive/phase-3.5-issues.md"
     description: "Rule + LLM intent classifier, confirm/clarify, advisory, voice queries"
     completed_date: "2026-05-02"
@@ -84,7 +84,7 @@ roadmap:
     name: "Menu UX Revamp"
     status: done
     duration: "1.5 tuần"
-    detailed_doc: "docs/current/phase-3.6-detailed.md"
+    detail_doc: "docs/current/phase-3.6-detailed.md"
     issues_doc: "docs/current/phase-3.6-issues.md"
     description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
     completed_date: "2026-05-05"
@@ -92,19 +92,39 @@ roadmap:
 
   - id: "3.7"
     name: "Agent Architecture"
-    status: current
+    status: done
     duration: "3 tuần"
-    detailed_doc: "docs/current/phase-3.7-detailed.md"
+    detail_doc: "docs/current/phase-3.7-detailed.md"
     issues_doc: "docs/current/phase-3.7-issues.md"
     description: "Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing"
     completed_date: ""
-    icon: "🔨"
+    icon: "✅"
+
+  - id: "3.8"
+    name: "Wealth Completion"
+    status: done
+    duration: "2 tuần"
+    detail_doc: "docs/current/phase-3.8-detailed.md"
+    issues_doc: "docs/current/phase-3.8-issues.md"
+    description: "Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3.8.5"
+    name: "Pre-Launch Readiness"
+    status: testing
+    duration: "3-4 ngày"
+    detail_doc: "docs/current/phase-3.8.5/phase-3.8.5-detailed.md"
+    issues_doc: "docs/current/phase-3.8.5/phase-3.8.5-issues.md"
+    description: "Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows)"
+    completed_date: ""
+    icon: "🧪"
 
   - id: "3B"
     name: "Market Intelligence"
     status: next
     duration: "TBD"
-    detailed_doc: "docs/current/phase-3b-outline.md"
+    detail_doc: "docs/current/phase-3b-outline.md"
     issues_doc: ""
     description: "Real market data, advisory deepening, portfolio analytics"
     completed_date: ""
@@ -114,7 +134,7 @@ roadmap:
     name: "Investment Intelligence"
     status: planned
     duration: "TBD"
-    detailed_doc: ""
+    detail_doc: ""
     issues_doc: ""
     description: "Investment Twin, scenario modeling, rental property tracking"
     completed_date: ""
@@ -124,7 +144,7 @@ roadmap:
     name: "Behavioral Engine"
     status: planned
     duration: "TBD"
-    detailed_doc: ""
+    detail_doc: ""
     issues_doc: ""
     description: "Wealth-aware nudges, Financial DNA, anomaly detection"
     completed_date: ""
@@ -134,30 +154,8 @@ roadmap:
     name: "Scale & Commercialize"
     status: planned
     duration: "TBD"
-    detailed_doc: ""
+    detail_doc: ""
     issues_doc: ""
     description: "Public beta, subscriptions, multi-region, household mode"
     completed_date: ""
     icon: "🔮"
-
-  - id: "3.8"
-    name: "TODO (skeleton — please update)"
-    status: planned
-    duration: "TBD"
-    detailed_doc: "docs/current/phase-3.8-detailed.md"
-    issues_doc: "docs/current/phase-3.8-issues.md"
-    description: "TODO: 1-line summary"
-    completed_date: ""
-    icon: "🔮"
-    skeleton: true
-
-  - id: "3.8.5"
-    name: "TODO (skeleton — please update)"
-    status: planned
-    duration: "TBD"
-    detailed_doc: "docs/current/phase-3.8.5-detailed.md"
-    issues_doc: ""
-    description: "TODO: 1-line summary"
-    completed_date: ""
-    icon: "🔮"
-    skeleton: true
