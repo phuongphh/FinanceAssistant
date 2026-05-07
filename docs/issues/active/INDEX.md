@@ -21,5 +21,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #246 | [Story] P3.8.5-S3: Active prompts scheduler | [issue-246.md](issue-246.md) |
 | #247 | [Story] P3.8.5-S4: UserProfile model + WealthLevelMapper | [issue-247.md](issue-247.md) |
 | #249 | [Story] P3.8.5-S6: Profile view + menu integration | [issue-249.md](issue-249.md) |
+| #250 | [Story] P3.8.5-S7: Edit display name + age range flows | [issue-250.md](issue-250.md) |
 
-**Total active:** 17
+**Total active:** 18
