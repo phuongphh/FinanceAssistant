@@ -12,6 +12,7 @@ Examples:
     confirm:delete:<uuid>
     cancel
 """
+
 from typing import Final
 
 TELEGRAM_CALLBACK_DATA_MAX_BYTES: Final[int] = 64
@@ -22,6 +23,7 @@ class CallbackPrefix:
     CHANGE_CATEGORY = "change_cat"
     DELETE_TRANSACTION = "del_tx"
     UNDO_TRANSACTION = "undo_tx"
+    UNDO_TRANSACTION_BATCH = "undo_batch"
     VIEW_REPORT = "view_report"
     SELECT_CATEGORY = "sel_cat"
     CONFIRM_ACTION = "confirm"

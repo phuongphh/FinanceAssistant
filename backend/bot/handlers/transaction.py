@@ -3,13 +3,20 @@
 Used after the backend creates a new expense (e.g. from manual ingestion,
 OCR confirm, or SMS parsing) to display a rich confirmation in Telegram.
 """
+
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.bot.formatters.templates import format_transaction_confirmation
-from backend.bot.keyboards.transaction_keyboard import transaction_actions_keyboard
+from backend.bot.formatters.templates import (
+    format_transaction_batch_confirmation,
+    format_transaction_confirmation,
+)
+from backend.bot.keyboards.transaction_keyboard import (
+    transaction_actions_keyboard,
+    transaction_batch_actions_keyboard,
+)
 from backend.models.expense import Expense
 from backend.services.dashboard_service import get_user_by_id
 from backend.services.telegram_service import send_message
@@ -71,9 +78,41 @@ async def send_transaction_confirmation(
     except Exception:
         # Aha-moment is decorative — never block a confirmed transaction.
         import logging
-        logging.getLogger(__name__).warning(
-            "step_5_aha_moment failed", exc_info=True
-        )
+
+        logging.getLogger(__name__).warning("step_5_aha_moment failed", exc_info=True)
+
+
+async def send_transaction_batch_confirmation(
+    db: AsyncSession,
+    expenses: list[Expense],
+    *,
+    batch_id: str,
+) -> None:
+    """Gửi một confirmation chung cho nhiều expense vừa tạo."""
+    if not expenses:
+        return
+
+    user = await get_user_by_id(db, expenses[0].user_id)
+    if not user or not user.telegram_id:
+        return
+
+    text = format_transaction_batch_confirmation(
+        items=[
+            (
+                expense.merchant or expense.note or "Giao dịch",
+                float(expense.amount),
+                _normalize_category(expense.category),
+            )
+            for expense in expenses
+        ],
+        time=max((expense.created_at for expense in expenses), default=None),
+    )
+    await send_message(
+        chat_id=user.telegram_id,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=transaction_batch_actions_keyboard(batch_id),
+    )
 
 
 async def resolve_transaction_by_callback_id(
@@ -97,3 +136,21 @@ async def resolve_transaction_by_callback_id(
         Expense.deleted_at.is_(None),
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def resolve_transactions_by_batch_id(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    batch_id: str,
+) -> list[Expense]:
+    """Lấy các expense thuộc cùng một batch manual input."""
+    stmt = (
+        select(Expense)
+        .where(
+            Expense.user_id == user_id,
+            Expense.deleted_at.is_(None),
+            Expense.raw_data["batch_id"].as_string() == batch_id,
+        )
+        .order_by(Expense.created_at.asc())
+    )
+    return list((await db.execute(stmt)).scalars().all())

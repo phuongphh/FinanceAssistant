@@ -1,9 +1,11 @@
 """Tests for message templates (Issue #27)."""
+
 from datetime import datetime
 
 from backend.bot.formatters.templates import (
     format_budget_alert,
     format_daily_summary,
+    format_transaction_batch_confirmation,
     format_transaction_confirmation,
     format_welcome_message,
 )
@@ -73,6 +75,19 @@ class TestTransactionConfirmation:
             category_code="not_a_real_category",
         )
         assert "📌" in result  # 'other' emoji
+
+
+class TestTransactionBatchConfirmation:
+    def test_contains_each_item_and_total(self):
+        result = format_transaction_batch_confirmation(
+            items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
+            time=datetime(2026, 5, 7, 19, 18),
+        )
+        assert "✅ Ghi xong 2 khoản!" in result
+        assert "🚗 tiền xăng" in result
+        assert "🍜 ăn trưa" in result
+        assert "Tổng: 100,000đ" in result
+        assert "19:18" in result
 
 
 class TestDailySummary:
