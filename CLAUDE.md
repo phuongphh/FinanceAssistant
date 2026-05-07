@@ -160,13 +160,17 @@ Goals system with `goals.*` schema migration. 6 readers updated for backwards co
 Field renames: `goal_name → goals.*`, `deadline → date`, `is_active → status field`.
 Stable `FeasibilityBand` enum (replaces localized text). 44 new tests added (total 1527).
 
-### Phase 3.8.5 — _(TODO: fill in 1-line summary)_
+### Phase 3.8.5 — Pre-Launch Readiness
 
-> **For maintainer:** Update this section with Phase 3.8.5 specifics. Suggested fields:
-> - **Goal:** What this phase delivers
-> - **Scope:** What's IN, what's OUT
-> - **Key changes:** New services, new intents, schema changes
-> - **Test focus:** What testing must verify
+- **Goal:** User có thể gửi feedback + xem/edit profile. Backend tự động classify feedback, profile auto-derive từ existing data. Soft launch ready tháng 6/2026.
+- **Scope IN:** Feedback system (`/feedback` command, DeepSeek auto-classifier, active prompts scheduler) + User Profile (view-mode primary, wealth levels VN-native, auto-derived stats, 3 editable fields). **OUT:** No new agent tools, no NLP-based profile editing.
+- **Key changes:**
+  - New module `app/feedback/` — models, services (FeedbackService, FeedbackClassifier, PromptScheduler), handlers
+  - New module `app/profile/` — models, services (ProfileService, StatsAggregator, WealthLevelMapper), handlers
+  - New DB tables: `feedbacks`, `user_profiles`
+  - New content YAMLs: `content/feedback_prompts.yaml` (5 active prompts), `content/wealth_levels.yaml` (4 VN tiers)
+  - Profile menu item added to Phase 3.6 main menu
+- **Test focus:** `/feedback` command end-to-end, DeepSeek classifier ≥80% accuracy, active prompt triggers + cooldown enforcement, profile view with all auto-derived stats, wealth level VN display (Khởi Đầu/Trẻ Năng Động/Trung Lưu Vững/Tinh Hoa), edit flows (name, age range, notifications), no Phase 3.8 regressions
 
 ### Testing focus
 
