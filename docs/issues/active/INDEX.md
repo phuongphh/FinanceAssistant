@@ -14,8 +14,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #243 | [Epic] Phase 3.8.5 — Epic 3: User Profile (Edit) | [issue-243.md](issue-243.md) |
-| #248 | [Story] P3.8.5-S5: ProfileStatsAggregator — auto-derived stats | [issue-248.md](issue-248.md) |
 | #250 | [Story] P3.8.5-S7: Edit display name + age range flows | [issue-250.md](issue-250.md) |
 | #251 | [Story] P3.8.5-S8: Notification settings flow | [issue-251.md](issue-251.md) |
 
-**Total active:** 13
+**Total active:** 12

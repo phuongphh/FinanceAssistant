@@ -132,7 +132,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #245 | Pre-Phase | [Story] P3.8.5-S2: Backend auto-classification via DeepSeek | [pre-phase/issue-245.md](by-phase/pre-phase/issue-245.md) |
 | #246 | Pre-Phase | [Story] P3.8.5-S3: Active prompts scheduler | [pre-phase/issue-246.md](by-phase/pre-phase/issue-246.md) |
 | #247 | Pre-Phase | [Story] P3.8.5-S4: UserProfile model + WealthLevelMapper | [pre-phase/issue-247.md](by-phase/pre-phase/issue-247.md) |
+| #248 | Pre-Phase | [Story] P3.8.5-S5: ProfileStatsAggregator — auto-derived stats | [pre-phase/issue-248.md](by-phase/pre-phase/issue-248.md) |
 | #249 | Pre-Phase | [Story] P3.8.5-S6: Profile view + menu integration | [pre-phase/issue-249.md](by-phase/pre-phase/issue-249.md) |
 
-**Total:** 129 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 112 Pre-Phase)
+**Total:** 130 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 113 Pre-Phase)
