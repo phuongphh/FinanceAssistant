@@ -95,12 +95,12 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         hour=2, minute=0, timezone="Asia/Ho_Chi_Minh",
         id="recurring_detection",
     )
-    # Phase 3.8 Epic 3 — daily reminder scheduler. 09:00 — early
-    # enough to fit the user's morning routine, late enough that
-    # overnight bank charges have settled.
+    # Phase 3.8 Epic 3 + Phase 3.8.5 profile settings — run every
+    # 15 minutes so each user's custom reminder_time can be respected.
+    # The job itself filters by user_profiles.reminder_enabled/time.
     scheduler.add_job(
-        run_reminder_scheduler, "cron",
-        hour=9, minute=0, timezone="Asia/Ho_Chi_Minh",
+        run_reminder_scheduler, "interval",
+        minutes=15, timezone="Asia/Ho_Chi_Minh",
         id="recurring_reminders",
     )
 
