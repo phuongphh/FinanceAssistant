@@ -17,6 +17,7 @@ from backend.models.telegram_update import (
     TelegramUpdate,
 )
 from backend.models.agent_audit_log import AgentAuditLog
+from backend.feedback.models.feedback import Feedback, PromptSentLog
 from backend.models.conversation_context import (
     ROLE_ASSISTANT,
     ROLE_USER,
@@ -42,6 +43,8 @@ __all__ = [
     "STATUS_DONE",
     "STATUS_FAILED",
     "AgentAuditLog",
+    "Feedback",
+    "PromptSentLog",
     "ConversationContext",
     "ROLE_USER",
     "ROLE_ASSISTANT",

@@ -10,6 +10,7 @@ Layer contract: service flushes only — caller commits.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -24,6 +25,18 @@ from backend.schemas.goal import (
     GoalProgressUpdate,
     GoalUpdate,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+async def _try_goal_completed_feedback_prompt(db: AsyncSession, user_id: uuid.UUID) -> None:
+    from backend.feedback.services.prompt_scheduler import check_goal_completed_prompt
+
+    try:
+        await check_goal_completed_prompt(db, user_id)
+    except Exception:
+        logger.exception("goal-completed feedback prompt hook failed")
 
 
 # ---------------------------------------------------------------------
@@ -60,6 +73,8 @@ async def create_goal(
     )
     db.add(goal)
     await db.flush()
+    if initial_status == "completed":
+        await _try_goal_completed_feedback_prompt(db, user_id)
     return goal
 
 
@@ -122,6 +137,7 @@ async def update_goal(
         and goal.completed_at is None
     ):
         goal.completed_at = datetime.utcnow()
+        await _try_goal_completed_feedback_prompt(db, user_id)
     await db.flush()
     return goal
 
@@ -148,6 +164,7 @@ async def update_goal_progress(
     ):
         goal.status = "completed"
         goal.completed_at = datetime.utcnow()
+        await _try_goal_completed_feedback_prompt(db, user_id)
     goal.updated_at = datetime.utcnow()
     await db.flush()
     return goal

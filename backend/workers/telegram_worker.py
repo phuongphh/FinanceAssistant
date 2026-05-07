@@ -78,6 +78,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers import recurring_entry as recurring_entry_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
+    from backend.feedback.handlers import feedback_command as feedback_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
     from backend.bot.handlers.menu_handler import (
         handle_menu_callback as handle_menu_v2_callback,
@@ -106,6 +107,7 @@ async def route_update(data: dict) -> None:
                     recurring_entry_handlers=recurring_entry_handlers,
                     goal_entry_handlers=goal_entry_handlers,
                     storytelling_handlers=storytelling_handlers,
+                    feedback_handlers=feedback_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
@@ -125,6 +127,7 @@ async def route_update(data: dict) -> None:
                         goal_entry_handlers=goal_entry_handlers,
                         briefing_handlers=briefing_handlers,
                         storytelling_handlers=storytelling_handlers,
+                        feedback_handlers=feedback_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_menu_v2_callback=handle_menu_v2_callback,
@@ -156,6 +159,7 @@ async def _handle_message(
     recurring_entry_handlers,
     goal_entry_handlers,
     storytelling_handlers,
+    feedback_handlers,
     dashboard_service,
     handle_report_command,
     handle_text_message,
@@ -259,6 +263,13 @@ async def _handle_message(
             return resolved_user.id
         return None
 
+    # /feedback — zero-friction feedback capture (Phase 3.8.5 Epic 1).
+    if command == "/feedback":
+        if resolved_user is not None:
+            await feedback_handlers.start_feedback(db, chat_id, resolved_user)
+            return resolved_user.id
+        return None
+
     # /story or /kechuyen — open storytelling mode (Phase 3A Epic 3).
     if command in ("/story", "/kechuyen", "/kể_chuyện"):
         if resolved_user is not None:
@@ -274,7 +285,9 @@ async def _handle_message(
     # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            if not await asset_entry_handlers.cancel_wizard(
+            if (resolved_user.wizard_state or {}).get("flow") == feedback_handlers.FLOW_FEEDBACK:
+                await feedback_handlers.handle_feedback_text_input(db, message)
+            elif not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
             ):
                 await storytelling_handlers.cancel_storytelling(
@@ -320,6 +333,18 @@ async def _handle_message(
         consumed = await onboarding_handlers.handle_name_input(
             db, chat_id, resolved_user, text
         )
+        if consumed:
+            return resolved_user.id
+
+    # Feedback text input — must run before other wizard/free-form parsers.
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+        and (resolved_user.wizard_state or {}).get("flow")
+        == feedback_handlers.FLOW_FEEDBACK
+    ):
+        consumed = await feedback_handlers.handle_feedback_text_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -477,6 +502,7 @@ async def _handle_callback(
     goal_entry_handlers,
     briefing_handlers,
     storytelling_handlers,
+    feedback_handlers,
     dashboard_service,
     handle_transaction_callback,
     handle_menu_v2_callback,
@@ -506,6 +532,10 @@ async def _handle_callback(
         callback_data=callback_data,
         dashboard_service=dashboard_service,
     )
+
+    # Feedback prompt callbacks own the feedback:* namespace.
+    if await feedback_handlers.handle_feedback_callback(db, callback_query):
+        return await _resolved_user_id()
 
     # About-page callbacks are static and do not need a user lookup.
     if await about_handlers.handle_about_callback(callback_query):

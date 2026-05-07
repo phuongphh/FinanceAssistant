@@ -265,12 +265,12 @@ class TestSetupBotCommands:
         assert "setMyCommands" in call_url
 
     @pytest.mark.asyncio
-    async def test_sends_4_phase_36_commands(self, mock_settings, mock_httpx):
+    async def test_sends_phase_385_commands(self, mock_settings, mock_httpx):
         await setup_bot_commands()
         payload = mock_httpx.post.call_args[1]["json"]
         commands = payload["commands"]
         names = [c["command"] for c in commands]
-        assert names == ["start", "menu", "help", "dashboard"]
+        assert names == ["start", "menu", "help", "dashboard", "feedback", "about"]
         # No deprecated V1 commands surfaced — Phase 3.6 cuts the list.
         for legacy in ("themtaisan", "taisan", "report", "goals", "market"):
             assert legacy not in names
