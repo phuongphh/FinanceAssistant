@@ -3,6 +3,7 @@
 Returns raw Telegram `InlineKeyboardMarkup` dicts (JSON-serialisable) vì
 `backend.services.telegram_service.send_message` gửi thẳng dict qua Bot API.
 """
+
 from backend.bot.keyboards.common import CallbackPrefix, build_callback
 from backend.config.categories import get_all_categories
 
@@ -27,19 +28,45 @@ def transaction_actions_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
                 },
                 {
                     "text": "✏️ Sửa",
-                    "callback_data": build_callback(CallbackPrefix.EDIT_TRANSACTION, tx),
+                    "callback_data": build_callback(
+                        CallbackPrefix.EDIT_TRANSACTION, tx
+                    ),
                 },
                 {
                     "text": "🗑 Xóa",
-                    "callback_data": build_callback(CallbackPrefix.DELETE_TRANSACTION, tx),
+                    "callback_data": build_callback(
+                        CallbackPrefix.DELETE_TRANSACTION, tx
+                    ),
                 },
             ],
             [
                 {
                     "text": "↶ Hủy (5s)",
-                    "callback_data": build_callback(CallbackPrefix.UNDO_TRANSACTION, tx),
+                    "callback_data": build_callback(
+                        CallbackPrefix.UNDO_TRANSACTION, tx
+                    ),
                 },
             ],
+        ],
+    }
+
+
+def transaction_batch_actions_keyboard(batch_id: str) -> InlineKeyboardMarkup:
+    """Keyboard cho confirmation nhiều giao dịch.
+
+    Với batch, chỉ hỗ trợ undo cả nhóm để tránh đổi danh mục/sửa nhầm
+    một item trong tin nhắn tổng.
+    """
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "↶ Hủy tất cả (5s)",
+                    "callback_data": build_callback(
+                        CallbackPrefix.UNDO_TRANSACTION_BATCH, batch_id
+                    ),
+                }
+            ]
         ],
     }
 

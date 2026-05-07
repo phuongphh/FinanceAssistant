@@ -5,6 +5,7 @@ labels "170k ăn trưa" as ``ACTION_QUICK_TRANSACTION``, the dispatcher
 must route to this handler (not the not-implemented fallback) and the
 handler must persist an expense + send the rich confirmation card.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -88,9 +89,7 @@ async def test_falls_back_to_llm_when_classifier_missed_amount():
     db = _fake_db()
     fake_expense = MagicMock(user_id="user-1")
 
-    llm_response = (
-        '{"amount": 50000, "merchant": "cà phê", "is_expense": true}'
-    )
+    llm_response = '{"amount": 50000, "merchant": "cà phê", "is_expense": true}'
 
     with patch(
         "backend.intent.handlers.action_quick_transaction.call_llm",
@@ -147,3 +146,82 @@ async def test_returns_friendly_text_when_no_amount_can_be_parsed():
     assert text  # non-empty hint to the user
     mock_create.assert_not_called()
     mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_splits_multiple_expenses_in_one_message_without_llm():
+    """Messages with multiple amount tokens should create one expense per item."""
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={"amount": 100_000, "merchant": "tiền xăng, ăn trưa"},
+        raw_text="Tối qua tiền xăng 50k, ăn trưa 50k",
+    )
+    db = _fake_db()
+    fake_expenses = [MagicMock(user_id="user-1"), MagicMock(user_id="user-1")]
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(side_effect=fake_expenses),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ) as mock_send_single, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_batch_confirmation",
+        AsyncMock(),
+    ) as mock_send_batch, patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(),
+    ) as mock_llm:
+        text = await handler.handle(result, _user(), db)
+
+    assert text == ""
+    assert mock_create.await_count == 2
+    mock_send_single.assert_not_called()
+    mock_send_batch.assert_awaited_once()
+    mock_llm.assert_not_called()
+
+    first = mock_create.await_args_list[0].args[2]
+    second = mock_create.await_args_list[1].args[2]
+    assert first.amount == 50_000.0
+    assert first.merchant == "tiền xăng"
+    assert first.category == "transport"
+    assert first.raw_data["batch_id"] == second.raw_data["batch_id"]
+    assert second.amount == 50_000.0
+    assert second.merchant == "ăn trưa"
+    assert second.category == "food"
+
+
+@pytest.mark.asyncio
+async def test_keeps_single_total_message_as_one_expense():
+    """One total amount for multiple nouns should remain one expense."""
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={"amount": 400_000, "merchant": "ăn tối và trà sữa"},
+        raw_text="Tối qua ăn tối và trà sữa 400k",
+    )
+    db = _fake_db()
+    fake_expense = MagicMock(user_id="user-1")
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=fake_expense),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ) as mock_send_single, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_batch_confirmation",
+        AsyncMock(),
+    ) as mock_send_batch:
+        text = await handler.handle(result, _user(), db)
+
+    assert text == ""
+    mock_create.assert_awaited_once()
+    mock_send_single.assert_awaited_once()
+    mock_send_batch.assert_not_called()
+    expense_data = mock_create.call_args.args[2]
+    assert expense_data.amount == 400_000.0
+    assert expense_data.merchant == "ăn tối và trà sữa"

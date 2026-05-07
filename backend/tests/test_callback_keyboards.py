@@ -1,4 +1,5 @@
 """Tests for Issue #28: callback convention + keyboards."""
+
 import uuid
 
 import pytest
@@ -13,6 +14,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
     confirm_delete_keyboard,
     transaction_actions_keyboard,
+    transaction_batch_actions_keyboard,
 )
 from backend.config.categories import get_all_categories
 
@@ -98,6 +100,20 @@ class TestTransactionActionsKeyboard:
                     len(btn["callback_data"].encode("utf-8"))
                     <= TELEGRAM_CALLBACK_DATA_MAX_BYTES
                 )
+
+
+class TestTransactionBatchActionsKeyboard:
+    def test_undo_batch_callback(self):
+        batch_id = str(uuid.uuid4())
+        kb = transaction_batch_actions_keyboard(batch_id)
+        button = kb["inline_keyboard"][0][0]
+        prefix, args = parse_callback(button["callback_data"])
+        assert prefix == CallbackPrefix.UNDO_TRANSACTION_BATCH
+        assert args == [batch_id]
+        assert (
+            len(button["callback_data"].encode("utf-8"))
+            <= TELEGRAM_CALLBACK_DATA_MAX_BYTES
+        )
 
 
 class TestCategoryPickerKeyboard:
