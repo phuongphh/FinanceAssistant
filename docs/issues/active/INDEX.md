@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #250 | [Story] P3.8.5-S7: Edit display name + age range flows | [issue-250.md](issue-250.md) |
 | #251 | [Story] P3.8.5-S8: Notification settings flow | [issue-251.md](issue-251.md) |
 
-**Total active:** 11
+**Total active:** 10
