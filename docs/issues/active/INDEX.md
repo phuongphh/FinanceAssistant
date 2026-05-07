@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #243 | [Epic] Phase 3.8.5 — Epic 3: User Profile (Edit) | [issue-243.md](issue-243.md) |
 | #244 | [Story] P3.8.5-S1: Feedback model + /feedback command handler | [issue-244.md](issue-244.md) |
 | #245 | [Story] P3.8.5-S2: Backend auto-classification via DeepSeek | [issue-245.md](issue-245.md) |
+| #246 | [Story] P3.8.5-S3: Active prompts scheduler | [issue-246.md](issue-246.md) |
 
-**Total active:** 14
+**Total active:** 15
