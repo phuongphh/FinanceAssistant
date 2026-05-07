@@ -327,7 +327,12 @@ async def handle_profile_callback(
 
     if action == "time" and len(parts) >= 4:
         kind = parts[2]
-        parsed = parse_hhmm(parts[3])
+        # The preset value is HH:MM, so a plain split(":") turns
+        # ``profile:time:briefing:08:00`` into [.., "08", "00"].
+        # Re-join the tail to keep preset buttons from being parsed as
+        # invalid and leaving the user with only a dismissed spinner.
+        raw_time = ":".join(parts[3:])
+        parsed = parse_hhmm(raw_time)
         if parsed is None:
             await answer_callback(callback_id, "Giờ không hợp lệ.", show_alert=True)
             return True

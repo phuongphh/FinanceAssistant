@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.jobs.reminder_scheduler_job import _should_send_reminders_now
 from backend.models.user import User
 from backend.profile.handlers.profile_menu import (
+    handle_profile_callback,
     handle_profile_view,
     notification_keyboard,
     parse_hhmm,
@@ -227,6 +228,71 @@ def test_notification_keyboard_reflects_status_and_times():
     assert "08:00" in buttons[1]
     assert "✅ Bật" in buttons[2]
     assert "09:30" in buttons[3]
+
+
+
+
+@pytest.mark.asyncio
+async def test_preset_briefing_time_callback_accepts_colon_value(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    user.briefing_time = time(7, 0)
+    profile = UserProfile(user_id=user.id)
+    profile.briefing_time = time(7, 0)
+    profile.briefing_enabled = True
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 0)
+    db = MagicMock()
+    db.flush = AsyncMock()
+    edited: dict = {}
+
+    async def fake_get_user(db, telegram_id):
+        assert telegram_id == 12345
+        return user
+
+    async def fake_get_or_create_profile(db, user_id):
+        assert user_id == user.id
+        return profile
+
+    async def fake_answer_callback(*args, **kwargs):
+        assert kwargs.get("text") != "Giờ không hợp lệ."
+
+    async def fake_edit_message_text(**kwargs):
+        edited.update(kwargs)
+
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu._get_user_by_telegram_id",
+        fake_get_user,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.get_or_create_profile",
+        fake_get_or_create_profile,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.answer_callback",
+        fake_answer_callback,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.edit_message_text",
+        fake_edit_message_text,
+    )
+
+    handled = await handle_profile_callback(
+        db,
+        {
+            "id": "cb-1",
+            "data": "profile:time:briefing:08:00",
+            "from": {"id": 12345},
+            "message": {"chat": {"id": 42}, "message_id": 99},
+        },
+    )
+
+    assert handled is True
+    assert profile.briefing_time == time(8, 0)
+    assert user.briefing_time == time(8, 0)
+    assert "08:00" in edited["text"]
+    db.flush.assert_awaited_once()
 
 
 def test_reminder_profile_settings_gate_delivery_time():
