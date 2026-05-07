@@ -13,6 +13,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
+| #242 | [Epic] Phase 3.8.5 — Epic 2: User Profile (View) | [issue-242.md](issue-242.md) |
 | #243 | [Epic] Phase 3.8.5 — Epic 3: User Profile (Edit) | [issue-243.md](issue-243.md) |
 
-**Total active:** 10
+**Total active:** 11
