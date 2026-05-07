@@ -16,5 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #241 | [Epic] Phase 3.8.5 — Epic 1: Feedback System | [issue-241.md](issue-241.md) |
 | #242 | [Epic] Phase 3.8.5 — Epic 2: User Profile (View) | [issue-242.md](issue-242.md) |
 | #243 | [Epic] Phase 3.8.5 — Epic 3: User Profile (Edit) | [issue-243.md](issue-243.md) |
+| #244 | [Story] P3.8.5-S1: Feedback model + /feedback command handler | [issue-244.md](issue-244.md) |
 
-**Total active:** 12
+**Total active:** 13
