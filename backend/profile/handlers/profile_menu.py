@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import time
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
@@ -13,6 +15,7 @@ from backend.bot.formatters.progress_bar import make_progress_bar
 from backend.models.user import User
 from backend.profile.models.user_profile import AGE_RANGES, UserProfile
 from backend.profile.services.stats_aggregator import ProfileStatsAggregator
+from backend.profile.services.wealth_level_mapper import WealthLevelMapper
 from backend.services import wizard_service
 from backend.services.telegram_service import (
     answer_callback,
@@ -26,19 +29,30 @@ STEP_NOTIFICATION_TIME = "awaiting_notification_time"
 TIME_PRESETS = (time(6, 0), time(7, 0), time(8, 0), time(9, 0))
 _TIME_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+logger = logging.getLogger(__name__)
+
+PROFILE_DEGRADED_NOTICE = (
+    "_Mình đang hiển thị Profile ở chế độ an toàn; vài số liệu/cài đặt "
+    "có thể tạm thời chưa cập nhật._"
+)
 
 
-def profile_keyboard() -> dict[str, list[list[dict[str, str]]]]:
-    return {
-        "inline_keyboard": [
+def profile_keyboard(
+    *, editable: bool = True
+) -> dict[str, list[list[dict[str, str]]]]:
+    rows = []
+    if editable:
+        rows.extend(
             [
-                {"text": "📝 Đổi tên hiển thị", "callback_data": "profile:edit_name"},
-                {"text": "🎂 Đổi nhóm tuổi", "callback_data": "profile:edit_age"},
-            ],
-            [{"text": "🔔 Cài thông báo", "callback_data": "profile:notifications"}],
-            [{"text": "◀️ Quay lại", "callback_data": "menu:main"}],
-        ]
-    }
+                [
+                    {"text": "📝 Đổi tên hiển thị", "callback_data": "profile:edit_name"},
+                    {"text": "🎂 Đổi nhóm tuổi", "callback_data": "profile:edit_age"},
+                ],
+                [{"text": "🔔 Cài thông báo", "callback_data": "profile:notifications"}],
+            ]
+        )
+    rows.append([{"text": "◀️ Quay lại", "callback_data": "menu:main"}])
+    return {"inline_keyboard": rows}
 
 
 def age_keyboard() -> dict[str, list[list[dict[str, str]]]]:
@@ -117,6 +131,30 @@ def time_keyboard(kind: str) -> dict[str, list[list[dict[str, str]]]]:
     }
 
 
+async def get_profile_or_default(
+    db: AsyncSession, user: User
+) -> tuple[UserProfile, bool]:
+    """Return the saved profile when available, otherwise safe defaults.
+
+    The Profile screen is a read path. It should not fail the whole menu just
+    because the optional profile overlay cannot be read (for example while a
+    migration is being rolled out). Editable actions still use
+    ``get_or_create_profile`` below.
+    """
+    try:
+        profile = (
+            await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+        ).scalar_one_or_none()
+    except SQLAlchemyError:
+        logger.exception("profile lookup failed; rendering degraded profile")
+        await db.rollback()
+        return _default_profile(user), False
+
+    if profile is not None:
+        return profile, True
+    return _default_profile(user), True
+
+
 async def get_or_create_profile(db: AsyncSession, user_id) -> UserProfile:
     profile = (
         await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
@@ -136,15 +174,30 @@ async def handle_profile_view(
     *,
     message_id: int | None = None,
 ) -> None:
-    profile = await get_or_create_profile(db, user.id)
-    stats = await ProfileStatsAggregator().aggregate(db, user.id)
-    text = render_profile(profile, user, stats)
+    profile, profile_editable = await get_profile_or_default(db, user)
+    notice = None
+    if profile_editable:
+        try:
+            stats = await ProfileStatsAggregator().aggregate(db, user.id)
+        except SQLAlchemyError:
+            logger.exception("profile stats aggregation failed; rendering fallback stats")
+            await db.rollback()
+            stats = _fallback_stats()
+            notice = PROFILE_DEGRADED_NOTICE
+        except Exception:
+            logger.exception("profile stats aggregation failed; rendering fallback stats")
+            stats = _fallback_stats()
+            notice = PROFILE_DEGRADED_NOTICE
+    else:
+        stats = _fallback_stats()
+        notice = PROFILE_DEGRADED_NOTICE
+    text = render_profile(profile, user, stats, notice=notice)
     if message_id is None:
         await send_message(
             chat_id=chat_id,
             text=text,
             parse_mode="Markdown",
-            reply_markup=profile_keyboard(),
+            reply_markup=profile_keyboard(editable=profile_editable),
         )
         return
     await edit_message_text(
@@ -152,7 +205,7 @@ async def handle_profile_view(
         message_id=message_id,
         text=text,
         parse_mode="Markdown",
-        reply_markup=profile_keyboard(),
+        reply_markup=profile_keyboard(editable=profile_editable),
     )
 
 
@@ -324,7 +377,13 @@ async def handle_profile_text_input(
     return False
 
 
-def render_profile(profile: UserProfile, user: User, stats: dict[str, Any]) -> str:
+def render_profile(
+    profile: UserProfile,
+    user: User,
+    stats: dict[str, Any],
+    *,
+    notice: str | None = None,
+) -> str:
     level = stats["wealth_level"]
     progress = stats["wealth_progress"]
     name = _display_name(profile, user)
@@ -350,6 +409,9 @@ def render_profile(profile: UserProfile, user: User, stats: dict[str, Any]) -> s
     if change is not None:
         sign = "+" if change >= 0 else ""
         lines.append(f"• Thay đổi tài sản: *{sign}{change:.1f}%*")
+
+    if notice:
+        lines.extend(["", notice])
 
     lines.extend([
         "",
@@ -447,6 +509,36 @@ async def _set_notification_time(
     await db.flush()
 
 
+def _default_profile(user: User) -> UserProfile:
+    profile = UserProfile(user_id=user.id)
+    profile.display_name = getattr(user, "display_name", None)
+    profile.age_range = None
+    profile.briefing_enabled = bool(getattr(user, "briefing_enabled", True))
+    profile.briefing_time = getattr(user, "briefing_time", None) or time(7, 0)
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 0)
+    return profile
+
+
+def _fallback_stats() -> dict[str, Any]:
+    mapper = WealthLevelMapper()
+    net_worth = Decimal("0")
+    return {
+        "account_age_days": 0,
+        "net_worth": net_worth,
+        "wealth_level": mapper.get_level(net_worth),
+        "wealth_progress": mapper.get_progress_to_next(net_worth),
+        "asset_types_count": 0,
+        "transaction_count_total": 0,
+        "transaction_count_this_month": 0,
+        "goals_active": 0,
+        "goals_completed": 0,
+        "briefing_read_count": 0,
+        "current_streak": 1,
+        "net_worth_change_pct": None,
+    }
+
+
 def _display_name(profile: UserProfile, user: User) -> str:
     for value in (
         profile.display_name,
@@ -493,6 +585,7 @@ __all__ = [
     "STEP_NOTIFICATION_TIME",
     "age_keyboard",
     "get_or_create_profile",
+    "get_profile_or_default",
     "handle_profile_callback",
     "handle_profile_text_input",
     "handle_profile_view",

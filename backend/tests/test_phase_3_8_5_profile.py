@@ -7,10 +7,12 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.jobs.reminder_scheduler_job import _should_send_reminders_now
 from backend.models.user import User
 from backend.profile.handlers.profile_menu import (
+    handle_profile_view,
     notification_keyboard,
     parse_hhmm,
     render_profile,
@@ -119,6 +121,69 @@ def test_render_profile_includes_vn_level_and_stats():
     assert "Tinh Hoa" in text
     assert "8" in text
 
+
+@pytest.mark.asyncio
+async def test_handle_profile_view_degrades_when_profile_storage_fails(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.display_name = "Bé Tiền Test"
+    user.briefing_enabled = True
+    user.briefing_time = time(7, 0)
+
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=SQLAlchemyError("missing user_profiles"))
+    db.rollback = AsyncMock()
+    sent: dict = {}
+
+    async def fake_send_message(**kwargs):
+        sent.update(kwargs)
+
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.send_message",
+        fake_send_message,
+    )
+
+    await handle_profile_view(db, chat_id=42, user=user)
+
+    assert sent["chat_id"] == 42
+    assert "Profile của Bé Tiền Test" in sent["text"]
+    assert "chế độ an toàn" in sent["text"]
+    assert sent["reply_markup"]["inline_keyboard"] == [
+        [{"text": "◀️ Quay lại", "callback_data": "menu:main"}]
+    ]
+    db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_profile_view_degrades_when_stats_fail(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.display_name = "Bé Tiền Test"
+
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=_scalar(None))
+    sent: dict = {}
+
+    async def fake_send_message(**kwargs):
+        sent.update(kwargs)
+
+    async def fake_aggregate(self, db, user_id):
+        raise RuntimeError("stats backend down")
+
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.send_message",
+        fake_send_message,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.ProfileStatsAggregator.aggregate",
+        fake_aggregate,
+    )
+
+    await handle_profile_view(db, chat_id=42, user=user)
+
+    assert "Profile của Bé Tiền Test" in sent["text"]
+    assert "chế độ an toàn" in sent["text"]
+    assert len(sent["reply_markup"]["inline_keyboard"]) == 3
 
 
 def test_sanitize_display_name_validates_and_strips_at():
