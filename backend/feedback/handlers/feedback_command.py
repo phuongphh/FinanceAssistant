@@ -25,8 +25,10 @@ CONFIRMATION_MESSAGE = (
 CANCEL_MESSAGE = "Đã huỷ gửi feedback rồi nè. Khi nào muốn góp ý, bạn gõ /feedback nhé 💚"
 
 
-async def start_feedback(db: AsyncSession, chat_id: int, user: User, *, trigger: str = "passive_command") -> None:
-    await wizard_service.start(
+async def start_feedback(
+    db: AsyncSession, chat_id: int, user: User, *, trigger: str = "passive_command"
+) -> None:
+    await wizard_service.start_flow(
         db,
         user.id,
         flow=FLOW_FEEDBACK,
@@ -54,7 +56,10 @@ async def handle_feedback_text_input(db: AsyncSession, message: dict) -> bool:
         await send_message(chat_id, CANCEL_MESSAGE, parse_mode="Markdown")
         return True
 
-    trigger = (user.wizard_state or {}).get("draft", {}).get("trigger") or "passive_command"
+    trigger = (
+        (user.wizard_state or {}).get("draft", {}).get("trigger")
+        or "passive_command"
+    )
     try:
         await feedback_service.create_feedback(db, user, text, trigger=trigger)
     except feedback_service.FeedbackValidationError as exc:
@@ -87,7 +92,11 @@ async def handle_feedback_callback(db: AsyncSession, callback_query: dict) -> bo
 
     from backend.services.dashboard_service import get_user_by_telegram_id
 
-    user = await get_user_by_telegram_id(db, telegram_id) if telegram_id is not None else None
+    user = (
+        await get_user_by_telegram_id(db, telegram_id)
+        if telegram_id is not None
+        else None
+    )
     if user is None:
         await answer_callback(callback_id, "Không tìm thấy hồ sơ người dùng.")
         return True
@@ -97,16 +106,21 @@ async def handle_feedback_callback(db: AsyncSession, callback_query: dict) -> bo
         await answer_callback(callback_id, "Đã ghi nhận, để sau nhé 💚")
         return True
     if action == "cta":
-        await wizard_service.start(
+        await wizard_service.start_flow(
             db,
             user.id,
             flow=FLOW_FEEDBACK,
             step=STEP_AWAITING_TEXT,
             draft={"trigger": prompt_id},
         )
-        chat_id = callback_query.get("message", {}).get("chat", {}).get("id") or user.telegram_id
+        chat_id = (
+            callback_query.get("message", {}).get("chat", {}).get("id")
+            or user.telegram_id
+        )
         await answer_callback(callback_id)
-        await send_message(chat_id, "Bạn nhắn cảm nhận của mình ở đây nhé 💚", parse_mode="Markdown")
+        await send_message(
+            chat_id, "Bạn nhắn cảm nhận của mình ở đây nhé 💚", parse_mode="Markdown"
+        )
         return True
 
     await answer_callback(callback_id)
