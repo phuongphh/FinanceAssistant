@@ -158,6 +158,11 @@ async def handle_briefing_callback(
 
     await answer_callback(callback_id)
     await _record_open_if_first(db, user.id)
+    from backend.feedback.services.prompt_scheduler import check_briefing_read_prompt
+    try:
+        await check_briefing_read_prompt(db, user.id)
+    except Exception:
+        logger.exception("briefing feedback prompt hook failed")
 
     event_type = _ACTION_TO_EVENT.get(action)
     if event_type:

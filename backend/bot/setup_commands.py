@@ -40,6 +40,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "menu", "description": "Menu chính"},
     {"command": "help", "description": "Hướng dẫn sử dụng"},
     {"command": "dashboard", "description": "Mở Mini App dashboard"},
+    {"command": "feedback", "description": "Gửi góp ý nhanh"},
     {"command": "about", "description": "Thông tin ứng dụng"},
 ]
 

@@ -1,0 +1,31 @@
+prompts:
+  - id: post_onboarding_day_7
+    trigger: account_age_days == 7
+    message: "Bé Tiền đồng hành với bạn được 7 ngày rồi 💚 Trải nghiệm ban đầu ổn không?"
+    cta_button: "Chia sẻ cảm nhận"
+    skip_button: "Để sau"
+    cooldown_days: 60
+  - id: post_briefing_30_reads
+    trigger: briefing_read_count == 30
+    message: "Bạn đã đọc 30 bản tin sáng rồi 🎉 Có điểm nào Bé Tiền nên cải thiện không?"
+    cta_button: "Góp ý briefing"
+    skip_button: "Để sau"
+    cooldown_days: 90
+  - id: post_first_goal_completed
+    trigger: goals_completed_count == 1
+    message: "Chúc mừng bạn hoàn thành mục tiêu đầu tiên! Bé Tiền hỗ trợ hành trình này tốt chưa?"
+    cta_button: "Chia sẻ cảm nhận"
+    skip_button: "Để sau"
+    cooldown_days: 180
+  - id: post_phase_4_launch
+    trigger: phase_4_first_view == true
+    message: "Bạn vừa thử tính năng mới. Cảm nhận nhanh của bạn sẽ giúp Bé Tiền chỉnh tốt hơn 💚"
+    cta_button: "Góp ý tính năng"
+    skip_button: "Để sau"
+    cooldown_days: 30
+  - id: post_3_months_active
+    trigger: account_age_days == 90
+    message: "3 tháng dùng Bé Tiền rồi đó! Điều gì hữu ích nhất, điều gì còn vướng?"
+    cta_button: "Chia sẻ ngay"
+    skip_button: "Để sau"
+    cooldown_days: 180
