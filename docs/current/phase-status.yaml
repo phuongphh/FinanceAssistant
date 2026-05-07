@@ -150,3 +150,14 @@ roadmap:
     completed_date: ""
     icon: "🔮"
     skeleton: true
+
+  - id: "3.8.5"
+    name: "TODO (skeleton — please update)"
+    status: planned
+    duration: "TBD"
+    detailed_doc: "docs/current/phase-3.8.5-detailed.md"
+    issues_doc: ""
+    description: "TODO: 1-line summary"
+    completed_date: ""
+    icon: "🔮"
+    skeleton: true

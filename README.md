@@ -25,6 +25,7 @@
 - 🔮 Phase 5: Behavioral Engine
 - 🔮 Phase 6: Scale & Commercialize
 - 🔮 Phase 3.8: TODO (skeleton — please update)
+- 🔮 Phase 3.8.5: TODO (skeleton — please update)
 <!-- END: phase-status:status-list -->
 
 
