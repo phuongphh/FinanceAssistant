@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "claude/**"
+      - "codex/**"
 
 permissions:
   contents: write
