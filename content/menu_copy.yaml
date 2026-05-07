@@ -69,6 +69,8 @@ main_menu:
       callback: "menu:goals"
     - label: "📊 Thị trường"
       callback: "menu:market"
+    - label: "👤 Profile"
+      callback: "menu:profile"
 
   hint: |-
     💡 _Mẹo:_ bạn có thể hỏi mình thẳng — không cần menu:
