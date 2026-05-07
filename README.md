@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Phase 3.7: Agent Architecture** (current) — [detail](docs/current/phase-3.7-detailed.md)
+🧪 **Pre-Launch Readiness** (testing) — [detail](docs/current/phase-3.8.5/phase-3.8.5-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->

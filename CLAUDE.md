@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Phase 3.7: Agent Architecture** (current) — [detail](docs/current/phase-3.7-detailed.md)
+🧪 **Pre-Launch Readiness** (testing) — [detail](docs/current/phase-3.8.5/phase-3.8.5-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
