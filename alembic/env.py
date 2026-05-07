@@ -12,7 +12,7 @@ from backend.models import (  # noqa: F401 — ensure all models are registered
     User, Expense, Goal, MonthlyReport,
     MarketSnapshot, InvestmentLog, LLMCache,
     PortfolioAsset, IncomeRecord, Event,
-    UserMilestone, UserStreak,
+    UserMilestone, UserStreak, Feedback, PromptSentLog, UserProfile,
 )
 from backend.wealth.models import (  # noqa: F401 — register Phase 3A wealth models
     Asset, AssetSnapshot, IncomeStream,

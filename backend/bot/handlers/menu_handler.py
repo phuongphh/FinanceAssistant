@@ -209,7 +209,7 @@ async def handle_menu_callback(
     user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
 
     target = parts[1]
-    is_v2 = target == "main" or target in known_categories()
+    is_v2 = target == "main" or target == "profile" or target in known_categories()
 
     if not is_v2:
         # Legacy V1 callback. Acknowledge + send redirect; do NOT
@@ -297,6 +297,16 @@ async def _navigate(
     level = user.wealth_level
     if target == "main":
         text, keyboard = format_main_menu(user, level=level)
+    elif target == "profile":
+        from backend.profile.handlers.profile_menu import handle_profile_view
+
+        await handle_profile_view(db, chat_id, user, message_id=message_id)
+        analytics.track(
+            "profile_viewed",
+            user_id=user.id,
+            properties={"source": "menu"},
+        )
+        return
     else:
         text, keyboard = format_submenu(user, target, level=level)
 

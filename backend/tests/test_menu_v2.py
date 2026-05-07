@@ -48,14 +48,15 @@ class TestYamlSchema:
         assert isinstance(copy, dict)
         assert "main_menu" in copy
 
-    def test_main_menu_has_five_categories(self):
+    def test_main_menu_has_phase385_profile_entry(self):
         copy = menu_formatter._load_copy()
         buttons = copy["main_menu"]["buttons"]
-        assert len(buttons) == 5
+        assert len(buttons) == 6
+        assert buttons[-1]["callback"] == "menu:profile"
 
     def test_main_menu_buttons_route_to_known_categories(self):
         copy = menu_formatter._load_copy()
-        cats = set(known_categories())
+        cats = set(known_categories()) | {"profile"}
         for btn in copy["main_menu"]["buttons"]:
             cat = btn["callback"].split(":")[1]
             assert cat in cats, f"Main menu button points to unknown category: {cat}"
@@ -173,10 +174,10 @@ class TestFormatMainMenu:
     def test_keyboard_layout_is_2_column_grid(self):
         _, kb = format_main_menu(_user())
         rows = kb["inline_keyboard"]
-        # 5 buttons, 2 per row → 3 rows (last has 1).
+        # Phase 3.8.5 adds Profile: 6 buttons, 2 per row → 3 full rows.
         assert len(rows) == 3
         assert len(rows[0]) == 2
-        assert len(rows[-1]) == 1
+        assert len(rows[-1]) == 2
 
     def test_unknown_level_falls_back_to_default(self):
         text, _ = format_main_menu(_user(), level="alien-level")
