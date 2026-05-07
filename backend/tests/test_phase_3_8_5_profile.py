@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.jobs.reminder_scheduler_job import _should_send_reminders_now
 from backend.models.user import User
-from backend.profile.handlers.profile_menu import render_profile
+from backend.profile.handlers.profile_menu import (
+    notification_keyboard,
+    parse_hhmm,
+    render_profile,
+    sanitize_display_name,
+)
 from backend.profile.models.user_profile import UserProfile
 from backend.profile.services.stats_aggregator import ProfileStatsAggregator
 from backend.profile.services.wealth_level_mapper import WealthLevelMapper
@@ -64,7 +70,10 @@ async def test_aggregate_new_user_defaults_gracefully():
         _scalar(None),  # first snapshot
     ])
 
-    with patch("backend.profile.services.stats_aggregator.net_worth_calculator.calculate", AsyncMock(return_value=SimpleNamespace(total=Decimal("0")))):
+    with patch(
+        "backend.profile.services.stats_aggregator.net_worth_calculator.calculate",
+        AsyncMock(return_value=SimpleNamespace(total=Decimal("0"))),
+    ):
         stats = await ProfileStatsAggregator().aggregate(db, user.id)
 
     assert stats["account_age_days"] == 0
@@ -89,7 +98,9 @@ def test_render_profile_includes_vn_level_and_stats():
         "account_age_days": 12,
         "net_worth": Decimal("300000000"),
         "wealth_level": WealthLevelMapper().get_level(Decimal("300000000")),
-        "wealth_progress": WealthLevelMapper().get_progress_to_next(Decimal("300000000")),
+        "wealth_progress": WealthLevelMapper().get_progress_to_next(
+            Decimal("300000000")
+        ),
         "asset_types_count": 3,
         "transaction_count_total": 40,
         "transaction_count_this_month": 8,
@@ -107,3 +118,55 @@ def test_render_profile_includes_vn_level_and_stats():
     assert "Trung Lưu Vững" in text
     assert "Tinh Hoa" in text
     assert "8" in text
+
+
+
+def test_sanitize_display_name_validates_and_strips_at():
+    assert sanitize_display_name("@Phương 💚\x00") == ("Phương 💚", None)
+    assert sanitize_display_name("   ")[1] == "Tên không được trống."
+    assert sanitize_display_name("x" * 51)[1] == (
+        "Tên dài quá! Tối đa 50 ký tự nhé."
+    )
+
+
+def test_parse_hhmm_validation():
+    assert parse_hhmm("7:05") == time(7, 5)
+    assert parse_hhmm("25:99") is None
+    assert parse_hhmm("bad") is None
+
+
+def test_notification_keyboard_reflects_status_and_times():
+    profile = UserProfile(user_id=uuid.uuid4())
+    profile.briefing_enabled = False
+    profile.briefing_time = time(8, 0)
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 30)
+
+    keyboard = notification_keyboard(profile)
+    buttons = [button[0]["text"] for button in keyboard["inline_keyboard"][:4]]
+
+    assert "🔕 Tắt" in buttons[0]
+    assert "08:00" in buttons[1]
+    assert "✅ Bật" in buttons[2]
+    assert "09:30" in buttons[3]
+
+
+def test_reminder_profile_settings_gate_delivery_time():
+    profile = UserProfile(user_id=uuid.uuid4())
+    profile.reminder_enabled = True
+    profile.reminder_time = time(8, 0)
+
+    assert _should_send_reminders_now(
+        profile,
+        now=datetime(2026, 5, 7, 8, 10, tzinfo=timezone.utc),
+    ) is True
+    assert _should_send_reminders_now(
+        profile,
+        now=datetime(2026, 5, 7, 8, 15, tzinfo=timezone.utc),
+    ) is False
+
+    profile.reminder_enabled = False
+    assert _should_send_reminders_now(
+        profile,
+        now=datetime(2026, 5, 7, 8, 5, tzinfo=timezone.utc),
+    ) is False

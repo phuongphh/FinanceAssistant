@@ -79,6 +79,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import recurring_entry as recurring_entry_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
     from backend.feedback.handlers import feedback_command as feedback_handlers
+    from backend.profile.handlers import profile_menu as profile_handlers
     from backend.bot.handlers.callbacks import handle_transaction_callback
     from backend.bot.handlers.menu_handler import (
         handle_menu_callback as handle_menu_v2_callback,
@@ -108,6 +109,7 @@ async def route_update(data: dict) -> None:
                     goal_entry_handlers=goal_entry_handlers,
                     storytelling_handlers=storytelling_handlers,
                     feedback_handlers=feedback_handlers,
+                    profile_handlers=profile_handlers,
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
@@ -128,6 +130,7 @@ async def route_update(data: dict) -> None:
                         briefing_handlers=briefing_handlers,
                         storytelling_handlers=storytelling_handlers,
                         feedback_handlers=feedback_handlers,
+                        profile_handlers=profile_handlers,
                         dashboard_service=dashboard_service,
                         handle_transaction_callback=handle_transaction_callback,
                         handle_menu_v2_callback=handle_menu_v2_callback,
@@ -160,6 +163,7 @@ async def _handle_message(
     goal_entry_handlers,
     storytelling_handlers,
     feedback_handlers,
+    profile_handlers,
     dashboard_service,
     handle_report_command,
     handle_text_message,
@@ -285,7 +289,9 @@ async def _handle_message(
     # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            if (resolved_user.wizard_state or {}).get("flow") == feedback_handlers.FLOW_FEEDBACK:
+            if (resolved_user.wizard_state or {}).get("flow") == profile_handlers.FLOW_PROFILE:
+                await profile_handlers.handle_profile_text_input(db, message)
+            elif (resolved_user.wizard_state or {}).get("flow") == feedback_handlers.FLOW_FEEDBACK:
                 await feedback_handlers.handle_feedback_text_input(db, message)
             elif not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
@@ -333,6 +339,18 @@ async def _handle_message(
         consumed = await onboarding_handlers.handle_name_input(
             db, chat_id, resolved_user, text
         )
+        if consumed:
+            return resolved_user.id
+
+    # Profile edit text input — must run before generic wizard/free-form parsers.
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+        and (resolved_user.wizard_state or {}).get("flow")
+        == profile_handlers.FLOW_PROFILE
+    ):
+        consumed = await profile_handlers.handle_profile_text_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -503,6 +521,7 @@ async def _handle_callback(
     briefing_handlers,
     storytelling_handlers,
     feedback_handlers,
+    profile_handlers,
     dashboard_service,
     handle_transaction_callback,
     handle_menu_v2_callback,
@@ -535,6 +554,10 @@ async def _handle_callback(
 
     # Feedback prompt callbacks own the feedback:* namespace.
     if await feedback_handlers.handle_feedback_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Profile edit callbacks own the profile:* namespace.
+    if await profile_handlers.handle_profile_callback(db, callback_query):
         return await _resolved_user_id()
 
     # About-page callbacks are static and do not need a user lookup.

@@ -33,7 +33,7 @@ import logging
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import distinct, select
+from sqlalchemy import and_, distinct, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -43,6 +43,7 @@ from backend.database import get_session_factory
 from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.user import User
+from backend.profile.models.user_profile import UserProfile
 from backend.ports.notifier import get_notifier
 
 logger = logging.getLogger(__name__)
@@ -106,14 +107,30 @@ async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
     if not user_ids:
         return []
 
-    stmt = select(User).where(
-        User.id.in_(user_ids),
-        User.is_active.is_(True),
-        User.deleted_at.is_(None),
-        User.telegram_id.isnot(None),
-        User.briefing_enabled.is_(True),
+    stmt = (
+        select(User, UserProfile)
+        .outerjoin(UserProfile, UserProfile.user_id == User.id)
+        .where(
+            User.id.in_(user_ids),
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+            User.telegram_id.isnot(None),
+            or_(
+                and_(
+                    UserProfile.user_id.is_(None),
+                    User.briefing_enabled.is_(True),
+                ),
+                UserProfile.briefing_enabled.is_(True),
+            ),
+        )
     )
-    return list((await db.execute(stmt)).scalars())
+    candidates: list[User] = []
+    for user, profile in (await db.execute(stmt)).all():
+        user._profile_briefing_time = (  # type: ignore[attr-defined]
+            profile.briefing_time if profile is not None else user.briefing_time
+        )
+        candidates.append(user)
+    return candidates
 
 
 async def run_morning_briefing_job(
@@ -143,7 +160,11 @@ async def run_morning_briefing_job(
     )
 
     for user in candidates:
-        target = user.briefing_time or time(7, 0)
+        target = (
+            getattr(user, "_profile_briefing_time", None)
+            or user.briefing_time
+            or time(7, 0)
+        )
         if not _is_within_15_min(now.time(), target):
             skipped_window += 1
             continue

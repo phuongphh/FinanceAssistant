@@ -23,8 +23,9 @@ Telegram failures roll back the per-user transaction so the
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -36,6 +37,7 @@ from backend.config.categories import get_category
 from backend.database import get_session_factory
 from backend.models.recurring_pattern import RecurringPattern
 from backend.models.user import User
+from backend.profile.models.user_profile import UserProfile
 from backend.services import recurring_service
 from backend.services.telegram_service import send_message
 
@@ -45,10 +47,13 @@ logger = logging.getLogger(__name__)
 # A user with this many distinct patterns due TODAY gets one
 # bundled message instead of three pings. 3 = the spec threshold.
 BUNDLE_THRESHOLD = 3
+REMINDER_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+WINDOW_MINUTES = 15
 
 
-async def run_reminder_scheduler() -> None:
+async def run_reminder_scheduler(*, now: datetime | None = None) -> None:
     """Entry point for the APScheduler cron registration."""
+    now = now or datetime.now(REMINDER_TIMEZONE)
     session_factory = get_session_factory()
     async with session_factory() as db:
         # Pull due patterns + group by user. One DB session for the
@@ -65,6 +70,9 @@ async def run_reminder_scheduler() -> None:
                 user = await user_db.get(User, user_id)
                 if user is None or user.deleted_at is not None:
                     continue
+                profile = await user_db.get(UserProfile, user_id)
+                if not _should_send_reminders_now(profile, now=now):
+                    continue
                 await _send_for_user(user_db, user, patterns)
                 await user_db.commit()
             except Exception:
@@ -72,6 +80,25 @@ async def run_reminder_scheduler() -> None:
                 logger.exception(
                     "reminder send failed for user %s", user_id,
                 )
+
+
+def _is_within_15_min(now: time, target: time) -> bool:
+    now_min = now.hour * 60 + now.minute
+    target_min = target.hour * 60 + target.minute
+    delta = (now_min - target_min) % (24 * 60)
+    return delta < WINDOW_MINUTES
+
+
+def _should_send_reminders_now(
+    profile: UserProfile | None,
+    *,
+    now: datetime,
+) -> bool:
+    if profile is None:
+        return _is_within_15_min(now.time(), time(9, 0))
+    if not profile.reminder_enabled:
+        return False
+    return _is_within_15_min(now.time(), profile.reminder_time or time(9, 0))
 
 
 # ---------------------------------------------------------------------
