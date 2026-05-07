@@ -66,6 +66,64 @@ async def test_feedback_rate_limit_blocks_sixth_submission():
 
 
 @pytest.mark.asyncio
+async def test_feedback_command_starts_feedback_flow():
+    user = _user()
+    db = MagicMock()
+
+    with patch.object(
+        feedback_command.wizard_service, "start_flow", AsyncMock()
+    ) as start_flow, patch.object(
+        feedback_command, "send_message", AsyncMock()
+    ) as send:
+        await feedback_command.start_feedback(db, chat_id=123, user=user)
+
+    start_flow.assert_awaited_once_with(
+        db,
+        user.id,
+        flow=feedback_command.FLOW_FEEDBACK,
+        step=feedback_command.STEP_AWAITING_TEXT,
+        draft={"trigger": "passive_command"},
+    )
+    assert "lắng nghe" in send.await_args.args[1]
+
+
+@pytest.mark.asyncio
+async def test_feedback_cta_callback_starts_feedback_flow():
+    user = _user()
+    db = MagicMock()
+
+    with patch(
+        "backend.services.dashboard_service.get_user_by_telegram_id",
+        AsyncMock(return_value=user),
+    ), patch.object(
+        feedback_command.wizard_service, "start_flow", AsyncMock()
+    ) as start_flow, patch.object(
+        feedback_command, "send_message", AsyncMock()
+    ) as send, patch.object(
+        feedback_command, "answer_callback", AsyncMock()
+    ):
+        handled = await feedback_command.handle_feedback_callback(
+            db,
+            {
+                "id": "cb-cta",
+                "data": "feedback:cta:post_onboarding_day_7",
+                "from": {"id": 123},
+                "message": {"chat": {"id": 123}},
+            },
+        )
+
+    assert handled is True
+    start_flow.assert_awaited_once_with(
+        db,
+        user.id,
+        flow=feedback_command.FLOW_FEEDBACK,
+        step=feedback_command.STEP_AWAITING_TEXT,
+        draft={"trigger": "post_onboarding_day_7"},
+    )
+    assert "cảm nhận" in send.await_args.args[1]
+
+
+@pytest.mark.asyncio
 async def test_feedback_handler_cancel_clears_state():
     user = _user({"flow": feedback_command.FLOW_FEEDBACK, "step": "awaiting_feedback_text", "draft": {}})
     db = MagicMock()
