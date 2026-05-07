@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Phase 3.7: Agent Architecture** (current) — [detail](docs/current/phase-3.7-detailed.md)
+🧪 **Phase 3.8.5** (testing) — [detail](docs/current/phase-3.8.5-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -124,7 +124,7 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Current phase:** [`docs/current/phase-3.7-detailed.md`](docs/current/phase-3.7-detailed.md) — Two-tier agent architecture, tool-use, orchestrator
+- **Current phase:** [`docs/current/phase-3.8.5-detailed.md`](docs/current/phase-3.8.5-detailed.md) — Phase 3.8.5 implementation & test plan
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -150,26 +150,50 @@ Quick reference:
 
 ---
 
-## Phase 3.7 — Current Focus: Agent Architecture
+## Phase 3.8.5 — Current Status: TESTING 🧪
 
-**Goal:** Two-tier agent architecture
-1. **DB-Agent** (DeepSeek) — direct DB queries via tool-use schemas
-2. **Premium Reasoning** (Claude) — complex multi-step analysis
-3. **Orchestrator** — routes between tiers based on query complexity
+**Status:** ✅ Implementation complete. Currently in testing phase before promoting to "done" and moving to next phase.
 
-**Implementation focus:**
-- Tool-use schemas for DB-Agent (CRUD assets, transactions, goals)
-- Routing heuristics in orchestrator (query complexity classification)
-- Cost tracking per tier
-- Fallback when DB-Agent fails to handle query
+### Recently shipped — Phase 3.8 (✅ done)
+Goals system with `goals.*` schema migration. 6 readers updated for backwards compatibility:
+`notion_sync`, `market_service`, `report_service`, `memory_moments`, `query_goals` intent handler, `advisory` intent handler.
+Field renames: `goal_name → goals.*`, `deadline → date`, `is_active → status field`.
+Stable `FeasibilityBand` enum (replaces localized text). 44 new tests added (total 1527).
 
-Detail: [`docs/current/phase-3.7-detailed.md`](docs/current/phase-3.7-detailed.md)
+### Phase 3.8.5 — _(TODO: fill in 1-line summary)_
+
+> **For maintainer:** Update this section with Phase 3.8.5 specifics. Suggested fields:
+> - **Goal:** What this phase delivers
+> - **Scope:** What's IN, what's OUT
+> - **Key changes:** New services, new intents, schema changes
+> - **Test focus:** What testing must verify
+
+### Testing focus
+
+While Phase 3.8.5 is in testing, Claude Code should prioritize:
+
+1. **Regression checks** — verify Phase 3.x intent handlers still work end-to-end
+2. **Vietnamese localization** — run `vi-localization-checker` subagent on changed user-facing code
+3. **Layer contract** — run `layer-contract-checker` on new services/handlers
+4. **Prompt quality** — run `prompt-tester` if any LLM prompts changed
+5. **Test coverage** — verify new code paths have tests; aim to keep total ≥1527
+
+### Exit criteria — to ship Phase 3.8.5
+
+- [ ] All unit + integration tests pass (`uv run pytest`)
+- [ ] No regressions in Phase 3.x intent handlers
+- [ ] Vietnamese localization verified (no hardcoded strings, persona consistent)
+- [ ] Layer contract clean (no critical violations)
+- [ ] Manual smoke test on Telegram: storytelling, morning briefing, advisory, goals query
+- [ ] Update `phase-status.yaml`: status `testing → done`, add next phase as `current`
+
+Detail: [`docs/current/phase-3.8.5-detailed.md`](docs/current/phase-3.8.5-detailed.md)
 
 ---
 
 ## Active Breaking Changes
 
-(None currently — Phase 3.7 is additive over 3.6)
+(None currently — Phase 3.8.5 is additive over 3.8)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 
@@ -188,5 +212,5 @@ This file evolves. If a rule fires twice for the same problem, add a note. If th
 ---
 
 *Document version: 3.0 — compacted to reduce token overhead*  
-*Last major update: 07/05/2026 — refactored from 1,340 lines to ~180 lines*  
+*Last major update: 07/05/2026 — refactored from 1,340 lines to ~190 lines*  
 *Update only when architecture rules change*
