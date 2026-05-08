@@ -185,6 +185,14 @@ class QueryMarketHandler(IntentHandler):
                 continue
 
             had_quote = True
+            logger.info(
+                "Gold quote served for %s: source=%s stale=%s buy=%s sell=%s",
+                symbol,
+                quote.source,
+                quote.is_stale,
+                quote.metadata.get("buy_price"),
+                quote.metadata.get("sell_price") or quote.price,
+            )
             buy_price = quote.metadata.get("buy_price")
             sell_price = quote.metadata.get("sell_price") or quote.price
             stale = " (dữ liệu cũ)" if quote.is_stale else ""
