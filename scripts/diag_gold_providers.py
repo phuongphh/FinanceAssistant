@@ -155,11 +155,48 @@ async def probe_existing_providers() -> None:
             print(f"{label}: FAIL — {type(exc).__name__}: {exc}")
 
 
+async def dump_btmc_rows() -> None:
+    """Print BTMC's first 15 rows so we can see which one the SJC matcher picks.
+
+    Important when prices look off (e.g. 16.45M for SJC bullion when real is
+    ~85M/lượng): the broad "sjc" alias may be matching a smaller bullion size
+    or a non-bullion product. Inspecting names + prices side-by-side reveals
+    whether the classifier needs tightening.
+    """
+    from backend.market_data.providers.gold_btmc import (
+        _BUY_PREFIXES,
+        _NAME_PREFIXES,
+        _SELL_PREFIXES,
+    )
+
+    print("\n=== BTMC raw row dump (first 15 rows + matcher trace) ===")
+    provider = BTMCGoldProvider()
+    try:
+        response = await provider._fetch_response()
+        rows = provider._parse_body(response.text, response.headers.get("content-type", ""))
+    except Exception as exc:
+        print(f"BTMC fetch/parse failed: {type(exc).__name__}: {exc}")
+        return
+
+    print(f"Total rows: {len(rows)}")
+    for i, row in enumerate(rows[:15]):
+        suffix = provider._row_suffix(row) or "?"
+        name = provider._row_field(row, suffix, _NAME_PREFIXES)
+        buy = provider._row_field(row, suffix, _BUY_PREFIXES, prefer_k=True)
+        sell = provider._row_field(row, suffix, _SELL_PREFIXES, prefer_k=True)
+        cls = provider._classify_name(str(name)) if name else None
+        print(
+            f"  [{i:2}] suffix={suffix} cls={cls!s:<10} "
+            f"name={str(name)[:50]!r:<55} buy={buy} sell={sell}"
+        )
+
+
 async def main() -> None:
     vnstock_check()
     for p in PROBES:
         await probe(p)
     await probe_existing_providers()
+    await dump_btmc_rows()
 
 
 if __name__ == "__main__":
