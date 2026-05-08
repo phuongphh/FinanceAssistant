@@ -7,19 +7,15 @@
 > **Type:** Epic | **Days:** 9-13 | **Stories:** 6
 
 ## Mục tiêu
-Hoàn thiện data sources cho full briefing. SJC/PNJ gold, 20 bank rates, RSS news feeds.
-
-## Story Đặc Biệt: S13 — Bank rates scraper
-Story lớn nhất phase (2 ngày) — 20 bank parsers. 3 banks tier 1 tới MUST work, còn lại OK nếu fail 1-2.
+Hoàn thiện data sources cho full briefing.
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P3.9-S10: SJC gold scraper (primary)
-- [ ] [Story] P3.9-S11: PNJ gold scraper (backup)
-- [ ] [Story] P3.9-S12: Gold price auto-updater + wealth integration
-- [ ] [Story] P3.9-S13: Bank rates scraper (top 20 banks)
-- [ ] [Story] P3.9-S14: News RSS feed integration
-- [ ] [Story] P3.9-S15: News LLM summarization tied to holdings
+- [ ] #277 [Story] P3.9-S10: SJC gold scraper (primary)
+- [ ] #278 [Story] P3.9-S11: PNJ gold scraper (backup)
+- [ ] #279 [Story] P3.9-S12: Gold price auto-updater + wealth integration
+- [ ] #280 [Story] P3.9-S13: Bank rates scraper (top 20 banks)
+- [ ] #281 [Story] P3.9-S14: News RSS feed integration
+- [ ] #282 [Story] P3.9-S15: News LLM summarization tied to holdings
 
 ## Reference
 `docs/current/phase-3.9/phase-3.9-detailed.md` § Gold + Bank + News
