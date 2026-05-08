@@ -1,5 +1,13 @@
 # Phase 3.9 — Telegram Manual Test Cases
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Dành cho:** Owner tự test trên Telegram chat — không cần chạy code, không cần DB, không cần API tool.
 > **Cách dùng:** Gửi đúng tin nhắn ghi trong Steps vào chat bot → kiểm tra bot trả lời đúng Expected Results.
 > **Tổng:** 38 test cases
