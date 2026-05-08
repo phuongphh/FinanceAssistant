@@ -20,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import asset_service
+from backend.wealth.valuation.crypto import value_crypto_holding
+from backend.wealth.valuation.stock import value_stock_holding
 
 PERIOD_DAY = "day"
 PERIOD_WEEK = "week"
@@ -79,7 +81,14 @@ async def calculate(
     largest_value = Decimal(0)
 
     for a in assets:
-        value = Decimal(a.current_value or 0)
+        if a.asset_type == "stock":
+            valuation = await value_stock_holding(a)
+            value = valuation.current_value
+        elif a.asset_type == "crypto":
+            valuation = await value_crypto_holding(a)
+            value = valuation.current_value
+        else:
+            value = Decimal(a.current_value or 0)
         total += value
         by_type[a.asset_type] = by_type.get(a.asset_type, Decimal(0)) + value
         if value > largest_value:

@@ -35,6 +35,19 @@ class PriceQuote:
         if self.fetched_at.tzinfo is None:
             self.fetched_at = self.fetched_at.replace(tzinfo=timezone.utc)
 
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        """Convert nested Decimal/datetime metadata to JSON-safe values."""
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, dict):
+            return {key: PriceQuote._json_safe(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [PriceQuote._json_safe(item) for item in value]
+        return value
+
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-safe dictionary representation."""
         return {
@@ -44,7 +57,7 @@ class PriceQuote:
             "asset_type": self.asset_type,
             "fetched_at": self.fetched_at.isoformat(),
             "source": self.source,
-            "metadata": self.metadata,
+            "metadata": self._json_safe(self.metadata),
             "is_stale": self.is_stale,
         }
 

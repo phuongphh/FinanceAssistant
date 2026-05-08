@@ -1,0 +1,30 @@
+"""Ticker to CoinGecko coin-id mapping for common crypto holdings."""
+from __future__ import annotations
+
+COINGECKO_SYMBOLS: dict[str, str] = {
+    "BTC": "bitcoin",
+    "ETH": "ethereum",
+    "USDT": "tether",
+    "BNB": "binancecoin",
+    "SOL": "solana",
+    "USDC": "usd-coin",
+    "XRP": "ripple",
+    "DOGE": "dogecoin",
+    "ADA": "cardano",
+    "TRX": "tron",
+    "AVAX": "avalanche-2",
+    "SHIB": "shiba-inu",
+    "DOT": "polkadot",
+    "LINK": "chainlink",
+    "BCH": "bitcoin-cash",
+    "NEAR": "near",
+    "MATIC": "matic-network",
+    "LTC": "litecoin",
+    "UNI": "uniswap",
+    "ATOM": "cosmos",
+    "ETC": "ethereum-classic",
+    "FIL": "filecoin",
+    "APT": "aptos",
+    "ARB": "arbitrum",
+    "OP": "optimism",
+}
