@@ -7,6 +7,7 @@ import time
 from sqlalchemy import select
 
 from backend.database import get_session_factory
+from backend.market_data.analytics.alerts import check_movements
 from backend.market_data.client import get_price_cache, get_stock_provider
 from backend.wealth.models.asset import Asset
 
@@ -36,6 +37,7 @@ async def update_all_held_stocks() -> dict[str, int]:
     provider = get_stock_provider()
     cache = get_price_cache()
     quotes = await provider.fetch_batch(symbols)
+    await check_movements(quotes, cache=cache)
     for quote in quotes:
         await cache.set(quote)
         await cache.set_last_known(quote)

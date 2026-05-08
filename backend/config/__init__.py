@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     # Market data
     redis_url: str = "redis://localhost:6379/0"
     market_data_timeout_seconds: float = 3.0
+    market_data_alerts_enabled: bool = False
 
     # OpenClaw Skills
     finance_api_url: str = "http://localhost:8001/api/v1"
