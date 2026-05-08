@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #264 | [Epic] Phase 3.9 — Epic 2: Stock + Crypto Providers | [issue-264.md](issue-264.md) |
 | #265 | [Epic] Phase 3.9 — Epic 3: Gold + Bank Rates + News | [issue-265.md](issue-265.md) |
 | #266 | [Epic] Phase 3.9 — Epic 4: Enhanced Briefing + Analytics + Alerts | [issue-266.md](issue-266.md) |
+| #267 | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [issue-267.md](issue-267.md) |
 
-**Total active:** 13
+**Total active:** 14
