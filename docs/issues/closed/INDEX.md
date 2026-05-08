@@ -153,10 +153,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #279 | Pre-Phase | [Story] P3.9-S12: Gold price auto-updater + wealth integration | [pre-phase/issue-279.md](by-phase/pre-phase/issue-279.md) |
 | #280 | Pre-Phase | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [pre-phase/issue-280.md](by-phase/pre-phase/issue-280.md) |
 | #281 | Pre-Phase | [Story] P3.9-S14: News RSS feed integration | [pre-phase/issue-281.md](by-phase/pre-phase/issue-281.md) |
+| #282 | Pre-Phase | [Story] P3.9-S15: News LLM summarization tied to holdings | [pre-phase/issue-282.md](by-phase/pre-phase/issue-282.md) |
 | #285 | Pre-Phase | [Story] P3.9-S18: Price movement alerts (>5% in 15 min) | [pre-phase/issue-285.md](by-phase/pre-phase/issue-285.md) |
 | #287 | Pre-Phase | [Story] P3.9-S20: Integration tests end-to-end | [pre-phase/issue-287.md](by-phase/pre-phase/issue-287.md) |
 | #288 | Pre-Phase | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [pre-phase/issue-288.md](by-phase/pre-phase/issue-288.md) |
 | #289 | Pre-Phase | [Story] P3.9-S22: Documentation + ADR + phase-status update | [pre-phase/issue-289.md](by-phase/pre-phase/issue-289.md) |
 
-**Total:** 153 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 136 Pre-Phase)
+**Total:** 154 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 137 Pre-Phase)
