@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-📋 **Financial Twin Conservative MVP** (next) — [detail](#)
+_(No active phase — all phases done or planned)_
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
