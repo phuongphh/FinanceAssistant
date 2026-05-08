@@ -27,6 +27,19 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PHASE_STATUS_FILE = REPO_ROOT / "docs/current/phase-status.yaml"
+CURRENT_DIR = REPO_ROOT / "docs/current"
+
+# Marker seeded into every phase-*-test-cases.md that lacks one.
+_SIGNOFF_MARKER_BLOCK = """\
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+"""
+_SIGNOFF_RE = re.compile(r"<!--\s*testing-signoff:", re.IGNORECASE)
 
 # Files that may contain marker sections. Each file independently opts-in
 # by including the marker BEGIN/END comments. Missing markers are skipped.
@@ -183,6 +196,47 @@ def sync_file(path: Path, current_line: str, roadmap_table: str, dry_run: bool =
     return True
 
 
+def seed_test_cases_markers(dry_run: bool = False) -> list[Path]:
+    """Insert the testing-signoff marker into any phase-*-test-cases*.md
+    in docs/current/ (recursive) that is missing it.
+
+    Inserts the marker block after the first H1 heading line (or at the
+    top of the file if no H1 is found). Returns list of files written.
+    """
+    seeded: list[Path] = []
+    for path in sorted(CURRENT_DIR.rglob("*.md")):
+        if "test-cases" not in path.name:
+            continue
+        if not re.match(r"phase-", path.name, re.IGNORECASE):
+            continue
+        text = path.read_text(encoding="utf-8")
+        if _SIGNOFF_RE.search(text):
+            continue  # already has marker
+
+        # Insert after the first H1 line (and its trailing newline), or
+        # prepend if no H1 found.
+        h1_match = re.search(r"^(# .+\n)", text, re.MULTILINE)
+        if h1_match:
+            insert_at = h1_match.end()
+            new_text = (
+                text[:insert_at]
+                + "\n"
+                + _SIGNOFF_MARKER_BLOCK
+                + text[insert_at:]
+            )
+        else:
+            new_text = _SIGNOFF_MARKER_BLOCK + "\n" + text
+
+        rel = path.relative_to(REPO_ROOT)
+        if dry_run:
+            print(f"  WOULD SEED marker: {rel}")
+        else:
+            path.write_text(new_text, encoding="utf-8")
+            print(f"  ✓ SEEDED marker: {rel}")
+        seeded.append(path)
+    return seeded
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync phase status to marker sections.")
     parser.add_argument(
@@ -200,6 +254,13 @@ def main():
     print(f"Active phase line: {current_line}")
     print(f"Total phases in roadmap: {len(data['phases'])}")
     print()
+
+    print("Seeding testing-signoff markers into test-cases files...")
+    seeded = seed_test_cases_markers(dry_run=args.dry_run)
+    if not seeded:
+        print("  All test-cases files already have markers.")
+    print()
+
     print(f"Syncing to {len(TARGET_FILES)} target files...")
 
     any_updated = False
@@ -208,7 +269,7 @@ def main():
             any_updated = True
 
     print()
-    if any_updated:
+    if any_updated or seeded:
         if args.dry_run:
             print("(dry-run) Would have updated some files.")
         else:

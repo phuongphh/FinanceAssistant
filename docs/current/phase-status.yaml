@@ -120,6 +120,16 @@ phases:
     completed_date: ""
     icon: "🧪"
 
+  - id: "3.9"
+    name: "Market Data Real"
+    status: planned
+    duration: "3 tuần"
+    detail_doc: "docs/current/phase-3.9/phase-3.9-detailed.md"
+    issues_doc: "docs/current/phase-3.9/phase-3.9-issues.md"
+    description: "Real-time market data integration: stock (vnstock), crypto (CoinGecko), gold (SJC), bank rates — replace all stubs"
+    completed_date: ""
+    icon: "🔮"
+
   - id: "3B"
     name: "Market Intelligence"
     status: next
