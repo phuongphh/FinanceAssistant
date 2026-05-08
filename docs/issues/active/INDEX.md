@@ -29,5 +29,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
 | #277 | [Story] P3.9-S10: SJC gold scraper (primary) | [issue-277.md](issue-277.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
+| #280 | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [issue-280.md](issue-280.md) |
 
-**Total active:** 25
+**Total active:** 26
