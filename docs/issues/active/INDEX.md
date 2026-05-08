@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #282 | [Story] P3.9-S15: News LLM summarization tied to holdings | [issue-282.md](issue-282.md) |
 | #283 | [Story] P3.9-S16: Morning briefing enrichment (real data) | [issue-283.md](issue-283.md) |
 | #284 | [Story] P3.9-S17: Portfolio analytics (YTD, best/worst, diversification) | [issue-284.md](issue-284.md) |
+| #285 | [Story] P3.9-S18: Price movement alerts (>5% in 15 min) | [issue-285.md](issue-285.md) |
 
-**Total active:** 31
+**Total active:** 32
