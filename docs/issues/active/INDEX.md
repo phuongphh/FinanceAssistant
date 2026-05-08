@@ -33,5 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #280 | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [issue-280.md](issue-280.md) |
 | #281 | [Story] P3.9-S14: News RSS feed integration | [issue-281.md](issue-281.md) |
 | #282 | [Story] P3.9-S15: News LLM summarization tied to holdings | [issue-282.md](issue-282.md) |
+| #284 | [Story] P3.9-S17: Portfolio analytics (YTD, best/worst, diversification) | [issue-284.md](issue-284.md) |
 
-**Total active:** 29
+**Total active:** 30
