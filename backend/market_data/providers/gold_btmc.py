@@ -1,10 +1,11 @@
-"""BTMC gold provider — JSON API used as SJC backup.
+"""BTMC gold provider — JSON/XML API used as SJC backup.
 
 PNJ's `/site/gia-vang` page is now JS-rendered (Next.js) — server returns
-0 tables. BTMC publishes a key-based public JSON endpoint used by their
-own Android app, which returns SJC bullion and 24K ring prices in one
-call without WAF blocking. This is significantly more durable than
-HTML scraping: the API has been stable since at least 2018.
+0 tables. BTMC publishes a key-based public endpoint used by their own
+Android app, which returns SJC bullion and 24K ring prices in one call
+without WAF blocking. As of 2026-05-08 the endpoint serves XML rather
+than JSON, so this provider sniffs the content-type / body prefix and
+parses either format.
 
 API format — BTMC ships two flavours of row in the same `DataList.Data`,
 both keyed by a numeric suffix that varies per row. The parser must
@@ -27,14 +28,20 @@ infer the suffix from the row's keys and try both naming conventions:
         "@pb_7": "84500000",
         "@ps_7": "85500000"
       }
+
+The XML form mirrors the JSON shape with attributes instead of object
+keys; `_parse_xml_rows` re-adds the `@` prefix so the row-matching code
+stays format-agnostic.
 """
 from __future__ import annotations
 
+import json
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
+from bs4 import BeautifulSoup
 
 from backend.market_data.base import BaseProvider
 from backend.market_data.exceptions import (
@@ -100,16 +107,19 @@ class BTMCGoldProvider(BaseProvider):
         return [self._build_quote(rows, symbol.upper().strip()) for symbol in symbols]
 
     async def _get_rows(self) -> list[dict[str, Any]]:
-        payload = await self._get_json()
-        try:
-            data = payload["DataList"]["Data"]
-        except (KeyError, TypeError) as exc:
-            raise ParserError(f"BTMC: unexpected JSON shape: {exc}") from exc
-        if not isinstance(data, list) or not data:
-            raise ParserError("BTMC: empty data list")
-        return data
+        response = await self._fetch_response()
+        body = response.text
+        content_type = response.headers.get("content-type", "").lower()
+        rows = self._parse_body(body, content_type)
+        if not rows:
+            preview = body[:240].replace("\n", " ").replace("\r", " ")
+            raise ParserError(
+                f"BTMC: empty data list "
+                f"(content_type={content_type!r} len={len(body)} preview={preview!r})"
+            )
+        return rows
 
-    async def _get_json(self) -> Any:
+    async def _fetch_response(self) -> httpx.Response:
         if self._client is not None:
             response = await self._client.get(self.url)
         else:
@@ -125,15 +135,73 @@ class BTMCGoldProvider(BaseProvider):
             raise SymbolNotFound("BTMC API not found")
         if response.status_code >= 400:
             raise ProviderUnavailable(f"BTMC unavailable: HTTP {response.status_code}")
+        return response
+
+    @classmethod
+    def _parse_body(cls, body: str, content_type: str) -> list[dict[str, Any]]:
+        """Sniff format by content-type / first non-whitespace byte and dispatch."""
+        stripped = body.lstrip()
+        is_xml = "xml" in content_type or stripped.startswith(("<?xml", "<DataList"))
+        is_json = (
+            "json" in content_type or stripped.startswith(("{", "["))
+        ) and not is_xml
+        if is_xml:
+            return cls._parse_xml_rows(body)
+        if is_json:
+            return cls._parse_json_rows(body)
+        # Ambiguous content-type; try JSON first, fall through to XML.
         try:
-            return response.json()
-        except Exception as exc:
-            preview = response.text[:240].replace("\n", " ").replace("\r", " ")
+            return cls._parse_json_rows(body)
+        except ParserError:
+            return cls._parse_xml_rows(body)
+
+    @staticmethod
+    def _parse_json_rows(body: str) -> list[dict[str, Any]]:
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError as exc:
+            preview = body[:240].replace("\n", " ").replace("\r", " ")
             raise ParserError(
-                f"BTMC returned non-JSON "
-                f"(content_type={response.headers.get('content-type', '?')!r} "
-                f"len={len(response.text)} preview={preview!r}): {exc}"
+                f"BTMC JSON parse failed (len={len(body)} preview={preview!r}): {exc}"
             ) from exc
+        try:
+            data = payload["DataList"]["Data"]
+        except (KeyError, TypeError) as exc:
+            raise ParserError(f"BTMC: unexpected JSON shape: {exc}") from exc
+        if not isinstance(data, list):
+            raise ParserError("BTMC: DataList.Data is not a list")
+        return data
+
+    @staticmethod
+    def _parse_xml_rows(body: str) -> list[dict[str, Any]]:
+        """Convert BTMC XML to row dicts shaped like the JSON form.
+
+        BTMC's XML mirrors the JSON-with-`@`-attributes convention:
+        what would be a JSON `@name_1` key appears as an XML attribute
+        `name_1` on a `<Data>` element. We re-add the `@` prefix so the
+        existing row-matching helpers (`_row_suffix`, `_row_field`)
+        still work without branching on format.
+        """
+        soup = BeautifulSoup(body, "xml")
+        nodes = soup.find_all(["Data", "data"])
+        rows: list[dict[str, Any]] = []
+        for node in nodes:
+            row: dict[str, Any] = {}
+            for attr_name, attr_val in node.attrs.items():
+                row[f"@{attr_name}"] = attr_val
+                row[attr_name] = attr_val
+            for child in node.find_all(recursive=False):
+                text = child.get_text(strip=True)
+                row[f"@{child.name}"] = text
+                row[child.name] = text
+            if row:
+                rows.append(row)
+        if not rows:
+            preview = body[:240].replace("\n", " ").replace("\r", " ")
+            raise ParserError(
+                f"BTMC XML: no <Data> rows (len={len(body)} preview={preview!r})"
+            )
+        return rows
 
     def _build_quote(self, rows: list[dict[str, Any]], symbol: str) -> PriceQuote:
         buy, sell, updated = self._find_row(rows, symbol)
