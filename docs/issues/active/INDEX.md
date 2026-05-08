@@ -16,6 +16,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #274 | [Story] P3.9-S7: Stock price auto-updater (cron job) | [issue-274.md](issue-274.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
 | #283 | [Story] P3.9-S16: Morning briefing enrichment (real data) | [issue-283.md](issue-283.md) |
-| #286 | [Story] P3.9-S19: Replace Phase 3.7 stubs in agent tools | [issue-286.md](issue-286.md) |
 
-**Total active:** 13
+**Total active:** 12

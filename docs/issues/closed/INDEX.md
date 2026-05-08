@@ -157,9 +157,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #282 | Pre-Phase | [Story] P3.9-S15: News LLM summarization tied to holdings | [pre-phase/issue-282.md](by-phase/pre-phase/issue-282.md) |
 | #284 | Pre-Phase | [Story] P3.9-S17: Portfolio analytics (YTD, best/worst, diversification) | [pre-phase/issue-284.md](by-phase/pre-phase/issue-284.md) |
 | #285 | Pre-Phase | [Story] P3.9-S18: Price movement alerts (>5% in 15 min) | [pre-phase/issue-285.md](by-phase/pre-phase/issue-285.md) |
+| #286 | Pre-Phase | [Story] P3.9-S19: Replace Phase 3.7 stubs in agent tools | [pre-phase/issue-286.md](by-phase/pre-phase/issue-286.md) |
 | #287 | Pre-Phase | [Story] P3.9-S20: Integration tests end-to-end | [pre-phase/issue-287.md](by-phase/pre-phase/issue-287.md) |
 | #288 | Pre-Phase | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [pre-phase/issue-288.md](by-phase/pre-phase/issue-288.md) |
 | #289 | Pre-Phase | [Story] P3.9-S22: Documentation + ADR + phase-status update | [pre-phase/issue-289.md](by-phase/pre-phase/issue-289.md) |
 
-**Total:** 156 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 139 Pre-Phase)
+**Total:** 157 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 140 Pre-Phase)
