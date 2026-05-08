@@ -1,0 +1,23 @@
+# Phase 3.9 real-data morning briefing template.
+# 5 sections, intentionally compact for Telegram.
+sections:
+  net_worth: |
+    💰 Tổng tài sản: {net_worth}
+    {change_label}: {change_abs} ({change_pct}%)
+  market: |
+    🌤️ Thị trường sáng nay:
+    • VN-Index: {vnindex}
+    • Vàng SJC: {gold}
+    • BTC: {btc}
+  portfolio: |
+    📊 Danh mục:
+    {allocation_lines}
+    Hôm nay: {today_change}
+  news: |
+    📰 Top tin liên quan:
+    {news_lines}
+  insights: |
+    💡 Gợi ý nhanh:
+    {insight_lines}
+footer:
+  stale: "⚠️ Một số giá đang dùng dữ liệu gần nhất vì nguồn realtime tạm chậm."

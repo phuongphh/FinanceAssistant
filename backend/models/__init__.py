@@ -21,6 +21,8 @@ from backend.feedback.models.feedback import Feedback, PromptSentLog
 from backend.profile.models.user_profile import UserProfile
 from backend.models.bank_rate import BankRateSnapshot
 from backend.models.news_article import NewsArticle
+from backend.models.stock_historical_price import StockHistoricalPrice
+from backend.models.price_alert import NotificationSettings, PriceAlertLog
 from backend.models.conversation_context import (
     ROLE_ASSISTANT,
     ROLE_USER,
@@ -54,4 +56,7 @@ __all__ = [
     "ConversationContext",
     "ROLE_USER",
     "ROLE_ASSISTANT",
+    "StockHistoricalPrice",
+    "NotificationSettings",
+    "PriceAlertLog",
 ]

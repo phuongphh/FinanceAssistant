@@ -28,6 +28,7 @@ from backend.jobs.weekly_goal_reminder import run_weekly_goal_reminder
 from backend.market_data.jobs.bank_rates_updater import update_bank_rates
 from backend.market_data.jobs.crypto_updater import update_all_held_crypto
 from backend.market_data.jobs.gold_updater import update_all_held_gold
+from backend.market_data.jobs.historical_price_seeder import seed_year_start_stock_prices
 from backend.market_data.jobs.news_updater import update_news_articles
 from backend.market_data.jobs.stock_updater import update_all_held_stocks
 
@@ -135,6 +136,11 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         update_news_articles, "cron",
         minute=0, timezone="Asia/Ho_Chi_Minh",
         id="news_updater",
+    )
+    scheduler.add_job(
+        seed_year_start_stock_prices, "cron",
+        month=1, day=1, hour=7, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="historical_price_seeder",
     )
 
 
