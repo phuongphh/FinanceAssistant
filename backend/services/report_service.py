@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_full, format_money_short
+from backend.intent.extractors._normalize import strip_diacritics
 from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.report import MonthlyReport
@@ -41,8 +42,19 @@ _REPORT_KEYWORDS = frozenset([
 
 
 def is_report_query(text: str) -> bool:
-    """Return True when text looks like a spending-report request, not an expense entry."""
+    """Return True for monthly report requests, not transaction listings.
+
+    Phrases like "báo cáo giao dịch hôm qua" should go through the
+    intent pipeline as ``query_expenses`` so the time range (including
+    daily ranges) is respected instead of generating the monthly CFO
+    report.
+    """
     lower = text.lower()
+    normalized = strip_diacritics(lower)
+
+    if "giao dich" in normalized:
+        return False
+
     return any(kw in lower for kw in _REPORT_KEYWORDS)
 
 

@@ -94,6 +94,17 @@ canonical:
   - text: "tháng này tôi tiết kiệm được bao nhiêu?"
     expected_intent: query_cashflow
     notes: "Net cashflow / saving for the month."
+  - text: "tổng hợp giao dịch tháng trước"
+    expected_intent: query_expenses
+    expected_parameters:
+      time_range: "last_month"
+    notes: "Regression: read-only transaction summary must not fall to LLM/unclear."
+
+  - text: "báo cáo giao dịch hôm qua"
+    expected_intent: query_expenses
+    expected_parameters:
+      time_range: "yesterday"
+    notes: "Regression: report + giao dịch means transaction listing, not monthly CFO report."
 
 
 edge_cases:
