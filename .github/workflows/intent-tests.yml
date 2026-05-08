@@ -44,13 +44,19 @@ jobs:
         # The intent layer pulls in sqlalchemy + pydantic-settings via
         # the model imports + a minimal subset of the LLM SDKs. Keep
         # the install list tight so this job stays fast.
+        # beautifulsoup4/lxml are required because intent handlers
+        # transitively import backend.market_data.client, which loads
+        # the gold scrapers (gold_common imports BeautifulSoup at
+        # module level). Without them, intent tests fail at collection
+        # with ModuleNotFoundError.
         run: |
           pip install --upgrade pip
           pip install \
             pytest pytest-asyncio pyyaml \
             'sqlalchemy[asyncio]' pydantic-settings python-dotenv \
             httpx fastapi 'uvicorn[standard]' python-multipart \
-            openai anthropic apscheduler
+            openai anthropic apscheduler \
+            beautifulsoup4 lxml
 
       - name: Run canonical query suite
         run: |
