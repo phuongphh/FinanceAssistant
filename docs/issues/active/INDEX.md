@@ -27,5 +27,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #274 | [Story] P3.9-S7: Stock price auto-updater (cron job) | [issue-274.md](issue-274.md) |
 | #275 | [Story] P3.9-S8: Crypto price auto-updater | [issue-275.md](issue-275.md) |
 | #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
+| #277 | [Story] P3.9-S10: SJC gold scraper (primary) | [issue-277.md](issue-277.md) |
 
-**Total active:** 23
+**Total active:** 24
