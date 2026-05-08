@@ -14,6 +14,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
-| #283 | [Story] P3.9-S16: Morning briefing enrichment (real data) | [issue-283.md](issue-283.md) |
 
-**Total active:** 11
+**Total active:** 10
