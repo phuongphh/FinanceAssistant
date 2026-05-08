@@ -7,6 +7,13 @@ without WAF blocking. As of 2026-05-08 the endpoint serves XML rather
 than JSON, so this provider sniffs the content-type / body prefix and
 parses either format.
 
+Unit normalization: BTMC quotes prices per chỉ (1/10 lượng) — confirmed
+by Vietnamese gold market quotes on 2026-05-08, where 1 chỉ SJC bullion
+trades around 16,450,000 VND. Other providers (SJC, PNJ) historically
+returned per-lượng values, and the handler labels prices "đ/lượng", so
+`_build_quote` multiplies the parsed buy/sell by 10 to keep callers on
+a single canonical unit.
+
 API format — BTMC ships two flavours of row in the same `DataList.Data`,
 both keyed by a numeric suffix that varies per row. The parser must
 infer the suffix from the row's keys and try both naming conventions:
@@ -75,6 +82,11 @@ _SELL_PREFIXES = ("sell", "ps")
 
 # Match `@<word>_<digits>` or `@<word>_<digits>k` keys to extract the suffix.
 _SUFFIX_KEY_RE = re.compile(r"^@[A-Za-z_]+_(\d+)k?$")
+
+# BTMC quotes prices per chỉ (1/10 lượng). The handler renders prices with
+# the suffix "đ/lượng" and SJC/PNJ providers (when working) returned per-
+# lượng values, so we normalize here so callers see one consistent unit.
+_CHI_TO_LUONG = Decimal("10")
 
 
 class BTMCGoldProvider(BaseProvider):
@@ -204,7 +216,11 @@ class BTMCGoldProvider(BaseProvider):
         return rows
 
     def _build_quote(self, rows: list[dict[str, Any]], symbol: str) -> PriceQuote:
-        buy, sell, updated = self._find_row(rows, symbol)
+        buy_per_chi, sell_per_chi, updated = self._find_row(rows, symbol)
+        # Normalize per-chỉ (BTMC's native unit) to per-lượng so the handler
+        # renders consistently with SJC/PNJ providers and the "đ/lượng" label.
+        buy = buy_per_chi * _CHI_TO_LUONG
+        sell = sell_per_chi * _CHI_TO_LUONG
         return PriceQuote(
             symbol=symbol,
             price=sell,

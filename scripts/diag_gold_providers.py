@@ -212,6 +212,24 @@ async def dump_btmc_rows() -> None:
     if len(classified) > 30:
         print(f"  ... and {len(classified) - 30} more classified rows")
 
+    # 1b) Full key dump for the FIRST classified row of each kind, so we can
+    #     see which field carries the weight/unit (per chỉ vs per lượng vs
+    #     per gram). 16.45M for "VÀNG MIẾNG SJC" is ~2 chỉ — the real per-
+    #     lượng price has to be reconstructed from a unit field we're not
+    #     reading yet.
+    print("\n-- Full key dump of first classified row per symbol --")
+    seen: set[str] = set()
+    for idx, row, cls in classified:
+        if cls in seen:
+            continue
+        seen.add(cls)
+        print(f"  Row [{idx}] cls={cls}:")
+        for key in sorted(row.keys()):
+            if key.startswith("@") or "_" not in key:
+                value = row[key]
+                if value not in (None, ""):
+                    print(f"    {key} = {value!r}")
+
     # 2) Every gold-keyword row, regardless of current classifier verdict.
     #    Lets us see the canonical SJC bullion name BTMC actually uses.
     print("\n-- Rows with gold keywords (vàng / sjc / nhẫn / miếng) --")

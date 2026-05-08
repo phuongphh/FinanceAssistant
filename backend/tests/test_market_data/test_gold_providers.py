@@ -129,14 +129,18 @@ async def test_gold_provider_sends_browser_headers_and_follows_redirects(monkeyp
 
 @pytest.mark.asyncio
 async def test_btmc_parses_sjc_bullion_from_fixture():
+    """Fixture has buy=16,450,000 sell=16,750,000 per chỉ — the 2026-05-08
+    SJC bullion rate. Provider must scale to per-lượng (×10) so the handler's
+    "đ/lượng" label is accurate.
+    """
     fixture = (FIXTURES / "btmc_sample.json").read_text()
     async with _json_client(fixture) as client:
         quote = await BTMCGoldProvider(client=client).fetch_quote("SJC_GOLD")
 
     assert quote.symbol == "SJC_GOLD"
     assert quote.source == "btmc"
-    assert quote.price == Decimal("85500000")
-    assert quote.metadata["buy_price"] == Decimal("84500000")
+    assert quote.price == Decimal("167500000")
+    assert quote.metadata["buy_price"] == Decimal("164500000")
     assert quote.metadata["btmc_updated_at"] == "08/05/2026 18:00"
 
 
@@ -148,8 +152,8 @@ async def test_btmc_parses_24k_ring_from_fixture():
 
     assert quote.symbol == "RING_24K"
     assert quote.source == "btmc"
-    assert quote.price == Decimal("79300000")
-    assert quote.metadata["buy_price"] == Decimal("78200000")
+    assert quote.price == Decimal("167000000")
+    assert quote.metadata["buy_price"] == Decimal("164000000")
 
 
 @pytest.mark.asyncio
@@ -166,12 +170,12 @@ async def test_btmc_parses_shape_b_without_at_row_field():
 
     assert sjc_quote.symbol == "SJC_GOLD"
     assert sjc_quote.source == "btmc"
-    assert sjc_quote.price == Decimal("85500000")
-    assert sjc_quote.metadata["buy_price"] == Decimal("84500000")
+    assert sjc_quote.price == Decimal("167500000")
+    assert sjc_quote.metadata["buy_price"] == Decimal("164500000")
 
     assert ring_quote.symbol == "RING_24K"
-    assert ring_quote.price == Decimal("79300000")
-    assert ring_quote.metadata["buy_price"] == Decimal("78200000")
+    assert ring_quote.price == Decimal("167000000")
+    assert ring_quote.metadata["buy_price"] == Decimal("164000000")
 
 
 @pytest.mark.asyncio
@@ -188,12 +192,12 @@ async def test_btmc_parses_xml_payload_for_sjc_bullion():
         ring_quote = await BTMCGoldProvider(client=client).fetch_quote("RING_24K")
 
     assert sjc_quote.source == "btmc"
-    assert sjc_quote.price == Decimal("85500000")
-    assert sjc_quote.metadata["buy_price"] == Decimal("84500000")
+    assert sjc_quote.price == Decimal("167500000")
+    assert sjc_quote.metadata["buy_price"] == Decimal("164500000")
     assert sjc_quote.metadata["btmc_updated_at"] == "08/05/2026 19:00"
 
-    assert ring_quote.price == Decimal("79300000")
-    assert ring_quote.metadata["buy_price"] == Decimal("78200000")
+    assert ring_quote.price == Decimal("167000000")
+    assert ring_quote.metadata["buy_price"] == Decimal("164000000")
 
 
 @pytest.mark.asyncio
@@ -205,7 +209,7 @@ async def test_btmc_xml_ignores_silver_rows():
     fixture = (FIXTURES / "btmc_sample.xml").read_text()
     async with _xml_client(fixture) as client:
         quote = await BTMCGoldProvider(client=client).fetch_quote("SJC_GOLD")
-    assert quote.metadata["buy_price"] == Decimal("84500000")
+    assert quote.metadata["buy_price"] == Decimal("164500000")
 
 
 @pytest.mark.asyncio
@@ -236,4 +240,4 @@ async def test_gold_dispatcher_falls_back_to_btmc_on_sjc_failure():
         quote = await dispatcher.fetch_quote("SJC_GOLD")
 
     assert quote.source == "btmc"
-    assert quote.price == Decimal("85500000")
+    assert quote.price == Decimal("167500000")
