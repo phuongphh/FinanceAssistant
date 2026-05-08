@@ -14,5 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #263 | [Epic] Phase 3.9 — Epic 1: Foundation & Provider Abstraction | [issue-263.md](issue-263.md) |
+| #265 | [Epic] Phase 3.9 — Epic 3: Gold + Bank Rates + News | [issue-265.md](issue-265.md) |
 
-**Total active:** 10
+**Total active:** 11
