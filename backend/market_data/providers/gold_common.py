@@ -10,6 +10,20 @@ from bs4 import BeautifulSoup
 from backend.market_data.exceptions import ParserError, SymbolNotFound
 
 
+# Vietnamese gold sites (sjc.com.vn, pnj.com.vn) reject the default
+# python-httpx User-Agent at the WAF/CDN layer. Send a realistic browser
+# UA so the scraper actually receives the gold-price HTML.
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+}
+
+
 _GOLD_ALIASES = {
     "SJC_GOLD": ("sjc",),
     "RING_24K": ("nhẫn", "nhan", "24k", "9999"),
