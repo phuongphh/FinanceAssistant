@@ -36,11 +36,11 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 <!-- BEGIN: phase-status:roadmap-table -->
 | Phase | Status | Duration | Detailed Doc | Description |
 |---|---|---|---|---|
-| UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/current/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
-| Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/current/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
-| Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/current/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
+| UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/archive/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
+| Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/archive/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
+| Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/archive/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
 | Intent Understanding Layer | ✅ done | 3 tuần | [phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
-| Menu UX Revamp | ✅ done | 1.5 tuần | [phase-3.6-detailed.md](docs/current/phase-3.6-detailed.md) | Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu |
+| Menu UX Revamp | ✅ done | 1.5 tuần | [phase-3.6-detailed.md](docs/archive/phase-3.6-detailed.md) | Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu |
 | Agent Architecture | ✅ done | 3 tuần | [phase-3.7-detailed.md](docs/current/phase-3.7-detailed.md) | Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing |
 | Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](docs/current/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
 | Pre-Launch Readiness | 🧪 testing | 3-4 ngày | [phase-3.8.5-detailed.md](docs/current/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
