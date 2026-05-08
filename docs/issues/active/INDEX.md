@@ -14,7 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #266 | [Epic] Phase 3.9 — Epic 4: Enhanced Briefing + Analytics + Alerts | [issue-266.md](issue-266.md) |
-| #271 | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [issue-271.md](issue-271.md) |
 | #272 | [Story] P3.9-S5: VNDIRECT stock provider (backup) | [issue-272.md](issue-272.md) |
 | #273 | [Story] P3.9-S6: CoinGecko crypto provider | [issue-273.md](issue-273.md) |
 | #274 | [Story] P3.9-S7: Stock price auto-updater (cron job) | [issue-274.md](issue-274.md) |
@@ -33,4 +32,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #288 | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [issue-288.md](issue-288.md) |
 | #289 | [Story] P3.9-S22: Documentation + ADR + phase-status update | [issue-289.md](issue-289.md) |
 
-**Total active:** 28
+**Total active:** 27
