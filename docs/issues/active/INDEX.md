@@ -14,7 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #274 | [Story] P3.9-S7: Stock price auto-updater (cron job) | [issue-274.md](issue-274.md) |
-| #275 | [Story] P3.9-S8: Crypto price auto-updater | [issue-275.md](issue-275.md) |
 | #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
 | #282 | [Story] P3.9-S15: News LLM summarization tied to holdings | [issue-282.md](issue-282.md) |
@@ -22,4 +21,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #284 | [Story] P3.9-S17: Portfolio analytics (YTD, best/worst, diversification) | [issue-284.md](issue-284.md) |
 | #286 | [Story] P3.9-S19: Replace Phase 3.7 stubs in agent tools | [issue-286.md](issue-286.md) |
 
-**Total active:** 17
+**Total active:** 16
