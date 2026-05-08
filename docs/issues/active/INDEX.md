@@ -18,5 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #265 | [Epic] Phase 3.9 — Epic 3: Gold + Bank Rates + News | [issue-265.md](issue-265.md) |
 | #266 | [Epic] Phase 3.9 — Epic 4: Enhanced Briefing + Analytics + Alerts | [issue-266.md](issue-266.md) |
 | #267 | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [issue-267.md](issue-267.md) |
+| #268 | [Story] P3.9-S1: Module skeleton + BaseProvider abstract class | [issue-268.md](issue-268.md) |
 
-**Total active:** 14
+**Total active:** 15
