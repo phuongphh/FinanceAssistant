@@ -78,8 +78,8 @@ class PhaseEntry:
 def _load_phases() -> list[PhaseEntry]:
     raw = yaml.safe_load(PHASE_STATUS_FILE.read_text(encoding="utf-8"))
     return [
-        PhaseEntry(id=str(p["id"]), detailed_doc=p.get("detailed_doc", ""))
-        for p in raw.get("roadmap", [])
+        PhaseEntry(id=str(p["id"]), detailed_doc=p.get("detail_doc", ""))
+        for p in raw.get("phases", [])
     ]
 
 
@@ -146,21 +146,14 @@ def _match_phase_id(filename: str, pid: str) -> bool:
     return bool(pat.match(filename))
 
 
-def find_files_for_phase(
-    pid: str, detailed_doc: str
-) -> list[Path]:
-    """All ``phase-{pid}-*.md`` files under ``docs/current/`` (recursive)
-    EXCEPT the detailed_doc. Handles flat layout and per-phase subfolders."""
-    detailed_path = (
-        (REPO_ROOT / detailed_doc).resolve() if detailed_doc else None
-    )
+def find_files_for_phase(pid: str) -> list[Path]:
+    """All ``phase-{pid}-*.md`` files under ``docs/current/`` (recursive),
+    including the detailed_doc. Handles flat layout and per-phase subfolders."""
     matches: list[Path] = []
     for entry in sorted(CURRENT_DIR.rglob("*.md")):
         if not entry.is_file():
             continue
         if not _match_phase_id(entry.name, pid):
-            continue
-        if detailed_path and entry.resolve() == detailed_path:
             continue
         matches.append(entry)
     return matches
@@ -195,37 +188,21 @@ def _git_mv(src: Path, dest: Path) -> None:
         shutil.move(str(src), str(dest))
 
 
-def _rewrite_links_in_archived_file(
-    archived: Path, detailed_doc: str
-) -> bool:
-    """In a freshly-archived file, rewrite ``./phase-X-detailed.md``
-    (and bare ``phase-X-detailed.md``) links so they keep working from
-    their new location.
+def _rewrite_cross_links_in_archived_file(archived: Path) -> bool:
+    """Rewrite any ``docs/current/`` absolute-style links inside an archived
+    file so they resolve correctly from ``docs/archive/``.
 
-    From ``docs/archive/phase-X-issues.md`` the detailed doc is reached
-    via ``../current/phase-X-detailed.md``.
-
-    From ``docs/archive/test-cases/phase-X-test-cases.md`` it's
-    ``../../current/phase-X-detailed.md``.
+    All phase docs are flattened into the same archive/ directory, so
+    ``./phase-X-detailed.md`` and bare ``phase-X-detailed.md`` links between
+    sibling archived files need no rewriting — they already point to the same
+    directory.  Only ``../current/...`` or ``docs/current/...`` links that
+    survived from a previous partial-archive need updating.
     """
-    if not detailed_doc:
-        return False
-    detailed_name = Path(detailed_doc).name
-    # Depth-aware target.
-    depth = len(archived.relative_to(ARCHIVE_DIR).parts) - 1
-    rel_prefix = "../" * (depth + 1)  # climb out of archive/, then into current/
-    new_target = f"{rel_prefix}current/{detailed_name}"
-
     text = archived.read_text(encoding="utf-8")
-    # Match markdown link bodies pointing to the detailed doc.
-    # Accept ``./name`` or bare ``name`` — but NOT already-rewritten
-    # paths containing ``current/`` so a re-run is a no-op.
-    pat = re.compile(
-        r"\]\((?!\.\./)(?:\./)?(" + re.escape(detailed_name) + r")(?P<frag>#[^)]*)?\)"
-    )
-    new_text, n = pat.subn(
-        lambda m: f"]({new_target}{m.group('frag') or ''})", text
-    )
+    # Rewrite any lingering links that still point into docs/current/.
+    # e.g.  ../current/phase-X-detailed.md  →  phase-X-detailed.md
+    pat = re.compile(r"\]\((?:\.\./)+"r"current/(phase-[^)]+)\)")
+    new_text, n = pat.subn(r"](\1)", text)
     if n == 0 or new_text == text:
         return False
     archived.write_text(new_text, encoding="utf-8")
@@ -265,10 +242,8 @@ class ArchiveResult:
     yaml_updated: bool = False
 
 
-def archive_phase(
-    pid: str, detailed_doc: str, dry_run: bool = False
-) -> ArchiveResult:
-    files = find_files_for_phase(pid, detailed_doc)
+def archive_phase(pid: str, dry_run: bool = False) -> ArchiveResult:
+    files = find_files_for_phase(pid)
     moves: list[tuple[Path, Path]] = []
     rewrites: list[Path] = []
     skipped: list[Path] = []
@@ -286,7 +261,7 @@ def archive_phase(
 
     for src, dest in moves:
         _git_mv(src, dest)
-        if _rewrite_links_in_archived_file(dest, detailed_doc):
+        if _rewrite_cross_links_in_archived_file(dest):
             rewrites.append(dest)
 
     yaml_updated = _update_yaml_paths_for_moves(moves)
@@ -342,7 +317,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             continue
-        result = archive_phase(pid, entry.detailed_doc, dry_run=args.dry_run)
+        result = archive_phase(pid, dry_run=args.dry_run)
         verb = "would move" if args.dry_run else "moved"
         if result.moved:
             any_changes = True

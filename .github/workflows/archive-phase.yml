@@ -67,6 +67,10 @@ jobs:
           python scripts/archive_phase.py ${{ steps.build_args.outputs.args }}
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
+      - name: Sync phase status to CLAUDE.md / README / strategy.md
+        if: github.event.inputs.dry_run != 'true'
+        run: python scripts/sync_phase_status.py
+
       - name: Check for changes
         id: check_changes
         run: |
@@ -85,8 +89,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/archive/ docs/current/ docs/current/phase-status.yaml
+          git add CLAUDE.md README.md docs/README.md docs/current/strategy.md 2>/dev/null || true
           if ! git diff --cached --quiet; then
-            git commit -m "chore: archive completed phase docs [skip ci]"
+            git commit -m "chore: archive completed phase docs + sync roadmap links [skip ci]"
             git push
             echo "✓ Pushed archived phase docs."
           else

@@ -9,6 +9,14 @@ This script renders two types of marker sections:
 Files can opt-in to either marker by including the BEGIN/END comments.
 Files without a marker are skipped silently (no error).
 
+Also seeds a ``<!-- testing-signoff: need to be signed -->`` marker into any
+``phase-*-test-cases*.md`` in ``docs/current/`` that is missing one, so the
+archive-phase workflow can detect tester sign-off automatically.
+
+Called by two workflows:
+- ``.github/workflows/sync-phase-status.yml`` — on every push touching phase-status.yaml
+- ``.github/workflows/archive-phase.yml`` — after archiving, to sync updated doc paths
+
 Usage:
     python scripts/sync_phase_status.py              # sync all target files
     python scripts/sync_phase_status.py --dry-run    # show what would change

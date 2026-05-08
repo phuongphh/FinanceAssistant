@@ -44,7 +44,7 @@ phases:
     name: "UX Foundation"
     status: done
     duration: "3 tuần"
-    detail_doc: "docs/current/phase-1-detailed.md"
+    detail_doc: "docs/archive/phase-1-detailed.md"
     issues_doc: ""
     description: "Telegram bot + manual entry + monthly report + Notion dashboard"
     completed_date: ""
@@ -54,7 +54,7 @@ phases:
     name: "Personality & Care"
     status: done
     duration: "3 tuần"
-    detail_doc: "docs/current/phase-2-detailed.md"
+    detail_doc: "docs/archive/phase-2-detailed.md"
     issues_doc: ""
     description: "Onboarding, Bé Tiền tone, milestone celebration, empathy engine"
     completed_date: ""
@@ -64,8 +64,8 @@ phases:
     name: "Wealth Foundation"
     status: done
     duration: "4 tuần"
-    detail_doc: "docs/current/phase-3a-detailed.md"
-    issues_doc: "docs/current/phase-3a-issues.md"
+    detail_doc: "docs/archive/phase-3a-detailed.md"
+    issues_doc: "docs/archive/phase-3a-issues.md"
     description: "Asset model, net worth, morning briefing, Mini App dashboard"
     completed_date: ""
     icon: "✅"
@@ -84,8 +84,8 @@ phases:
     name: "Menu UX Revamp"
     status: done
     duration: "1.5 tuần"
-    detail_doc: "docs/current/phase-3.6-detailed.md"
-    issues_doc: "docs/current/phase-3.6-issues.md"
+    detail_doc: "docs/archive/phase-3.6-detailed.md"
+    issues_doc: "docs/archive/phase-3.6-issues.md"
     description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
     completed_date: "2026-05-05"
     icon: "✅"

@@ -2,7 +2,7 @@
 
 > **Purpose:** 3 Epics chứa 13 User Stories — sẵn sàng copy-paste vào GitHub.  
 > **Format:** Epic = issue cha có task list link tới Stories. Stories = issue con với AC chi tiết.  
-> **Reference:** Mỗi story link về [phase-3.6-detailed.md](./phase-3.6-detailed.md)
+> **Reference:** Mỗi story link về [phase-3.6-detailed.md](../current/phase-3.6-detailed.md)
 
 ---
 
@@ -88,7 +88,7 @@ When Epic 1 is complete:
 
 ## Reference
 
-📖 [phase-3.6-detailed.md § Tuần 1](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § Tuần 1](../current/phase-3.6-detailed.md)
 
 ### Labels
 `phase-3.6` `epic` `menu-ux` `priority-high`
@@ -100,7 +100,7 @@ When Epic 1 is complete:
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** None
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.2 — Content File](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.2 — Content File](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -172,7 +172,7 @@ def test_all_levels_present():
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** P3.6-S1
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.3 — Menu Formatter](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.3 — Menu Formatter](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -237,7 +237,7 @@ async def test_format_submenu_assets():
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~0.5 day | **Depends on:** P3.6-S2
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.4 — Menu Handler](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.4 — Menu Handler](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -278,7 +278,7 @@ As a user, when I type `/menu`, I expect a clean rich menu to appear immediately
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** P3.6-S3
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.4 — Menu Handler](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.4 — Menu Handler](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -341,7 +341,7 @@ E2E test in real Telegram (manual):
 **Type:** Story | **Epic:** Epic 1 | **Estimate:** ~1 day | **Depends on:** P3.6-S4
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.4 — Menu Handler `_route_action`](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.4 — Menu Handler `_route_action`](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -465,7 +465,7 @@ When Epic 2 is complete:
 
 ## Reference
 
-📖 [phase-3.6-detailed.md § 2.1 — Wealth Level Test Matrix](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 2.1 — Wealth Level Test Matrix](../current/phase-3.6-detailed.md)
 
 ### Labels
 `phase-3.6` `epic` `personality` `priority-high`
@@ -477,7 +477,7 @@ When Epic 2 is complete:
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~1 day | **Depends on:** Epic 1 complete
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.3 — Adaptive logic](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.3 — Adaptive logic](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -542,7 +542,7 @@ async def test_hnw_intro():
 **Type:** Story | **Epic:** Epic 2 | **Estimate:** ~0.25 day | **Depends on:** Epic 1 complete
 
 ### Reference
-📖 [phase-3.6-detailed.md § 1.5 — Update Bot Menu Button](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 1.5 — Update Bot Menu Button](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -705,7 +705,7 @@ When Epic 3 is complete:
 
 ## Reference
 
-📖 [phase-3.6-detailed.md § 2.2 — Migration Strategy](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 2.2 — Migration Strategy](../current/phase-3.6-detailed.md)
 
 ### Labels
 `phase-3.6` `epic` `migration` `priority-critical`
@@ -717,7 +717,7 @@ When Epic 3 is complete:
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~1 day | **Depends on:** Epic 2 complete
 
 ### Reference
-📖 [phase-3.6-detailed.md § 2.2 — Migration Strategy](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 2.2 — Migration Strategy](../current/phase-3.6-detailed.md)
 
 ### User Story
 
@@ -789,7 +789,7 @@ As a product owner, I want the menu revamp to ship cleanly with clear user commu
 **Type:** Story | **Epic:** Epic 3 | **Estimate:** ~2 days (1 day testing + 1 day analyzing) | **Depends on:** P3.6-S11
 
 ### Reference
-📖 [phase-3.6-detailed.md § 2.3 — User Testing](./phase-3.6-detailed.md)
+📖 [phase-3.6-detailed.md § 2.3 — User Testing](../current/phase-3.6-detailed.md)
 
 ### User Story
 

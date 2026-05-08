@@ -1,6 +1,6 @@
 # Phase 3.6 — Manual Test Cases (Telegram Bot)
 
-<!-- testing-signoff: need to be signed -->
+<!-- testing-signoff:signed -->
 <!--
   Sign-off marker — driven by scripts/archive_phase.py.
   When testing is complete, change "need to be signed" → "signed" on the
@@ -10,7 +10,7 @@
 
 > **Purpose:** Comprehensive test cases for manual tester to validate Phase 3.6 (Menu UX Revamp) on Telegram bot.  
 > **Tester Profile:** No source code access. Tests via Telegram chat interface + Mini App for verification.  
-> **Reference:** [phase-3.6-detailed.md](./phase-3.6-detailed.md), [phase-3.6-issues.md](./phase-3.6-issues.md)
+> **Reference:** [phase-3.6-detailed.md](../current/phase-3.6-detailed.md), [phase-3.6-issues.md](./phase-3.6-issues.md)
 
 ---
 
