@@ -19,7 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #275 | [Story] P3.9-S8: Crypto price auto-updater | [issue-275.md](issue-275.md) |
 | #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
-| #279 | [Story] P3.9-S12: Gold price auto-updater + wealth integration | [issue-279.md](issue-279.md) |
 | #281 | [Story] P3.9-S14: News RSS feed integration | [issue-281.md](issue-281.md) |
 | #282 | [Story] P3.9-S15: News LLM summarization tied to holdings | [issue-282.md](issue-282.md) |
 | #283 | [Story] P3.9-S16: Morning briefing enrichment (real data) | [issue-283.md](issue-283.md) |
@@ -30,4 +29,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #288 | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [issue-288.md](issue-288.md) |
 | #289 | [Story] P3.9-S22: Documentation + ADR + phase-status update | [issue-289.md](issue-289.md) |
 
-**Total active:** 25
+**Total active:** 24

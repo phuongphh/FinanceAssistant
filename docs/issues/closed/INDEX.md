@@ -147,7 +147,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #270 | Pre-Phase | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [pre-phase/issue-270.md](by-phase/pre-phase/issue-270.md) |
 | #271 | Pre-Phase | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [pre-phase/issue-271.md](by-phase/pre-phase/issue-271.md) |
 | #277 | Pre-Phase | [Story] P3.9-S10: SJC gold scraper (primary) | [pre-phase/issue-277.md](by-phase/pre-phase/issue-277.md) |
+| #279 | Pre-Phase | [Story] P3.9-S12: Gold price auto-updater + wealth integration | [pre-phase/issue-279.md](by-phase/pre-phase/issue-279.md) |
 | #280 | Pre-Phase | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [pre-phase/issue-280.md](by-phase/pre-phase/issue-280.md) |
 
-**Total:** 144 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 127 Pre-Phase)
+**Total:** 145 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 128 Pre-Phase)
