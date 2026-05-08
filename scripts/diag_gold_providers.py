@@ -26,6 +26,7 @@ import httpx
 from backend.market_data.providers.gold_btmc import BTMCGoldProvider
 from backend.market_data.providers.gold_common import BROWSER_HEADERS
 from backend.market_data.providers.gold_pnj import PNJGoldProvider
+from backend.market_data.providers.gold_pnj_json import PNJJSONGoldProvider
 from backend.market_data.providers.gold_sjc import SJCGoldProvider
 
 
@@ -142,17 +143,23 @@ def vnstock_check() -> None:
 
 
 async def probe_existing_providers() -> None:
-    print("\n=== Existing providers (sanity check) ===")
+    print("\n=== Existing providers (sanity check, SJC_GOLD then RING_24K) ===")
     for label, provider in (
         ("SJCGoldProvider", SJCGoldProvider()),
         ("PNJGoldProvider", PNJGoldProvider()),
         ("BTMCGoldProvider", BTMCGoldProvider()),
+        ("PNJJSONGoldProvider", PNJJSONGoldProvider()),
     ):
-        try:
-            quote = await provider.fetch_quote("SJC_GOLD")
-            print(f"{label}: OK buy={quote.metadata['buy_price']:,.0f} sell={quote.price:,.0f}")
-        except Exception as exc:
-            print(f"{label}: FAIL — {type(exc).__name__}: {exc}")
+        for symbol in ("SJC_GOLD", "RING_24K"):
+            try:
+                quote = await provider.fetch_quote(symbol)
+                print(
+                    f"{label} [{symbol}]: OK "
+                    f"buy={quote.metadata['buy_price']:,.0f} "
+                    f"sell={quote.price:,.0f}"
+                )
+            except Exception as exc:
+                print(f"{label} [{symbol}]: FAIL — {type(exc).__name__}: {exc}")
 
 
 async def dump_btmc_rows() -> None:

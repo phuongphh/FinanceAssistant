@@ -1,0 +1,15 @@
+{
+  "data": [
+    { "masp": "SJC",  "tensp": "Vàng miếng SJC 999.9",      "giaban": 16750, "giamua": 16450 },
+    { "masp": "N24K", "tensp": "Nhẫn Trơn PNJ 999.9",       "giaban": 16730, "giamua": 16430 },
+    { "masp": "KB",   "tensp": "Vàng Kim Bảo 999.9",        "giaban": 16730, "giamua": 16430 },
+    { "masp": "TL",   "tensp": "Vàng Phúc Lộc Tài 999.9",   "giaban": 16730, "giamua": 16430 },
+    { "masp": "PNJ",  "tensp": "Vàng PNJ - Phượng Hoàng",   "giaban": 16730, "giamua": 16430 },
+    { "masp": "24K",  "tensp": "Vàng nữ trang 999.9",       "giaban": 16560, "giamua": 16160 },
+    { "masp": "999",  "tensp": "Vàng nữ trang 999",         "giaban": 16543, "giamua": 16143 },
+    { "masp": "9920", "tensp": "Vàng nữ trang 9920",        "giaban": 16428, "giamua": 15808 },
+    { "masp": "99",   "tensp": "Vàng nữ trang 99",          "giaban": 16394, "giamua": 15774 },
+    { "masp": "22K",  "tensp": "Vàng 916 (22K)",            "giaban": 15169, "giamua": 14549 },
+    { "masp": "75",   "tensp": "Vàng 750 (18K)",            "giaban": 12420, "giamua": 11530 }
+  ]
+}

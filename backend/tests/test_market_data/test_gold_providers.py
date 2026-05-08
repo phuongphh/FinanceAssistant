@@ -10,8 +10,9 @@ from backend.market_data.exceptions import ParserError, SymbolNotFound
 from backend.market_data.providers.base_dispatcher import Dispatcher
 from backend.market_data.providers.gold_btmc import BTMCGoldProvider
 from backend.market_data.providers.gold_pnj import PNJGoldProvider
+from backend.market_data.providers.gold_pnj_json import PNJJSONGoldProvider
 from backend.market_data.providers.gold_sjc import SJCGoldProvider
-from backend.market_data.providers import gold_btmc, gold_pnj, gold_sjc
+from backend.market_data.providers import gold_btmc, gold_pnj, gold_pnj_json, gold_sjc
 from backend.market_data.providers.gold_common import BROWSER_HEADERS
 from backend.tests.test_market_data.fakes import FakeAsyncRedis
 
@@ -79,13 +80,18 @@ async def test_gold_dispatcher_falls_back_to_pnj():
 
 @pytest.mark.parametrize(
     "module, provider_cls",
-    [(gold_sjc, SJCGoldProvider), (gold_pnj, PNJGoldProvider), (gold_btmc, BTMCGoldProvider)],
+    [
+        (gold_sjc, SJCGoldProvider),
+        (gold_pnj, PNJGoldProvider),
+        (gold_btmc, BTMCGoldProvider),
+        (gold_pnj_json, PNJJSONGoldProvider),
+    ],
 )
 @pytest.mark.asyncio
 async def test_gold_provider_sends_browser_headers_and_follows_redirects(monkeypatch, module, provider_cls):
     """Regression: scrape-style providers must send a real browser fingerprint.
 
-    Default python-httpx UA is rejected at WAF level by all three sources;
+    Default python-httpx UA is rejected at WAF level by all four sources;
     redirects must be followed so the parser sees the final page body.
     """
     captured: dict = {}
@@ -108,6 +114,14 @@ async def test_gold_provider_sends_browser_headers_and_follows_redirects(monkeyp
             if provider_cls is PNJGoldProvider:
                 body = (FIXTURES / "pnj_sample.html").read_text()
                 return httpx.Response(200, text=body, request=httpx.Request("GET", url))
+            if provider_cls is PNJJSONGoldProvider:
+                body = (FIXTURES / "pnj_edge_sample.json").read_text()
+                return httpx.Response(
+                    200,
+                    text=body,
+                    headers={"content-type": "application/json"},
+                    request=httpx.Request("GET", url),
+                )
             body = (FIXTURES / "btmc_sample.json").read_text()
             return httpx.Response(
                 200,
@@ -234,6 +248,85 @@ async def test_gold_dispatcher_falls_back_to_btmc_on_sjc_failure():
     async with _client("forbidden", status=403) as sjc_client, _json_client(fixture) as btmc_client:
         dispatcher = Dispatcher(
             SJCGoldProvider(client=sjc_client),
+            BTMCGoldProvider(client=btmc_client),
+            FakeAsyncRedis(),
+        )
+        quote = await dispatcher.fetch_quote("SJC_GOLD")
+
+    assert quote.source == "btmc"
+    assert quote.price == Decimal("167500000")
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_parses_sjc_bullion_from_fixture():
+    """Fixture mirrors the 2026-05-08 PNJ Edge response: SJC bullion at
+    16,450 / 16,750 (thousands of VND per chỉ). Provider must scale to
+    per-lượng VND (× 10,000) so the handler's "đ/lượng" label is correct.
+    """
+    fixture = (FIXTURES / "pnj_edge_sample.json").read_text()
+    async with _json_client(fixture) as client:
+        quote = await PNJJSONGoldProvider(client=client).fetch_quote("SJC_GOLD")
+
+    assert quote.symbol == "SJC_GOLD"
+    assert quote.source == "pnj-json"
+    assert quote.price == Decimal("167500000")
+    assert quote.metadata["buy_price"] == Decimal("164500000")
+    assert quote.metadata["pnj_product"] == "Vàng miếng SJC 999.9"
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_resolves_24k_ring_to_n24k_masp():
+    """Critical reason for adding this provider: it separates SJC bullion
+    from 24K nhẫn (BTMC quotes them at parity). The N24K row's 16,430 buy
+    differs from SJC's 16,450 — that delta is what the bot now exposes.
+    """
+    fixture = (FIXTURES / "pnj_edge_sample.json").read_text()
+    async with _json_client(fixture) as client:
+        quote = await PNJJSONGoldProvider(client=client).fetch_quote("RING_24K")
+
+    assert quote.symbol == "RING_24K"
+    assert quote.source == "pnj-json"
+    assert quote.price == Decimal("167300000")
+    assert quote.metadata["buy_price"] == Decimal("164300000")
+    assert quote.metadata["pnj_product"] == "Nhẫn Trơn PNJ 999.9"
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_raises_for_unsupported_symbol():
+    fixture = (FIXTURES / "pnj_edge_sample.json").read_text()
+    async with _json_client(fixture) as client:
+        with pytest.raises(SymbolNotFound):
+            await PNJJSONGoldProvider(client=client).fetch_quote("CRYPTO_BTC")
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_raises_when_masp_missing():
+    """If PNJ ever drops the SJC entry, we want SymbolNotFound (so the
+    dispatcher falls back to BTMC), not an obscure ParserError."""
+    payload = '{"data":[{"masp":"N24K","tensp":"Nhẫn","giamua":16430,"giaban":16730}]}'
+    async with _json_client(payload) as client:
+        with pytest.raises(SymbolNotFound):
+            await PNJJSONGoldProvider(client=client).fetch_quote("SJC_GOLD")
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_raises_parser_error_on_missing_data_field():
+    async with _json_client('{"unexpected":"shape"}') as client:
+        with pytest.raises(ParserError):
+            await PNJJSONGoldProvider(client=client).fetch_quote("SJC_GOLD")
+
+
+@pytest.mark.asyncio
+async def test_gold_dispatcher_falls_back_from_pnj_json_to_btmc():
+    """Production dispatcher chain: when PNJ Edge fails (5xx/timeout/parse),
+    dispatcher must serve BTMC's quote.
+    """
+    btmc_fixture = (FIXTURES / "btmc_sample.json").read_text()
+    async with _json_client("not json", status=500) as pnj_client, _json_client(
+        btmc_fixture
+    ) as btmc_client:
+        dispatcher = Dispatcher(
+            PNJJSONGoldProvider(client=pnj_client),
             BTMCGoldProvider(client=btmc_client),
             FakeAsyncRedis(),
         )
