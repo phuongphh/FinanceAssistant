@@ -19,5 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #266 | [Epic] Phase 3.9 — Epic 4: Enhanced Briefing + Analytics + Alerts | [issue-266.md](issue-266.md) |
 | #267 | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [issue-267.md](issue-267.md) |
 | #268 | [Story] P3.9-S1: Module skeleton + BaseProvider abstract class | [issue-268.md](issue-268.md) |
+| #269 | [Story] P3.9-S2: Redis price cache layer | [issue-269.md](issue-269.md) |
 
-**Total active:** 15
+**Total active:** 16
