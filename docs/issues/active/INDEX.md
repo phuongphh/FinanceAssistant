@@ -20,5 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #267 | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [issue-267.md](issue-267.md) |
 | #268 | [Story] P3.9-S1: Module skeleton + BaseProvider abstract class | [issue-268.md](issue-268.md) |
 | #269 | [Story] P3.9-S2: Redis price cache layer | [issue-269.md](issue-269.md) |
+| #270 | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [issue-270.md](issue-270.md) |
 
-**Total active:** 16
+**Total active:** 17
