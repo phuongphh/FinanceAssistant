@@ -140,6 +140,28 @@ async def test_btmc_parses_24k_ring_from_fixture():
 
 
 @pytest.mark.asyncio
+async def test_btmc_parses_shape_b_without_at_row_field():
+    """Regression for review on PR #308: BTMC also returns rows without `@row`,
+    using abbreviated prefixes (`@n_N`, `@pb_N`, `@ps_N`). The parser must
+    infer the suffix from row keys and try alternate prefixes; otherwise an
+    SJC outage falls through to SymbolNotFound and users see "chưa có dữ liệu".
+    """
+    fixture = (FIXTURES / "btmc_shape_b_sample.json").read_text()
+    async with _json_client(fixture) as client:
+        sjc_quote = await BTMCGoldProvider(client=client).fetch_quote("SJC_GOLD")
+        ring_quote = await BTMCGoldProvider(client=client).fetch_quote("RING_24K")
+
+    assert sjc_quote.symbol == "SJC_GOLD"
+    assert sjc_quote.source == "btmc"
+    assert sjc_quote.price == Decimal("85500000")
+    assert sjc_quote.metadata["buy_price"] == Decimal("84500000")
+
+    assert ring_quote.symbol == "RING_24K"
+    assert ring_quote.price == Decimal("79300000")
+    assert ring_quote.metadata["buy_price"] == Decimal("78200000")
+
+
+@pytest.mark.asyncio
 async def test_btmc_raises_when_no_matching_row():
     fixture = '{"DataList":{"Data":[{"@row":"1","@name_1":"VÀNG TRANG SỨC 18K","@buy_1k":"55000000","@sell_1k":"56000000"}]}}'
     async with _json_client(fixture) as client:

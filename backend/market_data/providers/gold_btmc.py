@@ -6,26 +6,31 @@ own Android app, which returns SJC bullion and 24K ring prices in one
 call without WAF blocking. This is significantly more durable than
 HTML scraping: the API has been stable since at least 2018.
 
-API format (each row keyed by `@row` value, other fields suffixed with it):
+API format — BTMC ships two flavours of row in the same `DataList.Data`,
+both keyed by a numeric suffix that varies per row. The parser must
+infer the suffix from the row's keys and try both naming conventions:
 
-    {
-      "DataList": {
-        "Data": [
-          {
-            "@row": "1",
-            "@name_1": "VÀNG MIẾNG SJC",
-            "@buy_1k": "84500000",
-            "@sell_1k": "85500000",
-            "@row_date_1": "08/05/2026 18:00",
-            ...
-          },
-          {"@row": "2", "@name_2": "VÀNG NHẪN BTMC", ...}
-        ]
+  Shape A (with `@row` and full prefixes):
+
+      {
+        "@row": "1",
+        "@name_1": "VÀNG MIẾNG SJC",
+        "@buy_1k": "84500000",
+        "@sell_1k": "85500000",
+        "@row_date_1": "08/05/2026 18:00"
       }
-    }
+
+  Shape B (no `@row`, abbreviated prefixes):
+
+      {
+        "@n_7": "VÀNG MIẾNG SJC",
+        "@pb_7": "84500000",
+        "@ps_7": "85500000"
+      }
 """
 from __future__ import annotations
 
+import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -48,11 +53,21 @@ _DEFAULT_URL = (
 )
 
 # BTMC product names → our normalized symbols.
-# Order matters: more specific matches go first ("nhẫn ép" before "sjc").
+# Order matters: more specific matches go first ("nhẫn" before "sjc")
+# so a name like "VÀNG NHẪN SJC" classifies as RING_24K, not SJC bullion.
 _NAME_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("RING_24K", ("nhẫn", "nhan", "9999", "999.9", "24k")),
     ("SJC_GOLD", ("vàng miếng sjc", "sjc 1l", "vàng sjc", "sjc")),
 )
+
+# Alternate prefixes for the same logical fields; tried in order until a
+# non-empty value is found. `@name_N` (Shape A) before `@n_N` (Shape B).
+_NAME_PREFIXES = ("name", "n")
+_BUY_PREFIXES = ("buy", "pb")
+_SELL_PREFIXES = ("sell", "ps")
+
+# Match `@<word>_<digits>` or `@<word>_<digits>k` keys to extract the suffix.
+_SUFFIX_KEY_RE = re.compile(r"^@[A-Za-z_]+_(\d+)k?$")
 
 
 class BTMCGoldProvider(BaseProvider):
@@ -135,6 +150,56 @@ class BTMCGoldProvider(BaseProvider):
                 return symbol
         return None
 
+    @staticmethod
+    def _row_suffix(row: dict[str, Any]) -> str | None:
+        """Return the numeric suffix shared by this row's `@*_N` keys.
+
+        Shape A rows expose it directly via `@row`. Shape B rows omit
+        `@row`, so we count suffixes across all `@<word>_N(k)?` keys
+        and return the most common one.
+        """
+        explicit = row.get("@row") or row.get("row")
+        if explicit is not None and str(explicit).strip():
+            return str(explicit).strip()
+
+        counts: dict[str, int] = {}
+        for key in row:
+            if not isinstance(key, str):
+                continue
+            match = _SUFFIX_KEY_RE.match(key)
+            if match:
+                suffix = match.group(1)
+                counts[suffix] = counts.get(suffix, 0) + 1
+        if not counts:
+            return None
+        return max(counts.items(), key=lambda item: item[1])[0]
+
+    @staticmethod
+    def _row_field(
+        row: dict[str, Any],
+        suffix: str,
+        prefixes: tuple[str, ...],
+        *,
+        prefer_k: bool = False,
+    ) -> Any:
+        """Look up `@<prefix>_<suffix>` (or `@<prefix>_<suffix>k`) for any
+        prefix in `prefixes`. The first non-empty hit wins.
+
+        `prefer_k=True` is for price fields, where `@buy_1k` (raw VND
+        integer) is more reliable than `@buy_1` (often in thousands).
+        """
+        for prefix in prefixes:
+            candidates = (
+                (f"@{prefix}_{suffix}k", f"@{prefix}_{suffix}")
+                if prefer_k
+                else (f"@{prefix}_{suffix}", f"@{prefix}_{suffix}k")
+            )
+            for key in candidates:
+                value = row.get(key)
+                if value not in (None, ""):
+                    return value
+        return None
+
     def _find_row(
         self, rows: list[dict[str, Any]], symbol: str
     ) -> tuple[Decimal, Decimal, str | None]:
@@ -142,15 +207,14 @@ class BTMCGoldProvider(BaseProvider):
             raise SymbolNotFound(f"BTMC: unsupported symbol {symbol}")
 
         for row in rows:
-            row_idx = row.get("@row") or row.get("row")
-            if row_idx is None:
+            suffix = self._row_suffix(row)
+            if suffix is None:
                 continue
-            suffix = str(row_idx)
-            name = str(row.get(f"@name_{suffix}") or "")
-            if self._classify_name(name) != symbol:
+            name = self._row_field(row, suffix, _NAME_PREFIXES)
+            if not name or self._classify_name(str(name)) != symbol:
                 continue
-            buy_raw = row.get(f"@buy_{suffix}k") or row.get(f"@buy_{suffix}")
-            sell_raw = row.get(f"@sell_{suffix}k") or row.get(f"@sell_{suffix}")
+            buy_raw = self._row_field(row, suffix, _BUY_PREFIXES, prefer_k=True)
+            sell_raw = self._row_field(row, suffix, _SELL_PREFIXES, prefer_k=True)
             updated = row.get(f"@row_date_{suffix}") or row.get("@time_now")
             try:
                 buy = self._to_vnd(buy_raw)
