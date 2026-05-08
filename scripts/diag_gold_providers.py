@@ -258,6 +258,113 @@ async def main() -> None:
         await probe(p)
     await probe_existing_providers()
     await dump_btmc_rows()
+    await dump_pnj_next_data()
+
+
+async def dump_pnj_next_data() -> None:
+    """Find PNJ's machine-readable gold-price source.
+
+    PNJ's `/site/gia-vang` page is Next.js, so the visible HTML has zero
+    `<table>` elements but the SSR data ships as `<script id="__NEXT_DATA__">
+    {...}</script>`. Strategy:
+      1. Fetch /site/gia-vang.
+      2. Pull out the __NEXT_DATA__ script tag, parse its JSON.
+      3. Walk recursively, collect any subtree whose keys/values mention
+         "vàng", "gold", "sjc", "nhẫn", "buy", "sell", "price" so we can
+         see the canonical schema without dumping the whole tree (often
+         hundreds of KB).
+      4. Also probe a few candidate REST endpoints so we know if there's
+         a simpler API behind the scenes.
+    """
+    import json as _json
+    from bs4 import BeautifulSoup as _BS
+
+    print("\n=== PNJ machine-readable source hunt ===")
+    url = "https://www.pnj.com.vn/site/gia-vang"
+    try:
+        async with httpx.AsyncClient(
+            timeout=10.0, headers=BROWSER_HEADERS, follow_redirects=True
+        ) as client:
+            response = await client.get(url)
+    except Exception as exc:
+        print(f"PNJ fetch failed: {type(exc).__name__}: {exc}")
+        return
+
+    print(f"GET {url} -> {response.status_code} (len={len(response.text)})")
+    if response.status_code != 200:
+        return
+
+    soup = _BS(response.text, "lxml")
+    next_script = soup.find("script", attrs={"id": "__NEXT_DATA__"})
+    if next_script is None:
+        # Try alternative inline-JSON patterns.
+        candidates = [
+            s for s in soup.find_all("script")
+            if s.string and ("__NEXT_DATA__" in s.string or "__INITIAL_STATE__" in s.string)
+        ]
+        print(f"No <script id='__NEXT_DATA__'> found; alternative inline scripts: {len(candidates)}")
+        for s in candidates[:2]:
+            content = (s.string or "")[:500]
+            print(f"  inline preview: {content!r}")
+    else:
+        try:
+            data = _json.loads(next_script.string or "")
+        except Exception as exc:
+            print(f"__NEXT_DATA__ JSON parse failed: {type(exc).__name__}: {exc}")
+            print(f"raw preview: {(next_script.string or '')[:500]!r}")
+        else:
+            print(f"__NEXT_DATA__ keys: {list(data.keys())}")
+            _dump_relevant_subtrees(data, depth=0, hits_left=8)
+
+    # Probe likely REST endpoints PNJ might expose.
+    for api_url in (
+        "https://www.pnj.com.vn/api/v1/golds",
+        "https://www.pnj.com.vn/site/api/gia-vang",
+        "https://giavang.pnj.com.vn/api/getgiavang",
+        "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price",
+    ):
+        try:
+            async with httpx.AsyncClient(
+                timeout=5.0, headers=BROWSER_HEADERS, follow_redirects=True
+            ) as client:
+                r = await client.get(api_url)
+        except Exception as exc:
+            print(f"\n{api_url} -> NETWORK_ERROR: {type(exc).__name__}: {exc}")
+            continue
+        ct = r.headers.get("content-type", "?")
+        print(f"\n{api_url}\n  -> HTTP {r.status_code} ({ct}, len={len(r.text)})")
+        if r.status_code == 200:
+            print(f"  preview: {r.text[:300]!r}")
+
+
+def _dump_relevant_subtrees(node, *, depth: int, path: str = "", hits_left: int) -> int:
+    """Recursively print JSON subtrees whose keys/values look gold-relevant.
+
+    Cap output via `hits_left` so we don't dump megabytes when the tree is
+    massive. Returns updated `hits_left` so the caller can short-circuit.
+    """
+    keywords = ("vàng", "gold", "sjc", "nhẫn", "nhan", "buy", "sell", "gia", "price")
+    if hits_left <= 0 or depth > 8:
+        return hits_left
+    if isinstance(node, dict):
+        for key, value in node.items():
+            key_lower = str(key).lower()
+            if any(kw in key_lower for kw in keywords):
+                preview = repr(value)[:300]
+                print(f"  {path}.{key}: {preview}")
+                hits_left -= 1
+                if hits_left <= 0:
+                    return hits_left
+                continue
+            hits_left = _dump_relevant_subtrees(
+                value, depth=depth + 1, path=f"{path}.{key}", hits_left=hits_left
+            )
+    elif isinstance(node, list):
+        for i, item in enumerate(node[:5]):
+            hits_left = _dump_relevant_subtrees(
+                item, depth=depth + 1, path=f"{path}[{i}]", hits_left=hits_left
+            )
+    return hits_left
 
 
 if __name__ == "__main__":
