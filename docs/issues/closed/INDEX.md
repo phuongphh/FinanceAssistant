@@ -147,11 +147,12 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #270 | Pre-Phase | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [pre-phase/issue-270.md](by-phase/pre-phase/issue-270.md) |
 | #271 | Pre-Phase | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [pre-phase/issue-271.md](by-phase/pre-phase/issue-271.md) |
 | #272 | Pre-Phase | [Story] P3.9-S5: VNDIRECT stock provider (backup) | [pre-phase/issue-272.md](by-phase/pre-phase/issue-272.md) |
+| #273 | Pre-Phase | [Story] P3.9-S6: CoinGecko crypto provider | [pre-phase/issue-273.md](by-phase/pre-phase/issue-273.md) |
 | #277 | Pre-Phase | [Story] P3.9-S10: SJC gold scraper (primary) | [pre-phase/issue-277.md](by-phase/pre-phase/issue-277.md) |
 | #279 | Pre-Phase | [Story] P3.9-S12: Gold price auto-updater + wealth integration | [pre-phase/issue-279.md](by-phase/pre-phase/issue-279.md) |
 | #280 | Pre-Phase | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [pre-phase/issue-280.md](by-phase/pre-phase/issue-280.md) |
 | #281 | Pre-Phase | [Story] P3.9-S14: News RSS feed integration | [pre-phase/issue-281.md](by-phase/pre-phase/issue-281.md) |
 | #287 | Pre-Phase | [Story] P3.9-S20: Integration tests end-to-end | [pre-phase/issue-287.md](by-phase/pre-phase/issue-287.md) |
 
-**Total:** 148 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 131 Pre-Phase)
+**Total:** 149 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 132 Pre-Phase)
