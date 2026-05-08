@@ -156,12 +156,13 @@ async def probe_existing_providers() -> None:
 
 
 async def dump_btmc_rows() -> None:
-    """Print BTMC's first 15 rows so we can see which one the SJC matcher picks.
+    """Print BTMC rows that the classifier matches plus all gold-keyword rows.
 
-    Important when prices look off (e.g. 16.45M for SJC bullion when real is
-    ~85M/lượng): the broad "sjc" alias may be matching a smaller bullion size
-    or a non-bullion product. Inspecting names + prices side-by-side reveals
-    whether the classifier needs tightening.
+    BTMC's endpoint returns 1000+ rows, the vast majority silver/jewelry.
+    Dumping just the first 15 hides the rows that actually classify, so we
+    instead surface (a) every row the current classifier picks up and
+    (b) every row whose name contains a gold/SJC/nhẫn keyword. That's the
+    minimum needed to design a tighter pattern.
     """
     from backend.market_data.providers.gold_btmc import (
         _BUY_PREFIXES,
@@ -169,7 +170,7 @@ async def dump_btmc_rows() -> None:
         _SELL_PREFIXES,
     )
 
-    print("\n=== BTMC raw row dump (first 15 rows + matcher trace) ===")
+    print("\n=== BTMC matcher trace ===")
     provider = BTMCGoldProvider()
     try:
         response = await provider._fetch_response()
@@ -179,16 +180,58 @@ async def dump_btmc_rows() -> None:
         return
 
     print(f"Total rows: {len(rows)}")
-    for i, row in enumerate(rows[:15]):
+
+    def render(idx: int, row: dict, cls: str | None) -> str:
         suffix = provider._row_suffix(row) or "?"
         name = provider._row_field(row, suffix, _NAME_PREFIXES)
         buy = provider._row_field(row, suffix, _BUY_PREFIXES, prefer_k=True)
         sell = provider._row_field(row, suffix, _SELL_PREFIXES, prefer_k=True)
-        cls = provider._classify_name(str(name)) if name else None
-        print(
-            f"  [{i:2}] suffix={suffix} cls={cls!s:<10} "
-            f"name={str(name)[:50]!r:<55} buy={buy} sell={sell}"
+        return (
+            f"  [{idx:4}] suffix={suffix!s:<4} cls={cls!s:<10} "
+            f"name={str(name)[:60]!r:<65} buy={buy} sell={sell}"
         )
+
+    # 1) Every row the current classifier matches — including the one that
+    #    produced the suspicious 16.45M reading.
+    print("\n-- Rows classified by current matcher --")
+    classified: list[tuple[int, dict, str]] = []
+    for i, row in enumerate(rows):
+        suffix = provider._row_suffix(row)
+        if suffix is None:
+            continue
+        name = provider._row_field(row, suffix, _NAME_PREFIXES)
+        if not name:
+            continue
+        cls = provider._classify_name(str(name))
+        if cls is not None:
+            classified.append((i, row, cls))
+    if not classified:
+        print("  (no rows match — the previous SJC_GOLD response was a stale cache hit?)")
+    for idx, row, cls in classified[:30]:
+        print(render(idx, row, cls))
+    if len(classified) > 30:
+        print(f"  ... and {len(classified) - 30} more classified rows")
+
+    # 2) Every gold-keyword row, regardless of current classifier verdict.
+    #    Lets us see the canonical SJC bullion name BTMC actually uses.
+    print("\n-- Rows with gold keywords (vàng / sjc / nhẫn / miếng) --")
+    keywords = ("vàng", "sjc", "nhẫn", "nhan", "miếng", "mieng")
+    matched_kw = []
+    for i, row in enumerate(rows):
+        suffix = provider._row_suffix(row)
+        if suffix is None:
+            continue
+        name_raw = provider._row_field(row, suffix, _NAME_PREFIXES)
+        if not name_raw:
+            continue
+        lowered = str(name_raw).lower()
+        if any(kw in lowered for kw in keywords):
+            matched_kw.append((i, row, provider._classify_name(str(name_raw))))
+    print(f"  ({len(matched_kw)} rows match a gold keyword)")
+    for idx, row, cls in matched_kw[:25]:
+        print(render(idx, row, cls))
+    if len(matched_kw) > 25:
+        print(f"  ... and {len(matched_kw) - 25} more gold-keyword rows")
 
 
 async def main() -> None:
