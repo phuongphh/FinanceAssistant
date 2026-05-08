@@ -6,7 +6,7 @@ import httpx
 from backend.market_data.base import BaseProvider
 from backend.market_data.exceptions import ProviderUnavailable, RateLimitError, SymbolNotFound
 from backend.market_data.normalizer import PriceQuote
-from backend.market_data.providers.gold_common import now_utc, parse_gold_table
+from backend.market_data.providers.gold_common import BROWSER_HEADERS, now_utc, parse_gold_table
 
 
 class SJCGoldProvider(BaseProvider):
@@ -44,7 +44,11 @@ class SJCGoldProvider(BaseProvider):
         if self._client is not None:
             response = await self._client.get(self.url)
         else:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=BROWSER_HEADERS,
+                follow_redirects=True,
+            ) as client:
                 response = await client.get(self.url)
         if response.status_code == 429:
             raise RateLimitError("SJC rate limit reached")

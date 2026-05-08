@@ -90,7 +90,13 @@ class QueryMarketHandler(IntentHandler):
             try:
                 quote = await get_gold_quote(symbol)
             except Exception as exc:
-                logger.warning("Unable to fetch gold quote for %s: %s", symbol, exc)
+                logger.warning(
+                    "Unable to fetch gold quote for %s (%s): %s",
+                    symbol,
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
                 lines.append(f"• {label}: chưa có dữ liệu")
                 continue
 
