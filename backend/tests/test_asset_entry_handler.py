@@ -362,6 +362,141 @@ async def test_crypto_current_price_same_creates_asset():
 
 
 # -----------------------------------------------------------------
+# Gold flow
+# -----------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_callback_type_picker_routes_to_gold_starter():
+    user = _user()
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry, "_start_gold_subtype_pick",
+                      AsyncMock()) as starter, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:type:gold",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    starter.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gold_subtype_pick_advances_to_quantity():
+    user = _user({
+        "flow": asset_entry.FLOW_GOLD,
+        "step": "subtype",
+        "draft": {"asset_type": "gold", "extra": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:gold_subtype:sjc",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    kwargs = update_step.await_args.kwargs
+    assert kwargs["step"] == "quantity"
+    assert kwargs["draft_patch"]["subtype"] == "sjc"
+    assert kwargs["draft_patch"]["name"] == "Vàng SJC"
+    assert kwargs["draft_patch"]["extra"]["symbol"] == "SJC_GOLD"
+
+
+@pytest.mark.asyncio
+async def test_gold_quantity_accepts_chi_and_stores_tael_and_grams():
+    user = _user({
+        "flow": asset_entry.FLOW_GOLD,
+        "step": "quantity",
+        "draft": {"asset_type": "gold", "subtype": "sjc", "extra": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "5 chỉ", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+    kwargs = update_step.await_args.kwargs
+    assert kwargs["step"] == "avg_price"
+    extra = kwargs["draft_patch"]["extra"]
+    assert extra["quantity"] == 0.5
+    assert extra["tael"] == 0.5
+    assert extra["weight_gram"] == 18.75
+
+
+@pytest.mark.asyncio
+async def test_gold_current_price_same_creates_asset():
+    user = _user({
+        "flow": asset_entry.FLOW_GOLD,
+        "step": "current_price",
+        "draft": {
+            "asset_type": "gold",
+            "subtype": "sjc",
+            "name": "Vàng SJC",
+            "initial_value": float(Decimal("180000000")),
+            "extra": {
+                "type": "SJC",
+                "symbol": "SJC_GOLD",
+                "quantity": 2.0,
+                "tael": 2.0,
+                "weight_gram": 75.0,
+                "avg_price": float(Decimal("90000000")),
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="gold", value=180_000_000)
+    created.subtype = "sjc"
+    created.name = "Vàng SJC"
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)) as create_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("180000000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:gold_price:same",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    create_mock.assert_awaited_once()
+    kwargs = create_mock.await_args.kwargs
+    assert kwargs["asset_type"] == "gold"
+    assert kwargs["subtype"] == "sjc"
+    assert kwargs["name"] == "Vàng SJC"
+    assert kwargs["initial_value"] == Decimal("180000000.0")
+    assert kwargs["current_value"] == Decimal("180000000.0")
+    assert kwargs["extra"]["symbol"] == "SJC_GOLD"
+
+# -----------------------------------------------------------------
 # Real estate flow
 # -----------------------------------------------------------------
 
