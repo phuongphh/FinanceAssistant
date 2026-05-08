@@ -1,5 +1,13 @@
 # Phase 3.9 — Manual Test Cases
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Purpose:** Comprehensive manual test cases cho Phase 3.9 (Market Data Real)
 > **Tester Profile:** No source code access. Tests via Telegram bot, owner admin tools, và direct DB query (read-only).
 > **Reference:** [phase-3.9-detailed.md](./phase-3.9-detailed.md), [phase-3.9-issues.md](./phase-3.9-issues.md)
