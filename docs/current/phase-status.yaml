@@ -85,7 +85,7 @@ phases:
     status: done
     duration: "1.5 tuần"
     detail_doc: "docs/current/phase-3.6-detailed.md"
-    issues_doc: "docs/current/phase-3.6-issues.md"
+    issues_doc: "docs/archive/phase-3.6-issues.md"
     description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
     completed_date: "2026-05-05"
     icon: "✅"
