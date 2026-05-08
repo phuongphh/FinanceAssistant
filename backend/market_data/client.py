@@ -12,6 +12,7 @@ from backend.market_data.exceptions import ProviderUnavailable
 from backend.market_data.normalizer import PriceQuote
 from backend.market_data.providers.base_dispatcher import Dispatcher
 from backend.market_data.providers.crypto_coingecko import CoinGeckoCryptoProvider
+from backend.market_data.providers.gold_dispatcher import build_gold_dispatcher
 from backend.market_data.providers.stock_dispatcher import build_stock_dispatcher
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,10 @@ def get_stock_provider() -> Dispatcher:
 
 def get_crypto_provider() -> CoinGeckoCryptoProvider:
     return CoinGeckoCryptoProvider(timeout=get_settings().market_data_timeout_seconds)
+
+
+def get_gold_provider() -> Dispatcher:
+    return build_gold_dispatcher(get_redis_client(), timeout=5.0)
 
 
 async def get_quote(asset_type: str, symbol: str, provider: QuoteProvider) -> PriceQuote:
@@ -72,3 +77,7 @@ async def get_stock_quote(symbol: str) -> PriceQuote:
 
 async def get_crypto_quote(symbol: str) -> PriceQuote:
     return await get_quote("crypto", symbol, get_crypto_provider())
+
+
+async def get_gold_quote(symbol: str = "SJC_GOLD") -> PriceQuote:
+    return await get_quote("gold", symbol, get_gold_provider())

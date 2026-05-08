@@ -19,6 +19,8 @@ from backend.models.telegram_update import (
 from backend.models.agent_audit_log import AgentAuditLog
 from backend.feedback.models.feedback import Feedback, PromptSentLog
 from backend.profile.models.user_profile import UserProfile
+from backend.models.bank_rate import BankRateSnapshot
+from backend.models.news_article import NewsArticle
 from backend.models.conversation_context import (
     ROLE_ASSISTANT,
     ROLE_USER,
@@ -47,6 +49,8 @@ __all__ = [
     "Feedback",
     "PromptSentLog",
     "UserProfile",
+    "BankRateSnapshot",
+    "NewsArticle",
     "ConversationContext",
     "ROLE_USER",
     "ROLE_ASSISTANT",

@@ -10,6 +10,7 @@ from backend.market_data.exceptions import ProviderUnavailable
 from backend.market_data.normalizer import PriceQuote
 from backend.wealth.models.asset import Asset
 from backend.wealth.valuation.crypto import value_crypto_holding
+from backend.wealth.valuation.gold import value_gold_holding
 from backend.wealth.valuation.stock import value_stock_holding
 
 
@@ -75,3 +76,22 @@ async def test_zero_cost_basis_keeps_pnl_none():
         valuation = await value_stock_holding(_asset("stock", {"ticker": "ABC", "quantity": 1, "avg_price": 0}, current_value=Decimal("0")))
 
     assert valuation.pnl_pct is None
+
+
+@pytest.mark.asyncio
+async def test_gold_valuation_uses_market_price_and_pnl():
+    with patch("backend.wealth.valuation.gold.get_gold_quote", AsyncMock(return_value=_quote("SJC_GOLD", "90000000", "gold"))):
+        valuation = await value_gold_holding(_asset("gold", {"type": "SJC", "tael": "2", "avg_price": "80000000"}, current_value=Decimal("160000000")))
+
+    assert valuation.current_price == Decimal("90000000")
+    assert valuation.current_value == Decimal("180000000")
+    assert valuation.pnl_pct == Decimal("12.500")
+
+
+@pytest.mark.asyncio
+async def test_gold_valuation_fallback_marks_stale():
+    with patch("backend.wealth.valuation.gold.get_gold_quote", AsyncMock(side_effect=ProviderUnavailable("down"))):
+        valuation = await value_gold_holding(_asset("gold", {"type": "SJC", "weight_gram": "37.5", "avg_price": "80000000"}))
+
+    assert valuation.current_price == Decimal("80000000")
+    assert valuation.is_stale is True

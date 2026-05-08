@@ -8,7 +8,7 @@ from typing import Any, Protocol
 
 from backend.market_data.base import BaseProvider
 from backend.market_data.cache.cache_keys import health_failures_key, health_open_until_key
-from backend.market_data.exceptions import ProviderUnavailable, RateLimitError
+from backend.market_data.exceptions import ParserError, ProviderUnavailable, RateLimitError
 from backend.market_data.normalizer import PriceQuote
 
 
@@ -27,7 +27,7 @@ _FAILURE_THRESHOLD = 5
 _FAILURE_WINDOW_SECONDS = 60
 _OPEN_SECONDS = 300
 
-_RETRYABLE_ERRORS = (asyncio.TimeoutError, TimeoutError, ProviderUnavailable, RateLimitError)
+_RETRYABLE_ERRORS = (asyncio.TimeoutError, TimeoutError, ProviderUnavailable, RateLimitError, ParserError)
 
 
 class Dispatcher:

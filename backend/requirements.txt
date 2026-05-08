@@ -29,6 +29,7 @@ fakeredis>=2.23.0
 vnstock>=0.2.9
 requests>=2.31.0
 beautifulsoup4>=4.12.0
+feedparser>=6.0.11
 lxml>=5.0.0
 
 # Charts
