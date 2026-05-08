@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #285 | [Story] P3.9-S18: Price movement alerts (>5% in 15 min) | [issue-285.md](issue-285.md) |
 | #286 | [Story] P3.9-S19: Replace Phase 3.7 stubs in agent tools | [issue-286.md](issue-286.md) |
 | #288 | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [issue-288.md](issue-288.md) |
+| #289 | [Story] P3.9-S22: Documentation + ADR + phase-status update | [issue-289.md](issue-289.md) |
 
-**Total active:** 34
+**Total active:** 35
