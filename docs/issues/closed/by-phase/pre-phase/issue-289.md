@@ -8,14 +8,14 @@
 As a future maintainer, I need docs + ADR for key Phase 3.9 decisions.
 
 ## Acceptance Criteria
-- [x] ADR file docs/adr/0XX-market-data-providers.md:
+- [ ] ADR file docs/adr/0XX-market-data-providers.md:
   - Why SSI primary, VNDIRECT backup
   - Why CoinGecko free tier
   - Why scraping (no PNJ/SJC API)
   - When to upgrade to paid
-- [x] Update CLAUDE.md Phase 3.9 section
-- [x] Update docs/current/phase-status.yaml
-- [x] Archive Phase 3.9 docs sau khi ship
+- [ ] Update CLAUDE.md Phase 3.9 section
+- [ ] Update docs/current/phase-status.yaml
+- [ ] Archive Phase 3.9 docs sau khi ship
 
 ## Estimate: ~0.5 day
 ## Depends on: P3.9-S20, P3.9-S21
