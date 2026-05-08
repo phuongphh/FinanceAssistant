@@ -140,6 +140,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #263 | Pre-Phase | [Epic] Phase 3.9 — Epic 1: Foundation & Provider Abstraction | [pre-phase/issue-263.md](by-phase/pre-phase/issue-263.md) |
 | #264 | Pre-Phase | [Epic] Phase 3.9 — Epic 2: Stock + Crypto Providers | [pre-phase/issue-264.md](by-phase/pre-phase/issue-264.md) |
 | #265 | Pre-Phase | [Epic] Phase 3.9 — Epic 3: Gold + Bank Rates + News | [pre-phase/issue-265.md](by-phase/pre-phase/issue-265.md) |
+| #266 | Pre-Phase | [Epic] Phase 3.9 — Epic 4: Enhanced Briefing + Analytics + Alerts | [pre-phase/issue-266.md](by-phase/pre-phase/issue-266.md) |
 | #267 | Pre-Phase | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [pre-phase/issue-267.md](by-phase/pre-phase/issue-267.md) |
 | #268 | Pre-Phase | [Story] P3.9-S1: Module skeleton + BaseProvider abstract class | [pre-phase/issue-268.md](by-phase/pre-phase/issue-268.md) |
 | #269 | Pre-Phase | [Story] P3.9-S2: Redis price cache layer | [pre-phase/issue-269.md](by-phase/pre-phase/issue-269.md) |
@@ -147,5 +148,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #271 | Pre-Phase | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [pre-phase/issue-271.md](by-phase/pre-phase/issue-271.md) |
 | #277 | Pre-Phase | [Story] P3.9-S10: SJC gold scraper (primary) | [pre-phase/issue-277.md](by-phase/pre-phase/issue-277.md) |
 
-**Total:** 142 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 125 Pre-Phase)
+**Total:** 143 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 126 Pre-Phase)
