@@ -25,7 +25,10 @@ from backend.jobs.reminder_scheduler_job import run_reminder_scheduler
 from backend.jobs.seasonal_notifier import run_seasonal_check
 from backend.jobs.weekly_fun_facts import run_weekly_fun_facts
 from backend.jobs.weekly_goal_reminder import run_weekly_goal_reminder
+from backend.market_data.jobs.bank_rates_updater import update_bank_rates
 from backend.market_data.jobs.crypto_updater import update_all_held_crypto
+from backend.market_data.jobs.gold_updater import update_all_held_gold
+from backend.market_data.jobs.news_updater import update_news_articles
 from backend.market_data.jobs.stock_updater import update_all_held_stocks
 
 logger = logging.getLogger(__name__)
@@ -116,6 +119,22 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         update_all_held_crypto, "interval",
         minutes=5, timezone="Asia/Ho_Chi_Minh",
         id="crypto_price_updater",
+    )
+    # Phase 3.9 Epic 3 — gold, bank rates, and market news.
+    scheduler.add_job(
+        update_all_held_gold, "cron",
+        hour="9,13,16", minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="gold_price_updater",
+    )
+    scheduler.add_job(
+        update_bank_rates, "cron",
+        day_of_week="mon", hour=6, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="bank_rates_updater",
+    )
+    scheduler.add_job(
+        update_news_articles, "cron",
+        minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="news_updater",
     )
 
 
