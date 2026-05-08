@@ -52,7 +52,6 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PHASE_STATUS_FILE = REPO_ROOT / "docs" / "current" / "phase-status.yaml"
 CURRENT_DIR = REPO_ROOT / "docs" / "current"
-TEST_CASES_DIR = CURRENT_DIR / "test-cases"
 ARCHIVE_DIR = REPO_ROOT / "docs" / "archive"
 
 # Marker comment. Keep "need to be signed" as the seeded default so a
@@ -111,15 +110,22 @@ def _phase_id_from_filename(name: str) -> str | None:
 
 def find_signed_phases(dry_run: bool = False) -> list[str]:
     """Return phase ids whose test-cases file has marker == 'signed'.
-    Order preserves filesystem listing for reproducibility."""
-    if not TEST_CASES_DIR.is_dir():
+
+    Searches recursively in docs/current/ for any file matching
+    phase-*-test-cases*.md (handles flat layout and per-phase subfolders).
+    Order preserves sorted filesystem listing for reproducibility.
+    """
+    if not CURRENT_DIR.is_dir():
         return []
     signed: list[str] = []
-    for entry in sorted(TEST_CASES_DIR.iterdir()):
-        if not entry.is_file() or entry.suffix != ".md":
+    seen_ids: set[str] = set()
+    for entry in sorted(CURRENT_DIR.rglob("*.md")):
+        if not entry.is_file():
+            continue
+        if "test-cases" not in entry.name:
             continue
         pid = _phase_id_from_filename(entry.name)
-        if pid is None:
+        if pid is None or pid in seen_ids:
             continue
         text = entry.read_text(encoding="utf-8")
         m = SIGNOFF_RE.search(text)
@@ -128,6 +134,7 @@ def find_signed_phases(dry_run: bool = False) -> list[str]:
         value = m.group("value").strip().lower()
         if value == SIGNOFF_SIGNED:
             signed.append(pid)
+            seen_ids.add(pid)
     return signed
 
 
@@ -142,23 +149,20 @@ def _match_phase_id(filename: str, pid: str) -> bool:
 def find_files_for_phase(
     pid: str, detailed_doc: str
 ) -> list[Path]:
-    """All ``phase-{pid}-*.md`` files in ``current/`` and
-    ``current/test-cases/`` EXCEPT the detailed_doc."""
+    """All ``phase-{pid}-*.md`` files under ``docs/current/`` (recursive)
+    EXCEPT the detailed_doc. Handles flat layout and per-phase subfolders."""
     detailed_path = (
         (REPO_ROOT / detailed_doc).resolve() if detailed_doc else None
     )
     matches: list[Path] = []
-    for root in (CURRENT_DIR, TEST_CASES_DIR):
-        if not root.is_dir():
+    for entry in sorted(CURRENT_DIR.rglob("*.md")):
+        if not entry.is_file():
             continue
-        for entry in sorted(root.iterdir()):
-            if not entry.is_file() or entry.suffix != ".md":
-                continue
-            if not _match_phase_id(entry.name, pid):
-                continue
-            if detailed_path and entry.resolve() == detailed_path:
-                continue
-            matches.append(entry)
+        if not _match_phase_id(entry.name, pid):
+            continue
+        if detailed_path and entry.resolve() == detailed_path:
+            continue
+        matches.append(entry)
     return matches
 
 
@@ -166,10 +170,9 @@ def find_files_for_phase(
 
 
 def _archive_destination(src: Path) -> Path:
-    """Mirror the test-cases subdir under archive/, flatten everything
-    else into archive/ root."""
-    if src.parent == TEST_CASES_DIR:
-        return ARCHIVE_DIR / "test-cases" / src.name
+    """Flatten all phase docs into archive/ root regardless of their
+    source subfolder (e.g. docs/current/phase-3.8/phase-3.8-issues.md
+    → docs/archive/phase-3.8-issues.md)."""
     return ARCHIVE_DIR / src.name
 
 

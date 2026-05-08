@@ -64,11 +64,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Add only the files this workflow is allowed to touch.
+          # Sync targets + any test-cases files that received seeded markers.
           git add CLAUDE.md README.md docs/README.md docs/current/strategy.md 2>/dev/null || true
+          git add 'docs/current/**/*test-cases*.md' 2>/dev/null || true
+          git add docs/current/ 2>/dev/null || true
           # Commit only if there are staged changes (some files may not exist).
           if ! git diff --cached --quiet; then
-            git commit -m "chore: sync phase status from phase-status.yaml [skip ci]"
+            git commit -m "chore: sync phase status + seed test-cases markers [skip ci]"
             git push
             echo "✓ Pushed phase status sync."
           else
