@@ -128,7 +128,12 @@ class BTMCGoldProvider(BaseProvider):
         try:
             return response.json()
         except Exception as exc:
-            raise ParserError(f"BTMC returned non-JSON: {exc}") from exc
+            preview = response.text[:240].replace("\n", " ").replace("\r", " ")
+            raise ParserError(
+                f"BTMC returned non-JSON "
+                f"(content_type={response.headers.get('content-type', '?')!r} "
+                f"len={len(response.text)} preview={preview!r}): {exc}"
+            ) from exc
 
     def _build_quote(self, rows: list[dict[str, Any]], symbol: str) -> PriceQuote:
         buy, sell, updated = self._find_row(rows, symbol)
