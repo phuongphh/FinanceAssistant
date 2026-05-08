@@ -137,6 +137,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #249 | Pre-Phase | [Story] P3.8.5-S6: Profile view + menu integration | [pre-phase/issue-249.md](by-phase/pre-phase/issue-249.md) |
 | #250 | Pre-Phase | [Story] P3.8.5-S7: Edit display name + age range flows | [pre-phase/issue-250.md](by-phase/pre-phase/issue-250.md) |
 | #251 | Pre-Phase | [Story] P3.8.5-S8: Notification settings flow | [pre-phase/issue-251.md](by-phase/pre-phase/issue-251.md) |
+| #263 | Pre-Phase | [Epic] Phase 3.9 — Epic 1: Foundation & Provider Abstraction | [pre-phase/issue-263.md](by-phase/pre-phase/issue-263.md) |
 
-**Total:** 133 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 116 Pre-Phase)
+**Total:** 134 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 117 Pre-Phase)
