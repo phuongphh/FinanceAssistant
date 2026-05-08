@@ -65,6 +65,13 @@ class TestIsReportQuery:
         assert is_report_query("tháng trước tôi chi tiêu bao nhiêu?") is False
         assert is_report_query("thang truoc toi chi tieu bao nhieu") is False
 
+    def test_does_not_hijack_transaction_summary_queries(self):
+        # Transaction summaries need the intent pipeline so daily/weekly
+        # ranges like "hôm qua" are respected; monthly report_service only
+        # understands month keys.
+        assert is_report_query("báo cáo giao dịch hôm qua") is False
+        assert is_report_query("bao cao giao dich thang truoc") is False
+
 
 class TestExtractMonthKey:
     def test_defaults_to_current_month(self):

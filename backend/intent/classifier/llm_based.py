@@ -59,7 +59,7 @@ INTENTS:
 - query_assets: Hỏi về tài sản (BĐS, CK, crypto, vàng, tiền)
 - query_net_worth: Hỏi tổng tài sản / net worth
 - query_portfolio: Hỏi danh mục chứng khoán
-- query_expenses: Hỏi chi tiêu chung
+- query_expenses: Hỏi chi tiêu chung; tổng hợp/báo cáo giao dịch theo thời gian
 - query_expenses_by_category: Hỏi chi tiêu theo loại (ăn uống, sức khỏe...)
 - query_income: Hỏi thu nhập / lương
 - query_cashflow: Hỏi dòng tiền / dư cuối tháng

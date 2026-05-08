@@ -95,8 +95,12 @@ query_portfolio:
       confidence: 0.9
 
 query_expenses:
-  description: "User asks about expenses (general, no specific category)."
+  description: "User asks about expenses / transactions (general, no specific category)."
   patterns:
+    # "tổng hợp giao dịch tháng trước" / "báo cáo giao dịch hôm qua"
+    # are read-only transaction summaries, not quick-transaction writes.
+    - pattern: '(?:tong\s*hop|bao\s*cao|liet\s*ke|xem).*(?:giao\s*dich|chi\s*(?:tieu|phi)).*(?:thang|tuan|nam|hom)'
+      confidence: 0.92
     - pattern: 'chi\s*(?:tieu|phi).*(?:thang|tuan|nam|hom)'
       confidence: 0.9
     - pattern: '(?:toi|minh).*(?:da\s+)?(?:chi|tieu).*(?:thang|tuan)'
