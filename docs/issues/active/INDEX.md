@@ -30,6 +30,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #277 | [Story] P3.9-S10: SJC gold scraper (primary) | [issue-277.md](issue-277.md) |
 | #278 | [Story] P3.9-S11: PNJ gold scraper (backup) | [issue-278.md](issue-278.md) |
 | #280 | [Story] P3.9-S13: Bank rates scraper (top 20 banks) | [issue-280.md](issue-280.md) |
+| #281 | [Story] P3.9-S14: News RSS feed integration | [issue-281.md](issue-281.md) |
 | #282 | [Story] P3.9-S15: News LLM summarization tied to holdings | [issue-282.md](issue-282.md) |
 
-**Total active:** 27
+**Total active:** 28
