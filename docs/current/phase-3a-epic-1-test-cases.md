@@ -1,6 +1,6 @@
 # Phase 3A — Epic 1 Test Cases (Telegram-only)
 
-<!-- testing-signoff: need to be signed -->
+<!-- testing-signoff: signed -->
 <!--
   Sign-off marker — driven by scripts/archive_phase.py.
   When testing is complete, change "need to be signed" → "signed" on the
