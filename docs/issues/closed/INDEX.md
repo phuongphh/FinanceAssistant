@@ -139,6 +139,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #251 | Pre-Phase | [Story] P3.8.5-S8: Notification settings flow | [pre-phase/issue-251.md](by-phase/pre-phase/issue-251.md) |
 | #263 | Pre-Phase | [Epic] Phase 3.9 — Epic 1: Foundation & Provider Abstraction | [pre-phase/issue-263.md](by-phase/pre-phase/issue-263.md) |
 | #264 | Pre-Phase | [Epic] Phase 3.9 — Epic 2: Stock + Crypto Providers | [pre-phase/issue-264.md](by-phase/pre-phase/issue-264.md) |
+| #267 | Pre-Phase | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [pre-phase/issue-267.md](by-phase/pre-phase/issue-267.md) |
 
-**Total:** 135 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 118 Pre-Phase)
+**Total:** 136 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 119 Pre-Phase)
