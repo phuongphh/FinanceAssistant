@@ -23,6 +23,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #270 | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [issue-270.md](issue-270.md) |
 | #271 | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [issue-271.md](issue-271.md) |
 | #272 | [Story] P3.9-S5: VNDIRECT stock provider (backup) | [issue-272.md](issue-272.md) |
+| #275 | [Story] P3.9-S8: Crypto price auto-updater | [issue-275.md](issue-275.md) |
 | #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
 
-**Total active:** 20
+**Total active:** 21
