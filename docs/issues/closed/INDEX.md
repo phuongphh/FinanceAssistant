@@ -148,6 +148,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #271 | Pre-Phase | [Story] P3.9-S4: SSI iBoard stock provider (primary) | [pre-phase/issue-271.md](by-phase/pre-phase/issue-271.md) |
 | #272 | Pre-Phase | [Story] P3.9-S5: VNDIRECT stock provider (backup) | [pre-phase/issue-272.md](by-phase/pre-phase/issue-272.md) |
 | #273 | Pre-Phase | [Story] P3.9-S6: CoinGecko crypto provider | [pre-phase/issue-273.md](by-phase/pre-phase/issue-273.md) |
+| #274 | Pre-Phase | [Story] P3.9-S7: Stock price auto-updater (cron job) | [pre-phase/issue-274.md](by-phase/pre-phase/issue-274.md) |
 | #275 | Pre-Phase | [Story] P3.9-S8: Crypto price auto-updater | [pre-phase/issue-275.md](by-phase/pre-phase/issue-275.md) |
 | #276 | Pre-Phase | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [pre-phase/issue-276.md](by-phase/pre-phase/issue-276.md) |
 | #277 | Pre-Phase | [Story] P3.9-S10: SJC gold scraper (primary) | [pre-phase/issue-277.md](by-phase/pre-phase/issue-277.md) |
@@ -162,5 +163,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #288 | Pre-Phase | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [pre-phase/issue-288.md](by-phase/pre-phase/issue-288.md) |
 | #289 | Pre-Phase | [Story] P3.9-S22: Documentation + ADR + phase-status update | [pre-phase/issue-289.md](by-phase/pre-phase/issue-289.md) |
 
-**Total:** 157 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 140 Pre-Phase)
+**Total:** 158 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 141 Pre-Phase)
