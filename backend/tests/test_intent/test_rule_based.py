@@ -77,6 +77,14 @@ def test_edge_cases_handled_gracefully(fixture, classifier):
     assert result.confidence >= fixture.expected_min_confidence
 
 
+def test_crypto_my_assets_extracts_crypto_filter(classifier):
+    result = classifier.classify("crypto của tôi")
+
+    assert result is not None
+    assert result.intent == IntentType.QUERY_ASSETS
+    assert result.parameters["asset_type"] == "crypto"
+
+
 # ---------------------- correctness invariants ----------------------
 
 

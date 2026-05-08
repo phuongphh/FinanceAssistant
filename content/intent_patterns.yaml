@@ -26,6 +26,9 @@ query_assets:
     # "tôi có tài sản gì"
     - pattern: '(?:toi|minh)\s+co.*tai\s*san.*(?:gi|nao)'
       confidence: 0.95
+    # direct type-specific forms: "crypto của tôi" / "tiền số của mình"
+    - pattern: '(?:crypto|tien\s*so|bitcoin|ethereum|solana|btc|eth|sol)\s+(?:cua\s+)?(?:toi|minh|em|anh|chi|ban)'
+      confidence: 0.92
     # "show my assets" — English fallback
     - pattern: 'show\s+(?:my|the)\s+assets?'
       confidence: 0.9
@@ -58,7 +61,7 @@ query_assets:
       patterns:
         - { match: 'bat\s*dong\s*san|bds|nha\s+dat', value: real_estate }
         - { match: 'chung\s*khoan|co\s*phieu|stocks?', value: stock }
-        - { match: 'crypto|tien\s*so|btc|bitcoin|ethereum', value: crypto }
+        - { match: 'crypto|tien\s*so|btc|bitcoin|ethereum|eth|sol|solana', value: crypto }
         - { match: 'vang|gold', value: gold }
         - { match: 'tien\s*mat|cash|tien\s+gui', value: cash }
 

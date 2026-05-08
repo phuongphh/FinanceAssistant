@@ -97,6 +97,85 @@ async def test_query_assets_handler_lists_all_types():
 
 
 @pytest.mark.asyncio
+async def test_query_assets_handler_crypto_uses_market_prices():
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+    from backend.wealth.valuation.crypto import HoldingValuation
+
+    assets = [
+        _fake_asset(
+            name="BTC",
+            asset_type="crypto",
+            current_value=Decimal("100000000"),
+            extra={"symbol": "BTC", "quantity": "0.5"},
+        ),
+        _fake_asset(
+            name="ETH",
+            asset_type="crypto",
+            current_value=Decimal("200000000"),
+            extra={"symbol": "ETH", "quantity": "2"},
+        ),
+        _fake_asset(
+            name="SOL",
+            asset_type="crypto",
+            current_value=Decimal("30000000"),
+            extra={"symbol": "SOL", "quantity": "10"},
+        ),
+    ]
+
+    valuations = {
+        "BTC": HoldingValuation(
+            current_price=Decimal("2000000000"),
+            quantity=Decimal("0.5"),
+            cost_basis=Decimal("1000000000"),
+            current_value=Decimal("1000000000"),
+            pnl_pct=Decimal("100"),
+            is_stale=False,
+        ),
+        "ETH": HoldingValuation(
+            current_price=Decimal("100000000"),
+            quantity=Decimal("2"),
+            cost_basis=Decimal("80000000"),
+            current_value=Decimal("200000000"),
+            pnl_pct=Decimal("25"),
+            is_stale=False,
+        ),
+        "SOL": HoldingValuation(
+            current_price=Decimal("3000000"),
+            quantity=Decimal("10"),
+            cost_basis=Decimal("2000000"),
+            current_value=Decimal("30000000"),
+            pnl_pct=Decimal("50"),
+            is_stale=False,
+        ),
+    }
+
+    async def fake_value_crypto_holding(asset):
+        return valuations[asset.extra["symbol"]]
+
+    with patch(
+        "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+        AsyncMock(return_value=assets),
+    ), patch(
+        "backend.intent.handlers.query_assets.value_crypto_holding",
+        AsyncMock(side_effect=fake_value_crypto_holding),
+    ) as value_mock:
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="crypto của tôi",
+            parameters={"asset_type": "crypto"},
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    assert value_mock.await_count == 3
+    assert "Tiền số của An" in response
+    assert "Tổng: *1,230,000,000đ*" in response
+    assert "BTC: 0.5 × 2,000,000,000đ = 1,000,000,000đ" in response
+    assert "ETH: 2 × 100,000,000đ = 200,000,000đ" in response
+    assert "SOL: 10 × 3,000,000đ = 30,000,000đ" in response
+
+
+@pytest.mark.asyncio
 async def test_query_assets_handler_empty_state():
     from backend.intent.handlers.query_assets import QueryAssetsHandler
 

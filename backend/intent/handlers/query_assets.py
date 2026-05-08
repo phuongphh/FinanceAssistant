@@ -11,6 +11,7 @@ from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
 from backend.wealth.services import asset_service
+from backend.wealth.valuation.crypto import HoldingValuation, value_crypto_holding
 
 # Top-N items per asset type to render before the "...và X mục nữa" tail.
 _TOP_N_PER_TYPE = 3
@@ -31,7 +32,7 @@ class QueryAssetsHandler(IntentHandler):
             return self._empty_state(user)
 
         style = await resolve_style(db, user)
-        formatted = self._format(
+        formatted = await self._format(
             assets, user, filtered_type=type_filter, style=style
         )
         return decorate(formatted, style)
@@ -54,7 +55,7 @@ class QueryAssetsHandler(IntentHandler):
             "Mình có thể giúp bạn thêm vào không? Tap /themtaisan"
         )
 
-    def _format(
+    async def _format(
         self,
         assets,
         user: User,
@@ -62,10 +63,19 @@ class QueryAssetsHandler(IntentHandler):
         filtered_type: str | None,
         style: LevelStyle,
     ) -> str:
+        crypto_valuations = await self._value_crypto_assets(assets)
+
         by_type: dict[str, list] = {}
+        display_values: dict[object, Decimal] = {}
         total = Decimal(0)
         for asset in assets:
-            value = Decimal(asset.current_value or 0)
+            valuation = crypto_valuations.get(asset)
+            value = (
+                valuation.current_value
+                if valuation is not None
+                else Decimal(asset.current_value or 0)
+            )
+            display_values[asset] = value
             total += value
             by_type.setdefault(asset.asset_type, []).append(asset)
 
@@ -86,13 +96,13 @@ class QueryAssetsHandler(IntentHandler):
         # biggest holdings first.
         ordered = sorted(
             by_type.items(),
-            key=lambda kv: sum(Decimal(a.current_value or 0) for a in kv[1]),
+            key=lambda kv: sum(display_values[a] for a in kv[1]),
             reverse=True,
         )
         for asset_type, items in ordered:
             icon = _ASSET_ICONS.get(asset_type, "📌")
             label = _ASSET_LABELS.get(asset_type, asset_type)
-            type_total = sum(Decimal(a.current_value or 0) for a in items)
+            type_total = sum(display_values[a] for a in items)
             # Show allocation % only for Mass Affluent + HNW. Starter and
             # Young Pro see the raw amount only — fewer numbers to scan.
             type_line = f"{icon} *{label}* — {format_money_short(type_total)}"
@@ -101,9 +111,21 @@ class QueryAssetsHandler(IntentHandler):
                 type_line += f" _({pct:.0f}%)_"
             lines.append(type_line)
             for asset in items[:_TOP_N_PER_TYPE]:
-                lines.append(
-                    f"   • {asset.name}: {format_money_short(asset.current_value)}"
-                )
+                valuation = crypto_valuations.get(asset)
+                if valuation is not None:
+                    symbol = _crypto_symbol(asset)
+                    stale_marker = " _(giá cũ)_" if valuation.is_stale else ""
+                    lines.append(
+                        "   • "
+                        f"{symbol}: {_format_quantity(valuation.quantity)} × "
+                        f"{format_money_full(valuation.current_price)} = "
+                        f"{format_money_full(valuation.current_value)}"
+                        f"{stale_marker}"
+                    )
+                else:
+                    lines.append(
+                        f"   • {asset.name}: {format_money_short(display_values[asset])}"
+                    )
             if len(items) > _TOP_N_PER_TYPE:
                 lines.append(
                     f"   _...và {len(items) - _TOP_N_PER_TYPE} mục nữa_"
@@ -117,6 +139,14 @@ class QueryAssetsHandler(IntentHandler):
         if style.is_starter:
             lines.append("Hỏi mình nếu cần thêm chi tiết nhé 😊")
         return "\n".join(lines).rstrip()
+
+    async def _value_crypto_assets(self, assets) -> dict[object, HoldingValuation]:
+        valuations: dict[object, HoldingValuation] = {}
+        for asset in assets:
+            if asset.asset_type != "crypto":
+                continue
+            valuations[asset] = await value_crypto_holding(asset)
+        return valuations
 
 
 # Inline tables — kept here rather than re-loading asset_categories.yaml
@@ -139,3 +169,16 @@ _ASSET_ICONS = {
     "gold": "🥇",
     "other": "📦",
 }
+
+
+def _crypto_symbol(asset) -> str:
+    extra = getattr(asset, "extra", None) or {}
+    return str(extra.get("symbol") or extra.get("ticker") or asset.name).upper().strip()
+
+
+def _format_quantity(quantity: Decimal) -> str:
+    normalized = quantity.normalize()
+    # Decimal.normalize() can switch large/small values to scientific notation;
+    # fixed-point keeps Telegram output easy to read for holdings like 0.5 BTC.
+    text = format(normalized, "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
