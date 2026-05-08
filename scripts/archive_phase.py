@@ -78,8 +78,8 @@ class PhaseEntry:
 def _load_phases() -> list[PhaseEntry]:
     raw = yaml.safe_load(PHASE_STATUS_FILE.read_text(encoding="utf-8"))
     return [
-        PhaseEntry(id=str(p["id"]), detailed_doc=p.get("detailed_doc", ""))
-        for p in raw.get("roadmap", [])
+        PhaseEntry(id=str(p["id"]), detailed_doc=p.get("detail_doc", ""))
+        for p in raw.get("phases", [])
     ]
 
 

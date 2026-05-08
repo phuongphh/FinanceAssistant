@@ -4,7 +4,7 @@
 > **Goal**: Determine whether Phase 3A ships to public beta.
 > **Duration**: 7 calendar days × 7 recruited users.
 > **Reference**: [`docs/issues/active/issue-83.md`](../issues/active/issue-83.md)
->          · [`phase-3a-detailed.md`](phase-3a-detailed.md) § 4.2
+>          · [`phase-3a-detailed.md`](../current/phase-3a-detailed.md) § 4.2
 
 ---
 

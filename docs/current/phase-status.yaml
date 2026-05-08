@@ -65,7 +65,7 @@ phases:
     status: done
     duration: "4 tuần"
     detail_doc: "docs/current/phase-3a-detailed.md"
-    issues_doc: "docs/current/phase-3a-issues.md"
+    issues_doc: "docs/archive/phase-3a-issues.md"
     description: "Asset model, net worth, morning briefing, Mini App dashboard"
     completed_date: ""
     icon: "✅"
