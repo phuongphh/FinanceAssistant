@@ -1,5 +1,13 @@
 # Phase 3.8 — Manual Test Cases (Telegram Bot)
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Purpose:** Comprehensive test cases for Phase 3.8 (Wealth Completion).  
 > **Tester Profile:** No source code access. Tests via Telegram chat + Mini App.  
 > **Reference:** [phase-3.8-detailed.md](./phase-3.8-detailed.md), [phase-3.8-issues.md](./phase-3.8-issues.md)
