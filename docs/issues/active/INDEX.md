@@ -22,5 +22,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #269 | [Story] P3.9-S2: Redis price cache layer | [issue-269.md](issue-269.md) |
 | #270 | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [issue-270.md](issue-270.md) |
 | #272 | [Story] P3.9-S5: VNDIRECT stock provider (backup) | [issue-272.md](issue-272.md) |
+| #276 | [Story] P3.9-S9: Wealth valuation integration (stocks + crypto) | [issue-276.md](issue-276.md) |
 
-**Total active:** 18
+**Total active:** 19
