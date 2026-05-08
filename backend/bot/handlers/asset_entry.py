@@ -1,7 +1,7 @@
 """Asset-entry wizard handler.
 
-Four flows — cash, stock, crypto, real-estate — share a common entry point and
-dispatcher, plus a Phase 3.8 "mark existing as rental" flow. State
+Five flows — cash, stock, crypto, gold, real-estate — share a common entry point
+and dispatcher, plus a Phase 3.8 "mark existing as rental" flow. State
 lives on ``users.wizard_state`` (JSONB) so the bot can survive process
 restarts mid-wizard.
 
@@ -11,6 +11,8 @@ Flow names (stored in ``wizard_state.flow``):
     asset_add_stock        — 4 questions: subtype → ticker → quantity
                              → avg_price → (same|new current_price)
     asset_add_crypto       — subtype → symbol → quantity → avg_price
+                             → (same|new current_price)
+    asset_add_gold         — subtype → quantity → avg_price
                              → (same|new current_price)
     asset_add_real_estate  — 4 questions + optional rental sub-wizard:
                              subtype → name → initial_value →
@@ -37,6 +39,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -56,6 +59,8 @@ from backend.bot.keyboards.asset_keyboard import (
     cash_subtype_keyboard,
     crypto_current_price_keyboard,
     crypto_subtype_keyboard,
+    gold_current_price_keyboard,
+    gold_subtype_keyboard,
     real_estate_subtype_keyboard,
     rental_ask_keyboard,
     rental_extra_keyboard,
@@ -108,6 +113,7 @@ FLOW_PICKER = "asset_add_picker"  # 6-button type picker shown, nothing chosen
 FLOW_CASH = "asset_add_cash"
 FLOW_STOCK = "asset_add_stock"
 FLOW_CRYPTO = "asset_add_crypto"
+FLOW_GOLD = "asset_add_gold"
 FLOW_REAL_ESTATE = "asset_add_real_estate"
 # Phase 3.8 — "mark existing real-estate as rental" flow. Distinct from
 # FLOW_REAL_ESTATE because it skips the create-asset path and only
@@ -852,6 +858,222 @@ async def _save_crypto_asset(
         asset_type=AssetType.CRYPTO.value,
         subtype=draft.get("subtype"),
         name=name,
+        initial_value=initial_value,
+        current_value=current_value,
+        extra=extra,
+    )
+    await _post_save(db, chat_id, user, asset)
+
+
+# ---------- Gold flow --------------------------------------------------
+
+_GOLD_TYPE_BY_SUBTYPE: dict[str, str] = {
+    "sjc": "SJC",
+    "pnj": "PNJ",
+    "nhan": "NHAN_24K",
+    "trang_suc": "JEWELRY",
+}
+_GOLD_SYMBOL_BY_SUBTYPE: dict[str, str] = {
+    "sjc": "SJC_GOLD",
+    "pnj": "SJC_GOLD",
+    "nhan": "RING_24K",
+    "trang_suc": "SJC_GOLD",
+}
+_GOLD_QUANTITY_RE = re.compile(r"(?P<num>\d+(?:[.,]\d+)?)")
+_GOLD_GRAM_RE = re.compile(r"(?<![a-z])(?:gram|grams|gam|g)\b")
+
+
+def _parse_gold_quantity(text: str) -> tuple[Decimal, Decimal] | None:
+    """Parse a Vietnamese gold quantity into (lượng, grams).
+
+    Defaults to lượng when the user only types a number. Also accepts
+    chỉ/phân/gram because users commonly describe small gold holdings
+    with those units.
+    """
+    match = _GOLD_QUANTITY_RE.search((text or "").strip().lower())
+    if match is None:
+        return None
+    amount = Decimal(match.group("num").replace(",", "."))
+    if amount <= 0:
+        return None
+
+    lowered = text.lower()
+    if _GOLD_GRAM_RE.search(lowered):
+        grams = amount
+        tael = grams / Decimal("37.5")
+    elif "chỉ" in lowered or "chi" in lowered:
+        tael = amount / Decimal(10)
+        grams = amount * Decimal("3.75")
+    elif "phân" in lowered or "phan" in lowered:
+        tael = amount / Decimal(100)
+        grams = amount * Decimal("0.375")
+    else:
+        tael = amount
+        grams = amount * Decimal("37.5")
+    return tael, grams
+
+
+async def _start_gold_subtype_pick(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    await wizard_service.start_flow(
+        db, user.id, FLOW_GOLD, step="subtype",
+        draft={"asset_type": AssetType.GOLD.value, "extra": {}},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="🥇 Bạn muốn thêm loại vàng nào?",
+        parse_mode="HTML",
+        reply_markup=gold_subtype_keyboard(),
+    )
+
+
+async def _handle_gold_subtype_pick(
+    db: AsyncSession, chat_id: int, user: User, subtype: str
+) -> None:
+    subs = get_subtypes(AssetType.GOLD.value)
+    if subtype not in subs:
+        await send_message(chat_id=chat_id, text="Loại không hợp lệ.")
+        return
+
+    extra = {
+        "type": _GOLD_TYPE_BY_SUBTYPE.get(subtype, subtype.upper()),
+        "symbol": _GOLD_SYMBOL_BY_SUBTYPE.get(subtype, "SJC_GOLD"),
+    }
+    await wizard_service.update_step(
+        db, user.id, step="quantity",
+        draft_patch={"subtype": subtype, "name": subs[subtype], "extra": extra},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"⚖️ Bạn đang có bao nhiêu <b>{subs[subtype]}</b>?\n\n"
+            "Ví dụ: <code>2 lượng</code>, <code>5 chỉ</code>, "
+            "hoặc <code>37.5 gram</code>."
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def _handle_gold_quantity_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(chat_id=chat_id, text="Số lượng vàng phải lớn hơn 0 nhé 🙂")
+        return
+    parsed = _parse_gold_quantity(text)
+    if parsed is None:
+        await send_message(
+            chat_id=chat_id,
+            text="Nhập số lượng vàng nhé. Ví dụ: <code>2 lượng</code> hoặc <code>5 chỉ</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    tael, grams = parsed
+    extra = dict(draft.get("extra") or {})
+    extra["quantity"] = float(tael)
+    extra["tael"] = float(tael)
+    extra["weight_gram"] = float(grams)
+    await wizard_service.update_step(
+        db, user.id, step="avg_price", draft_patch={"extra": extra},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ <b>{tael.normalize()}</b> lượng (~{grams.normalize()}g)\n\n"
+            "Giá mua trung bình mỗi lượng là bao nhiêu (VNĐ)?\n"
+            "Ví dụ: <code>90 triệu</code>, <code>92tr</code>"
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def _handle_gold_avg_price_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
+        return
+    avg_price = parse_amount(text)
+    if avg_price is None or avg_price <= 0:
+        await send_message(
+            chat_id=chat_id,
+            text="Nhập giá mua mỗi lượng nhé. Ví dụ: <code>90 triệu</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    extra = dict(draft.get("extra") or {})
+    extra["avg_price"] = float(avg_price)
+    quantity = Decimal(str(extra.get("quantity") or 0))
+    initial_value = avg_price * quantity
+    await wizard_service.update_step(
+        db, user.id, step="current_price",
+        draft_patch={"extra": extra, "initial_value": float(initial_value)},
+    )
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Tổng vốn: <b>{int(initial_value):,}đ</b>\n\n"
+            "Giá hiện tại của 1 lượng là bao nhiêu?\n"
+            "(Hoặc dùng giá mua nếu chưa muốn cập nhật)"
+        ),
+        parse_mode="HTML",
+        reply_markup=gold_current_price_keyboard(),
+    )
+
+
+async def _handle_gold_current_price_choice(
+    db: AsyncSession, chat_id: int, user: User, choice: str, draft: dict
+) -> None:
+    if choice == "same":
+        avg_price = Decimal(str(draft.get("extra", {}).get("avg_price") or 0))
+        await _save_gold_asset(db, chat_id, user, draft, avg_price)
+    elif choice == "new":
+        await wizard_service.update_step(db, user.id, step="current_price_input")
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "💹 Nhập giá hiện tại của 1 lượng vàng (VNĐ):\n"
+                "Ví dụ: <code>92 triệu</code>"
+            ),
+            parse_mode="HTML",
+        )
+
+
+async def _handle_gold_current_price_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
+        return
+    current_price = parse_amount(text)
+    if current_price is None or current_price <= 0:
+        await send_message(
+            chat_id=chat_id,
+            text="Nhập giá hiện tại mỗi lượng nhé. Ví dụ: <code>92 triệu</code>",
+            parse_mode="HTML",
+        )
+        return
+    await _save_gold_asset(db, chat_id, user, draft, current_price)
+
+
+async def _save_gold_asset(
+    db: AsyncSession, chat_id: int, user: User, draft: dict, current_price: Decimal
+) -> None:
+    extra = dict(draft.get("extra") or {})
+    quantity = Decimal(str(extra.get("quantity") or extra.get("tael") or 0))
+    avg_price = Decimal(str(extra.get("avg_price") or 0))
+    initial_value = avg_price * quantity
+    current_value = current_price * quantity
+    extra["current_price"] = float(current_price)
+
+    asset = await asset_service.create_asset(
+        db, user.id,
+        asset_type=AssetType.GOLD.value,
+        subtype=draft.get("subtype"),
+        name=draft.get("name") or "Vàng",
         initial_value=initial_value,
         current_value=current_value,
         extra=extra,
@@ -1640,6 +1862,9 @@ _TEXT_DISPATCH = {
     (FLOW_CRYPTO, "quantity"): _handle_crypto_quantity_input,
     (FLOW_CRYPTO, "avg_price"): _handle_crypto_avg_price_input,
     (FLOW_CRYPTO, "current_price_input"): _handle_crypto_current_price_input,
+    (FLOW_GOLD, "quantity"): _handle_gold_quantity_input,
+    (FLOW_GOLD, "avg_price"): _handle_gold_avg_price_input,
+    (FLOW_GOLD, "current_price_input"): _handle_gold_current_price_input,
     (FLOW_REAL_ESTATE, "name"): _handle_re_name_input,
     (FLOW_REAL_ESTATE, "initial_value"): _handle_re_initial_value_input,
     (FLOW_REAL_ESTATE, "current_value"): _handle_re_current_value_input,
@@ -1776,16 +2001,17 @@ async def _dispatch_asset_action(
             AssetType.CASH.value: _start_cash_subtype_pick,
             AssetType.STOCK.value: _start_stock_subtype_pick,
             AssetType.CRYPTO.value: _start_crypto_subtype_pick,
+            AssetType.GOLD.value: _start_gold_subtype_pick,
             AssetType.REAL_ESTATE.value: _start_real_estate_subtype_pick,
         }
         starter = starters.get(arg)
         if starter is None:
-            # Gold / Other: not wired yet.
+            # Other: not wired yet.
             await send_message(
                 chat_id=chat_id,
                 text=(
                     "Loại này sẽ có sớm 🙏 Tạm thời bạn dùng "
-                    "💵 / 📈 / 🏠 / ₿ nhé."
+                    "💵 / 📈 / 🏠 / ₿ / 🥇 nhé."
                 ),
             )
             return
@@ -1808,6 +2034,10 @@ async def _dispatch_asset_action(
         await _handle_re_subtype_pick(db, chat_id, user, arg)
         return
 
+    if action == "gold_subtype" and arg:
+        await _handle_gold_subtype_pick(db, chat_id, user, arg)
+        return
+
     if action == "stock_price" and arg in ("same", "new"):
         draft = wizard_service.get_draft(user.wizard_state)
         await _handle_stock_current_price_choice(db, chat_id, user, arg, draft)
@@ -1816,6 +2046,11 @@ async def _dispatch_asset_action(
     if action == "crypto_price" and arg in ("same", "new"):
         draft = wizard_service.get_draft(user.wizard_state)
         await _handle_crypto_current_price_choice(db, chat_id, user, arg, draft)
+        return
+
+    if action == "gold_price" and arg in ("same", "new"):
+        draft = wizard_service.get_draft(user.wizard_state)
+        await _handle_gold_current_price_choice(db, chat_id, user, arg, draft)
         return
 
     if action == "rental_ask" and arg in ("yes", "no"):

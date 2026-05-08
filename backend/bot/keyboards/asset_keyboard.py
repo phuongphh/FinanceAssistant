@@ -7,9 +7,11 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:cash_subtype:<subtype>      — cash subtype pick
     asset_add:stock_subtype:<subtype>     — stock subtype pick
     asset_add:crypto_subtype:<subtype>    — crypto subtype pick
+    asset_add:gold_subtype:<subtype>      — gold subtype pick
     asset_add:re_subtype:<subtype>        — real-estate subtype pick
     asset_add:stock_price:<same|new>      — reuse purchase price as current
     asset_add:crypto_price:<same|new>     — reuse purchase price as current
+    asset_add:gold_price:<same|new>       — reuse purchase price as current
     asset_add:more                        — add another asset
     asset_add:done                        — finish wizard
     asset_add:cancel                      — abort wizard
@@ -152,6 +154,30 @@ def crypto_subtype_keyboard() -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
+def gold_subtype_keyboard() -> InlineKeyboardMarkup:
+    subs = get_subtypes(AssetType.GOLD.value)
+    rows = [
+        [{
+            "text": f"🥇 {subs.get('sjc', 'Vàng SJC')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "gold_subtype", "sjc"),
+        }],
+        [{
+            "text": f"🏅 {subs.get('pnj', 'Vàng PNJ')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "gold_subtype", "pnj"),
+        }],
+        [{
+            "text": f"💍 {subs.get('nhan', 'Vàng nhẫn')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "gold_subtype", "nhan"),
+        }],
+        [{
+            "text": f"📿 {subs.get('trang_suc', 'Trang sức')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "gold_subtype", "trang_suc"),
+        }],
+        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+    ]
+    return {"inline_keyboard": rows}
+
+
 def real_estate_subtype_keyboard() -> InlineKeyboardMarkup:
     subs = get_subtypes(AssetType.REAL_ESTATE.value)
     rows = [
@@ -196,6 +222,23 @@ def crypto_current_price_keyboard() -> InlineKeyboardMarkup:
             [{
                 "text": "💹 Nhập giá hiện tại",
                 "callback_data": build_callback(CB_ASSET_ADD, "crypto_price", "new"),
+            }],
+            [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        ]
+    }
+
+
+def gold_current_price_keyboard() -> InlineKeyboardMarkup:
+    """After average buy price, ask for current gold price per lượng."""
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "✅ Dùng giá mua",
+                "callback_data": build_callback(CB_ASSET_ADD, "gold_price", "same"),
+            }],
+            [{
+                "text": "💹 Nhập giá hiện tại",
+                "callback_data": build_callback(CB_ASSET_ADD, "gold_price", "new"),
             }],
             [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
         ]
