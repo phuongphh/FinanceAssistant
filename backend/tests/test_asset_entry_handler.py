@@ -251,6 +251,116 @@ async def test_stock_quantity_accepts_with_separators():
     assert patch_kwargs["draft_patch"]["extra"]["quantity"] == 1000
 
 
+
+
+# -----------------------------------------------------------------
+# Crypto flow
+# -----------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_callback_type_picker_routes_to_crypto_starter():
+    user = _user()
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry, "_start_crypto_subtype_pick",
+                      AsyncMock()) as starter, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:type:crypto",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    starter.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_crypto_subtype_bitcoin_advances_to_quantity():
+    user = _user({
+        "flow": asset_entry.FLOW_CRYPTO,
+        "step": "subtype",
+        "draft": {"asset_type": "crypto", "extra": {}},
+    })
+    db = _db(user)
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.wizard_service, "update_step",
+                      AsyncMock()) as update_step, \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:crypto_subtype:bitcoin",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    kwargs = update_step.await_args.kwargs
+    assert kwargs["step"] == "quantity"
+    assert kwargs["draft_patch"]["name"] == "BTC"
+    assert kwargs["draft_patch"]["extra"]["symbol"] == "BTC"
+
+
+@pytest.mark.asyncio
+async def test_crypto_current_price_same_creates_asset():
+    user = _user({
+        "flow": asset_entry.FLOW_CRYPTO,
+        "step": "current_price",
+        "draft": {
+            "asset_type": "crypto",
+            "subtype": "bitcoin",
+            "name": "BTC",
+            "initial_value": float(Decimal("100000000")),
+            "extra": {
+                "symbol": "BTC",
+                "ticker": "BTC",
+                "quantity": 0.05,
+                "avg_price": float(Decimal("2000000000")),
+            },
+        },
+    })
+    db = _db(user)
+    created = _asset(asset_type="crypto", value=100_000_000)
+    created.subtype = "bitcoin"
+    created.name = "BTC"
+    with patch.object(asset_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(asset_entry.asset_service, "create_asset",
+                      AsyncMock(return_value=created)) as create_mock, \
+         patch.object(asset_entry.net_worth_calculator, "calculate",
+                      AsyncMock(return_value=MagicMock(
+                          total=Decimal("100_000_000"), asset_count=1,
+                      ))), \
+         patch.object(asset_entry, "update_user_level",
+                      AsyncMock(return_value=None)), \
+         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
+         patch.object(asset_entry, "answer_callback", AsyncMock()), \
+         patch.object(asset_entry, "send_message", AsyncMock()):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:crypto_price:same",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    create_mock.assert_awaited_once()
+    kwargs = create_mock.await_args.kwargs
+    assert kwargs["asset_type"] == "crypto"
+    assert kwargs["subtype"] == "bitcoin"
+    assert kwargs["name"] == "BTC"
+    assert kwargs["initial_value"] == Decimal("100000000.000")
+    assert kwargs["current_value"] == Decimal("100000000.000")
+    assert kwargs["extra"]["symbol"] == "BTC"
+
+
 # -----------------------------------------------------------------
 # Real estate flow
 # -----------------------------------------------------------------

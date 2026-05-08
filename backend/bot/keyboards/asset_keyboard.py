@@ -6,8 +6,10 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:type:<asset_type>           — pick asset type
     asset_add:cash_subtype:<subtype>      — cash subtype pick
     asset_add:stock_subtype:<subtype>     — stock subtype pick
+    asset_add:crypto_subtype:<subtype>    — crypto subtype pick
     asset_add:re_subtype:<subtype>        — real-estate subtype pick
     asset_add:stock_price:<same|new>      — reuse purchase price as current
+    asset_add:crypto_price:<same|new>     — reuse purchase price as current
     asset_add:more                        — add another asset
     asset_add:done                        — finish wizard
     asset_add:cancel                      — abort wizard
@@ -126,6 +128,30 @@ def stock_subtype_keyboard() -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
+def crypto_subtype_keyboard() -> InlineKeyboardMarkup:
+    subs = get_subtypes(AssetType.CRYPTO.value)
+    rows = [
+        [{
+            "text": f"₿ {subs.get('bitcoin', 'BTC')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "crypto_subtype", "bitcoin"),
+        }],
+        [{
+            "text": f"♦️ {subs.get('ethereum', 'ETH')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "crypto_subtype", "ethereum"),
+        }],
+        [{
+            "text": f"💵 {subs.get('stablecoin', 'USDT/USDC')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "crypto_subtype", "stablecoin"),
+        }],
+        [{
+            "text": f"🪙 {subs.get('altcoin', 'Coin khác')}",
+            "callback_data": build_callback(CB_ASSET_ADD, "crypto_subtype", "altcoin"),
+        }],
+        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+    ]
+    return {"inline_keyboard": rows}
+
+
 def real_estate_subtype_keyboard() -> InlineKeyboardMarkup:
     subs = get_subtypes(AssetType.REAL_ESTATE.value)
     rows = [
@@ -153,6 +179,23 @@ def stock_current_price_keyboard() -> InlineKeyboardMarkup:
             [{
                 "text": "💹 Nhập giá hiện tại",
                 "callback_data": build_callback(CB_ASSET_ADD, "stock_price", "new"),
+            }],
+            [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        ]
+    }
+
+
+def crypto_current_price_keyboard() -> InlineKeyboardMarkup:
+    """After crypto average buy price, ask for current market price."""
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "✅ Dùng giá mua",
+                "callback_data": build_callback(CB_ASSET_ADD, "crypto_price", "same"),
+            }],
+            [{
+                "text": "💹 Nhập giá hiện tại",
+                "callback_data": build_callback(CB_ASSET_ADD, "crypto_price", "new"),
             }],
             [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
         ]
