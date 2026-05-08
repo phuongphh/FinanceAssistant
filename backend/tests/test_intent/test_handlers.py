@@ -380,6 +380,7 @@ async def test_query_market_handler_shows_price_and_personal_holding():
     )
 
     handler = QueryMarketHandler()
+    handler._latest_quote = AsyncMock(return_value=None)
     handler._latest_snapshot = AsyncMock(return_value=snapshot)
     handler._user_holding = AsyncMock(return_value=holding)
 
@@ -398,10 +399,46 @@ async def test_query_market_handler_shows_price_and_personal_holding():
 
 
 @pytest.mark.asyncio
+async def test_query_market_handler_vnindex_uses_live_points_format():
+    from datetime import datetime, timezone
+
+    from backend.intent.handlers.query_market import QueryMarketHandler
+    from backend.market_data.normalizer import PriceQuote
+
+    live_quote = PriceQuote(
+        "VNINDEX",
+        Decimal("1915.37"),
+        "VND",
+        "stock",
+        datetime(2026, 5, 8, tzinfo=timezone.utc),
+        "ssi",
+        metadata={"change_pct": Decimal("0.33")},
+    )
+
+    handler = QueryMarketHandler()
+    handler._latest_quote = AsyncMock(return_value=live_quote)
+    handler._latest_snapshot = AsyncMock()
+    handler._user_holding = AsyncMock(return_value=None)
+
+    intent = IntentResult(
+        intent=IntentType.QUERY_MARKET,
+        confidence=0.92,
+        parameters={"ticker": "VNINDEX"},
+        raw_text="VN-Index hôm nay",
+    )
+    response = await handler.handle(intent, _user(), _fake_db())
+
+    assert "Giá: 1,915.37 điểm" in response
+    assert "1,915đ" not in response
+    handler._latest_snapshot.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_query_market_handler_unknown_ticker():
     from backend.intent.handlers.query_market import QueryMarketHandler
 
     handler = QueryMarketHandler()
+    handler._latest_quote = AsyncMock(return_value=None)
     handler._latest_snapshot = AsyncMock(return_value=None)
     handler._user_holding = AsyncMock(return_value=None)
 
