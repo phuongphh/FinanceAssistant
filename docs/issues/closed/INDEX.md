@@ -143,7 +143,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #267 | Pre-Phase | [Epic] Phase 3.9 — Epic 5: Testing & Polish | [pre-phase/issue-267.md](by-phase/pre-phase/issue-267.md) |
 | #268 | Pre-Phase | [Story] P3.9-S1: Module skeleton + BaseProvider abstract class | [pre-phase/issue-268.md](by-phase/pre-phase/issue-268.md) |
 | #269 | Pre-Phase | [Story] P3.9-S2: Redis price cache layer | [pre-phase/issue-269.md](by-phase/pre-phase/issue-269.md) |
+| #270 | Pre-Phase | [Story] P3.9-S3: Provider dispatcher + circuit breaker | [pre-phase/issue-270.md](by-phase/pre-phase/issue-270.md) |
 | #277 | Pre-Phase | [Story] P3.9-S10: SJC gold scraper (primary) | [pre-phase/issue-277.md](by-phase/pre-phase/issue-277.md) |
 
-**Total:** 140 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 123 Pre-Phase)
+**Total:** 141 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 124 Pre-Phase)
