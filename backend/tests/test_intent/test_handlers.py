@@ -338,6 +338,58 @@ async def test_query_market_handler_unknown_ticker():
 
 
 @pytest.mark.asyncio
+async def test_query_market_handler_gold_category_shows_gold_prices():
+    from datetime import datetime, timezone
+
+    from backend.intent.handlers.query_market import QueryMarketHandler
+    from backend.market_data.normalizer import PriceQuote
+
+    quotes = {
+        "SJC_GOLD": PriceQuote(
+            "SJC_GOLD",
+            Decimal("92000000"),
+            "VND",
+            "gold",
+            datetime(2026, 5, 8, tzinfo=timezone.utc),
+            "sjc",
+            metadata={
+                "buy_price": Decimal("90000000"),
+                "sell_price": Decimal("92000000"),
+            },
+        ),
+        "RING_24K": PriceQuote(
+            "RING_24K",
+            Decimal("91000000"),
+            "VND",
+            "gold",
+            datetime(2026, 5, 8, tzinfo=timezone.utc),
+            "sjc",
+        ),
+    }
+
+    async def fake_get_gold_quote(symbol="SJC_GOLD"):
+        return quotes[symbol]
+
+    intent = IntentResult(
+        intent=IntentType.QUERY_MARKET,
+        confidence=1.0,
+        parameters={"category": "gold"},
+        raw_text="[menu:market:gold]",
+    )
+
+    with patch(
+        "backend.intent.handlers.query_market.get_gold_quote",
+        side_effect=fake_get_gold_quote,
+    ):
+        response = await QueryMarketHandler().handle(intent, _user(), _fake_db())
+
+    assert "Giá vàng" in response
+    assert "Vàng SJC" in response
+    assert "Vàng nhẫn" in response
+    assert "Bạn muốn xem giá mã nào" not in response
+
+
+@pytest.mark.asyncio
 async def test_query_market_handler_no_ticker():
     from backend.intent.handlers.query_market import QueryMarketHandler
 

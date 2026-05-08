@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
+from backend.market_data.client import get_gold_quote
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
 from backend.wealth.models.asset import Asset
@@ -20,6 +21,10 @@ class QueryMarketHandler(IntentHandler):
     async def handle(
         self, intent: IntentResult, user: User, db: AsyncSession
     ) -> str:
+        category = str(intent.parameters.get("category") or "").lower()
+        if category == "gold":
+            return await self._handle_gold_prices()
+
         ticker = intent.parameters.get("ticker")
         if not ticker:
             return (
@@ -68,6 +73,48 @@ class QueryMarketHandler(IntentHandler):
                     ]
                 )
 
+        return "\n".join(lines)
+
+    async def _handle_gold_prices(self) -> str:
+        """Show supported gold prices for the menu gold shortcut.
+
+        ``menu:market:gold`` sends ``category=gold`` instead of a stock-like
+        ticker. Handle it here so the shortcut does not fall into the generic
+        "which ticker?" clarification path.
+        """
+        symbols = (("SJC_GOLD", "Vàng SJC"), ("RING_24K", "Vàng nhẫn 24K"))
+        lines = ["🥇 *Giá vàng hôm nay:*"]
+        had_quote = False
+
+        for symbol, label in symbols:
+            try:
+                quote = await get_gold_quote(symbol)
+            except Exception as exc:
+                logger.warning("Unable to fetch gold quote for %s: %s", symbol, exc)
+                lines.append(f"• {label}: chưa có dữ liệu")
+                continue
+
+            had_quote = True
+            buy_price = quote.metadata.get("buy_price")
+            sell_price = quote.metadata.get("sell_price") or quote.price
+            stale = " (dữ liệu cũ)" if quote.is_stale else ""
+            if buy_price is not None:
+                lines.append(
+                    f"• {label}: mua {Decimal(str(buy_price)):,.0f}đ · "
+                    f"bán {Decimal(str(sell_price)):,.0f}đ/lượng{stale}"
+                )
+            else:
+                lines.append(
+                    f"• {label}: {quote.price:,.0f}đ/lượng{stale}"
+                )
+
+        if not had_quote:
+            lines.extend(
+                [
+                    "",
+                    "Mình chưa lấy được giá vàng lúc này. Bạn thử lại sau nhé.",
+                ]
+            )
         return "\n".join(lines)
 
     async def _latest_snapshot(
