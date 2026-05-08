@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""  # Validates webhook requests from Telegram
     owner_telegram_id: str = ""
 
+    # Market data
+    redis_url: str = "redis://localhost:6379/0"
+    market_data_timeout_seconds: float = 3.0
+
     # OpenClaw Skills
     finance_api_url: str = "http://localhost:8001/api/v1"
     finance_api_key: str = ""
