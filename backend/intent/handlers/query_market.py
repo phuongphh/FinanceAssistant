@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
-from backend.market_data.client import get_gold_quote, get_stock_quote
+from backend.market_data.client import get_crypto_quote, get_gold_quote, get_stock_quote
 from backend.market_data.normalizer import PriceQuote
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
@@ -24,6 +24,8 @@ class QueryMarketHandler(IntentHandler):
         category = str(intent.parameters.get("category") or "").lower()
         if category == "gold":
             return await self._handle_gold_prices()
+        if category == "crypto":
+            return await self._handle_crypto_prices()
 
         ticker = intent.parameters.get("ticker")
         if not ticker:
@@ -112,6 +114,50 @@ class QueryMarketHandler(IntentHandler):
         if snapshot is not None and snapshot.change_1d_pct is not None:
             return Decimal(str(snapshot.change_1d_pct))
         return None
+
+    async def _handle_crypto_prices(self) -> str:
+        """Show top crypto prices for the menu crypto shortcut.
+
+        ``menu:market:crypto`` sends ``category=crypto`` without a ticker.
+        Handle it here so the shortcut shows useful coin prices instead of the
+        generic stock-style "which ticker?" clarification.
+        """
+        symbols = ("BTC", "ETH", "BNB", "SOL", "XRP")
+        lines = ["₿ *Giá tiền số phổ biến hôm nay:*"]
+        had_quote = False
+
+        for symbol in symbols:
+            try:
+                quote = await get_crypto_quote(symbol)
+            except Exception as exc:
+                logger.warning(
+                    "Unable to fetch crypto quote for %s (%s): %s",
+                    symbol,
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
+                lines.append(f"• {symbol}: chưa có dữ liệu")
+                continue
+
+            had_quote = True
+            stale = " (dữ liệu cũ)" if quote.is_stale else ""
+            change = quote.metadata.get("change_pct_24h")
+            change_text = ""
+            if change is not None:
+                change_pct = Decimal(str(change))
+                sign = "+" if change_pct >= 0 else ""
+                change_text = f" · 24h {sign}{change_pct:.2f}%"
+            lines.append(f"• {symbol}: {quote.price:,.0f}đ{change_text}{stale}")
+
+        if not had_quote:
+            lines.extend(
+                [
+                    "",
+                    "Mình chưa lấy được giá tiền số lúc này. Bạn thử lại sau nhé.",
+                ]
+            )
+        return "\n".join(lines)
 
     async def _handle_gold_prices(self) -> str:
         """Show supported gold prices for the menu gold shortcut.
