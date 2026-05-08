@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🧪 **Pre-Launch Readiness** (testing) — [detail](docs/current/phase-3.8.5/phase-3.8.5-detailed.md)
+📋 **Financial Twin Conservative MVP** (next) — [detail](#)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
@@ -19,13 +19,15 @@
 - ✅ Phase 3A: Wealth Foundation
 - ✅ Phase 3.5: Intent Understanding Layer
 - ✅ Phase 3.6: Menu UX Revamp
-- 🔨 Phase 3.7: Agent Architecture ← **current**
-- 📋 Phase 3B: Market Intelligence
+- ✅ Phase 3.7: Agent Architecture
+- ✅ Phase 3.8: Wealth Completion
+- ✅ Phase 3.8.5: Pre-Launch Readiness
+- ✅ Phase 3.9: Market Data Real
+- 📋 Phase 4A: Financial Twin Conservative MVP ← **next**
+- 🔮 Phase 3B: Market Intelligence
 - 🔮 Phase 4: Investment Intelligence
 - 🔮 Phase 5: Behavioral Engine
 - 🔮 Phase 6: Scale & Commercialize
-- 🔮 Phase 3.8: TODO (skeleton — please update)
-- 🔮 Phase 3.8.5: TODO (skeleton — please update)
 <!-- END: phase-status:status-list -->
 
 
@@ -51,7 +53,7 @@
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
 | Dashboard | Notion (read-only sync) |
-| Market data | vnstock (stocks), CoinGecko (crypto), cafef (funds), SJC (gold) |
+| Market data | SSI/VNDIRECT (VN stocks), CoinGecko (crypto), SJC/PNJ (gold), bank-rate scrapers, RSS news |
 
 ---
 

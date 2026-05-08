@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🧪 **Pre-Launch Readiness** (testing) — [detail](docs/current/phase-3.8.5/phase-3.8.5-detailed.md)
+📋 **Financial Twin Conservative MVP** (next) — [detail](#)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -29,7 +29,7 @@ For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-stat
 | Primary LLM | DeepSeek API (text, classify, extract) |
 | Vision LLM | Claude API (OCR only) |
 | Speech | OpenAI Whisper API |
-| Market data | vnstock (stocks), CoinGecko (crypto), SJC scrape (gold), cafef scrape (funds) |
+| Market data | SSI/VNDIRECT (VN stocks), CoinGecko (crypto), SJC/PNJ (gold), bank-rate scrapers, RSS news |
 | Dashboard | Notion (one-way read sync from PostgreSQL) |
 | Package manager | uv |
 
@@ -124,7 +124,8 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Current phase:** [`docs/current/phase-3.8.5-detailed.md`](docs/current/phase-3.8.5-detailed.md) — Phase 3.8.5 implementation & test plan
+- **Recently completed phase:** [`docs/current/phase-3.9/phase-3.9-detailed.md`](docs/current/phase-3.9/phase-3.9-detailed.md) — real market-data integration and quality gate
+- **Next phase:** Phase 4A — Financial Twin Conservative MVP
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -150,50 +151,23 @@ Quick reference:
 
 ---
 
-## Phase 3.8.5 — Current Status: TESTING 🧪
+## Phase 3.9 — Status: DONE ✅
 
-**Status:** ✅ Implementation complete. Currently in testing phase before promoting to "done" and moving to next phase.
+**Status:** ✅ Implementation complete. Phase 3.9 replaced market-data stubs with real provider integrations and completed the Epic 5 quality gate.
 
-### Recently shipped — Phase 3.8 (✅ done)
-Goals system with `goals.*` schema migration. 6 readers updated for backwards compatibility:
-`notion_sync`, `market_service`, `report_service`, `memory_moments`, `query_goals` intent handler, `advisory` intent handler.
-Field renames: `goal_name → goals.*`, `deadline → date`, `is_active → status field`.
-Stable `FeasibilityBand` enum (replaces localized text). 44 new tests added (total 1527).
+### Shipped in Phase 3.9
 
-### Phase 3.8.5 — Pre-Launch Readiness
+- Real provider layer for VN stocks (SSI primary, VNDIRECT backup), crypto (CoinGecko), gold (SJC primary, PNJ backup), bank rates, and RSS news.
+- Redis cache and last-known fallback so briefings can show stale-data banners instead of failing hard.
+- Provider dispatcher with circuit breaker to protect failing upstreams.
+- Wealth valuation, morning briefing, portfolio analytics, price alerts, and agent market tools now consume normalized real quotes.
+- Epic 5 added end-to-end tests, an offline benchmark script, benchmark report, and provider ADR.
 
-- **Goal:** User có thể gửi feedback + xem/edit profile. Backend tự động classify feedback, profile auto-derive từ existing data. Soft launch ready tháng 6/2026.
-- **Scope IN:** Feedback system (`/feedback` command, DeepSeek auto-classifier, active prompts scheduler) + User Profile (view-mode primary, wealth levels VN-native, auto-derived stats, 3 editable fields). **OUT:** No new agent tools, no NLP-based profile editing.
-- **Key changes:**
-  - New module `app/feedback/` — models, services (FeedbackService, FeedbackClassifier, PromptScheduler), handlers
-  - New module `app/profile/` — models, services (ProfileService, StatsAggregator, WealthLevelMapper), handlers
-  - New DB tables: `feedbacks`, `user_profiles`
-  - New content YAMLs: `content/feedback_prompts.yaml` (5 active prompts), `content/wealth_levels.yaml` (4 VN tiers)
-  - Profile menu item added to Phase 3.6 main menu
-- **Test focus:** `/feedback` command end-to-end, DeepSeek classifier ≥80% accuracy, active prompt triggers + cooldown enforcement, profile view with all auto-derived stats, wealth level VN display (Khởi Đầu/Trẻ Năng Động/Trung Lưu Vững/Tinh Hoa), edit flows (name, age range, notifications), no Phase 3.8 regressions
+### Next phase
 
-### Testing focus
+Phase 4A — Financial Twin Conservative MVP.
 
-While Phase 3.8.5 is in testing, Claude Code should prioritize:
-
-1. **Regression checks** — verify Phase 3.x intent handlers still work end-to-end
-2. **Vietnamese localization** — run `vi-localization-checker` subagent on changed user-facing code
-3. **Layer contract** — run `layer-contract-checker` on new services/handlers
-4. **Prompt quality** — run `prompt-tester` if any LLM prompts changed
-5. **Test coverage** — verify new code paths have tests; aim to keep total ≥1527
-
-### Exit criteria — to ship Phase 3.8.5
-
-- [ ] All unit + integration tests pass (`uv run pytest`)
-- [ ] No regressions in Phase 3.x intent handlers
-- [ ] Vietnamese localization verified (no hardcoded strings, persona consistent)
-- [ ] Layer contract clean (no critical violations)
-- [ ] Manual smoke test on Telegram: storytelling, morning briefing, advisory, goals query
-- [ ] Update `phase-status.yaml`: status `testing → done`, add next phase as `current`
-
-Detail: [`docs/current/phase-3.8.5-detailed.md`](docs/current/phase-3.8.5-detailed.md)
-
----
+Detail: [`docs/current/phase-3.9/phase-3.9-detailed.md`](docs/current/phase-3.9/phase-3.9-detailed.md)
 
 ## Active Breaking Changes
 

@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "3.8.5"
+current_phase: "4A"
 
 phases:
   - id: "1"
@@ -112,31 +112,41 @@ phases:
 
   - id: "3.8.5"
     name: "Pre-Launch Readiness"
-    status: testing
+    status: done
     duration: "3-4 ngày"
     detail_doc: "docs/current/phase-3.8.5/phase-3.8.5-detailed.md"
     issues_doc: "docs/current/phase-3.8.5/phase-3.8.5-issues.md"
     description: "Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows)"
-    completed_date: ""
-    icon: "🧪"
+    completed_date: "2026-05-08"
+    icon: "✅"
 
   - id: "3.9"
     name: "Market Data Real"
-    status: planned
+    status: done
     duration: "3 tuần"
     detail_doc: "docs/current/phase-3.9/phase-3.9-detailed.md"
     issues_doc: "docs/current/phase-3.9/phase-3.9-issues.md"
-    description: "Real-time market data integration: stock (vnstock), crypto (CoinGecko), gold (SJC), bank rates — replace all stubs"
-    completed_date: ""
-    icon: "🔮"
+    description: "Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete"
+    completed_date: "2026-05-08"
+    icon: "✅"
 
   - id: "3B"
     name: "Market Intelligence"
-    status: next
+    status: planned
     duration: "TBD"
     detail_doc: "docs/current/phase-3b-outline.md"
     issues_doc: ""
     description: "Real market data, advisory deepening, portfolio analytics"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "4A"
+    name: "Financial Twin Conservative MVP"
+    status: next
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Conservative Financial Twin MVP building on real market data from Phase 3.9"
     completed_date: ""
     icon: "📋"
 
