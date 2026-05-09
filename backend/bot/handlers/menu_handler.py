@@ -56,6 +56,7 @@ from backend.bot.formatters.menu_formatter import (
     format_submenu,
     known_categories,
 )
+from backend.bot.formatters.money import format_money_full
 from backend.bot.handlers.free_form_text import _send_outcome
 from backend.intent.dispatcher import IntentDispatcher
 from backend.intent.intents import (
@@ -346,10 +347,10 @@ async def _navigate(
 # single source of truth — the dispatcher does the rest (handler call,
 # personality wrap, follow-up keyboard).
 _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
-    # Tài sản — "Tổng tài sản" = short summary; "Báo cáo chi tiết" = list
-    # of every asset grouped by type. The mapping was swapped before
-    # Phase 3.6 user feedback called out the mismatch.
-    ("assets", "net_worth"): (IntentType.QUERY_NET_WORTH, {}),
+    # Tài sản — "Tổng tài sản" uses a direct fast handler because the
+    # callback is deterministic and should answer from the already-current
+    # asset values without waiting for historical snapshot comparisons.
+    # "Báo cáo chi tiết" still maps to the existing per-asset list intent.
     ("assets", "report"): (IntentType.QUERY_ASSETS, {}),
     # Chi tiêu
     ("expenses", "report"): (IntentType.QUERY_EXPENSES, {}),
@@ -401,16 +402,19 @@ async def _route_action(
       3. Synthesised advisory via ``_ADVISORY_MAP``.
       4. Coming-soon fallback (never crash, always escape route).
     """
-    analytics.track(
-        "menu_action_tapped",
-        user_id=user.id,
-        properties={"category": category, "action": action},
-    )
+    # Track after the selected action has rendered. ``analytics.track`` is
+    # fire-and-forget, but it still opens a background DB session; doing it
+    # before fast read paths can contend for the same connection pool and
+    # add visible latency before the user sees a reply.
+    track_properties = {"category": category, "action": action}
 
     # 1. Direct-handler actions.
     direct = _DIRECT_HANDLERS.get((category, action))
     if direct is not None:
         await direct(db=db, user=user, chat_id=chat_id, message_id=message_id)
+        analytics.track(
+            "menu_action_tapped", user_id=user.id, properties=track_properties
+        )
         return
 
     # 2. Synthesised read intent.
@@ -423,6 +427,9 @@ async def _route_action(
             intent_type=intent_type,
             parameters=params,
             origin=f"menu:{category}:{action}",
+        )
+        analytics.track(
+            "menu_action_tapped", user_id=user.id, properties=track_properties
         )
         return
 
@@ -438,10 +445,16 @@ async def _route_action(
             origin=f"menu:{category}:{action}",
             raw_text=prompt,
         )
+        analytics.track(
+            "menu_action_tapped", user_id=user.id, properties=track_properties
+        )
         return
 
     # 4. Genuinely unwired — friendly stub with escape route.
     await _send_coming_soon(chat_id, category, action)
+    analytics.track(
+        "menu_action_tapped", user_id=user.id, properties=track_properties
+    )
 
 
 async def _dispatch_synthesised(
@@ -490,6 +503,51 @@ async def _send_coming_soon(chat_id: int, category: str, action: str) -> None:
 # -----------------------------------------------------------------
 # Direct-handler implementations (wizards, prompt-and-wait)
 # -----------------------------------------------------------------
+
+
+async def _action_assets_net_worth(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Fast menu response for ``Tài sản → Tổng tài sản``.
+
+    A menu callback has an exact intent, so this path intentionally skips
+    the generic intent dispatcher and historical snapshot comparisons. The
+    slower free-form ``query_net_worth`` handler still provides monthly/YTD
+    change context when the user asks in natural language.
+    """
+    from backend.intent.wealth_adapt import decorate, style_for_level
+    from backend.wealth.ladder import detect_level
+    from backend.wealth.services import net_worth_calculator
+
+    breakdown = await net_worth_calculator.calculate(db, user.id)
+    name = user.display_name or "bạn"
+    if breakdown.total <= 0:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                f"💎 {name} chưa có tài sản nào trong hệ thống.\n\n"
+                "Tap /themtaisan để mình tính tổng tài sản giúp nhé 🚀"
+            ),
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+
+    level = detect_level(breakdown.total)
+    style = style_for_level(level, breakdown.total)
+    lines = [
+        f"💰 Tổng tài sản của {name}:",
+        f"*{format_money_full(breakdown.total)}*",
+    ]
+    if breakdown.asset_count and not style.is_starter:
+        lines.append("")
+        lines.append(f"_Theo dõi qua {breakdown.asset_count} tài sản_")
+
+    await send_message(
+        chat_id=chat_id,
+        text=decorate("\n".join(lines), style),
+        parse_mode="Markdown",
+        reply_markup=back_to_main_keyboard(),
+    )
 
 
 async def _action_assets_add(
@@ -626,6 +684,7 @@ async def _action_goals_update(
 
 
 _DIRECT_HANDLERS = {
+    ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "add"): _action_assets_add,
     ("assets", "edit"): _action_assets_edit,
     ("assets", "mark_rental"): _action_assets_mark_rental,
