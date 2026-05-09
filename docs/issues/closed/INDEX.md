@@ -45,6 +45,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #80 | Pre-Phase | [P3A-22] Implement /api/wealth/overview endpoint | [pre-phase/issue-80.md](by-phase/pre-phase/issue-80.md) |
 | #81 | Pre-Phase | [P3A-23] Chart.js integration: pie chart + trend line chart | [pre-phase/issue-81.md](by-phase/pre-phase/issue-81.md) |
 | #82 | Pre-Phase | [P3A-24] Milestone progress display for Starter level | [pre-phase/issue-82.md](by-phase/pre-phase/issue-82.md) |
+| #83 | Pre-Phase | [P3A-25] User testing protocol — 7 users, 7 days validation | [pre-phase/issue-83.md](by-phase/pre-phase/issue-83.md) |
 | #84 | Pre-Phase | [P3A-26] Bug fixes & Phase 3A exit review | [pre-phase/issue-84.md](by-phase/pre-phase/issue-84.md) |
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
@@ -166,5 +167,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #288 | Pre-Phase | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [pre-phase/issue-288.md](by-phase/pre-phase/issue-288.md) |
 | #289 | Pre-Phase | [Story] P3.9-S22: Documentation + ADR + phase-status update | [pre-phase/issue-289.md](by-phase/pre-phase/issue-289.md) |
 
-**Total:** 161 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 144 Pre-Phase)
+**Total:** 162 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 145 Pre-Phase)
