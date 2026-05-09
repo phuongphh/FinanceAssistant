@@ -37,7 +37,7 @@ from sqlalchemy import and_, distinct, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
-from backend.bot.formatters.briefing_formatter import BriefingFormatter
+from backend.briefing.morning_briefing import render_enriched_morning_briefing
 from backend.bot.keyboards.briefing_keyboard import briefing_actions_keyboard
 from backend.database import get_session_factory
 from backend.models.event import Event
@@ -143,7 +143,6 @@ async def run_morning_briefing_job(
     and we read the wall clock in Asia/Ho_Chi_Minh.
     """
     now = now or datetime.now(BRIEFING_TIMEZONE)
-    formatter = BriefingFormatter()
     notifier = get_notifier()
     sent = 0
     skipped_window = 0
@@ -175,7 +174,7 @@ async def run_morning_briefing_job(
                     skipped_dedup += 1
                     continue
 
-                result = await formatter.generate_for_user(db, user)
+                result = await render_enriched_morning_briefing(db, user)
 
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,
@@ -200,6 +199,8 @@ async def run_morning_briefing_job(
                     "level": result.level.value,
                     "is_empty_state": result.is_empty_state,
                     "char_count": result.char_count,
+                    "is_stale": result.is_stale,
+                    "render_ms": result.render_ms,
                 },
             )
             sent += 1

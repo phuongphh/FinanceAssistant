@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import date
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -23,6 +22,7 @@ from backend.market_data.client import get_crypto_quote, get_gold_quote
 from backend.models.bank_rate import BankRateSnapshot
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
+from backend.wealth.ladder import WealthLevel, detect_level
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import net_worth_calculator
 
@@ -32,9 +32,15 @@ _TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "content" / "briefing.yam
 @dataclass(frozen=True)
 class EnrichedBriefingResult:
     text: str
+    level: WealthLevel
+    is_empty_state: bool = False
     is_stale: bool = False
     render_ms: int = 0
     sections: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def char_count(self) -> int:
+        return len(self.text)
 
 
 @lru_cache(maxsize=1)
@@ -169,6 +175,8 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     diversification = compute_diversification_score([{"asset_type": asset.asset_type, "value": Decimal(asset.current_value or 0)} for asset in assets])
 
     is_stale = bool((btc and btc.is_stale) or (gold and gold.is_stale))
+    level = detect_level(breakdown.total)
+    is_empty_state = breakdown.asset_count == 0 or breakdown.total <= 0
     insight_lines = _insights(assets, vcb_rate)
     top, bottom = performers
     if top is not None:
@@ -199,6 +207,8 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         text = f"{text}\n\n{template['footer']['stale']}"
     return EnrichedBriefingResult(
         text=text,
+        level=level,
+        is_empty_state=is_empty_state,
         is_stale=is_stale,
         render_ms=int((time.perf_counter() - started) * 1000),
         sections=sections,
