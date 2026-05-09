@@ -172,15 +172,35 @@ def get_follow_ups(
     *,
     wealth_level: WealthLevel | None = None,
     avoid_intent: IntentType | None = None,
+    parameters: dict | None = None,
 ) -> list[FollowUp]:
     """Pick up to ``MAX_SUGGESTIONS`` relevant suggestions.
 
     Wealth-level overrides take precedence; the base pool fills the
     rest if the override list is shorter than the cap. ``avoid_intent``
     drops suggestions that point back at the just-asked intent — the
-    user already has that answer on screen.
+    user already has that answer on screen. ``parameters`` lets broad
+    intents such as market queries keep follow-ups context-aware without
+    adding another DB roundtrip.
     """
     pool: list[FollowUp] = []
+    category = str((parameters or {}).get("category") or "").lower()
+    if intent == IntentType.QUERY_MARKET and category == "gold":
+        pool.extend(
+            (
+                FollowUp(
+                    "💼 Portfolio của tôi",
+                    IntentType.QUERY_PORTFOLIO,
+                    {"asset_type": "gold"},
+                ),
+                FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
+                FollowUp(
+                    "💎 Tài sản chi tiết",
+                    IntentType.QUERY_ASSETS,
+                    {"asset_type": "gold"},
+                ),
+            )
+        )
     if wealth_level is not None:
         override = _LEVEL_OVERRIDES.get((intent, wealth_level))
         if override:

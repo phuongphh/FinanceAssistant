@@ -232,17 +232,17 @@ async def _send_outcome(chat_id: int, outcome: DispatchOutcome) -> None:
     if outcome.kind == OUTCOME_CONFIRM_SENT:
         keyboard = _build_confirm_keyboard()
     elif outcome.kind == OUTCOME_EXECUTED and outcome.inline_keyboard_hint:
-        # The dispatcher passed labels; rebuild as follow-up suggestions
-        # using the same intent so the callback round-trips correctly.
-        # We don't have access to the wealth level here, so re-derive
-        # via follow_up's default pool (matches the labels we got).
-        suggestions = follow_up.get_follow_ups(
-            outcome.intent, avoid_intent=outcome.intent
-        )
-        # Filter to the labels the dispatcher selected — keeps the two
-        # paths in sync if e.g. the dispatcher shrunk the list.
-        wanted = set(outcome.inline_keyboard_hint)
-        suggestions = [fu for fu in suggestions if fu.label in wanted]
+        # Prefer dispatcher-built follow-ups so context parameters (for
+        # example market=gold → portfolio asset_type=gold) are preserved.
+        suggestions = outcome.follow_ups
+        if suggestions is None:
+            # Backwards-compatible fallback for tests/custom dispatchers that
+            # still provide labels only.
+            suggestions = follow_up.get_follow_ups(
+                outcome.intent, avoid_intent=outcome.intent
+            )
+            wanted = set(outcome.inline_keyboard_hint)
+            suggestions = [fu for fu in suggestions if fu.label in wanted]
         keyboard = follow_up.build_inline_keyboard(suggestions)
     else:
         keyboard = _build_inline_keyboard(outcome.inline_keyboard_hint)

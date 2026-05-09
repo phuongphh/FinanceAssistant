@@ -101,6 +101,7 @@ class DispatchOutcome:
     intent: IntentType
     confidence: float = 0.0
     inline_keyboard_hint: list[str] | None = None
+    follow_ups: list | None = None
 
 
 class IntentDispatcher:
@@ -266,6 +267,7 @@ class IntentDispatcher:
 
         wrapped = text
         keyboard_hint: list[str] | None = None
+        suggestions = []
         if result.intent not in _SKIP_PERSONALITY_INTENTS:
             wrapped = add_personality(text, user, result.intent)
 
@@ -287,6 +289,7 @@ class IntentDispatcher:
                 result.intent,
                 wealth_level=level,
                 avoid_intent=result.intent,
+                parameters=result.parameters,
             )
             if suggestions:
                 keyboard_hint = [fu.label for fu in suggestions]
@@ -297,6 +300,7 @@ class IntentDispatcher:
             intent=result.intent,
             confidence=result.confidence,
             inline_keyboard_hint=keyboard_hint,
+            follow_ups=suggestions if keyboard_hint else None,
         )
 
     # ------------------------ handler registry ------------------------
