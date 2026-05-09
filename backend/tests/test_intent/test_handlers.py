@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -211,12 +211,15 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
     change.change_percentage = 11.11
     change.period_label = "tháng trước"
 
+    calculate_mock = AsyncMock(return_value=breakdown)
+    change_mock = AsyncMock(return_value=change)
+
     with patch(
         "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
-        AsyncMock(return_value=breakdown),
+        calculate_mock,
     ), patch(
-        "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change",
-        AsyncMock(return_value=change),
+        "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+        change_mock,
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_NET_WORTH,
@@ -228,6 +231,10 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
     assert "500,000,000" in response
     assert "tháng trước" in response
     assert "📈" in response or "📉" in response
+    calculate_mock.assert_awaited_once()
+    change_mock.assert_awaited_once_with(
+        ANY, ANY, Decimal("500000000"), period="month"
+    )
 
 
 @pytest.mark.asyncio

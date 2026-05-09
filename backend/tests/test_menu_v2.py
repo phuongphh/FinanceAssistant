@@ -8,7 +8,9 @@ Three concerns covered:
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -602,6 +604,50 @@ class TestCmdDashboard:
         assert url == "https://example.com/miniapp/wealth?source=dashboard_command"
 
 
+class TestNetWorthFastPath:
+    @pytest.mark.asyncio
+    async def test_assets_net_worth_direct_handler_skips_historical_change(
+        self, monkeypatch
+    ):
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        breakdown = SimpleNamespace(
+            total=Decimal("500000000"),
+            asset_count=3,
+        )
+        sent: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        async def fail_change(*_args, **_kwargs):
+            raise AssertionError("menu fast path must not query snapshots")
+
+        monkeypatch.setattr(
+            net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=breakdown),
+        )
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate", fail_change
+        )
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_change_from_current", fail_change
+        )
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+
+        await menu_handler._action_assets_net_worth(
+            db=object(), user=_user("An"), chat_id=42, message_id=7
+        )
+
+        assert sent["chat_id"] == 42
+        assert "Tổng tài sản của An" in sent["text"]
+        assert "500,000,000" in sent["text"]
+        assert "tháng trước" not in sent["text"]
+        assert sent["reply_markup"] == back_to_main_keyboard()
+
+
 # ============================================================
 # Cross-check: every submenu action has a wired handler or fallback
 # ============================================================
@@ -642,19 +688,18 @@ class TestActionCoverage:
             f"Unwired actions (coming-soon stub will fire): {coming_soon}"
         )
 
-    def test_assets_net_worth_and_report_intents_are_not_swapped(self):
+    def test_assets_net_worth_and_report_routes_are_not_swapped(self):
         """User feedback caught these inverted: ``📊 Tổng tài sản``
-        should fire the SHORT summary (``QUERY_NET_WORTH``) and
-        ``📈 Báo cáo chi tiết`` should fire the per-asset list
-        (``QUERY_ASSETS``). This test pins the orientation so a
-        well-meaning refactor can't silently re-swap them.
+        should show the SHORT summary and ``📈 Báo cáo chi tiết`` should
+        show the per-asset list. Pin the orientation even though net worth
+        now uses a direct fast handler instead of the intent dispatcher.
         """
-        from backend.bot.handlers.menu_handler import _INTENT_MAP
+        from backend.bot.handlers.menu_handler import _DIRECT_HANDLERS, _INTENT_MAP
         from backend.intent.intents import IntentType
 
-        assert _INTENT_MAP[("assets", "net_worth")] == (
-            IntentType.QUERY_NET_WORTH, {}
-        ), "📊 Tổng tài sản must show the short net-worth summary"
+        assert ("assets", "net_worth") in _DIRECT_HANDLERS, (
+            "📊 Tổng tài sản must use the fast short net-worth summary"
+        )
         assert _INTENT_MAP[("assets", "report")] == (
             IntentType.QUERY_ASSETS, {}
         ), "📈 Báo cáo chi tiết must list every asset"
