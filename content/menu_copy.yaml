@@ -363,3 +363,11 @@ submenu_market:
     • "VNM giá bao nhiêu?"
     • "BTC hôm nay thế nào?"
     • "nên đầu tư gì?"
+
+# ============================================================
+# DIRECT ACTION COPY
+# ============================================================
+
+action_assets_net_worth:
+  market_value_note: "tài sản đã được cập nhật theo giá trị thị trường (giá chứng khoán, giá tiền số, giá vàng)"
+  recalculating_wait: "⏳ Mình đang tính lại tài sản theo giá trị thị trường, chờ mình một chút nhé..."
