@@ -361,6 +361,66 @@ async def test_query_portfolio_empty_state():
     assert "chưa có cổ phiếu" in response
 
 
+@pytest.mark.asyncio
+async def test_query_portfolio_handler_lists_gold_assets_when_requested():
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    gold_assets = [
+        _fake_asset(
+            name="Vàng SJC",
+            asset_type="gold",
+            subtype="sjc",
+            current_value=Decimal("184000000"),
+            initial_value=Decimal("180000000"),
+            extra={"quantity": 2, "current_price": 92000000},
+        ),
+    ]
+    with patch(
+        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+        AsyncMock(return_value=gold_assets),
+    ) as mock_get, patch(
+        "backend.intent.handlers.query_portfolio.resolve_style",
+        AsyncMock(return_value=_young_prof_style()),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_PORTFOLIO,
+            confidence=0.95,
+            parameters={"asset_type": "gold"},
+            raw_text="portfolio vàng",
+        )
+        response = await QueryPortfolioHandler().handle(intent, _user(), _fake_db())
+
+    mock_get.assert_awaited_once()
+    assert mock_get.await_args.kwargs["asset_type"] == "gold"
+    assert "Portfolio vàng" in response
+    assert "Vàng SJC" in response
+    assert "2 lượng" in response
+    assert "184tr" in response
+    assert "🟢" in response
+    assert "NVDA" not in response
+
+
+@pytest.mark.asyncio
+async def test_query_portfolio_gold_empty_state_is_personalized():
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    with patch(
+        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+        AsyncMock(return_value=[]),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_PORTFOLIO,
+            confidence=0.95,
+            parameters={"asset_type": "gold"},
+            raw_text="portfolio vàng",
+        )
+        response = await QueryPortfolioHandler().handle(intent, _user("Bé"), _fake_db())
+
+    assert "Bé chưa có tài sản vàng" in response
+    assert "Bé Tiền" in response
+    assert "cổ phiếu" not in response
+
+
 # ---------------------- query_market ----------------------
 
 

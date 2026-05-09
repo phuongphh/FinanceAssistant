@@ -98,6 +98,23 @@ def test_parse_returns_none_for_bad_payload():
     assert parse_callback_data(f"{CALLBACK_PREFIX}!!!notbase64") is None
 
 
+def test_gold_market_follow_up_routes_portfolio_to_gold_assets():
+    fus = get_follow_ups(
+        IntentType.QUERY_MARKET,
+        parameters={"category": "gold"},
+        avoid_intent=IntentType.QUERY_MARKET,
+    )
+
+    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].intent == IntentType.QUERY_PORTFOLIO
+    assert fus[0].parameters == {"asset_type": "gold"}
+
+    parsed = parse_callback_data(fus[0].to_callback_data())
+    assert parsed is not None
+    assert parsed.intent == IntentType.QUERY_PORTFOLIO
+    assert parsed.parameters == {"asset_type": "gold"}
+
+
 def test_callback_data_under_telegram_64_byte_limit():
     """Telegram caps callback_data at 64 bytes."""
     for fu in get_follow_ups(IntentType.QUERY_ASSETS):
