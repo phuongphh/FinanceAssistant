@@ -8,6 +8,7 @@ Three concerns covered:
 """
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -644,8 +645,56 @@ class TestNetWorthFastPath:
         assert sent["chat_id"] == 42
         assert "Tổng tài sản của An" in sent["text"]
         assert "500,000,000" in sent["text"]
+        assert (
+            "tài sản đã được cập nhật theo giá trị thị trường "
+            "(giá chứng khoán, giá tiền số, giá vàng)"
+        ) in sent["text"]
         assert "tháng trước" not in sent["text"]
         assert sent["reply_markup"] == back_to_main_keyboard()
+
+    @pytest.mark.asyncio
+    async def test_assets_net_worth_waits_only_after_700ms(
+        self, monkeypatch
+    ):
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        breakdown = SimpleNamespace(
+            total=Decimal("500000000"),
+            asset_count=3,
+        )
+        sent_messages: list[dict] = []
+
+        async def fake_send_message(**kwargs):
+            sent_messages.append(kwargs)
+
+        async def slow_calculate(*_args, **_kwargs):
+            await asyncio.sleep(0.02)
+            return breakdown
+
+        monkeypatch.setattr(menu_handler, "NET_WORTH_WAIT_DELAY_SECONDS", 0.01)
+        monkeypatch.setattr(
+            net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(side_effect=slow_calculate),
+        )
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+
+        await menu_handler._action_assets_net_worth(
+            db=object(), user=_user("An"), chat_id=42, message_id=7
+        )
+
+        assert len(sent_messages) == 2
+        assert sent_messages[0]["text"] == (
+            "⏳ Mình đang tính lại tài sản theo giá trị thị trường, "
+            "chờ mình một chút nhé..."
+        )
+        assert "Tổng tài sản của An" in sent_messages[1]["text"]
+
+    def test_assets_net_worth_wait_delay_is_700ms(self):
+        from backend.bot.handlers import menu_handler
+
+        assert menu_handler.NET_WORTH_WAIT_DELAY_SECONDS == 0.7
 
 
 # ============================================================
