@@ -43,6 +43,7 @@ from backend.bot.keyboards.recurring_keyboard import (
     recurring_disable_confirm_keyboard,
     recurring_list_actions_keyboard,
     recurring_list_footer_keyboard,
+    recurring_manage_list_keyboard,
     recurring_reminders_toggle_keyboard,
 )
 from backend.config.categories import get_category
@@ -64,6 +65,7 @@ class RecurringEvent:
     REMINDER_PAID = "reminder_action_paid"
     REMINDER_DELAYED = "reminder_action_delayed"
     REMINDER_DISABLED = "reminder_action_disabled"
+    REMINDER_ENABLED = "reminder_action_enabled"
     SUGGESTION_ACCEPTED = "suggestion_accepted"
     SUGGESTION_REJECTED = "suggestion_rejected"
     WIZARD_CANCELED = "recurring_wizard_canceled"
@@ -78,10 +80,26 @@ FLOW_REMINDER_PAID = "reminder_paid_amount"
 # ---------- List view --------------------------------------------------
 
 
+def _format_pattern_line(pattern, index: int) -> str:
+    cat = get_category(pattern.category)
+    active_tag = "" if pattern.is_active else " · ⏸️ tạm dừng"
+    bell = "🔔" if pattern.enable_reminders else "🔕"
+    day_str = (
+        f"ngày {pattern.expected_day_of_month}"
+        if pattern.expected_day_of_month
+        else "không cố định"
+    )
+    return (
+        f"{index}. {cat.emoji} <b>{pattern.name}</b>{active_tag}\n"
+        f"   {format_money_short(pattern.expected_amount)}/tháng · "
+        f"{cat.name_vi} · 📅 {day_str} · {bell}"
+    )
+
+
 async def show_recurring_list(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
-    """Render menu:expenses:recurring list view."""
+    """Render a compact, read-only recurring-pattern overview."""
     patterns = await recurring_service.get_active_patterns(
         db, user.id, include_inactive=True,
     )
@@ -102,38 +120,69 @@ async def show_recurring_list(
         (Decimal(p.expected_amount) for p in patterns if p.is_active),
         Decimal(0),
     )
-    header = [
+    lines = [
         "🔄 <b>Khoản định kỳ</b>",
         "",
         f"📊 Tổng/tháng: <b>{format_money_short(total_monthly)}</b>",
         "",
     ]
-    await send_message(chat_id=chat_id, text="\n".join(header), parse_mode="HTML")
+    lines.extend(_format_pattern_line(p, i) for i, p in enumerate(patterns, 1))
+    await send_message(
+        chat_id=chat_id,
+        text="\n\n".join(lines),
+        parse_mode="HTML",
+        reply_markup=recurring_list_footer_keyboard(),
+    )
 
-    for p in patterns:
-        cat = get_category(p.category)
-        active_tag = "" if p.is_active else " (⏸️ tạm dừng)"
-        bell = "🔔" if p.enable_reminders else "🔕"
-        day_str = (
-            f"ngày {p.expected_day_of_month}"
-            if p.expected_day_of_month
-            else "không cố định"
-        )
-        text = (
-            f"{cat.emoji} <b>{p.name}</b>{active_tag}\n"
-            f"   {cat.name_vi} · {format_money_short(p.expected_amount)}/tháng\n"
-            f"   📅 {day_str} · {bell}"
-        )
+
+async def show_recurring_manage_list(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Render the picker for edit/reminder/delete actions."""
+    patterns = await recurring_service.get_active_patterns(
+        db, user.id, include_inactive=True,
+    )
+    if not patterns:
         await send_message(
-            chat_id=chat_id, text=text, parse_mode="HTML",
-            reply_markup=recurring_list_actions_keyboard(
-                p.id, enable_reminders=p.enable_reminders,
-            ),
+            chat_id=chat_id,
+            text="Chưa có khoản định kỳ nào để sửa nhé.",
+            reply_markup=recurring_list_footer_keyboard(),
         )
+        return
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            "✏️ <b>Sửa khoản định kỳ</b>\n\n"
+            "Chọn 1 khoản bên dưới để sửa số tiền, bật/tắt nhắc, hoặc xoá."
+        ),
+        parse_mode="HTML",
+        reply_markup=recurring_manage_list_keyboard(patterns),
+    )
+
+
+async def show_recurring_pattern_actions(
+    db: AsyncSession, chat_id: int, user: User, pattern_id_str: str
+) -> None:
+    try:
+        pattern_id = uuid.UUID(pattern_id_str)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy khoản.")
+        return
+    pattern = await recurring_service.get_pattern_by_id(db, user.id, pattern_id)
+    if pattern is None:
+        await send_message(chat_id=chat_id, text="Không tìm thấy khoản.")
+        return
 
     await send_message(
-        chat_id=chat_id, text="—",
-        reply_markup=recurring_list_footer_keyboard(),
+        chat_id=chat_id,
+        text=(
+            "Bạn muốn làm gì với khoản này?\n\n"
+            f"{_format_pattern_line(pattern, 1)}"
+        ),
+        parse_mode="HTML",
+        reply_markup=recurring_list_actions_keyboard(
+            pattern.id, enable_reminders=pattern.enable_reminders,
+        ),
     )
 
 
@@ -425,6 +474,25 @@ async def _handle_disable_show_confirm(
     )
 
 
+async def _handle_reminder_enable(
+    db: AsyncSession, chat_id: int, user: User, pattern_id_str: str,
+) -> None:
+    try:
+        pattern_id = uuid.UUID(pattern_id_str)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy khoản.")
+        return
+    try:
+        await recurring_service.update_pattern(
+            db, user.id, pattern_id, enable_reminders=True,
+        )
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy khoản.")
+        return
+    analytics.track(RecurringEvent.REMINDER_ENABLED, user_id=user.id)
+    await send_message(chat_id=chat_id, text="🔔 Đã bật nhắc nhở lại.")
+
+
 async def _handle_disable_confirm(
     db: AsyncSession, chat_id: int, user: User, pattern_id_str: str,
 ) -> None:
@@ -687,6 +755,12 @@ async def _dispatch_recurring(
     if action == "list":
         await show_recurring_list(db, chat_id, user)
         return
+    if action == "manage":
+        await show_recurring_manage_list(db, chat_id, user)
+        return
+    if action == "select" and arg:
+        await show_recurring_pattern_actions(db, chat_id, user, arg)
+        return
     if action == "cancel":
         await wizard_service.clear(db, user.id)
         analytics.track(RecurringEvent.WIZARD_CANCELED, user_id=user.id)
@@ -702,6 +776,9 @@ async def _dispatch_recurring(
         return
     if action == "edit" and arg:
         await _handle_edit_pick(db, chat_id, user, arg)
+        return
+    if action == "reminder_on" and arg:
+        await _handle_reminder_enable(db, chat_id, user, arg)
         return
     if action == "disable" and arg:
         await _handle_disable_show_confirm(db, chat_id, user, arg)

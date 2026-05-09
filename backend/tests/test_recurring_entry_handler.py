@@ -272,3 +272,98 @@ class TestCancel:
             consumed = await recurring_entry.cancel_wizard(db, 100, user)
         assert consumed is False
         clear.assert_not_awaited()
+
+# ---------------------------------------------------------------------
+# Recurring menu UX
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestRecurringMenuUx:
+    async def test_list_is_read_only_with_three_footer_actions(self):
+        user = _user()
+        db = _db(user)
+        pattern = _pattern()
+        with patch.object(recurring_entry.recurring_service, "get_active_patterns",
+                          AsyncMock(return_value=[pattern])), \
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
+            await recurring_entry.show_recurring_list(db, 100, user)
+
+        send.assert_awaited_once()
+        kwargs = send.await_args.kwargs
+        assert "Thuê nhà" in kwargs["text"]
+        keyboard = kwargs["reply_markup"]["inline_keyboard"]
+        labels = [button["text"] for row in keyboard for button in row]
+        callbacks = [button["callback_data"] for row in keyboard for button in row]
+        assert labels == [
+            "➕ Thêm khoản định kỳ",
+            "✏️ Sửa khoản định kỳ",
+            "◀️ Quay về Chi tiêu",
+        ]
+        assert callbacks == ["recurring:start", "recurring:manage", "menu:expenses"]
+        assert "🗑️" not in str(kwargs["reply_markup"])
+        assert "reminder:" not in str(kwargs["reply_markup"])
+
+    async def test_manage_lists_patterns_as_picker(self):
+        user = _user()
+        db = _db(user)
+        pattern = _pattern()
+        with patch.object(recurring_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(recurring_entry.recurring_service, "get_active_patterns",
+                          AsyncMock(return_value=[pattern])), \
+             patch.object(recurring_entry, "answer_callback", AsyncMock()), \
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
+            await recurring_entry.handle_recurring_callback(
+                db,
+                {"id": "cb1", "data": "recurring:manage",
+                 "message": {"chat": {"id": 100}, "message_id": 1},
+                 "from": {"id": 100}},
+            )
+
+        keyboard = send.await_args.kwargs["reply_markup"]["inline_keyboard"]
+        assert keyboard[0][0]["text"] == "Thuê nhà"
+        assert keyboard[0][0]["callback_data"] == f"recurring:select:{pattern.id}"
+
+    async def test_select_pattern_shows_actions(self):
+        user = _user()
+        db = _db(user)
+        pattern = _pattern()
+        with patch.object(recurring_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(recurring_entry.recurring_service, "get_pattern_by_id",
+                          AsyncMock(return_value=pattern)), \
+             patch.object(recurring_entry, "answer_callback", AsyncMock()), \
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
+            await recurring_entry.handle_recurring_callback(
+                db,
+                {"id": "cb1", "data": f"recurring:select:{pattern.id}",
+                 "message": {"chat": {"id": 100}, "message_id": 1},
+                 "from": {"id": 100}},
+            )
+
+        markup = str(send.await_args.kwargs["reply_markup"])
+        assert "recurring:edit" in markup
+        assert "reminder:disable" in markup
+        assert "recurring:disable" in markup
+
+    async def test_reminder_on_updates_pattern(self):
+        user = _user()
+        db = _db(user)
+        pid = uuid.uuid4()
+        with patch.object(recurring_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(recurring_entry.recurring_service, "update_pattern",
+                          AsyncMock()) as update, \
+             patch.object(recurring_entry, "answer_callback", AsyncMock()), \
+             patch.object(recurring_entry, "send_message", AsyncMock()):
+            await recurring_entry.handle_recurring_callback(
+                db,
+                {"id": "cb1", "data": f"recurring:reminder_on:{pid}",
+                 "message": {"chat": {"id": 100}, "message_id": 1},
+                 "from": {"id": 100}},
+            )
+
+        update.assert_awaited_once_with(
+            db, user.id, pid, enable_reminders=True,
+        )
