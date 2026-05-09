@@ -6,7 +6,10 @@ Two callback prefixes (separate so worker dispatch is unambiguous):
     recurring:list                        — refresh list view
     recurring:category:<code>             — pick category
     recurring:reminders:<on|off>          — toggle reminders during add
+    recurring:manage                     — choose a pattern to manage
+    recurring:select:<pattern_uuid>       — show edit/reminder/delete actions
     recurring:edit:<pattern_uuid>         — edit-amount sub-wizard
+    recurring:reminder_on:<pattern_uuid>  — enable reminders
     recurring:disable:<pattern_uuid>      — confirm pause
     recurring:disable_confirm:<uuid>      — actually pause
     recurring:cancel                      — abort
@@ -73,10 +76,13 @@ def recurring_list_actions_keyboard(
     *,
     enable_reminders: bool,
 ) -> InlineKeyboardMarkup:
-    """Per-row buttons in the list view.
+    """Action buttons shown only after the user selects one pattern
+    from the manage list.
 
-    The reminders-toggle button label asymmetric on state so users
-    see at a glance whether a row is being pinged."""
+    Keeping edit/remind/delete off the read-only overview prevents
+    accidental destructive taps while still giving a fast two-step
+    management path.
+    """
     pid = str(pattern_id)
     bell_btn = (
         {
@@ -86,7 +92,7 @@ def recurring_list_actions_keyboard(
         if enable_reminders
         else {
             "text": "🔔 Bật nhắc",
-            "callback_data": build_callback(CB_RECURRING, "edit", pid),
+            "callback_data": build_callback(CB_RECURRING, "reminder_on", pid),
         }
     )
     return {
@@ -101,6 +107,10 @@ def recurring_list_actions_keyboard(
             [{
                 "text": "🗑️ Xóa",
                 "callback_data": build_callback(CB_RECURRING, "disable", pid),
+            }],
+            [{
+                "text": "◀️ Chọn khoản khác",
+                "callback_data": build_callback(CB_RECURRING, "manage"),
             }],
         ]
     }
@@ -127,15 +137,40 @@ def recurring_disable_confirm_keyboard(
 
 
 def recurring_list_footer_keyboard() -> InlineKeyboardMarkup:
+    """Read-only overview footer: add, enter manage mode, or go back to
+    the Expenses submenu.
+    """
     return {
         "inline_keyboard": [
             [{
                 "text": "➕ Thêm khoản định kỳ",
                 "callback_data": build_callback(CB_RECURRING, "start"),
             }],
-            [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
+            [{
+                "text": "✏️ Sửa khoản định kỳ",
+                "callback_data": build_callback(CB_RECURRING, "manage"),
+            }],
+            [{"text": "◀️ Quay về Chi tiêu", "callback_data": "menu:expenses"}],
         ]
     }
+
+
+def recurring_manage_list_keyboard(
+    patterns: list,
+) -> InlineKeyboardMarkup:
+    """Pattern picker for the edit/reminder/delete flow."""
+    rows: list[list[dict]] = []
+    for p in patterns:
+        status = "⏸️ " if not getattr(p, "is_active", True) else ""
+        rows.append([{
+            "text": f"{status}{p.name}",
+            "callback_data": build_callback(CB_RECURRING, "select", str(p.id)),
+        }])
+    rows.append([{
+        "text": "◀️ Quay lại danh sách",
+        "callback_data": build_callback(CB_RECURRING, "list"),
+    }])
+    return {"inline_keyboard": rows}
 
 
 # ---------------------------------------------------------------------
