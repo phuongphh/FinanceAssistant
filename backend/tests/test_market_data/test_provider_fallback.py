@@ -18,21 +18,29 @@ from backend.wealth.valuation.stock import value_stock_holding
 
 
 class _Provider(BaseProvider):
-    def __init__(self, name: str, *, price: Decimal | None = None, fail: bool = False) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        price: Decimal | None = None,
+        fail: bool = False,
+        asset_type: str = "stock",
+    ) -> None:
         self.name = name
         self.price = price
         self.fail = fail
+        self._asset_type = asset_type
         self.calls = 0
 
     @property
     def asset_type(self) -> str:
-        return "stock"
+        return self._asset_type
 
     async def fetch_quote(self, symbol: str) -> PriceQuote:
         self.calls += 1
         if self.fail:
             raise ProviderUnavailable(self.name)
-        return PriceQuote(symbol, self.price or Decimal("0"), "VND", "stock", datetime(2026, 5, 8, tzinfo=timezone.utc), self.name)
+        return PriceQuote(symbol, self.price or Decimal("0"), "VND", self.asset_type, datetime(2026, 5, 8, tzinfo=timezone.utc), self.name)
 
     async def fetch_batch(self, symbols: list[str]) -> list[PriceQuote]:
         return [await self.fetch_quote(symbol) for symbol in symbols]
@@ -66,3 +74,31 @@ async def test_provider_fallback_uses_vndirect_and_wealth_valuation_is_correct()
     assert valuation.current_value == Decimal("12000")
     assert valuation.pnl_pct == Decimal("20.0")
     assert await redis.get("market_data:stock:VNM:last_known") is not None
+
+
+@pytest.mark.asyncio
+async def test_get_quotes_fetches_cache_misses_in_one_batch():
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+    provider = _Provider("gold-feed", price=Decimal("100"), asset_type="gold")
+
+    with patch("backend.market_data.client.get_price_cache", return_value=cache):
+        from backend.market_data.client import get_quotes
+
+        quotes = await get_quotes(
+            "gold", ["SJC_GOLD", "RING_24K", "KIM_BAO_24K"], provider
+        )
+
+    assert set(quotes) == {"SJC_GOLD", "RING_24K", "KIM_BAO_24K"}
+    assert provider.calls == 3
+    assert await redis.get("market_data:gold:SJC_GOLD") is not None
+    assert await redis.get("market_data:gold:SJC_GOLD:last_known") is not None
+
+    provider.calls = 0
+    with patch("backend.market_data.client.get_price_cache", return_value=cache):
+        from backend.market_data.client import get_quotes
+
+        cached_quotes = await get_quotes("gold", ["SJC_GOLD", "RING_24K"], provider)
+
+    assert set(cached_quotes) == {"SJC_GOLD", "RING_24K"}
+    assert provider.calls == 0

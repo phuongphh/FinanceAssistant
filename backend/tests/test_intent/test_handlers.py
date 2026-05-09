@@ -460,31 +460,31 @@ async def test_query_market_handler_gold_category_shows_gold_prices():
     from backend.intent.handlers.query_market import QueryMarketHandler
     from backend.market_data.normalizer import PriceQuote
 
+    symbols = [
+        "SJC_GOLD",
+        "RING_24K",
+        "KIM_BAO_24K",
+        "PHUC_LOC_TAI_24K",
+        "PNJ_PHOENIX_24K",
+    ]
     quotes = {
-        "SJC_GOLD": PriceQuote(
-            "SJC_GOLD",
-            Decimal("92000000"),
+        symbol: PriceQuote(
+            symbol,
+            Decimal("92000000") - Decimal(index * 100000),
             "VND",
             "gold",
             datetime(2026, 5, 8, tzinfo=timezone.utc),
-            "sjc",
+            "pnj-json",
             metadata={
-                "buy_price": Decimal("90000000"),
-                "sell_price": Decimal("92000000"),
+                "buy_price": Decimal("90000000") - Decimal(index * 100000),
+                "sell_price": Decimal("92000000") - Decimal(index * 100000),
             },
-        ),
-        "RING_24K": PriceQuote(
-            "RING_24K",
-            Decimal("91000000"),
-            "VND",
-            "gold",
-            datetime(2026, 5, 8, tzinfo=timezone.utc),
-            "sjc",
-        ),
+        )
+        for index, symbol in enumerate(symbols)
     }
 
-    async def fake_get_gold_quote(symbol="SJC_GOLD"):
-        return quotes[symbol]
+    async def fake_get_gold_quotes(requested_symbols):
+        return {symbol: quotes[symbol] for symbol in requested_symbols}
 
     intent = IntentResult(
         intent=IntentType.QUERY_MARKET,
@@ -494,14 +494,18 @@ async def test_query_market_handler_gold_category_shows_gold_prices():
     )
 
     with patch(
-        "backend.intent.handlers.query_market.get_gold_quote",
-        side_effect=fake_get_gold_quote,
+        "backend.intent.handlers.query_market.get_gold_quotes",
+        side_effect=fake_get_gold_quotes,
     ):
         response = await QueryMarketHandler().handle(intent, _user(), _fake_db())
 
     assert "Giá vàng" in response
     assert "Vàng SJC" in response
     assert "Vàng nhẫn" in response
+    assert "Vàng Kim Bảo" in response
+    assert "Vàng Phúc Lộc Tài" in response
+    assert "Vàng PNJ Phượng Hoàng" in response
+    assert response.count("•") == 5
     assert "Bạn muốn xem giá mã nào" not in response
 
 
