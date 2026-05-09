@@ -12,6 +12,7 @@ Dispatcher returns a ``DispatchOutcome`` (text + optional pending state
 description) so the caller (free_form_text) can attach inline keyboards
 and clear/restore state appropriately.
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,36 +37,42 @@ logger = logging.getLogger(__name__)
 EXECUTE_THRESHOLD = 0.8
 CONFIRM_THRESHOLD = 0.5
 
-READ_INTENTS = frozenset({
-    IntentType.QUERY_ASSETS,
-    IntentType.QUERY_NET_WORTH,
-    IntentType.QUERY_PORTFOLIO,
-    IntentType.QUERY_EXPENSES,
-    IntentType.QUERY_EXPENSES_BY_CATEGORY,
-    IntentType.QUERY_INCOME,
-    IntentType.QUERY_CASHFLOW,
-    IntentType.QUERY_MARKET,
-    IntentType.QUERY_GOALS,
-    IntentType.QUERY_GOAL_PROGRESS,
-})
+READ_INTENTS = frozenset(
+    {
+        IntentType.QUERY_ASSETS,
+        IntentType.QUERY_NET_WORTH,
+        IntentType.QUERY_PORTFOLIO,
+        IntentType.QUERY_EXPENSES,
+        IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        IntentType.QUERY_INCOME,
+        IntentType.QUERY_CASHFLOW,
+        IntentType.QUERY_MARKET,
+        IntentType.QUERY_GOALS,
+        IntentType.QUERY_GOAL_PROGRESS,
+    }
+)
 
-WRITE_INTENTS = frozenset({
-    IntentType.ACTION_RECORD_SAVING,
-    IntentType.ACTION_QUICK_TRANSACTION,
-})
+WRITE_INTENTS = frozenset(
+    {
+        IntentType.ACTION_RECORD_SAVING,
+        IntentType.ACTION_QUICK_TRANSACTION,
+    }
+)
 
 # Intents whose handler output should NOT be wrapped with the
 # personality layer. Advisory speaks for itself (LLM-shaped tone +
 # legal disclaimer). Meta intents (greeting/help) and action handlers
 # also format their own copy.
-_SKIP_PERSONALITY_INTENTS = frozenset({
-    IntentType.ADVISORY,
-    IntentType.PLANNING,
-    IntentType.GREETING,
-    IntentType.HELP,
-    IntentType.ACTION_RECORD_SAVING,
-    IntentType.ACTION_QUICK_TRANSACTION,
-})
+_SKIP_PERSONALITY_INTENTS = frozenset(
+    {
+        IntentType.ADVISORY,
+        IntentType.PLANNING,
+        IntentType.GREETING,
+        IntentType.HELP,
+        IntentType.ACTION_RECORD_SAVING,
+        IntentType.ACTION_QUICK_TRANSACTION,
+    }
+)
 
 
 # Outcome kinds — string constants so analytics + tests stay decoupled
@@ -114,9 +121,7 @@ class IntentDispatcher:
     ) -> DispatchOutcome:
         # Meta intents short-circuit the confidence policy entirely.
         if result.intent == IntentType.OUT_OF_SCOPE:
-            text = await self._meta[IntentType.OUT_OF_SCOPE].handle(
-                result, user, db
-            )
+            text = await self._meta[IntentType.OUT_OF_SCOPE].handle(result, user, db)
             return DispatchOutcome(
                 text=text,
                 kind=OUTCOME_OUT_OF_SCOPE,
@@ -133,10 +138,7 @@ class IntentDispatcher:
             )
 
         # Low confidence — clarify.
-        if (
-            result.confidence < CONFIRM_THRESHOLD
-            or result.intent == IntentType.UNCLEAR
-        ):
+        if result.confidence < CONFIRM_THRESHOLD or result.intent == IntentType.UNCLEAR:
             return await self._build_clarification(result, user, db)
 
         # Medium confidence — read intents execute, write intents confirm.
@@ -199,9 +201,7 @@ class IntentDispatcher:
         # persist clarification state because there's no original intent
         # to come back to.
         if result.intent == IntentType.UNCLEAR or result.confidence == 0.0:
-            text = await self._meta[IntentType.UNCLEAR].handle(
-                result, user, db
-            )
+            text = await self._meta[IntentType.UNCLEAR].handle(result, user, db)
             return DispatchOutcome(
                 text=text,
                 kind=OUTCOME_UNCLEAR,
@@ -246,9 +246,7 @@ class IntentDispatcher:
         try:
             text = await handler.handle(result, user, db)
         except Exception:
-            logger.exception(
-                "Handler error for intent=%s", result.intent.value
-            )
+            logger.exception("Handler error for intent=%s", result.intent.value)
             return DispatchOutcome(
                 text=(
                     "Mình đang hơi rối, gặp lỗi khi xử lý 😔\n"
@@ -264,30 +262,26 @@ class IntentDispatcher:
         # tone) and meta intents (greeting/help format their own copy).
         from backend.bot.personality.query_voice import add_personality
         from backend.intent import follow_up
-        from backend.wealth.ladder import detect_level
-        from backend.wealth.services import net_worth_calculator
+        from backend.wealth.ladder import WealthLevel
 
         wrapped = text
         keyboard_hint: list[str] | None = None
         if result.intent not in _SKIP_PERSONALITY_INTENTS:
             wrapped = add_personality(text, user, result.intent)
 
-            # Detect wealth level once for the keyboard. Skip the read
-            # roundtrip for handlers that already pulled it (we don't have
-            # access to their Style object from here — one DB hit is
-            # cheap and the dispatcher path is already async).
+            # Follow-up buttons only need the persisted wealth band. Do not
+            # recompute net worth here: that path performs live stock/crypto
+            # valuations and can add seconds of provider latency to every
+            # read intent (including simple menu taps such as VNINDEX).
             level = None
-            try:
-                maybe = net_worth_calculator.calculate(db, user.id)
-                # Guard against tests passing a sync Mock that returns
-                # something not awaitable — produces a clean None level
-                # instead of a "never-awaited coroutine" warning.
-                import inspect as _inspect
-                if _inspect.isawaitable(maybe):
-                    breakdown = await maybe
-                    level = detect_level(breakdown.total)
-            except Exception:
-                level = None
+            raw_level = getattr(user, "wealth_level", None)
+            if isinstance(raw_level, WealthLevel):
+                level = raw_level
+            elif isinstance(raw_level, str) and raw_level:
+                try:
+                    level = WealthLevel(raw_level)
+                except ValueError:
+                    level = None
 
             suggestions = follow_up.get_follow_ups(
                 result.intent,
@@ -321,53 +315,65 @@ class IntentDispatcher:
             from backend.intent.handlers.action_quick_transaction import (
                 ActionQuickTransactionHandler,
             )
+
             return ActionQuickTransactionHandler()
         if intent == IntentType.QUERY_ASSETS:
             from backend.intent.handlers.query_assets import QueryAssetsHandler
+
             return QueryAssetsHandler()
         if intent == IntentType.QUERY_NET_WORTH:
             from backend.intent.handlers.query_net_worth import (
                 QueryNetWorthHandler,
             )
+
             return QueryNetWorthHandler()
         if intent == IntentType.QUERY_PORTFOLIO:
             from backend.intent.handlers.query_portfolio import (
                 QueryPortfolioHandler,
             )
+
             return QueryPortfolioHandler()
         if intent == IntentType.QUERY_EXPENSES:
             from backend.intent.handlers.query_expenses import (
                 QueryExpensesHandler,
             )
+
             return QueryExpensesHandler()
         if intent == IntentType.QUERY_EXPENSES_BY_CATEGORY:
             from backend.intent.handlers.query_expenses import (
                 QueryExpensesByCategoryHandler,
             )
+
             return QueryExpensesByCategoryHandler()
         if intent == IntentType.QUERY_INCOME:
             from backend.intent.handlers.query_income import (
                 QueryIncomeHandler,
             )
+
             return QueryIncomeHandler()
         if intent == IntentType.QUERY_CASHFLOW:
             from backend.intent.handlers.query_cashflow import (
                 QueryCashflowHandler,
             )
+
             return QueryCashflowHandler()
         if intent == IntentType.QUERY_MARKET:
             from backend.intent.handlers.query_market import QueryMarketHandler
+
             return QueryMarketHandler()
         if intent == IntentType.QUERY_GOALS:
             from backend.intent.handlers.query_goals import QueryGoalsHandler
+
             return QueryGoalsHandler()
         if intent == IntentType.QUERY_GOAL_PROGRESS:
             from backend.intent.handlers.query_goals import (
                 QueryGoalProgressHandler,
             )
+
             return QueryGoalProgressHandler()
         if intent == IntentType.ADVISORY:
             from backend.intent.handlers.advisory import AdvisoryHandler
+
             return AdvisoryHandler()
         return None
 

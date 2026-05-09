@@ -1,4 +1,5 @@
 """Tests for the IntentDispatcher confidence policy + handler routing."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -53,9 +54,7 @@ def db():
 
 @pytest.mark.asyncio
 async def test_greeting_uses_meta_handler(dispatcher, db):
-    result = IntentResult(
-        intent=IntentType.GREETING, confidence=0.95, raw_text="chào"
-    )
+    result = IntentResult(intent=IntentType.GREETING, confidence=0.95, raw_text="chào")
     outcome = await dispatcher.dispatch(result, _user(), db)
     assert isinstance(outcome, DispatchOutcome)
     assert outcome.kind == OUTCOME_EXECUTED
@@ -64,15 +63,10 @@ async def test_greeting_uses_meta_handler(dispatcher, db):
 
 @pytest.mark.asyncio
 async def test_unclear_intent_returns_unclear_outcome(dispatcher, db):
-    result = IntentResult(
-        intent=IntentType.UNCLEAR, confidence=0.0, raw_text="???"
-    )
+    result = IntentResult(intent=IntentType.UNCLEAR, confidence=0.0, raw_text="???")
     outcome = await dispatcher.dispatch(result, _user("An"), db)
     assert outcome.kind == OUTCOME_UNCLEAR
-    assert (
-        "chưa hiểu" in outcome.text.lower()
-        or "thử hỏi" in outcome.text.lower()
-    )
+    assert "chưa hiểu" in outcome.text.lower() or "thử hỏi" in outcome.text.lower()
 
 
 @pytest.mark.asyncio
@@ -90,9 +84,7 @@ async def test_low_confidence_known_intent_triggers_clarification(dispatcher, db
 
 
 @pytest.mark.asyncio
-async def test_write_intent_at_medium_confidence_triggers_confirmation(
-    dispatcher, db
-):
+async def test_write_intent_at_medium_confidence_triggers_confirmation(dispatcher, db):
     """0.5–0.8 + write intent → confirmation, NOT execution."""
     result = IntentResult(
         intent=IntentType.ACTION_RECORD_SAVING,
@@ -267,3 +259,33 @@ def test_write_intents_set_excludes_reads():
     assert WRITE_INTENTS.isdisjoint(READ_INTENTS)
     assert IntentType.ACTION_RECORD_SAVING in WRITE_INTENTS
     assert IntentType.ACTION_QUICK_TRANSACTION in WRITE_INTENTS
+
+
+@pytest.mark.asyncio
+async def test_follow_up_level_uses_persisted_user_level_not_live_net_worth(
+    dispatcher, db, monkeypatch
+):
+    fake_handler = MagicMock()
+    fake_handler.handle = AsyncMock(return_value="HANDLER_OK")
+    dispatcher._handlers[IntentType.QUERY_MARKET] = fake_handler
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("net worth should not be recomputed for follow-ups")
+
+    from backend.wealth.services import net_worth_calculator
+
+    monkeypatch.setattr(net_worth_calculator, "calculate", fail_if_called)
+    user = _user()
+    user.wealth_level = "hnw"
+    result = IntentResult(
+        intent=IntentType.QUERY_MARKET,
+        confidence=0.95,
+        raw_text="vnindex",
+        parameters={"ticker": "VNINDEX"},
+    )
+
+    outcome = await dispatcher.dispatch(result, user, db)
+
+    assert outcome.kind == OUTCOME_EXECUTED
+    assert "HANDLER_OK" in outcome.text
+    fake_handler.handle.assert_awaited_once()
