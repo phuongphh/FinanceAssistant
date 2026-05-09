@@ -44,8 +44,10 @@ Action wiring philosophy (Epic 1 plumbing rule):
 """
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +56,7 @@ from backend.bot.formatters.menu_formatter import (
     back_to_main_keyboard,
     format_main_menu,
     format_submenu,
+    get_action_copy,
     known_categories,
 )
 from backend.bot.formatters.money import format_money_full
@@ -73,6 +76,9 @@ from backend.services.telegram_service import (
     send_message,
 )
 
+if TYPE_CHECKING:
+    from backend.wealth.services.net_worth_calculator import NetWorthBreakdown
+
 logger = logging.getLogger(__name__)
 
 _dispatcher = IntentDispatcher()
@@ -87,6 +93,8 @@ DASHBOARD_NOT_CONFIGURED_TEXT = (
     "📊 Dashboard chưa sẵn sàng — admin cần cấu hình "
     "`MINIAPP_BASE_URL` trước nhé."
 )
+
+NET_WORTH_WAIT_DELAY_SECONDS = 0.7
 
 
 async def cmd_dashboard(
@@ -505,6 +513,39 @@ async def _send_coming_soon(chat_id: int, category: str, action: str) -> None:
 # -----------------------------------------------------------------
 
 
+async def _send_net_worth_wait(chat_id: int) -> None:
+    """Send the net-worth waiting sentence."""
+    await send_message(
+        chat_id=chat_id,
+        text=get_action_copy("action_assets_net_worth", "recalculating_wait"),
+        parse_mode="Markdown",
+    )
+
+
+async def _calculate_stored_current_with_wait(
+    *, db: AsyncSession, user_id: Any, chat_id: int
+) -> "NetWorthBreakdown":
+    """Calculate stored net worth and show wait copy after 700ms.
+
+    ``wait_for`` keeps the fast path clean: no background sleep task is
+    created unless the calculation actually crosses the threshold.
+    ``shield`` prevents the timeout from cancelling the in-flight DB work.
+    """
+    from backend.wealth.services import net_worth_calculator
+
+    calculation = asyncio.create_task(
+        net_worth_calculator.calculate_stored_current(db, user_id)
+    )
+    try:
+        return await asyncio.wait_for(
+            asyncio.shield(calculation), timeout=NET_WORTH_WAIT_DELAY_SECONDS
+        )
+    except asyncio.TimeoutError:
+        with contextlib.suppress(Exception):
+            await _send_net_worth_wait(chat_id)
+        return await calculation
+
+
 async def _action_assets_net_worth(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -514,13 +555,15 @@ async def _action_assets_net_worth(
     the generic intent dispatcher, historical snapshot comparisons, and live
     market quote refreshes. The slower free-form ``query_net_worth`` handler
     still provides monthly/YTD change context when the user asks in natural
-    language.
+    language. If the stored-current calculation takes at least 700ms, the
+    user gets an explicit waiting sentence before the final total.
     """
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
-    from backend.wealth.services import net_worth_calculator
 
-    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    breakdown = await _calculate_stored_current_with_wait(
+        db=db, user_id=user.id, chat_id=chat_id
+    )
     name = user.display_name or "bạn"
     if breakdown.total <= 0:
         await send_message(
@@ -538,6 +581,8 @@ async def _action_assets_net_worth(
     lines = [
         f"💰 Tổng tài sản của {name}:",
         f"*{format_money_full(breakdown.total)}*",
+        "",
+        get_action_copy("action_assets_net_worth", "market_value_note"),
     ]
     if breakdown.asset_count and not style.is_starter:
         lines.append("")

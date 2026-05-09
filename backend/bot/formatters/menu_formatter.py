@@ -108,6 +108,14 @@ def back_to_main_keyboard() -> dict:
     }
 
 
+def get_action_copy(section: str, key: str) -> str:
+    """Read user-facing copy for direct menu actions from YAML."""
+    value = _load_copy().get(section, {}).get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise KeyError(f"Missing menu action copy: {section}.{key}")
+    return value
+
+
 def known_categories() -> list[str]:
     return [
         key.removeprefix("submenu_")
@@ -122,5 +130,6 @@ __all__ = [
     "back_to_main_keyboard",
     "format_main_menu",
     "format_submenu",
+    "get_action_copy",
     "known_categories",
 ]
