@@ -8,7 +8,10 @@ from decimal import Decimal
 import pytest
 
 from backend.market_data.base import BaseProvider
-from backend.market_data.cache.cache_keys import health_failures_key, health_open_until_key
+from backend.market_data.cache.cache_keys import (
+    health_failures_key,
+    health_open_until_key,
+)
 from backend.market_data.exceptions import ProviderUnavailable
 from backend.market_data.normalizer import PriceQuote
 from backend.market_data.providers.base_dispatcher import Dispatcher
@@ -20,6 +23,7 @@ class ProviderStub(BaseProvider):
         self.name = name
         self.fail_times = fail_times
         self.calls = 0
+        self.batch_calls = 0
 
     @property
     def asset_type(self) -> str:
@@ -39,6 +43,7 @@ class ProviderStub(BaseProvider):
         )
 
     async def fetch_batch(self, symbols: list[str]) -> list[PriceQuote]:
+        self.batch_calls += 1
         return [await self.fetch_quote(symbol) for symbol in symbols]
 
 
@@ -119,3 +124,55 @@ async def test_timeout_is_retryable_and_falls_back():
 
     assert quote.source == "vndirect"
     assert await redis.get(health_failures_key("ssi")) == "1"
+
+
+@pytest.mark.asyncio
+async def test_open_secondary_circuit_is_skipped_immediately():
+    redis = FakeAsyncRedis()
+    primary = ProviderStub("ssi")
+    secondary = ProviderStub("vndirect")
+    await redis.setex(health_open_until_key("ssi"), 300, str(time.time() + 300))
+    await redis.setex(health_open_until_key("vndirect"), 300, str(time.time() + 300))
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    with pytest.raises(ProviderUnavailable):
+        await dispatcher.fetch_quote("VNM")
+
+    assert primary.batch_calls == 0
+    assert primary.calls == 0
+    assert secondary.batch_calls == 0
+    assert secondary.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_batch_uses_provider_batch_once():
+    redis = FakeAsyncRedis()
+    primary = ProviderStub("ssi")
+    secondary = ProviderStub("vndirect")
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    quotes = await dispatcher.fetch_batch(["VNM", "FPT", "HPG"])
+
+    assert [quote.symbol for quote in quotes] == ["VNM", "FPT", "HPG"]
+    assert primary.batch_calls == 1
+    assert primary.calls == 3
+    assert secondary.batch_calls == 0
+    assert secondary.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_batch_skips_open_secondary_circuit():
+    redis = FakeAsyncRedis()
+    primary = ProviderStub("ssi")
+    secondary = ProviderStub("vndirect")
+    await redis.setex(health_open_until_key("ssi"), 300, str(time.time() + 300))
+    await redis.setex(health_open_until_key("vndirect"), 300, str(time.time() + 300))
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    with pytest.raises(ProviderUnavailable):
+        await dispatcher.fetch_batch(["VNM", "FPT", "HPG"])
+
+    assert primary.batch_calls == 0
+    assert primary.calls == 0
+    assert secondary.batch_calls == 0
+    assert secondary.calls == 0
