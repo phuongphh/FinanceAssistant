@@ -10,15 +10,14 @@ Focus on the documented edge cases from issue #70:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, time, timedelta, timezone
-from decimal import Decimal
+from datetime import datetime, time
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from backend import analytics
-from backend.bot.formatters.briefing_formatter import BriefingResult
+from backend.briefing.morning_briefing import EnrichedBriefingResult
 from backend.jobs import morning_briefing_job as job
 from backend.models.user import User
 from backend.wealth.ladder import WealthLevel
@@ -175,8 +174,8 @@ async def test_sends_and_tracks_when_eligible():
     notifier = MagicMock()
     notifier.send_message = AsyncMock(return_value={"ok": True, "result": {}})
 
-    formatter_result = BriefingResult(
-        text="🌅 Sáng Minh ơi", level=WealthLevel.STARTER, char_count=18,
+    briefing_result = EnrichedBriefingResult(
+        text="🌅 Sáng Minh ơi", level=WealthLevel.STARTER,
     )
 
     with patch(
@@ -189,8 +188,8 @@ async def test_sends_and_tracks_when_eligible():
         "backend.jobs.morning_briefing_job.already_sent_today",
         new=AsyncMock(return_value=False),
     ), patch(
-        "backend.jobs.morning_briefing_job.BriefingFormatter.generate_for_user",
-        new=AsyncMock(return_value=formatter_result),
+        "backend.jobs.morning_briefing_job.render_enriched_morning_briefing",
+        new=AsyncMock(return_value=briefing_result),
     ), patch(
         "backend.jobs.morning_briefing_job.get_notifier",
         return_value=notifier,
@@ -226,8 +225,8 @@ async def test_failed_send_does_not_track_sent_event():
     notifier = MagicMock()
     notifier.send_message = AsyncMock(return_value=None)
 
-    formatter_result = BriefingResult(
-        text="x", level=WealthLevel.STARTER, char_count=1,
+    briefing_result = EnrichedBriefingResult(
+        text="x", level=WealthLevel.STARTER,
     )
 
     with patch(
@@ -240,8 +239,8 @@ async def test_failed_send_does_not_track_sent_event():
         "backend.jobs.morning_briefing_job.already_sent_today",
         new=AsyncMock(return_value=False),
     ), patch(
-        "backend.jobs.morning_briefing_job.BriefingFormatter.generate_for_user",
-        new=AsyncMock(return_value=formatter_result),
+        "backend.jobs.morning_briefing_job.render_enriched_morning_briefing",
+        new=AsyncMock(return_value=briefing_result),
     ), patch(
         "backend.jobs.morning_briefing_job.get_notifier",
         return_value=notifier,
@@ -270,11 +269,11 @@ async def test_one_user_failure_does_not_halt_others():
     notifier = MagicMock()
     notifier.send_message = AsyncMock(return_value={"ok": True})
 
-    async def fake_generate(self, db, user):
+    async def fake_generate(db, user):
         if user.id == bad.id:
             raise RuntimeError("boom")
-        return BriefingResult(
-            text="ok", level=WealthLevel.STARTER, char_count=2,
+        return EnrichedBriefingResult(
+            text="ok", level=WealthLevel.STARTER,
         )
 
     with patch(
@@ -287,7 +286,7 @@ async def test_one_user_failure_does_not_halt_others():
         "backend.jobs.morning_briefing_job.already_sent_today",
         new=AsyncMock(return_value=False),
     ), patch(
-        "backend.jobs.morning_briefing_job.BriefingFormatter.generate_for_user",
+        "backend.jobs.morning_briefing_job.render_enriched_morning_briefing",
         new=fake_generate,
     ), patch(
         "backend.jobs.morning_briefing_job.get_notifier",
