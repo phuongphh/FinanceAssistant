@@ -133,10 +133,18 @@ async def calculate_historical(
     return Decimal(total)
 
 
-async def calculate_change(
-    db: AsyncSession, user_id: uuid.UUID, period: str = PERIOD_DAY
+async def calculate_change_from_current(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    current: Decimal,
+    period: str = PERIOD_DAY,
 ) -> NetWorthChange:
-    """Compare current net worth to ``period`` ago.
+    """Compare a known current net worth to ``period`` ago.
+
+    Use this when the caller already calculated the current breakdown.
+    It avoids a second live asset valuation pass in hot paths such as
+    ``query_net_worth`` while preserving the exact historical comparison
+    semantics of :func:`calculate_change`.
 
     Edge cases:
     - User has no historical snapshots → previous=0, change=current
@@ -148,9 +156,7 @@ async def calculate_change(
             f"Unknown period {period!r}; must be one of {list(_PERIOD_DAYS)}"
         )
 
-    current_breakdown = await calculate(db, user_id)
-    current = current_breakdown.total
-
+    current = Decimal(current or 0)
     past = date.today() - timedelta(days=_PERIOD_DAYS[period])
     previous = await calculate_historical(db, user_id, past)
 
@@ -167,4 +173,20 @@ async def calculate_change(
         change_absolute=change_absolute,
         change_percentage=change_pct,
         period_label=_PERIOD_LABELS[period],
+    )
+
+
+async def calculate_change(
+    db: AsyncSession, user_id: uuid.UUID, period: str = PERIOD_DAY
+) -> NetWorthChange:
+    """Compare current net worth to ``period`` ago.
+
+    This compatibility wrapper still computes the current breakdown for
+    callers that only need a one-shot change result. Callers that already
+    have a current total should use :func:`calculate_change_from_current`
+    to avoid duplicate asset queries / live valuations.
+    """
+    current_breakdown = await calculate(db, user_id)
+    return await calculate_change_from_current(
+        db, user_id, current_breakdown.total, period=period
     )
