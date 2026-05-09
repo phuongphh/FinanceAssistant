@@ -625,7 +625,12 @@ class TestNetWorthFastPath:
             raise AssertionError("menu fast path must not query snapshots")
 
         monkeypatch.setattr(
-            net_worth_calculator, "calculate", AsyncMock(return_value=breakdown)
+            net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=breakdown),
+        )
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate", fail_change
         )
         monkeypatch.setattr(
             net_worth_calculator, "calculate_change_from_current", fail_change

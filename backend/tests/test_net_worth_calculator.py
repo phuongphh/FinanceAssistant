@@ -61,6 +61,30 @@ class TestCalculate:
         assert b.by_type["real_estate"] == Decimal("2_000_000_000")
         assert b.largest_asset == ("Nhà Mỹ Đình", Decimal("2_000_000_000"))
 
+    async def test_stored_current_skips_live_market_valuation(self, monkeypatch):
+        async def fail_live_valuation(*_args, **_kwargs):
+            raise AssertionError("stored-current path must not call live valuation")
+
+        monkeypatch.setattr(nwc, "value_stock_holding", fail_live_valuation)
+        monkeypatch.setattr(nwc, "value_crypto_holding", fail_live_valuation)
+        monkeypatch.setattr(
+            "backend.wealth.services.asset_service.get_user_assets",
+            AsyncMock(return_value=[
+                _asset("stock", "VNM", 20_000_000),
+                _asset("crypto", "BTC", 30_000_000),
+                _asset("cash", "VCB", 50_000_000),
+            ]),
+        )
+
+        breakdown = await nwc.calculate_stored_current(MagicMock(), uuid.uuid4())
+
+        assert breakdown.total == Decimal("100_000_000")
+        assert breakdown.asset_count == 3
+        assert breakdown.by_type["stock"] == Decimal("20_000_000")
+        assert breakdown.by_type["crypto"] == Decimal("30_000_000")
+        assert breakdown.by_type["cash"] == Decimal("50_000_000")
+        assert breakdown.largest_asset == ("VCB", Decimal("50_000_000"))
+
 
 @pytest.mark.asyncio
 class TestCalculateHistorical:

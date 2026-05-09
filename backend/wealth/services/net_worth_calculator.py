@@ -103,6 +103,41 @@ async def calculate(
     )
 
 
+async def calculate_stored_current(
+    db: AsyncSession, user_id: uuid.UUID
+) -> NetWorthBreakdown:
+    """Sum active assets from stored ``current_value`` only.
+
+    This intentionally skips live stock/crypto market valuation. Use it for
+    deterministic UI surfaces (for example Telegram menu taps) where latency
+    matters more than refreshing quotes on demand. Rich free-form queries and
+    dashboards can still call :func:`calculate` when they want live pricing.
+    """
+    assets: list[Asset] = await asset_service.get_user_assets(db, user_id)
+    if not assets:
+        return NetWorthBreakdown()
+
+    by_type: dict[str, Decimal] = {}
+    total = Decimal(0)
+    largest_name: str | None = None
+    largest_value = Decimal(0)
+
+    for a in assets:
+        value = Decimal(a.current_value or 0)
+        total += value
+        by_type[a.asset_type] = by_type.get(a.asset_type, Decimal(0)) + value
+        if value > largest_value:
+            largest_value = value
+            largest_name = a.name
+
+    return NetWorthBreakdown(
+        total=total,
+        by_type=by_type,
+        asset_count=len(assets),
+        largest_asset=(largest_name, largest_value),
+    )
+
+
 async def calculate_historical(
     db: AsyncSession, user_id: uuid.UUID, target_date: date
 ) -> Decimal:

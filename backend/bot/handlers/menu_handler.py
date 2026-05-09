@@ -511,15 +511,16 @@ async def _action_assets_net_worth(
     """Fast menu response for ``Tài sản → Tổng tài sản``.
 
     A menu callback has an exact intent, so this path intentionally skips
-    the generic intent dispatcher and historical snapshot comparisons. The
-    slower free-form ``query_net_worth`` handler still provides monthly/YTD
-    change context when the user asks in natural language.
+    the generic intent dispatcher, historical snapshot comparisons, and live
+    market quote refreshes. The slower free-form ``query_net_worth`` handler
+    still provides monthly/YTD change context when the user asks in natural
+    language.
     """
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
     from backend.wealth.services import net_worth_calculator
 
-    breakdown = await net_worth_calculator.calculate(db, user.id)
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     name = user.display_name or "bạn"
     if breakdown.total <= 0:
         await send_message(
