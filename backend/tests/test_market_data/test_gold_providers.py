@@ -334,3 +334,27 @@ async def test_gold_dispatcher_falls_back_from_pnj_json_to_btmc():
 
     assert quote.source == "btmc"
     assert quote.price == Decimal("167500000")
+
+
+@pytest.mark.asyncio
+async def test_pnj_json_fetch_batch_returns_five_menu_products_from_one_payload():
+    fixture = (FIXTURES / "pnj_edge_sample.json").read_text()
+    symbols = [
+        "SJC_GOLD",
+        "RING_24K",
+        "KIM_BAO_24K",
+        "PHUC_LOC_TAI_24K",
+        "PNJ_PHOENIX_24K",
+    ]
+
+    async with _json_client(fixture) as client:
+        quotes = await PNJJSONGoldProvider(client=client).fetch_batch(symbols)
+
+    assert [quote.symbol for quote in quotes] == symbols
+    assert [quote.metadata["pnj_product"] for quote in quotes] == [
+        "Vàng miếng SJC 999.9",
+        "Nhẫn Trơn PNJ 999.9",
+        "Vàng Kim Bảo 999.9",
+        "Vàng Phúc Lộc Tài 999.9",
+        "Vàng PNJ - Phượng Hoàng",
+    ]

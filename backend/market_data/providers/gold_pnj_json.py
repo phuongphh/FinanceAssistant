@@ -23,6 +23,7 @@ Wired as the dispatcher's primary because it cleanly separates SJC bullion
 (`masp=SJC`) from 24K nhẫn (`masp=N24K`) — BTMC quotes the two at parity
 on most days, so PNJ gives more accurate per-product breakdown.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
@@ -43,13 +44,25 @@ from backend.market_data.providers.gold_common import BROWSER_HEADERS, now_utc
 
 _DEFAULT_URL = "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price"
 
-# PNJ-Edge `masp` codes mapped to our normalized symbols. Other masp values
-# (KB, TL, PNJ, 24K, 999, 9920, 22K, 75) refer to PNJ house brands or lower-
-# karat jewelry that don't correspond to canonical SJC bullion / 24K nhẫn.
+# PNJ-Edge `masp` codes mapped to our normalized symbols. The first five
+# rows are the useful 999.9 gold products PNJ exposes for the market menu.
+# Lower-karat jewelry rows (24K, 999, 9920, 22K, 75, ...) remain intentionally
+# unsupported because they are not the user's requested gold shortlist.
 _SYMBOL_TO_MASP: dict[str, str] = {
     "SJC_GOLD": "SJC",
     "RING_24K": "N24K",
+    "KIM_BAO_24K": "KB",
+    "PHUC_LOC_TAI_24K": "TL",
+    "PNJ_PHOENIX_24K": "PNJ",
 }
+
+PNJ_GOLD_MENU_PRODUCTS: tuple[tuple[str, str], ...] = (
+    ("SJC_GOLD", "Vàng SJC"),
+    ("RING_24K", "Vàng nhẫn 24K"),
+    ("KIM_BAO_24K", "Vàng Kim Bảo"),
+    ("PHUC_LOC_TAI_24K", "Vàng Phúc Lộc Tài"),
+    ("PNJ_PHOENIX_24K", "Vàng PNJ Phượng Hoàng"),
+)
 
 # PNJ Edge quotes prices as `int` in thousands of VND per chỉ (1/10 lượng).
 # Multiply by 1,000 to get VND per chỉ, then by 10 to convert per-chỉ to
@@ -117,10 +130,14 @@ class PNJJSONGoldProvider(BaseProvider):
                 f"len={len(response.text)} preview={preview!r}): {exc}"
             ) from exc
         if not isinstance(payload, dict):
-            raise ParserError(f"PNJ Edge: top-level is {type(payload).__name__}, expected object")
+            raise ParserError(
+                f"PNJ Edge: top-level is {type(payload).__name__}, expected object"
+            )
         data = payload.get("data")
         if not isinstance(data, list) or not data:
-            raise ParserError(f"PNJ Edge: missing or empty 'data' (keys: {list(payload.keys())})")
+            raise ParserError(
+                f"PNJ Edge: missing or empty 'data' (keys: {list(payload.keys())})"
+            )
         return data
 
     def _build_quote(self, rows: list[dict[str, Any]], symbol: str) -> PriceQuote:

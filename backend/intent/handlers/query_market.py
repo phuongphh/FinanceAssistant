@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
-from backend.market_data.client import get_crypto_quote, get_gold_quote, get_stock_quote
+from backend.market_data.client import (
+    get_crypto_quote,
+    get_gold_quotes,
+    get_stock_quote,
+)
+from backend.market_data.providers.gold_pnj_json import PNJ_GOLD_MENU_PRODUCTS
 from backend.market_data.normalizer import PriceQuote
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
@@ -166,21 +171,24 @@ class QueryMarketHandler(IntentHandler):
         ticker. Handle it here so the shortcut does not fall into the generic
         "which ticker?" clarification path.
         """
-        symbols = (("SJC_GOLD", "Vàng SJC"), ("RING_24K", "Vàng nhẫn 24K"))
+        symbols = PNJ_GOLD_MENU_PRODUCTS
         lines = ["🥇 *Giá vàng hôm nay:*"]
         had_quote = False
 
+        try:
+            quote_by_symbol = await get_gold_quotes([symbol for symbol, _ in symbols])
+        except Exception as exc:
+            logger.warning(
+                "Unable to fetch gold quote batch (%s): %s",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            quote_by_symbol = {}
+
         for symbol, label in symbols:
-            try:
-                quote = await get_gold_quote(symbol)
-            except Exception as exc:
-                logger.warning(
-                    "Unable to fetch gold quote for %s (%s): %s",
-                    symbol,
-                    type(exc).__name__,
-                    exc,
-                    exc_info=True,
-                )
+            quote = quote_by_symbol.get(symbol)
+            if quote is None:
                 lines.append(f"• {label}: chưa có dữ liệu")
                 continue
 
