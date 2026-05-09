@@ -143,6 +143,12 @@ submenu_assets:
     • "tổng tài sản tôi bao nhiêu?"
     • "danh mục cổ phiếu của tôi"
 
+# Direct-action copy lives next to the Tài sản menu to reduce merge
+# conflicts when unrelated menus are appended later.
+action_assets_net_worth:
+  market_value_note: "tài sản đã được cập nhật theo giá trị thị trường (giá chứng khoán, giá tiền số, giá vàng)"
+  recalculating_wait: "⏳ Mình đang tính lại tài sản theo giá trị thị trường, chờ mình một chút nhé..."
+
 # ============================================================
 # SUB-MENU: CHI TIÊU (Level 2)
 # ============================================================

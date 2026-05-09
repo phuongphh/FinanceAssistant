@@ -47,7 +47,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,6 +75,9 @@ from backend.services.telegram_service import (
     edit_message_text,
     send_message,
 )
+
+if TYPE_CHECKING:
+    from backend.wealth.services.net_worth_calculator import NetWorthBreakdown
 
 logger = logging.getLogger(__name__)
 
@@ -510,14 +513,37 @@ async def _send_coming_soon(chat_id: int, category: str, action: str) -> None:
 # -----------------------------------------------------------------
 
 
-async def _send_delayed_net_worth_wait(chat_id: int) -> None:
-    """Send a waiting sentence only when net-worth calculation is slow."""
-    await asyncio.sleep(NET_WORTH_WAIT_DELAY_SECONDS)
+async def _send_net_worth_wait(chat_id: int) -> None:
+    """Send the net-worth waiting sentence."""
     await send_message(
         chat_id=chat_id,
         text=get_action_copy("action_assets_net_worth", "recalculating_wait"),
         parse_mode="Markdown",
     )
+
+
+async def _calculate_stored_current_with_wait(
+    *, db: AsyncSession, user_id: Any, chat_id: int
+) -> "NetWorthBreakdown":
+    """Calculate stored net worth and show wait copy after 700ms.
+
+    ``wait_for`` keeps the fast path clean: no background sleep task is
+    created unless the calculation actually crosses the threshold.
+    ``shield`` prevents the timeout from cancelling the in-flight DB work.
+    """
+    from backend.wealth.services import net_worth_calculator
+
+    calculation = asyncio.create_task(
+        net_worth_calculator.calculate_stored_current(db, user_id)
+    )
+    try:
+        return await asyncio.wait_for(
+            asyncio.shield(calculation), timeout=NET_WORTH_WAIT_DELAY_SECONDS
+        )
+    except asyncio.TimeoutError:
+        with contextlib.suppress(Exception):
+            await _send_net_worth_wait(chat_id)
+        return await calculation
 
 
 async def _action_assets_net_worth(
@@ -534,23 +560,10 @@ async def _action_assets_net_worth(
     """
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
-    from backend.wealth.services import net_worth_calculator
 
-    loop = asyncio.get_running_loop()
-    started_at = loop.time()
-    wait_task = asyncio.create_task(_send_delayed_net_worth_wait(chat_id))
-    try:
-        breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
-    finally:
-        elapsed = loop.time() - started_at
-        if elapsed < NET_WORTH_WAIT_DELAY_SECONDS and not wait_task.done():
-            wait_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await wait_task
-        else:
-            with contextlib.suppress(Exception):
-                await wait_task
-
+    breakdown = await _calculate_stored_current_with_wait(
+        db=db, user_id=user.id, chat_id=chat_id
+    )
     name = user.display_name or "bạn"
     if breakdown.total <= 0:
         await send_message(
