@@ -122,6 +122,27 @@ class TestCalculateChange:
         # No baseline — display flat 0% rather than +inf%.
         assert change.change_percentage == 0.0
 
+    async def test_change_from_current_skips_current_recalculation(self, monkeypatch):
+        async def fail_calculate(*_args, **_kwargs):
+            raise AssertionError("calculate() should not be called")
+
+        monkeypatch.setattr(nwc, "calculate", fail_calculate)
+        result = MagicMock()
+        result.scalar.return_value = Decimal("80_000_000")
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        change = await nwc.calculate_change_from_current(
+            db, uuid.uuid4(), Decimal("100_000_000"), period="month"
+        )
+
+        assert change.current == Decimal("100_000_000")
+        assert change.previous == Decimal("80_000_000")
+        assert change.change_absolute == Decimal("20_000_000")
+        assert change.change_percentage == 25.0
+        assert change.period_label == "tháng trước"
+        db.execute.assert_awaited_once()
+
     async def test_unknown_period_raises(self, monkeypatch):
         monkeypatch.setattr(
             "backend.wealth.services.asset_service.get_user_assets",

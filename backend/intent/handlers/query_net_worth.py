@@ -29,8 +29,11 @@ class QueryNetWorthHandler(IntentHandler):
         level = detect_level(breakdown.total)
         style = style_for_level(level, breakdown.total)
 
-        change = await net_worth_calculator.calculate_change(
-            db, user.id, period=net_worth_calculator.PERIOD_MONTH
+        change = await net_worth_calculator.calculate_change_from_current(
+            db,
+            user.id,
+            breakdown.total,
+            period=net_worth_calculator.PERIOD_MONTH,
         )
 
         name = user.display_name or "bạn"
@@ -55,8 +58,11 @@ class QueryNetWorthHandler(IntentHandler):
         # year-period approximation from net_worth_calculator.
         if style.show_ytd_return:
             try:
-                yearly = await net_worth_calculator.calculate_change(
-                    db, user.id, period=net_worth_calculator.PERIOD_YEAR
+                yearly = await net_worth_calculator.calculate_change_from_current(
+                    db,
+                    user.id,
+                    breakdown.total,
+                    period=net_worth_calculator.PERIOD_YEAR,
                 )
             except ValueError:
                 yearly = None
