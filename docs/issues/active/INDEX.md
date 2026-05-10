@@ -33,5 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #353 | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [issue-353.md](issue-353.md) |
 | #354 | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [issue-354.md](issue-354.md) |
 | #355 | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [issue-355.md](issue-355.md) |
+| #356 | [Story] P3.9.5-S18: Helper utility render animation emoji | [issue-356.md](issue-356.md) |
 
-**Total active:** 29
+**Total active:** 30
