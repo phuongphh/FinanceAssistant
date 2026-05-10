@@ -4,10 +4,11 @@ We mock ``asset_service.get_user_assets`` (sync-replace via monkeypatch)
 and ``db.execute`` so we can exercise the breakdown / historical /
 change paths without a real Postgres.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -46,12 +47,14 @@ class TestCalculate:
     async def test_breakdown_by_type(self, monkeypatch):
         monkeypatch.setattr(
             "backend.wealth.services.asset_service.get_user_assets",
-            AsyncMock(return_value=[
-                _asset("cash", "VCB", 50_000_000),
-                _asset("cash", "MoMo", 5_000_000),
-                _asset("stock", "VNM", 20_000_000),
-                _asset("real_estate", "Nhà Mỹ Đình", 2_000_000_000),
-            ]),
+            AsyncMock(
+                return_value=[
+                    _asset("cash", "VCB", 50_000_000),
+                    _asset("cash", "MoMo", 5_000_000),
+                    _asset("stock", "VNM", 20_000_000),
+                    _asset("real_estate", "Nhà Mỹ Đình", 2_000_000_000),
+                ]
+            ),
         )
         b = await nwc.calculate(MagicMock(), uuid.uuid4())
         assert b.total == Decimal("2_075_000_000")
@@ -69,11 +72,13 @@ class TestCalculate:
         monkeypatch.setattr(nwc, "value_crypto_holding", fail_live_valuation)
         monkeypatch.setattr(
             "backend.wealth.services.asset_service.get_user_assets",
-            AsyncMock(return_value=[
-                _asset("stock", "VNM", 20_000_000),
-                _asset("crypto", "BTC", 30_000_000),
-                _asset("cash", "VCB", 50_000_000),
-            ]),
+            AsyncMock(
+                return_value=[
+                    _asset("stock", "VNM", 20_000_000),
+                    _asset("crypto", "BTC", 30_000_000),
+                    _asset("cash", "VCB", 50_000_000),
+                ]
+            ),
         )
 
         breakdown = await nwc.calculate_stored_current(MagicMock(), uuid.uuid4())
@@ -94,9 +99,7 @@ class TestCalculateHistorical:
         db = MagicMock()
         db.execute = AsyncMock(return_value=result)
 
-        total = await nwc.calculate_historical(
-            db, uuid.uuid4(), date(2026, 4, 1)
-        )
+        total = await nwc.calculate_historical(db, uuid.uuid4(), date(2026, 4, 1))
         assert total == Decimal("123_000_000")
 
     async def test_no_snapshots_returns_zero(self):
@@ -104,9 +107,7 @@ class TestCalculateHistorical:
         result.scalar.return_value = None
         db = MagicMock()
         db.execute = AsyncMock(return_value=result)
-        total = await nwc.calculate_historical(
-            db, uuid.uuid4(), date(2026, 4, 1)
-        )
+        total = await nwc.calculate_historical(db, uuid.uuid4(), date(2026, 4, 1))
         assert total == Decimal(0)
 
 
@@ -197,3 +198,67 @@ class TestCalculateChange:
 
         change = await nwc.calculate_change(db, uuid.uuid4(), period=period)
         assert change.period_label == label
+
+
+@pytest.mark.asyncio
+async def test_calculate_ytd_return_uses_jan_1_baseline(monkeypatch):
+    historical = AsyncMock(return_value=Decimal("100000000"))
+    monkeypatch.setattr(nwc, "calculate_historical", historical)
+
+    db = object()
+    result = await nwc.calculate_ytd_return_from_current(
+        db=db,
+        user_id="user-1",
+        current=Decimal("125000000"),
+        account_created_at=datetime(2025, 6, 1),
+        today=date(2026, 5, 10),
+    )
+
+    assert result.base == Decimal("100000000")
+    assert result.change_percentage == 25.0
+    assert result.period_label == "YTD"
+    assert result.is_join_date_fallback is False
+    historical.assert_awaited_once_with(db, "user-1", date(2026, 1, 1))
+
+
+@pytest.mark.asyncio
+async def test_calculate_ytd_return_falls_back_to_join_date(monkeypatch):
+    calls = []
+
+    async def fake_historical(db, user_id, target_date):
+        calls.append((db, user_id, target_date))
+        return Decimal("50000000")
+
+    monkeypatch.setattr(nwc, "calculate_historical", fake_historical)
+
+    result = await nwc.calculate_ytd_return_from_current(
+        db="db",
+        user_id="user-1",
+        current=Decimal("55000000"),
+        account_created_at=datetime(2026, 3, 2),
+        today=date(2026, 5, 10),
+    )
+
+    assert result.period_label == "Từ ngày tham gia"
+    assert result.is_join_date_fallback is True
+    assert result.change_percentage == 10.0
+    assert calls == [("db", "user-1", date(2026, 3, 2))]
+
+
+@pytest.mark.asyncio
+async def test_calculate_ytd_return_zero_base_returns_none(monkeypatch):
+    monkeypatch.setattr(
+        nwc,
+        "calculate_historical",
+        AsyncMock(return_value=Decimal("0")),
+    )
+
+    result = await nwc.calculate_ytd_return_from_current(
+        db="db",
+        user_id="user-1",
+        current=Decimal("55000000"),
+        today=date(2026, 5, 10),
+    )
+
+    assert result.change_percentage is None
+    assert result.change_absolute == Decimal("55000000")

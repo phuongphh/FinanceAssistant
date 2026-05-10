@@ -4,10 +4,11 @@ Exercises the response shape (Vietnamese tone, key facts present) +
 empty-state behaviour. DB interactions are stubbed via the existing
 fake-session pattern from test_asset_service.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
@@ -21,6 +22,7 @@ def _user(name: str = "An") -> MagicMock:
     user.id = uuid.uuid4()
     user.display_name = name
     user.monthly_income = None
+    user.created_at = datetime(2025, 1, 1)
     return user
 
 
@@ -70,12 +72,15 @@ async def test_query_assets_handler_lists_all_types():
     from backend.intent.handlers.query_assets import QueryAssetsHandler
 
     assets = [
-        _fake_asset(name="VCB savings", asset_type="cash",
-                    current_value=Decimal("80000000")),
-        _fake_asset(name="VNM 100 cổ", asset_type="stock",
-                    current_value=Decimal("4500000")),
-        _fake_asset(name="Nhà Q1", asset_type="real_estate",
-                    current_value=Decimal("3000000000")),
+        _fake_asset(
+            name="VCB savings", asset_type="cash", current_value=Decimal("80000000")
+        ),
+        _fake_asset(
+            name="VNM 100 cổ", asset_type="stock", current_value=Decimal("4500000")
+        ),
+        _fake_asset(
+            name="Nhà Q1", asset_type="real_estate", current_value=Decimal("3000000000")
+        ),
     ]
     with patch(
         "backend.intent.handlers.query_assets.asset_service.get_user_assets",
@@ -152,13 +157,16 @@ async def test_query_assets_handler_crypto_uses_market_prices():
     async def fake_value_crypto_holding(asset):
         return valuations[asset.extra["symbol"]]
 
-    with patch(
-        "backend.intent.handlers.query_assets.asset_service.get_user_assets",
-        AsyncMock(return_value=assets),
-    ), patch(
-        "backend.intent.handlers.query_assets.value_crypto_holding",
-        AsyncMock(side_effect=fake_value_crypto_holding),
-    ) as value_mock:
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=assets),
+        ),
+        patch(
+            "backend.intent.handlers.query_assets.value_crypto_holding",
+            AsyncMock(side_effect=fake_value_crypto_holding),
+        ) as value_mock,
+    ):
         intent = IntentResult(
             intent=IntentType.QUERY_ASSETS,
             confidence=0.95,
@@ -214,12 +222,15 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
     calculate_mock = AsyncMock(return_value=breakdown)
     change_mock = AsyncMock(return_value=change)
 
-    with patch(
-        "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
-        calculate_mock,
-    ), patch(
-        "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
-        change_mock,
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            calculate_mock,
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            change_mock,
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_NET_WORTH,
@@ -232,9 +243,110 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
     assert "tháng trước" in response
     assert "📈" in response or "📉" in response
     calculate_mock.assert_awaited_once()
-    change_mock.assert_awaited_once_with(
-        ANY, ANY, Decimal("500000000"), period="month"
+    change_mock.assert_awaited_once_with(ANY, ANY, Decimal("500000000"), period="month")
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_shows_true_ytd_for_hnw():
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+    from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal("1500000000")
+    breakdown.asset_count = 5
+
+    change = MagicMock()
+    change.previous = Decimal("1400000000")
+    change.change_absolute = Decimal("100000000")
+    change.change_percentage = 7.14
+    change.period_label = "tháng trước"
+
+    ytd = NetWorthYtdReturn(
+        current=Decimal("1500000000"),
+        base=Decimal("1200000000"),
+        change_absolute=Decimal("300000000"),
+        change_percentage=25.0,
+        period_label="YTD",
     )
+
+    ytd_mock = AsyncMock(return_value=ytd)
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            AsyncMock(return_value=breakdown),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            AsyncMock(return_value=change),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_ytd_return_from_current",
+            ytd_mock,
+        ),
+    ):
+        user = _user("An")
+        user.created_at = datetime(2024, 1, 1)
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="tổng tài sản",
+        )
+        response = await QueryNetWorthHandler().handle(intent, user, _fake_db())
+
+    assert "📈 YTD: +25.0%" in response
+    ytd_mock.assert_awaited_once_with(
+        ANY, user.id, Decimal("1500000000"), account_created_at=user.created_at
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_shows_dash_for_zero_ytd_base():
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+    from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal("1500000000")
+    breakdown.asset_count = 5
+
+    change = MagicMock()
+    change.previous = Decimal("1400000000")
+    change.change_absolute = Decimal("100000000")
+    change.change_percentage = 7.14
+    change.period_label = "tháng trước"
+
+    ytd = NetWorthYtdReturn(
+        current=Decimal("1500000000"),
+        base=Decimal("0"),
+        change_absolute=Decimal("1500000000"),
+        change_percentage=None,
+        period_label="Từ ngày tham gia",
+        is_join_date_fallback=True,
+    )
+
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            AsyncMock(return_value=breakdown),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            AsyncMock(return_value=change),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_ytd_return_from_current",
+            AsyncMock(return_value=ytd),
+        ),
+    ):
+        user = _user("An")
+        user.created_at = datetime(2026, 2, 1)
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="tổng tài sản",
+        )
+        response = await QueryNetWorthHandler().handle(intent, user, _fake_db())
+
+    assert "Từ ngày tham gia: —" in response
 
 
 @pytest.mark.asyncio
@@ -265,12 +377,14 @@ def _young_prof_style():
     """Young Professional level style — shows P&L, hides allocation %."""
     from backend.intent.wealth_adapt import style_for_level
     from backend.wealth.ladder import WealthLevel
+
     return style_for_level(WealthLevel.YOUNG_PROFESSIONAL, Decimal("100000000"))
 
 
 def _starter_style():
     from backend.intent.wealth_adapt import style_for_level
     from backend.wealth.ladder import WealthLevel
+
     return style_for_level(WealthLevel.STARTER, Decimal("10000000"))
 
 
@@ -287,12 +401,15 @@ async def test_query_portfolio_handler_shows_positions_and_pnl():
             extra={"ticker": "VNM", "quantity": 100},
         ),
     ]
-    with patch(
-        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
-        AsyncMock(return_value=stocks),
-    ), patch(
-        "backend.intent.handlers.query_portfolio.resolve_style",
-        AsyncMock(return_value=_young_prof_style()),
+    with (
+        patch(
+            "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+            AsyncMock(return_value=stocks),
+        ),
+        patch(
+            "backend.intent.handlers.query_portfolio.resolve_style",
+            AsyncMock(return_value=_young_prof_style()),
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_PORTFOLIO,
@@ -330,12 +447,15 @@ async def test_query_portfolio_handler_renders_funds_with_ccq_unit():
             extra={"ticker": "VNM", "quantity": 100},
         ),
     ]
-    with patch(
-        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
-        AsyncMock(return_value=holdings),
-    ), patch(
-        "backend.intent.handlers.query_portfolio.resolve_style",
-        AsyncMock(return_value=_young_prof_style()),
+    with (
+        patch(
+            "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+            AsyncMock(return_value=holdings),
+        ),
+        patch(
+            "backend.intent.handlers.query_portfolio.resolve_style",
+            AsyncMock(return_value=_young_prof_style()),
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_PORTFOLIO,
@@ -382,12 +502,15 @@ async def test_query_portfolio_handler_lists_gold_assets_when_requested():
             extra={"quantity": 2, "current_price": 92000000},
         ),
     ]
-    with patch(
-        "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
-        AsyncMock(return_value=gold_assets),
-    ) as mock_get, patch(
-        "backend.intent.handlers.query_portfolio.resolve_style",
-        AsyncMock(return_value=_young_prof_style()),
+    with (
+        patch(
+            "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+            AsyncMock(return_value=gold_assets),
+        ) as mock_get,
+        patch(
+            "backend.intent.handlers.query_portfolio.resolve_style",
+            AsyncMock(return_value=_young_prof_style()),
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_PORTFOLIO,
@@ -664,8 +787,12 @@ async def test_query_goals_lists_with_progress_bars():
     # Phase 3.8 Epic 5: ``goal_name`` → ``name``, ``deadline`` →
     # ``target_date`` on the model.
     goals = [
-        MagicMock(name="Mua xe", target_amount=Decimal("500000000"),
-                  current_amount=Decimal("100000000"), target_date=None),
+        MagicMock(
+            name="Mua xe",
+            target_amount=Decimal("500000000"),
+            current_amount=Decimal("100000000"),
+            target_date=None,
+        ),
     ]
     # ``MagicMock(name=...)`` sets the mock's *repr* name, not the
     # ``.name`` attribute. Set explicitly so the handler reads it.
@@ -705,12 +832,17 @@ async def test_query_goal_progress_finds_named_goal():
 
     # Phase 3.8 Epic 5 renames; explicit .name= because MagicMock's
     # ``name`` kwarg sets repr, not the attribute.
-    g1 = MagicMock(target_amount=Decimal("500000000"),
-                   current_amount=Decimal("100000000"),
-                   target_date=date(2027, 12, 31))
+    g1 = MagicMock(
+        target_amount=Decimal("500000000"),
+        current_amount=Decimal("100000000"),
+        target_date=date(2027, 12, 31),
+    )
     g1.name = "Mua xe"
-    g2 = MagicMock(target_amount=Decimal("3000000000"),
-                   current_amount=Decimal("0"), target_date=None)
+    g2 = MagicMock(
+        target_amount=Decimal("3000000000"),
+        current_amount=Decimal("0"),
+        target_date=None,
+    )
     g2.name = "Mua nhà"
     goals = [g1, g2]
     with patch(
@@ -741,12 +873,14 @@ async def test_query_income_lists_streams():
     # so we mock it to match the raw amount for monthly streams.
     streams = [
         MagicMock(
-            stream_type="salary", name="Lương FPT",
+            stream_type="salary",
+            name="Lương FPT",
             amount=Decimal("30000000"),
             monthly_equivalent=Decimal("30000000"),
         ),
         MagicMock(
-            stream_type="dividend", name="Cổ tức VNM",
+            stream_type="dividend",
+            name="Cổ tức VNM",
             amount=Decimal("500000"),
             monthly_equivalent=Decimal("500000"),
         ),

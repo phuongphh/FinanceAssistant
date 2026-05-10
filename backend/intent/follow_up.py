@@ -18,6 +18,7 @@ Dedup
 about — no point offering "view your assets" when they just saw their
 assets.
 """
+
 from __future__ import annotations
 
 import json
@@ -59,6 +60,7 @@ _CODE_TO_INTENT: dict[str, IntentType] = {v: k for k, v in _INTENT_TO_CODE.items
 @dataclass(frozen=True)
 class FollowUp:
     """One follow-up suggestion — label + the intent it triggers."""
+
     label: str
     intent: IntentType
     parameters: dict | None = None
@@ -75,9 +77,13 @@ class FollowUp:
         code = _INTENT_TO_CODE.get(self.intent, self.intent.value[:8])
         if not self.parameters:
             return f"{CALLBACK_PREFIX}{code}"
-        encoded = urlsafe_b64encode(
-            json.dumps(self.parameters, separators=(",", ":")).encode()
-        ).decode().rstrip("=")
+        encoded = (
+            urlsafe_b64encode(
+                json.dumps(self.parameters, separators=(",", ":")).encode()
+            )
+            .decode()
+            .rstrip("=")
+        )
         return f"{CALLBACK_PREFIX}{code}.{encoded}"
 
 
@@ -93,7 +99,6 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("📈 Cổ phiếu", IntentType.QUERY_PORTFOLIO),
     ),
     IntentType.QUERY_NET_WORTH: (
-        FollowUp("📊 Phân bổ chi tiết", IntentType.QUERY_ASSETS),
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
         FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS),
     ),
@@ -105,10 +110,16 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
     IntentType.QUERY_EXPENSES: (
         FollowUp("📅 Tuần này", IntentType.QUERY_EXPENSES, {"time_range": "this_week"}),
         FollowUp("🍕 Theo loại", IntentType.QUERY_EXPENSES_BY_CATEGORY),
-        FollowUp("📊 So sánh tháng trước", IntentType.QUERY_EXPENSES, {"time_range": "last_month"}),
+        FollowUp(
+            "📊 So sánh tháng trước",
+            IntentType.QUERY_EXPENSES,
+            {"time_range": "last_month"},
+        ),
     ),
     IntentType.QUERY_EXPENSES_BY_CATEGORY: (
-        FollowUp("📅 Tháng trước", IntentType.QUERY_EXPENSES, {"time_range": "last_month"}),
+        FollowUp(
+            "📅 Tháng trước", IntentType.QUERY_EXPENSES, {"time_range": "last_month"}
+        ),
         FollowUp("📊 Tổng chi tiêu", IntentType.QUERY_EXPENSES),
         FollowUp("🍕 Loại khác", IntentType.QUERY_EXPENSES_BY_CATEGORY),
     ),
@@ -142,9 +153,7 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
 
 # Wealth-level overrides — Starter gets gentler "how do I add" prompts,
 # HNW gets analytics-first prompts. Missing entries fall back to base.
-_LEVEL_OVERRIDES: dict[
-    tuple[IntentType, WealthLevel], tuple[FollowUp, ...]
-] = {
+_LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     (IntentType.QUERY_ASSETS, WealthLevel.STARTER): (
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
         FollowUp("💎 Net worth tổng", IntentType.QUERY_NET_WORTH),
@@ -155,13 +164,11 @@ _LEVEL_OVERRIDES: dict[
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
     (IntentType.QUERY_ASSETS, WealthLevel.HIGH_NET_WORTH): (
-        FollowUp("📊 Phân bổ chi tiết", IntentType.QUERY_NET_WORTH),
         FollowUp("📈 YTD return", IntentType.QUERY_PORTFOLIO),
         FollowUp("💼 Portfolio detail", IntentType.QUERY_PORTFOLIO),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.HIGH_NET_WORTH): (
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("📊 Phân bổ chi tiết", IntentType.QUERY_ASSETS),
         FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
     ),
 }
@@ -248,7 +255,7 @@ def parse_callback_data(callback_data: str) -> FollowUp | None:
     """
     if not callback_data.startswith(CALLBACK_PREFIX):
         return None
-    rest = callback_data[len(CALLBACK_PREFIX):]
+    rest = callback_data[len(CALLBACK_PREFIX) :]
     if "." in rest:
         code, encoded = rest.split(".", 1)
     else:

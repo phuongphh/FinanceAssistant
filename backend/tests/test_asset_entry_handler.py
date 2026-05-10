@@ -7,6 +7,7 @@ Telegram + DB are mocked; we focus on:
 - Cancel clears state
 - Parse failures re-prompt without dropping wizard state
 """
+
 from __future__ import annotations
 
 import uuid
@@ -63,33 +64,43 @@ def _asset(asset_type: str = "cash", value: int = 100_000_000) -> Asset:
 # Cash flow
 # -----------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_cash_amount_input_parses_label_and_creates_asset():
-    user = _user({
-        "flow": asset_entry.FLOW_CASH,
-        "step": "amount",
-        "draft": {"asset_type": "cash", "subtype": "bank_savings"},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "amount",
+            "draft": {"asset_type": "cash", "subtype": "bank_savings"},
+        }
+    )
     db = _db(user)
     created = _asset()
 
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("100_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear",
-                      AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("100_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
-            {"text": "VCB 100 triệu", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "VCB 100 triệu", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is True
     create_mock.assert_awaited_once()
@@ -110,22 +121,27 @@ async def test_cash_amount_input_rejects_negative_with_warm_message():
     reply must be the specific "must be > 0" message — not the generic
     "couldn't parse" one.
     """
-    user = _user({
-        "flow": asset_entry.FLOW_CASH,
-        "step": "amount",
-        "draft": {"asset_type": "cash", "subtype": "bank_savings"},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "amount",
+            "draft": {"asset_type": "cash", "subtype": "bank_savings"},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock()) as create_mock, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send, \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock()
+        ) as create_mock,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
-            {"text": "VCB -100 triệu", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "VCB -100 triệu", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is True
     create_mock.assert_not_awaited()
@@ -137,22 +153,27 @@ async def test_cash_amount_input_rejects_negative_with_warm_message():
 
 @pytest.mark.asyncio
 async def test_cash_amount_input_parse_fails_keeps_wizard_open():
-    user = _user({
-        "flow": asset_entry.FLOW_CASH,
-        "step": "amount",
-        "draft": {"asset_type": "cash", "subtype": "bank_savings"},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "amount",
+            "draft": {"asset_type": "cash", "subtype": "bank_savings"},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock()) as create_mock, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send, \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock()
+        ) as create_mock,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
-            {"text": "blah blah", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "blah blah", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is True
     create_mock.assert_not_awaited()
@@ -164,23 +185,33 @@ async def test_cash_amount_input_parse_fails_keeps_wizard_open():
 # Stock flow — ticker step
 # -----------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_stock_ticker_normalised_uppercase():
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "ticker",
-        "draft": {"asset_type": "stock", "subtype": "vn_stock", "extra": {"exchange": "HOSE"}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "ticker",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "vn_stock",
+                "extra": {"exchange": "HOSE"},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
-            {"text": "vnm stocks", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "vnm stocks", "chat": {"id": 100}, "from": {"id": 100}},
         )
     update_step.assert_awaited_once()
     patch_kwargs = update_step.await_args.kwargs
@@ -191,38 +222,49 @@ async def test_stock_ticker_normalised_uppercase():
 
 @pytest.mark.asyncio
 async def test_stock_ticker_rejects_garbage():
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "ticker",
-        "draft": {"extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "ticker",
+            "draft": {"extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
-            {"text": "!!!?", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "!!!?", "chat": {"id": 100}, "from": {"id": 100}},
         )
     update_step.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_stock_quantity_rejects_non_integer():
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "quantity",
-        "draft": {"extra": {"ticker": "VNM"}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "quantity",
+            "draft": {"extra": {"ticker": "VNM"}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "abc", "chat": {"id": 100}, "from": {"id": 100}},
@@ -232,17 +274,23 @@ async def test_stock_quantity_rejects_non_integer():
 
 @pytest.mark.asyncio
 async def test_stock_quantity_accepts_with_separators():
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "quantity",
-        "draft": {"extra": {"ticker": "VNM"}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "quantity",
+            "draft": {"extra": {"ticker": "VNM"}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "1,000", "chat": {"id": 100}, "from": {"id": 100}},
@@ -251,21 +299,22 @@ async def test_stock_quantity_accepts_with_separators():
     assert patch_kwargs["draft_patch"]["extra"]["quantity"] == 1000
 
 
-
-
 # -----------------------------------------------------------------
 # Crypto flow
 # -----------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_callback_type_picker_routes_to_crypto_starter():
     user = _user()
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry, "_start_crypto_subtype_pick",
-                      AsyncMock()) as starter, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry, "_start_crypto_subtype_pick", AsyncMock()) as starter,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -280,18 +329,24 @@ async def test_callback_type_picker_routes_to_crypto_starter():
 
 @pytest.mark.asyncio
 async def test_crypto_subtype_bitcoin_advances_to_quantity():
-    user = _user({
-        "flow": asset_entry.FLOW_CRYPTO,
-        "step": "subtype",
-        "draft": {"asset_type": "crypto", "extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CRYPTO,
+            "step": "subtype",
+            "draft": {"asset_type": "crypto", "extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -309,39 +364,50 @@ async def test_crypto_subtype_bitcoin_advances_to_quantity():
 
 @pytest.mark.asyncio
 async def test_crypto_current_price_same_creates_asset():
-    user = _user({
-        "flow": asset_entry.FLOW_CRYPTO,
-        "step": "current_price",
-        "draft": {
-            "asset_type": "crypto",
-            "subtype": "bitcoin",
-            "name": "BTC",
-            "initial_value": float(Decimal("100000000")),
-            "extra": {
-                "symbol": "BTC",
-                "ticker": "BTC",
-                "quantity": 0.05,
-                "avg_price": float(Decimal("2000000000")),
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CRYPTO,
+            "step": "current_price",
+            "draft": {
+                "asset_type": "crypto",
+                "subtype": "bitcoin",
+                "name": "BTC",
+                "initial_value": float(Decimal("100000000")),
+                "extra": {
+                    "symbol": "BTC",
+                    "ticker": "BTC",
+                    "quantity": 0.05,
+                    "avg_price": float(Decimal("2000000000")),
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="crypto", value=100_000_000)
     created.subtype = "bitcoin"
     created.name = "BTC"
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("100_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("100_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -365,15 +431,18 @@ async def test_crypto_current_price_same_creates_asset():
 # Gold flow
 # -----------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_callback_type_picker_routes_to_gold_starter():
     user = _user()
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry, "_start_gold_subtype_pick",
-                      AsyncMock()) as starter, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry, "_start_gold_subtype_pick", AsyncMock()) as starter,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -388,18 +457,24 @@ async def test_callback_type_picker_routes_to_gold_starter():
 
 @pytest.mark.asyncio
 async def test_gold_subtype_pick_advances_to_quantity():
-    user = _user({
-        "flow": asset_entry.FLOW_GOLD,
-        "step": "subtype",
-        "draft": {"asset_type": "gold", "extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_GOLD,
+            "step": "subtype",
+            "draft": {"asset_type": "gold", "extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -418,17 +493,23 @@ async def test_gold_subtype_pick_advances_to_quantity():
 
 @pytest.mark.asyncio
 async def test_gold_quantity_accepts_chi_and_stores_tael_and_grams():
-    user = _user({
-        "flow": asset_entry.FLOW_GOLD,
-        "step": "quantity",
-        "draft": {"asset_type": "gold", "subtype": "sjc", "extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_GOLD,
+            "step": "quantity",
+            "draft": {"asset_type": "gold", "subtype": "sjc", "extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "5 chỉ", "chat": {"id": 100}, "from": {"id": 100}},
@@ -443,41 +524,52 @@ async def test_gold_quantity_accepts_chi_and_stores_tael_and_grams():
 
 @pytest.mark.asyncio
 async def test_gold_current_price_same_creates_asset():
-    user = _user({
-        "flow": asset_entry.FLOW_GOLD,
-        "step": "current_price",
-        "draft": {
-            "asset_type": "gold",
-            "subtype": "sjc",
-            "name": "Vàng SJC",
-            "initial_value": float(Decimal("180000000")),
-            "extra": {
-                "type": "SJC",
-                "symbol": "SJC_GOLD",
-                "quantity": 2.0,
-                "tael": 2.0,
-                "weight_gram": 75.0,
-                "avg_price": float(Decimal("90000000")),
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_GOLD,
+            "step": "current_price",
+            "draft": {
+                "asset_type": "gold",
+                "subtype": "sjc",
+                "name": "Vàng SJC",
+                "initial_value": float(Decimal("180000000")),
+                "extra": {
+                    "type": "SJC",
+                    "symbol": "SJC_GOLD",
+                    "quantity": 2.0,
+                    "tael": 2.0,
+                    "weight_gram": 75.0,
+                    "avg_price": float(Decimal("90000000")),
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="gold", value=180_000_000)
     created.subtype = "sjc"
     created.name = "Vàng SJC"
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("180000000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("180000000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -496,25 +588,35 @@ async def test_gold_current_price_same_creates_asset():
     assert kwargs["current_value"] == Decimal("180000000.0")
     assert kwargs["extra"]["symbol"] == "SJC_GOLD"
 
+
 # -----------------------------------------------------------------
 # Real estate flow
 # -----------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_stock_subtype_pick_seeds_usd_currency_for_foreign_stock():
     """Picking 'foreign_stock' must seed extra.currency=USD + fx_rate
     so downstream price prompts and the saver know to convert."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "subtype",
-        "draft": {"asset_type": "stock", "extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "subtype",
+            "draft": {"asset_type": "stock", "extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry._handle_stock_subtype_pick(
-            db, 100, user, "foreign_stock",
+            db,
+            100,
+            user,
+            "foreign_stock",
         )
     patch_kwargs = update_step.await_args.kwargs
     assert patch_kwargs["draft_patch"]["subtype"] == "foreign_stock"
@@ -526,17 +628,25 @@ async def test_stock_subtype_pick_seeds_usd_currency_for_foreign_stock():
 @pytest.mark.asyncio
 async def test_stock_subtype_pick_no_currency_for_vn_stock():
     """vn_stock must NOT get a currency tag — the saver branches on it."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "subtype",
-        "draft": {"asset_type": "stock", "extra": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "subtype",
+            "draft": {"asset_type": "stock", "extra": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry._handle_stock_subtype_pick(
-            db, 100, user, "vn_stock",
+            db,
+            100,
+            user,
+            "vn_stock",
         )
     extra = update_step.await_args.kwargs["draft_patch"]["extra"]
     assert "currency" not in extra
@@ -546,18 +656,25 @@ async def test_stock_subtype_pick_no_currency_for_vn_stock():
 @pytest.mark.asyncio
 async def test_fund_quantity_prompt_uses_chung_chi_quy():
     """Fund subtype must prompt with 'chứng chỉ quỹ', not 'cổ phiếu'."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "quantity",
-        "draft": {"asset_type": "stock", "subtype": "fund",
-                  "extra": {"ticker": "VESAF"}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "quantity",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "fund",
+                "extra": {"ticker": "VESAF"},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "100", "chat": {"id": 100}, "from": {"id": 100}},
@@ -570,18 +687,25 @@ async def test_fund_quantity_prompt_uses_chung_chi_quy():
 @pytest.mark.asyncio
 async def test_fund_avg_price_confirm_uses_ccq_suffix():
     """Per-unit price confirmation should read '/ccq' for funds, '/cp' for stocks."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "avg_price",
-        "draft": {"asset_type": "stock", "subtype": "fund",
-                  "extra": {"ticker": "VESAF", "quantity": 100}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "avg_price",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "fund",
+                "extra": {"ticker": "VESAF", "quantity": 100},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "15000", "chat": {"id": 100}, "from": {"id": 100}},
@@ -596,20 +720,32 @@ async def test_fund_avg_price_confirm_uses_ccq_suffix():
 async def test_foreign_stock_avg_price_parses_usd_and_converts_to_vnd():
     """Typing '150' on a foreign-stock avg-price step must be read as USD,
     converted with USD_VND_RATE, and saved as float VND in extra.avg_price."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "avg_price",
-        "draft": {"asset_type": "stock", "subtype": "foreign_stock",
-                  "extra": {"ticker": "AAPL", "quantity": 10,
-                            "currency": "USD",
-                            "fx_rate_vnd": float(asset_entry.USD_VND_RATE)}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "avg_price",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "foreign_stock",
+                "extra": {
+                    "ticker": "AAPL",
+                    "quantity": 10,
+                    "currency": "USD",
+                    "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
+                },
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "150", "chat": {"id": 100}, "from": {"id": 100}},
@@ -632,19 +768,27 @@ async def test_foreign_stock_avg_price_parses_usd_and_converts_to_vnd():
 async def test_foreign_stock_avg_price_rejects_vn_unit_suffix():
     """'150 tr' on a foreign-stock step must be rejected, not interpreted as
     150 million USD. The USD parser ignores VN units entirely."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "avg_price",
-        "draft": {"asset_type": "stock", "subtype": "foreign_stock",
-                  "extra": {"ticker": "AAPL", "quantity": 10,
-                            "currency": "USD"}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "avg_price",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "foreign_stock",
+                "extra": {"ticker": "AAPL", "quantity": 10, "currency": "USD"},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "150 tr", "chat": {"id": 100}, "from": {"id": 100}},
@@ -657,42 +801,59 @@ async def test_foreign_stock_avg_price_rejects_vn_unit_suffix():
 @pytest.mark.asyncio
 async def test_foreign_stock_save_persists_usd_and_fx_rate():
     """End of foreign-stock flow: extra must carry USD-side fields + FX rate."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "current_price",
-        "draft": {
-            "asset_type": "stock",
-            "subtype": "foreign_stock",
-            "name": "AAPL",
-            "extra": {
-                "ticker": "AAPL",
-                "quantity": 10,
-                "currency": "USD",
-                "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
-                "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
-                "avg_price_usd": 150.0,
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "current_price",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "foreign_stock",
+                "name": "AAPL",
+                "extra": {
+                    "ticker": "AAPL",
+                    "quantity": 10,
+                    "currency": "USD",
+                    "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
+                    "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
+                    "avg_price_usd": 150.0,
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
-    created = _asset(asset_type="stock", value=int(Decimal("165") * asset_entry.USD_VND_RATE * 10))
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("100_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry.wizard_service, "update_step", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    created = _asset(
+        asset_type="stock", value=int(Decimal("165") * asset_entry.USD_VND_RATE * 10)
+    )
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("100_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         # Simulate the user picking "Nhập giá hiện tại" and typing "165".
         draft = user.wizard_state["draft"]
         await asset_entry._handle_stock_current_price_input(
-            db, 100, user, "165", draft,
+            db,
+            100,
+            user,
+            "165",
+            draft,
         )
     create_mock.assert_awaited_once()
     kwargs = create_mock.await_args.kwargs
@@ -712,38 +873,49 @@ async def test_foreign_stock_save_persists_usd_and_fx_rate():
 async def test_foreign_stock_same_as_purchase_reuses_usd_avg_as_current():
     """'Use purchase price' for foreign stock: current_price_usd must mirror
     avg_price_usd, not be left missing or zero."""
-    user = _user({
-        "flow": asset_entry.FLOW_STOCK,
-        "step": "current_price",
-        "draft": {
-            "asset_type": "stock",
-            "subtype": "foreign_stock",
-            "name": "AAPL",
-            "extra": {
-                "ticker": "AAPL",
-                "quantity": 10,
-                "currency": "USD",
-                "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
-                "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
-                "avg_price_usd": 150.0,
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_STOCK,
+            "step": "current_price",
+            "draft": {
+                "asset_type": "stock",
+                "subtype": "foreign_stock",
+                "name": "AAPL",
+                "extra": {
+                    "ticker": "AAPL",
+                    "quantity": 10,
+                    "currency": "USD",
+                    "fx_rate_vnd": float(asset_entry.USD_VND_RATE),
+                    "avg_price": float(Decimal("150") * asset_entry.USD_VND_RATE),
+                    "avg_price_usd": 150.0,
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="stock")
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("100_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("100_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -761,28 +933,36 @@ async def test_foreign_stock_same_as_purchase_reuses_usd_avg_as_current():
 
 @pytest.mark.asyncio
 async def test_real_estate_initial_value_accepts_ty():
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "initial_value",
-        "draft": {
-            "asset_type": "real_estate",
-            "subtype": "house_primary",
-            "name": "Nhà Mỹ Đình",
-            "extra": {},
-        },
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "initial_value",
+            "draft": {
+                "asset_type": "real_estate",
+                "subtype": "house_primary",
+                "name": "Nhà Mỹ Đình",
+                "extra": {},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as update_step, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.wizard_service, "update_step", AsyncMock()
+        ) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "2 tỷ", "chat": {"id": 100}, "from": {"id": 100}},
         )
     patch_kwargs = update_step.await_args.kwargs
-    assert patch_kwargs["draft_patch"]["initial_value"] == float(Decimal("2_000_000_000"))
+    assert patch_kwargs["draft_patch"]["initial_value"] == float(
+        Decimal("2_000_000_000")
+    )
     assert patch_kwargs["step"] == "current_value"
 
 
@@ -794,25 +974,30 @@ async def test_real_estate_current_value_advances_to_rental_ask():
     happens later in either ``_save_real_estate_no_rental`` (No
     branch) or ``_commit_rental`` (Yes branch).
     """
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "current_value",
-        "draft": {
-            "asset_type": "real_estate",
-            "subtype": "house_primary",
-            "name": "Nhà Mỹ Đình",
-            "initial_value": float(Decimal("2_000_000_000")),
-            "extra": {},
-        },
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "current_value",
+            "draft": {
+                "asset_type": "real_estate",
+                "subtype": "house_primary",
+                "name": "Nhà Mỹ Đình",
+                "initial_value": float(Decimal("2_000_000_000")),
+                "extra": {},
+            },
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock()) as create_mock, \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as advance, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock()
+        ) as create_mock,
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()) as advance,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "2.5 tỷ", "chat": {"id": 100}, "from": {"id": 100}},
@@ -822,8 +1007,12 @@ async def test_real_estate_current_value_advances_to_rental_ask():
     advance.assert_awaited_once()
     advance_kwargs = advance.await_args.kwargs
     assert advance_kwargs["step"] == "rental_ask"
-    assert advance_kwargs["draft_patch"]["initial_value"] == float(Decimal("2_000_000_000"))
-    assert advance_kwargs["draft_patch"]["current_value"] == float(Decimal("2_500_000_000"))
+    assert advance_kwargs["draft_patch"]["initial_value"] == float(
+        Decimal("2_000_000_000")
+    )
+    assert advance_kwargs["draft_patch"]["current_value"] == float(
+        Decimal("2_500_000_000")
+    )
     # Confirmation message should mention rental Y/N.
     send.assert_called()
     sent_text = send.call_args.kwargs["text"]
@@ -836,35 +1025,47 @@ async def test_real_estate_rental_ask_no_creates_asset_no_rental():
     rental_metadata, and ``rental_service.mark_as_rental`` is NOT
     called.
     """
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "rental_ask",
-        "draft": {
-            "asset_type": "real_estate",
-            "subtype": "house_primary",
-            "name": "Nhà Mỹ Đình",
-            "initial_value": float(Decimal("2_000_000_000")),
-            "current_value": float(Decimal("2_500_000_000")),
-            "extra": {},
-        },
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "rental_ask",
+            "draft": {
+                "asset_type": "real_estate",
+                "subtype": "house_primary",
+                "name": "Nhà Mỹ Đình",
+                "initial_value": float(Decimal("2_000_000_000")),
+                "current_value": float(Decimal("2_500_000_000")),
+                "extra": {},
+            },
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="real_estate", value=2_500_000_000)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)) as create_mock, \
-         patch.object(asset_entry.rental_service, "mark_as_rental",
-                      AsyncMock()) as mark_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("2_500_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ) as create_mock,
+        patch.object(
+            asset_entry.rental_service, "mark_as_rental", AsyncMock()
+        ) as mark_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("2_500_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -888,42 +1089,54 @@ async def test_real_estate_rental_full_flow_marks_with_metadata():
     """
     # We test the final step (rental_extra:done) which collapses all
     # the previously-collected draft into a save action.
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "rental_extra",
-        "draft": {
-            "asset_type": "real_estate",
-            "subtype": "house_primary",
-            "name": "Nhà Mỹ Đình",
-            "initial_value": float(Decimal("2_500_000_000")),
-            "current_value": float(Decimal("2_500_000_000")),
-            "extra": {},
-            "rental": {
-                "monthly_rent": float(Decimal("15000000")),
-                "monthly_expenses": float(Decimal("1500000")),
-                "occupancy_status": "rented",
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "rental_extra",
+            "draft": {
+                "asset_type": "real_estate",
+                "subtype": "house_primary",
+                "name": "Nhà Mỹ Đình",
+                "initial_value": float(Decimal("2_500_000_000")),
+                "current_value": float(Decimal("2_500_000_000")),
+                "extra": {},
+                "rental": {
+                    "monthly_rent": float(Decimal("15000000")),
+                    "monthly_expenses": float(Decimal("1500000")),
+                    "occupancy_status": "rented",
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="real_estate", value=2_500_000_000)
     marked = _asset(asset_type="real_estate", value=2_500_000_000)
     marked.is_rental = True
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)), \
-         patch.object(asset_entry.rental_service, "mark_as_rental",
-                      AsyncMock(return_value=marked)) as mark_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("2_500_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ),
+        patch.object(
+            asset_entry.rental_service, "mark_as_rental", AsyncMock(return_value=marked)
+        ) as mark_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("2_500_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -943,40 +1156,54 @@ async def test_real_estate_rental_full_flow_marks_with_metadata():
 @pytest.mark.asyncio
 async def test_real_estate_rental_status_vacant_skips_extras():
     """Status=vacant → no tenant/lease prompts, save immediately."""
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "rental_status",
-        "draft": {
-            "asset_type": "real_estate",
-            "subtype": "house_primary",
-            "name": "Nhà Trống",
-            "initial_value": float(Decimal("3_000_000_000")),
-            "current_value": float(Decimal("3_000_000_000")),
-            "extra": {},
-            "rental": {
-                "monthly_rent": float(Decimal("20000000")),
-                "monthly_expenses": float(Decimal("2000000")),
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "rental_status",
+            "draft": {
+                "asset_type": "real_estate",
+                "subtype": "house_primary",
+                "name": "Nhà Trống",
+                "initial_value": float(Decimal("3_000_000_000")),
+                "current_value": float(Decimal("3_000_000_000")),
+                "extra": {},
+                "rental": {
+                    "monthly_rent": float(Decimal("20000000")),
+                    "monthly_expenses": float(Decimal("2000000")),
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     created = _asset(asset_type="real_estate", value=3_000_000_000)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "create_asset",
-                      AsyncMock(return_value=created)), \
-         patch.object(asset_entry.rental_service, "mark_as_rental",
-                      AsyncMock(return_value=created)) as mark_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("3_000_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "wizard_service", asset_entry.wizard_service), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "create_asset", AsyncMock(return_value=created)
+        ),
+        patch.object(
+            asset_entry.rental_service,
+            "mark_as_rental",
+            AsyncMock(return_value=created),
+        ) as mark_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("3_000_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "wizard_service", asset_entry.wizard_service),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -995,17 +1222,21 @@ async def test_real_estate_rental_status_vacant_skips_extras():
 async def test_rental_rent_input_negative_rejected():
     """Negative rent is rejected with a friendly nudge; wizard stays
     at the rental_rent step (no advance, no save)."""
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "rental_rent",
-        "draft": {"rental": {}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "rental_rent",
+            "draft": {"rental": {}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as advance, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()) as advance,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "-15tr", "chat": {"id": 100}, "from": {"id": 100}},
@@ -1018,17 +1249,21 @@ async def test_rental_rent_input_negative_rejected():
 async def test_rental_expenses_zero_keyword_accepted():
     """User types '0' for expenses → wizard advances to status step
     with monthly_expenses=0."""
-    user = _user({
-        "flow": asset_entry.FLOW_REAL_ESTATE,
-        "step": "rental_expenses",
-        "draft": {"rental": {"monthly_rent": float(Decimal("15000000"))}},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_REAL_ESTATE,
+            "step": "rental_expenses",
+            "draft": {"rental": {"monthly_rent": float(Decimal("15000000"))}},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "update_step",
-                      AsyncMock()) as advance, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()) as advance,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.handle_asset_text_input(
             db,
             {"text": "0", "chat": {"id": 100}, "from": {"id": 100}},
@@ -1048,14 +1283,21 @@ async def test_mark_rental_pick_starts_subwizard():
     db = _db(user)
     re_asset = _asset(asset_type="real_estate", value=2_500_000_000)
     re_asset.is_rental = False
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "get_asset_by_id",
-                      AsyncMock(return_value=re_asset)), \
-         patch.object(asset_entry.wizard_service, "start_flow",
-                      AsyncMock()) as start_flow, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "get_asset_by_id",
+            AsyncMock(return_value=re_asset),
+        ),
+        patch.object(
+            asset_entry.wizard_service, "start_flow", AsyncMock()
+        ) as start_flow,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         consumed = await asset_entry.handle_asset_rental_callback(
             db,
             {
@@ -1085,37 +1327,47 @@ async def test_mark_existing_rental_does_not_expose_undo_button():
     ``_post_mark_existing`` instead, which never offers an undo
     button.
     """
-    user = _user({
-        "flow": asset_entry.FLOW_MARK_RENTAL,
-        "step": "rental_extra",
-        "draft": {
-            "mode": "mark_existing",
-            "target_asset_id": str(uuid.uuid4()),
-            "rental": {
-                "monthly_rent": float(Decimal("15000000")),
-                "monthly_expenses": float(Decimal("1500000")),
-                "occupancy_status": "rented",
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_MARK_RENTAL,
+            "step": "rental_extra",
+            "draft": {
+                "mode": "mark_existing",
+                "target_asset_id": str(uuid.uuid4()),
+                "rental": {
+                    "monthly_rent": float(Decimal("15000000")),
+                    "monthly_expenses": float(Decimal("1500000")),
+                    "occupancy_status": "rented",
+                },
             },
-        },
-    })
+        }
+    )
     db = _db(user)
     marked = _asset(asset_type="real_estate", value=2_500_000_000)
     marked.is_rental = True
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.rental_service, "mark_as_rental",
-                      AsyncMock(return_value=marked)), \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("2_500_000_000"), asset_count=1,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "_mark_onboarding_first_asset_done",
-                      AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.rental_service, "mark_as_rental", AsyncMock(return_value=marked)
+        ),
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("2_500_000_000"),
+                    asset_count=1,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "_mark_onboarding_first_asset_done", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -1146,14 +1398,21 @@ async def test_mark_rental_pick_already_rental_rejected():
     db = _db(user)
     re_asset = _asset(asset_type="real_estate", value=2_500_000_000)
     re_asset.is_rental = True
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "get_asset_by_id",
-                      AsyncMock(return_value=re_asset)), \
-         patch.object(asset_entry.wizard_service, "start_flow",
-                      AsyncMock()) as start_flow, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "get_asset_by_id",
+            AsyncMock(return_value=re_asset),
+        ),
+        patch.object(
+            asset_entry.wizard_service, "start_flow", AsyncMock()
+        ) as start_flow,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_rental_callback(
             db,
             {
@@ -1171,16 +1430,19 @@ async def test_mark_rental_pick_already_rental_rejected():
 # Callback dispatch
 # -----------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_callback_cancel_clears_state():
     user = _user({"flow": "asset_add_cash", "step": "amount", "draft": {}})
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.wizard_service, "clear",
-                      AsyncMock()) as clear, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         consumed = await asset_entry.handle_asset_callback(
             db,
             {
@@ -1198,11 +1460,13 @@ async def test_callback_cancel_clears_state():
 async def test_callback_type_picker_routes_to_starter():
     user = _user()
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry, "_start_cash_subtype_pick",
-                      AsyncMock()) as starter, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry, "_start_cash_subtype_pick", AsyncMock()) as starter,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -1225,20 +1489,30 @@ async def test_callback_undo_hard_deletes_asset_and_recomputes_net_worth():
     asset.id = target_id
     asset.name = "VCB-001"
 
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "get_asset_by_id",
-                      AsyncMock(return_value=asset)), \
-         patch.object(asset_entry.asset_service, "hard_delete",
-                      AsyncMock(return_value=True)) as delete_mock, \
-         patch.object(asset_entry.net_worth_calculator, "calculate",
-                      AsyncMock(return_value=MagicMock(
-                          total=Decimal("0"), asset_count=0,
-                      ))), \
-         patch.object(asset_entry, "update_user_level",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=asset)
+        ),
+        patch.object(
+            asset_entry.asset_service, "hard_delete", AsyncMock(return_value=True)
+        ) as delete_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate",
+            AsyncMock(
+                return_value=MagicMock(
+                    total=Decimal("0"),
+                    asset_count=0,
+                )
+            ),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         consumed = await asset_entry.handle_asset_callback(
             db,
             {
@@ -1263,12 +1537,16 @@ async def test_callback_undo_hard_deletes_asset_and_recomputes_net_worth():
 async def test_callback_undo_handles_invalid_uuid_gracefully():
     user = _user()
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "hard_delete",
-                      AsyncMock()) as delete_mock, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "hard_delete", AsyncMock()
+        ) as delete_mock,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         consumed = await asset_entry.handle_asset_callback(
             db,
             {
@@ -1290,14 +1568,19 @@ async def test_callback_undo_when_asset_already_gone():
     user = _user()
     db = _db(user)
     target_id = uuid.uuid4()
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry.asset_service, "get_asset_by_id",
-                      AsyncMock(return_value=None)), \
-         patch.object(asset_entry.asset_service, "hard_delete",
-                      AsyncMock(return_value=False)) as delete_mock, \
-         patch.object(asset_entry, "answer_callback", AsyncMock()), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=None)
+        ),
+        patch.object(
+            asset_entry.asset_service, "hard_delete", AsyncMock(return_value=False)
+        ) as delete_mock,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         await asset_entry.handle_asset_callback(
             db,
             {
@@ -1315,8 +1598,9 @@ async def test_callback_undo_when_asset_already_gone():
 async def test_text_input_returns_false_when_no_wizard():
     user = _user(state=None)
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)):
+    with patch.object(
+        asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
             {"text": "anything", "chat": {"id": 100}, "from": {"id": 100}},
@@ -1330,8 +1614,9 @@ async def test_text_input_returns_false_for_non_asset_flow():
     they have their own router earlier in the dispatch chain."""
     user = _user({"flow": "storytelling", "step": "awaiting_story", "draft": {}})
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)):
+    with patch.object(
+        asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
             {"text": "anything", "chat": {"id": 100}, "from": {"id": 100}},
@@ -1347,20 +1632,24 @@ async def test_text_input_at_picker_step_nudges_instead_of_leaking():
     "VCB-002 20 triệu" without picking a type. Must be CONSUMED with a
     nudge — not fall through to the NL expense parser.
     """
-    user = _user({
-        "flow": asset_entry.FLOW_PICKER,
-        "step": "type",
-        "draft": {},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_PICKER,
+            "step": "type",
+            "draft": {},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send, \
-         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
-            {"text": "VCB-002 20 triệu", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "VCB-002 20 triệu", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is True
     clear.assert_not_awaited()  # picker stays open so user can still tap
@@ -1373,19 +1662,23 @@ async def test_text_input_at_picker_step_nudges_instead_of_leaking():
 async def test_text_input_at_subtype_step_nudges_instead_of_leaking():
     """Same incident class, second leaky step: user picked Cash type but
     typed text instead of picking a subtype. Must be consumed."""
-    user = _user({
-        "flow": asset_entry.FLOW_CASH,
-        "step": "subtype",
-        "draft": {"asset_type": "cash"},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "subtype",
+            "draft": {"asset_type": "cash"},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry, "get_user_by_telegram_id",
-                      AsyncMock(return_value=user)), \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         consumed = await asset_entry.handle_asset_text_input(
             db,
-            {"text": "VCB-002 20 triệu", "chat": {"id": 100},
-             "from": {"id": 100}},
+            {"text": "VCB-002 20 triệu", "chat": {"id": 100}, "from": {"id": 100}},
         )
     assert consumed is True
     send.assert_awaited_once()
@@ -1397,9 +1690,12 @@ async def test_start_asset_wizard_sets_picker_state():
     sentinel — NOT null. That's what closes the leak window."""
     user = _user(state={"flow": "asset_add_cash", "step": "amount", "draft": {}})
     db = _db(user)
-    with patch.object(asset_entry.wizard_service, "start_flow",
-                      AsyncMock()) as start_flow, \
-         patch.object(asset_entry, "send_message", AsyncMock()):
+    with (
+        patch.object(
+            asset_entry.wizard_service, "start_flow", AsyncMock()
+        ) as start_flow,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
         await asset_entry.start_asset_wizard(db, 100, user)
     start_flow.assert_awaited_once()
     args = start_flow.await_args.args
@@ -1412,15 +1708,18 @@ async def test_start_asset_wizard_sets_picker_state():
 
 @pytest.mark.asyncio
 async def test_cancel_wizard_clears_active_asset_flow():
-    user = _user({
-        "flow": asset_entry.FLOW_CASH,
-        "step": "amount",
-        "draft": {"asset_type": "cash"},
-    })
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "amount",
+            "draft": {"asset_type": "cash"},
+        }
+    )
     db = _db(user)
-    with patch.object(asset_entry.wizard_service, "clear",
-                      AsyncMock()) as clear, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         cancelled = await asset_entry.cancel_wizard(db, 100, user)
     assert cancelled is True
     clear.assert_awaited_once()
@@ -1433,10 +1732,114 @@ async def test_cancel_wizard_noop_when_other_flow_active():
     return False so the caller can fall back to the right canceller."""
     user = _user({"flow": "storytelling", "step": "x", "draft": {}})
     db = _db(user)
-    with patch.object(asset_entry.wizard_service, "clear",
-                      AsyncMock()) as clear, \
-         patch.object(asset_entry, "send_message", AsyncMock()) as send:
+    with (
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
         cancelled = await asset_entry.cancel_wizard(db, 100, user)
     assert cancelled is False
     clear.assert_not_awaited()
     send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_asset_manage_delete_flow_filters_by_type_then_soft_deletes():
+    user = _user()
+    db = _db(user)
+    stock = _asset(asset_type="stock", value=120_000_000)
+    stock.name = "VCB"
+    stock.subtype = "vn_stock"
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[stock]),
+        ) as list_mock,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_manage:delete_type:stock",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    list_mock.assert_awaited_once_with(db, user.id, asset_type="stock")
+    reply_markup = send.await_args.kwargs["reply_markup"]
+    callbacks = [
+        button["callback_data"]
+        for row in reply_markup["inline_keyboard"]
+        for button in row
+    ]
+    assert f"asset_manage:delete_confirm:{stock.id}" in callbacks
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=stock)
+        ),
+        patch.object(
+            asset_entry.asset_service, "soft_delete", AsyncMock(return_value=stock)
+        ) as delete_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=MagicMock(total=Decimal("0"))),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb2",
+                "data": f"asset_manage:delete:{stock.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    delete_mock.assert_awaited_once_with(db, user.id, stock.id)
+    assert "Đã xoá" in send.await_args.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_asset_manage_delete_empty_type_shows_empty_state():
+    user = _user()
+    db = _db(user)
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_user_assets", AsyncMock(return_value=[])
+        ),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_manage:delete_type:crypto",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    assert "Không có tài sản loại Tiền số" in send.await_args.kwargs["text"]

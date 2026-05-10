@@ -35,6 +35,7 @@ Layer contract: this handler reads/mutates DB through services
 (``wizard_service``, ``asset_service``, ``net_worth_calculator``) and
 never commits — the worker owns the transaction boundary.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -47,7 +48,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
-from backend.bot.formatters.money import format_money_short
+from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.bot.formatters.wealth_formatter import (
     format_asset_added,
     format_asset_list,
@@ -55,6 +56,10 @@ from backend.bot.formatters.wealth_formatter import (
 )
 from backend.bot.keyboards.asset_keyboard import (
     add_more_keyboard,
+    asset_delete_confirm_keyboard,
+    asset_delete_list_keyboard,
+    asset_delete_type_keyboard,
+    asset_manage_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
     crypto_current_price_keyboard,
@@ -75,7 +80,6 @@ from backend.services import wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
-    edit_message_text,
     send_message,
 )
 from backend.wealth.amount_parser import (
@@ -83,7 +87,12 @@ from backend.wealth.amount_parser import (
     parse_amount,
     parse_label_and_amount,
 )
-from backend.wealth.asset_types import AssetType, get_subtypes
+from backend.wealth.asset_types import (
+    AssetType,
+    get_label,
+    get_subtype_icon,
+    get_subtypes,
+)
 from backend.wealth.fx import USD_VND_RATE, parse_usd_amount, usd_to_vnd
 from backend.wealth.ladder import update_user_level
 from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
@@ -94,6 +103,7 @@ logger = logging.getLogger(__name__)
 
 class AssetEvent:
     """Analytics event names for the asset-entry funnel."""
+
     WIZARD_OPENED = "asset_wizard_opened"
     TYPE_PICKED = "asset_wizard_type_picked"
     ASSET_ADDED = "asset_added"
@@ -123,9 +133,8 @@ FLOW_MARK_RENTAL = "asset_add_mark_rental"
 
 # ---------- Entry point ----------------------------------------------
 
-async def start_asset_wizard(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+
+async def start_asset_wizard(db: AsyncSession, chat_id: int, user: User) -> None:
     """Show the 6-button asset-type picker. First step of every flow.
 
     Sets ``wizard_state`` to a picker sentinel rather than clearing it, so
@@ -135,23 +144,22 @@ async def start_asset_wizard(
     parser and being silently saved as a transaction.
     """
     await wizard_service.start_flow(
-        db, user.id, FLOW_PICKER, step="type", draft={},
+        db,
+        user.id,
+        FLOW_PICKER,
+        step="type",
+        draft={},
     )
     await send_message(
         chat_id=chat_id,
-        text=(
-            "💎 <b>Thêm tài sản mới</b>\n\n"
-            "Loại tài sản nào bạn muốn thêm?"
-        ),
+        text=("💎 <b>Thêm tài sản mới</b>\n\nLoại tài sản nào bạn muốn thêm?"),
         parse_mode="HTML",
         reply_markup=asset_type_picker_keyboard(),
     )
     analytics.track(AssetEvent.WIZARD_OPENED, user_id=user.id)
 
 
-async def cancel_wizard(
-    db: AsyncSession, chat_id: int, user: User
-) -> bool:
+async def cancel_wizard(db: AsyncSession, chat_id: int, user: User) -> bool:
     """Clear an active asset-wizard state and acknowledge.
 
     Returns True if there was an asset wizard to cancel. Used by the
@@ -165,20 +173,130 @@ async def cancel_wizard(
         return False
     await wizard_service.clear(db, user.id)
     analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
-    await send_message(
-        chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋"
-    )
+    await send_message(chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋")
     return True
 
 
-async def list_assets(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+async def list_assets(db: AsyncSession, chat_id: int, user: User) -> None:
     """Handle /taisan — display all active assets for the user."""
     assets = await asset_service.get_user_assets(db, user.id)
     await send_message(
         chat_id=chat_id,
         text=format_asset_list(assets),
+        parse_mode="HTML",
+    )
+
+
+async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> None:
+    """Open asset management actions from ``Tài sản → Sửa tài sản``."""
+    await send_message(
+        chat_id=chat_id,
+        text=("✏️ <b>Sửa tài sản</b>\n\nBạn muốn làm gì với danh mục tài sản hiện tại?"),
+        parse_mode="HTML",
+        reply_markup=asset_manage_keyboard(),
+    )
+
+
+def _asset_delete_row_label(asset) -> str:
+    icon = get_subtype_icon(asset.asset_type, asset.subtype)
+    return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
+
+
+async def show_asset_delete_type_picker(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Ask the user for an asset type before rendering delete rows."""
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            "🗑 <b>Xoá tài sản</b>\n\n"
+            "Chọn loại tài sản trước để danh sách gọn và tránh xoá nhầm nhé."
+        ),
+        parse_mode="HTML",
+        reply_markup=asset_delete_type_keyboard(),
+    )
+
+
+async def show_asset_delete_list(
+    db: AsyncSession, chat_id: int, user: User, asset_type: str
+) -> None:
+    """List only active assets of one type for deletion."""
+    assets = await asset_service.get_user_assets(db, user.id, asset_type=asset_type)
+    label = get_label(asset_type)
+    if not assets:
+        await send_message(
+            chat_id=chat_id,
+            text=f"Không có tài sản loại {label}.",
+            parse_mode="HTML",
+            reply_markup=asset_delete_type_keyboard(),
+        )
+        return
+
+    candidates = [(asset.id, _asset_delete_row_label(asset)) for asset in assets]
+    await send_message(
+        chat_id=chat_id,
+        text=f"Chọn tài sản <b>{label}</b> muốn xoá:",
+        parse_mode="HTML",
+        reply_markup=asset_delete_list_keyboard(candidates, asset_type=asset_type),
+    )
+
+
+async def _confirm_asset_delete(
+    db: AsyncSession, chat_id: int, user: User, asset_id_text: str
+) -> None:
+    try:
+        asset_uuid = uuid.UUID(asset_id_text)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None or not asset.is_active:
+        await send_message(
+            chat_id=chat_id, text="Tài sản này không còn trong danh sách."
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            "Bạn chắc chắn muốn xoá tài sản này khỏi danh mục?\n\n"
+            f"{_asset_delete_row_label(asset)}\n\n"
+            "Mình sẽ ẩn tài sản khỏi danh mục hiện tại, không xoá lịch sử."
+        ),
+        parse_mode="HTML",
+        reply_markup=asset_delete_confirm_keyboard(
+            asset.id, asset_type=asset.asset_type
+        ),
+    )
+
+
+async def _soft_delete_asset(
+    db: AsyncSession, chat_id: int, user: User, asset_id_text: str
+) -> None:
+    try:
+        asset_uuid = uuid.UUID(asset_id_text)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None or not asset.is_active:
+        await send_message(
+            chat_id=chat_id, text="Tài sản này không còn trong danh sách."
+        )
+        return
+
+    asset_name = asset.name
+    await asset_service.soft_delete(db, user.id, asset_uuid)
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    await update_user_level(db, user, breakdown.total)
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Đã xoá <b>{asset_name}</b> khỏi danh mục hiện tại.\n"
+            f"💎 Tổng tài sản mới: <b>{format_money_full(breakdown.total)}</b>"
+        ),
         parse_mode="HTML",
     )
 
@@ -205,11 +323,12 @@ _CASH_SUBTYPE_PROMPTS: dict[str, tuple[str, str]] = {
 }
 
 
-async def _start_cash_subtype_pick(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+async def _start_cash_subtype_pick(db: AsyncSession, chat_id: int, user: User) -> None:
     await wizard_service.start_flow(
-        db, user.id, FLOW_CASH, step="subtype",
+        db,
+        user.id,
+        FLOW_CASH,
+        step="subtype",
         draft={"asset_type": AssetType.CASH.value},
     )
     await send_message(
@@ -229,7 +348,10 @@ async def _handle_cash_subtype_pick(
         return
 
     await wizard_service.update_step(
-        db, user.id, step="amount", draft_patch={"subtype": subtype},
+        db,
+        user.id,
+        step="amount",
+        draft_patch={"subtype": subtype},
     )
     label_prompt, example = _CASH_SUBTYPE_PROMPTS[subtype]
     await send_message(
@@ -243,9 +365,7 @@ async def _handle_cash_amount_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
     parsed = parse_label_and_amount(text)
@@ -268,9 +388,7 @@ async def _handle_cash_amount_input(
 
     label, amount = parsed
     if amount <= 0:
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
     name = label or {
@@ -281,7 +399,8 @@ async def _handle_cash_amount_input(
     }.get(draft.get("subtype", ""), "Tài khoản")
 
     asset = await asset_service.create_asset(
-        db, user.id,
+        db,
+        user.id,
         asset_type=AssetType.CASH.value,
         subtype=draft.get("subtype"),
         name=name,
@@ -291,6 +410,7 @@ async def _handle_cash_amount_input(
 
 
 # ---------- Stock flow ------------------------------------------------
+
 
 def _stock_unit_label(subtype: str | None) -> str:
     """Human-readable unit name shown in stock-flow prompts.
@@ -323,11 +443,12 @@ def _format_usd(amount: Decimal) -> str:
     return f"${value:,.2f}"
 
 
-async def _start_stock_subtype_pick(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+async def _start_stock_subtype_pick(db: AsyncSession, chat_id: int, user: User) -> None:
     await wizard_service.start_flow(
-        db, user.id, FLOW_STOCK, step="subtype",
+        db,
+        user.id,
+        FLOW_STOCK,
+        step="subtype",
         draft={"asset_type": AssetType.STOCK.value, "extra": {}},
     )
     await send_message(
@@ -357,7 +478,9 @@ async def _handle_stock_subtype_pick(
         extra["fx_rate_vnd"] = float(USD_VND_RATE)
 
     await wizard_service.update_step(
-        db, user.id, step="ticker",
+        db,
+        user.id,
+        step="ticker",
         draft_patch={"subtype": subtype, "extra": extra},
     )
     examples = {
@@ -368,10 +491,7 @@ async def _handle_stock_subtype_pick(
     }.get(subtype, "<code>VNM</code>, <code>VIC</code>, <code>HPG</code>")
     await send_message(
         chat_id=chat_id,
-        text=(
-            "📈 <b>Mã (ticker) là gì?</b>\n\n"
-            f"Ví dụ: {examples}"
-        ),
+        text=(f"📈 <b>Mã (ticker) là gì?</b>\n\nVí dụ: {examples}"),
         parse_mode="HTML",
     )
 
@@ -391,16 +511,15 @@ async def _handle_stock_ticker_input(
     extra = dict(draft.get("extra") or {})
     extra["ticker"] = ticker
     await wizard_service.update_step(
-        db, user.id, step="quantity",
+        db,
+        user.id,
+        step="quantity",
         draft_patch={"extra": extra, "name": ticker},
     )
     unit = _stock_unit_label(draft.get("subtype"))
     await send_message(
         chat_id=chat_id,
-        text=(
-            f"✅ <b>{ticker}</b>\n\n"
-            f"Bạn đang sở hữu bao nhiêu {unit}?"
-        ),
+        text=(f"✅ <b>{ticker}</b>\n\nBạn đang sở hữu bao nhiêu {unit}?"),
         parse_mode="HTML",
     )
 
@@ -425,7 +544,10 @@ async def _handle_stock_quantity_input(
     extra = dict(draft.get("extra") or {})
     extra["quantity"] = quantity
     await wizard_service.update_step(
-        db, user.id, step="avg_price", draft_patch={"extra": extra},
+        db,
+        user.id,
+        step="avg_price",
+        draft_patch={"extra": extra},
     )
     subtype = draft.get("subtype")
     unit = _stock_unit_label(subtype)
@@ -454,9 +576,7 @@ async def _handle_stock_avg_price_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
     subtype = draft.get("subtype")
@@ -472,12 +592,15 @@ async def _handle_stock_avg_price_input(
         avg_price_vnd = parse_amount(text)
 
     if avg_price_vnd is None or avg_price_vnd <= 0:
-        analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
-                        properties={"flow": FLOW_STOCK, "field": "avg_price"})
+        analytics.track(
+            AssetEvent.PARSE_FAILED,
+            user_id=user.id,
+            properties={"flow": FLOW_STOCK, "field": "avg_price"},
+        )
         example = (
             "Ví dụ: <code>150</code> hoặc <code>150.5</code> (USD)"
-            if is_foreign else
-            "Ví dụ: <code>45000</code> hoặc <code>45k</code>"
+            if is_foreign
+            else "Ví dụ: <code>45000</code> hoặc <code>45k</code>"
         )
         await send_message(
             chat_id=chat_id,
@@ -496,7 +619,9 @@ async def _handle_stock_avg_price_input(
     initial_value = avg_price_vnd * quantity
 
     await wizard_service.update_step(
-        db, user.id, step="current_price",
+        db,
+        user.id,
+        step="current_price",
         draft_patch={"extra": extra, "initial_value": float(initial_value)},
     )
 
@@ -540,19 +665,12 @@ async def _handle_stock_current_price_choice(
         unit = _stock_unit_label(subtype)
         if subtype == "foreign_stock":
             prompt = (
-                f"💹 Nhập giá hiện tại của 1 {unit} (USD):\n"
-                "Ví dụ: <code>165</code>"
+                f"💹 Nhập giá hiện tại của 1 {unit} (USD):\nVí dụ: <code>165</code>"
             )
         elif subtype == "fund":
-            prompt = (
-                f"💹 Nhập giá hiện tại của 1 {unit}:\n"
-                "Ví dụ: <code>16000</code>"
-            )
+            prompt = f"💹 Nhập giá hiện tại của 1 {unit}:\nVí dụ: <code>16000</code>"
         else:
-            prompt = (
-                f"💹 Nhập giá hiện tại của 1 {unit}:\n"
-                "Ví dụ: <code>52000</code>"
-            )
+            prompt = f"💹 Nhập giá hiện tại của 1 {unit}:\nVí dụ: <code>52000</code>"
         await send_message(chat_id=chat_id, text=prompt, parse_mode="HTML")
 
 
@@ -560,9 +678,7 @@ async def _handle_stock_current_price_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
     subtype = draft.get("subtype")
@@ -579,7 +695,8 @@ async def _handle_stock_current_price_input(
 
     if current_price_vnd is None or current_price_vnd <= 0:
         example = (
-            "Ví dụ: <code>165</code> (USD)" if is_foreign
+            "Ví dụ: <code>165</code> (USD)"
+            if is_foreign
             else "Ví dụ: <code>52000</code>"
         )
         await send_message(
@@ -614,17 +731,21 @@ async def _save_stock_asset(
     # view can show "$1,500 ≈ 37.5tr tạm tính" without re-deriving.
     if extra.get("currency") == "USD":
         avg_price_usd = Decimal(str(extra.get("avg_price_usd") or 0))
-        current_price_usd = Decimal(str(
-            extra.get("current_price_usd") if extra.get("current_price_usd") is not None
-            else extra.get("avg_price_usd") or 0
-        ))
+        current_price_usd = Decimal(
+            str(
+                extra.get("current_price_usd")
+                if extra.get("current_price_usd") is not None
+                else extra.get("avg_price_usd") or 0
+            )
+        )
         extra["current_price_usd"] = float(current_price_usd)
         extra["initial_value_usd"] = float(avg_price_usd * quantity)
         extra["current_value_usd"] = float(current_price_usd * quantity)
         extra["current_price"] = float(current_price)
 
     asset = await asset_service.create_asset(
-        db, user.id,
+        db,
+        user.id,
         asset_type=AssetType.STOCK.value,
         subtype=draft.get("subtype"),
         name=name,
@@ -660,7 +781,10 @@ async def _start_crypto_subtype_pick(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
     await wizard_service.start_flow(
-        db, user.id, FLOW_CRYPTO, step="subtype",
+        db,
+        user.id,
+        FLOW_CRYPTO,
+        step="subtype",
         draft={"asset_type": AssetType.CRYPTO.value, "extra": {}},
     )
     await send_message(
@@ -683,7 +807,9 @@ async def _handle_crypto_subtype_pick(
     if symbol:
         extra = {"symbol": symbol, "ticker": symbol}
         await wizard_service.update_step(
-            db, user.id, step="quantity",
+            db,
+            user.id,
+            step="quantity",
             draft_patch={"subtype": subtype, "name": symbol, "extra": extra},
         )
         await send_message(
@@ -703,7 +829,10 @@ async def _handle_crypto_subtype_pick(
         else "<code>SOL</code>, <code>BNB</code>"
     )
     await wizard_service.update_step(
-        db, user.id, step="symbol", draft_patch={"subtype": subtype, "extra": {}},
+        db,
+        user.id,
+        step="symbol",
+        draft_patch={"subtype": subtype, "extra": {}},
     )
     await send_message(
         chat_id=chat_id,
@@ -727,7 +856,10 @@ async def _handle_crypto_symbol_input(
     extra["symbol"] = symbol
     extra["ticker"] = symbol
     await wizard_service.update_step(
-        db, user.id, step="quantity", draft_patch={"extra": extra, "name": symbol},
+        db,
+        user.id,
+        step="quantity",
+        draft_patch={"extra": extra, "name": symbol},
     )
     await send_message(
         chat_id=chat_id,
@@ -758,7 +890,10 @@ async def _handle_crypto_quantity_input(
     extra = dict(draft.get("extra") or {})
     extra["quantity"] = float(quantity)
     await wizard_service.update_step(
-        db, user.id, step="avg_price", draft_patch={"extra": extra},
+        db,
+        user.id,
+        step="avg_price",
+        draft_patch={"extra": extra},
     )
     symbol = extra.get("symbol", "coin")
     await send_message(
@@ -792,7 +927,9 @@ async def _handle_crypto_avg_price_input(
     quantity = Decimal(str(extra.get("quantity") or 0))
     initial_value = avg_price * quantity
     await wizard_service.update_step(
-        db, user.id, step="current_price",
+        db,
+        user.id,
+        step="current_price",
         draft_patch={"extra": extra, "initial_value": float(initial_value)},
     )
     await send_message(
@@ -817,10 +954,7 @@ async def _handle_crypto_current_price_choice(
         await wizard_service.update_step(db, user.id, step="current_price_input")
         await send_message(
             chat_id=chat_id,
-            text=(
-                "💹 Nhập giá hiện tại của 1 coin (VNĐ):\n"
-                "Ví dụ: <code>2.2 tỷ</code>"
-            ),
+            text=("💹 Nhập giá hiện tại của 1 coin (VNĐ):\nVí dụ: <code>2.2 tỷ</code>"),
             parse_mode="HTML",
         )
 
@@ -854,7 +988,8 @@ async def _save_crypto_asset(
     name = draft.get("name") or extra.get("symbol") or "Crypto"
 
     asset = await asset_service.create_asset(
-        db, user.id,
+        db,
+        user.id,
         asset_type=AssetType.CRYPTO.value,
         subtype=draft.get("subtype"),
         name=name,
@@ -913,11 +1048,12 @@ def _parse_gold_quantity(text: str) -> tuple[Decimal, Decimal] | None:
     return tael, grams
 
 
-async def _start_gold_subtype_pick(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+async def _start_gold_subtype_pick(db: AsyncSession, chat_id: int, user: User) -> None:
     await wizard_service.start_flow(
-        db, user.id, FLOW_GOLD, step="subtype",
+        db,
+        user.id,
+        FLOW_GOLD,
+        step="subtype",
         draft={"asset_type": AssetType.GOLD.value, "extra": {}},
     )
     await send_message(
@@ -941,7 +1077,9 @@ async def _handle_gold_subtype_pick(
         "symbol": _GOLD_SYMBOL_BY_SUBTYPE.get(subtype, "SJC_GOLD"),
     }
     await wizard_service.update_step(
-        db, user.id, step="quantity",
+        db,
+        user.id,
+        step="quantity",
         draft_patch={"subtype": subtype, "name": subs[subtype], "extra": extra},
     )
     await send_message(
@@ -976,7 +1114,10 @@ async def _handle_gold_quantity_input(
     extra["tael"] = float(tael)
     extra["weight_gram"] = float(grams)
     await wizard_service.update_step(
-        db, user.id, step="avg_price", draft_patch={"extra": extra},
+        db,
+        user.id,
+        step="avg_price",
+        draft_patch={"extra": extra},
     )
     await send_message(
         chat_id=chat_id,
@@ -1009,7 +1150,9 @@ async def _handle_gold_avg_price_input(
     quantity = Decimal(str(extra.get("quantity") or 0))
     initial_value = avg_price * quantity
     await wizard_service.update_step(
-        db, user.id, step="current_price",
+        db,
+        user.id,
+        step="current_price",
         draft_patch={"extra": extra, "initial_value": float(initial_value)},
     )
     await send_message(
@@ -1070,7 +1213,8 @@ async def _save_gold_asset(
     extra["current_price"] = float(current_price)
 
     asset = await asset_service.create_asset(
-        db, user.id,
+        db,
+        user.id,
         asset_type=AssetType.GOLD.value,
         subtype=draft.get("subtype"),
         name=draft.get("name") or "Vàng",
@@ -1090,7 +1234,10 @@ async def _start_real_estate_subtype_pick(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
     await wizard_service.start_flow(
-        db, user.id, FLOW_REAL_ESTATE, step="subtype",
+        db,
+        user.id,
+        FLOW_REAL_ESTATE,
+        step="subtype",
         draft={"asset_type": AssetType.REAL_ESTATE.value, "extra": {}},
     )
     await send_message(
@@ -1109,7 +1256,10 @@ async def _handle_re_subtype_pick(
         await send_message(chat_id=chat_id, text="Loại không hợp lệ.")
         return
     await wizard_service.update_step(
-        db, user.id, step="name", draft_patch={"subtype": subtype},
+        db,
+        user.id,
+        step="name",
+        draft_patch={"subtype": subtype},
     )
     examples = {
         "house_primary": "Nhà Mỹ Đình",
@@ -1145,7 +1295,10 @@ async def _handle_re_name_input(
         )
 
     await wizard_service.update_step(
-        db, user.id, step="initial_value", draft_patch={"name": name},
+        db,
+        user.id,
+        step="initial_value",
+        draft_patch={"name": name},
     )
     await send_message(
         chat_id=chat_id,
@@ -1162,14 +1315,15 @@ async def _handle_re_initial_value_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
     amount = parse_amount(text)
     if amount is None or amount <= 0:
-        analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
-                        properties={"flow": FLOW_REAL_ESTATE, "field": "initial_value"})
+        analytics.track(
+            AssetEvent.PARSE_FAILED,
+            user_id=user.id,
+            properties={"flow": FLOW_REAL_ESTATE, "field": "initial_value"},
+        )
         await send_message(
             chat_id=chat_id,
             text="Nhập giá giúp mình. Ví dụ: <code>2 tỷ</code>",
@@ -1178,7 +1332,9 @@ async def _handle_re_initial_value_input(
         return
 
     await wizard_service.update_step(
-        db, user.id, step="current_value",
+        db,
+        user.id,
+        step="current_value",
         draft_patch={"initial_value": float(amount)},
     )
     await send_message(
@@ -1197,9 +1353,7 @@ async def _handle_re_current_value_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
     current = parse_amount(text)
     if current is None or current <= 0:
@@ -1220,7 +1374,9 @@ async def _handle_re_current_value_input(
     # transaction rather than create → mutate. This also makes "❌ Hủy"
     # at the rental step a clean abort: no orphan asset rows.
     await wizard_service.update_step(
-        db, user.id, step="rental_ask",
+        db,
+        user.id,
+        step="rental_ask",
         draft_patch={
             "initial_value": float(initial),
             "current_value": float(current),
@@ -1252,7 +1408,8 @@ async def _save_real_estate_no_rental(
         # instead of crashing.
         await wizard_service.clear(db, user.id)
         await send_message(
-            chat_id=chat_id, text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
+            chat_id=chat_id,
+            text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
         )
         return
     if initial <= 0:
@@ -1260,7 +1417,8 @@ async def _save_real_estate_no_rental(
 
     extra = dict(draft.get("extra") or {})
     asset = await asset_service.create_asset(
-        db, user.id,
+        db,
+        user.id,
         asset_type=AssetType.REAL_ESTATE.value,
         subtype=draft.get("subtype"),
         name=draft.get("name") or "Bất động sản",
@@ -1271,8 +1429,7 @@ async def _save_real_estate_no_rental(
     await send_message(
         chat_id=chat_id,
         text=(
-            "💡 Bạn có thể update giá trị BĐS bất cứ lúc nào "
-            "khi thị trường biến động."
+            "💡 Bạn có thể update giá trị BĐS bất cứ lúc nào khi thị trường biến động."
         ),
     )
     await _post_save(db, chat_id, user, asset)
@@ -1305,7 +1462,10 @@ async def _handle_rental_ask_choice(
     if choice == "yes":
         analytics.track(AssetEvent.RENTAL_FLOW_OPENED, user_id=user.id)
         await wizard_service.update_step(
-            db, user.id, step="rental_rent", draft_patch={"rental": {}},
+            db,
+            user.id,
+            step="rental_rent",
+            draft_patch={"rental": {}},
         )
         await send_message(
             chat_id=chat_id,
@@ -1321,14 +1481,15 @@ async def _handle_rental_rent_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
     rent = parse_amount(text)
     if rent is None or rent <= 0:
-        analytics.track(AssetEvent.PARSE_FAILED, user_id=user.id,
-                        properties={"flow": "rental", "field": "monthly_rent"})
+        analytics.track(
+            AssetEvent.PARSE_FAILED,
+            user_id=user.id,
+            properties={"flow": "rental", "field": "monthly_rent"},
+        )
         await send_message(
             chat_id=chat_id,
             text=(
@@ -1342,7 +1503,10 @@ async def _handle_rental_rent_input(
     rental = dict(draft.get("rental") or {})
     rental["monthly_rent"] = float(rent)
     await wizard_service.update_step(
-        db, user.id, step="rental_expenses", draft_patch={"rental": rental},
+        db,
+        user.id,
+        step="rental_expenses",
+        draft_patch={"rental": rental},
     )
     await send_message(
         chat_id=chat_id,
@@ -1359,9 +1523,7 @@ async def _handle_rental_expenses_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
     if has_negative_sign(text):
-        await send_message(
-            chat_id=chat_id, text="Chi phí phải ≥ 0 nhé 🙂"
-        )
+        await send_message(chat_id=chat_id, text="Chi phí phải ≥ 0 nhé 🙂")
         return
     cleaned = text.strip().lower()
     if cleaned in ("0", "không", "khong", "ko", "no"):
@@ -1394,7 +1556,10 @@ async def _handle_rental_expenses_input(
         )
     rental["monthly_expenses"] = float(expenses)
     await wizard_service.update_step(
-        db, user.id, step="rental_status", draft_patch={"rental": rental},
+        db,
+        user.id,
+        step="rental_status",
+        draft_patch={"rental": rental},
     )
     await send_message(
         chat_id=chat_id,
@@ -1416,14 +1581,20 @@ async def _handle_rental_status_choice(
     if choice == OccupancyStatus.VACANT.value:
         # Vacant → no tenant info to collect, save immediately.
         await wizard_service.update_step(
-            db, user.id, step="rental_save", draft_patch={"rental": rental},
+            db,
+            user.id,
+            step="rental_save",
+            draft_patch={"rental": rental},
         )
         await _commit_rental(db, chat_id, user, draft={**draft, "rental": rental})
         return
 
     # Rented → offer tenant / lease extras.
     await wizard_service.update_step(
-        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+        db,
+        user.id,
+        step="rental_extra",
+        draft_patch={"rental": rental},
     )
     await send_message(
         chat_id=chat_id,
@@ -1443,10 +1614,7 @@ async def _handle_rental_extra_choice(
         await wizard_service.update_step(db, user.id, step="rental_tenant_input")
         await send_message(
             chat_id=chat_id,
-            text=(
-                "👤 <b>Tên người thuê?</b>\n\n"
-                "Gõ <code>skip</code> để bỏ qua."
-            ),
+            text=("👤 <b>Tên người thuê?</b>\n\nGõ <code>skip</code> để bỏ qua."),
             parse_mode="HTML",
         )
         return
@@ -1475,15 +1643,16 @@ async def _handle_rental_tenant_input(
         rental = dict(draft.get("rental") or {})
     else:
         if len(cleaned) > 200:
-            await send_message(
-                chat_id=chat_id, text="Tên người thuê tối đa 200 ký tự."
-            )
+            await send_message(chat_id=chat_id, text="Tên người thuê tối đa 200 ký tự.")
             return
         rental = dict(draft.get("rental") or {})
         rental["tenant_name"] = cleaned
 
     await wizard_service.update_step(
-        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+        db,
+        user.id,
+        step="rental_extra",
+        draft_patch={"rental": rental},
     )
     await send_message(
         chat_id=chat_id,
@@ -1499,7 +1668,10 @@ async def _handle_rental_lease_input(
     if cleaned.lower() in ("skip", "bỏ qua", "bo qua"):
         rental = dict(draft.get("rental") or {})
         await wizard_service.update_step(
-            db, user.id, step="rental_extra", draft_patch={"rental": rental},
+            db,
+            user.id,
+            step="rental_extra",
+            draft_patch={"rental": rental},
         )
         await send_message(
             chat_id=chat_id,
@@ -1540,7 +1712,10 @@ async def _handle_rental_lease_input(
     rental["lease_start_date"] = start.isoformat()
     rental["lease_end_date"] = end.isoformat()
     await wizard_service.update_step(
-        db, user.id, step="rental_extra", draft_patch={"rental": rental},
+        db,
+        user.id,
+        step="rental_extra",
+        draft_patch={"rental": rental},
     )
     await send_message(
         chat_id=chat_id,
@@ -1551,7 +1726,10 @@ async def _handle_rental_lease_input(
 
 
 async def _commit_rental(
-    db: AsyncSession, chat_id: int, user: User, draft: dict,
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    draft: dict,
 ) -> None:
     """Final step: validate metadata, save asset (or mark existing),
     create/refresh income stream, send confirmation."""
@@ -1578,12 +1756,16 @@ async def _commit_rental(
         except (TypeError, ValueError):
             await wizard_service.clear(db, user.id)
             await send_message(
-                chat_id=chat_id, text="Không tìm thấy BĐS đích.",
+                chat_id=chat_id,
+                text="Không tìm thấy BĐS đích.",
             )
             return
         try:
             asset = await rental_service.mark_as_rental(
-                db, user.id, asset_id, metadata,
+                db,
+                user.id,
+                asset_id,
+                metadata,
             )
         except ValueError as exc:
             logger.warning("mark_as_rental failed: %s", exc)
@@ -1597,14 +1779,16 @@ async def _commit_rental(
         if current <= 0:
             await wizard_service.clear(db, user.id)
             await send_message(
-                chat_id=chat_id, text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
+                chat_id=chat_id,
+                text="Có lỗi với wizard. Thử lại bằng /assets nhé.",
             )
             return
         if initial <= 0:
             initial = current
         extra = dict(draft.get("extra") or {})
         asset = await asset_service.create_asset(
-            db, user.id,
+            db,
+            user.id,
             asset_type=AssetType.REAL_ESTATE.value,
             subtype=draft.get("subtype"),
             name=draft.get("name") or "Bất động sản",
@@ -1613,7 +1797,10 @@ async def _commit_rental(
             extra=extra,
         )
         asset = await rental_service.mark_as_rental(
-            db, user.id, asset.id, metadata,
+            db,
+            user.id,
+            asset.id,
+            metadata,
         )
 
     analytics.track(
@@ -1633,7 +1820,10 @@ async def _commit_rental(
     await send_message(
         chat_id=chat_id,
         text=format_rental_marked(
-            asset, monthly_rent, monthly_expenses, yield_pct,
+            asset,
+            monthly_rent,
+            monthly_expenses,
+            yield_pct,
             metadata.occupancy_status,
         ),
         parse_mode="HTML",
@@ -1655,12 +1845,12 @@ async def _commit_rental(
 # ---------- Mark-existing-as-rental flow (post-creation entry) -------
 
 
-async def start_mark_rental_wizard(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
+async def start_mark_rental_wizard(db: AsyncSession, chat_id: int, user: User) -> None:
     """Menu entry: list non-rental real-estate assets, let user pick."""
     candidates = await asset_service.get_user_assets(
-        db, user.id, asset_type=AssetType.REAL_ESTATE.value,
+        db,
+        user.id,
+        asset_type=AssetType.REAL_ESTATE.value,
     )
     candidates = [a for a in candidates if not a.is_rental]
     if not candidates:
@@ -1704,15 +1894,21 @@ async def _handle_rental_pick(
         return
 
     await wizard_service.start_flow(
-        db, user.id, FLOW_MARK_RENTAL, step="rental_rent",
+        db,
+        user.id,
+        FLOW_MARK_RENTAL,
+        step="rental_rent",
         draft={
             "mode": "mark_existing",
             "target_asset_id": str(asset_id),
             "rental": {},
         },
     )
-    analytics.track(AssetEvent.RENTAL_FLOW_OPENED, user_id=user.id,
-                    properties={"mode": "mark_existing"})
+    analytics.track(
+        AssetEvent.RENTAL_FLOW_OPENED,
+        user_id=user.id,
+        properties={"mode": "mark_existing"},
+    )
     await send_message(
         chat_id=chat_id,
         text=(
@@ -1725,6 +1921,7 @@ async def _handle_rental_pick(
 
 
 # ---------- Save / cleanup --------------------------------------------
+
 
 async def _post_mark_existing(
     db: AsyncSession, chat_id: int, user: User, asset
@@ -1764,9 +1961,7 @@ async def _post_mark_existing(
     )
 
 
-async def _post_save(
-    db: AsyncSession, chat_id: int, user: User, asset
-) -> None:
+async def _post_save(db: AsyncSession, chat_id: int, user: User, asset) -> None:
     """Finalise: clear wizard, recompute net worth, update wealth level,
     track analytics, and prompt for the next action."""
     await wizard_service.clear(db, user.id)
@@ -1881,9 +2076,7 @@ _TEXT_DISPATCH = {
 }
 
 
-async def handle_asset_text_input(
-    db: AsyncSession, message: dict
-) -> bool:
+async def handle_asset_text_input(db: AsyncSession, message: dict) -> bool:
     """Consume free text if the user is mid-wizard. Return True if so.
 
     Returns True for *any* asset-wizard flow — including the picker /
@@ -1940,8 +2133,9 @@ async def handle_asset_text_input(
     try:
         await handler(db, chat_id, user, text, draft)
     except Exception:
-        logger.exception("asset wizard text handler crashed: flow=%s step=%s",
-                         flow, step)
+        logger.exception(
+            "asset wizard text handler crashed: flow=%s step=%s", flow, step
+        )
         await wizard_service.clear(db, user.id)
         await send_message(
             chat_id=chat_id,
@@ -1974,7 +2168,9 @@ async def _dispatch_asset_action(
     if action == "cancel":
         await wizard_service.clear(db, user.id)
         analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
-        await send_message(chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋")
+        await send_message(
+            chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋"
+        )
         return
 
     if action == "undo" and arg:
@@ -2010,8 +2206,7 @@ async def _dispatch_asset_action(
             await send_message(
                 chat_id=chat_id,
                 text=(
-                    "Loại này sẽ có sớm 🙏 Tạm thời bạn dùng "
-                    "💵 / 📈 / 🏠 / ₿ / 🥇 nhé."
+                    "Loại này sẽ có sớm 🙏 Tạm thời bạn dùng 💵 / 📈 / 🏠 / ₿ / 🥇 nhé."
                 ),
             )
             return
@@ -2069,9 +2264,7 @@ async def _dispatch_asset_action(
         return
 
 
-async def handle_asset_rental_callback(
-    db: AsyncSession, callback_query: dict
-) -> bool:
+async def handle_asset_rental_callback(db: AsyncSession, callback_query: dict) -> bool:
     """Route ``asset_rental:*`` callbacks (mark-existing flow only).
 
     Distinct from ``asset_add:*`` because the entry point doesn't go
@@ -2114,9 +2307,56 @@ async def handle_asset_rental_callback(
     return True
 
 
-async def handle_asset_callback(
-    db: AsyncSession, callback_query: dict
-) -> bool:
+async def handle_asset_manage_callback(db: AsyncSession, callback_query: dict) -> bool:
+    """Route ``asset_manage:*`` callbacks for edit/delete flows."""
+    data: str = callback_query.get("data") or ""
+    if not data.startswith("asset_manage"):
+        return False
+
+    callback_id = callback_query["id"]
+    message = callback_query.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    telegram_id = (callback_query.get("from") or {}).get("id")
+    if chat_id is None or telegram_id is None:
+        await answer_callback(callback_id)
+        return True
+
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        await answer_callback(callback_id, text="Bạn cần /start trước nhé.")
+        return True
+
+    _, parts = parse_callback(data)
+    action = parts[0] if parts else "menu"
+    arg = parts[1] if len(parts) > 1 else None
+
+    async def _act() -> None:
+        if action == "menu":
+            await show_asset_manage_menu(db, chat_id, user)
+            return
+        if action == "delete_type" and arg:
+            await show_asset_delete_list(db, chat_id, user, arg)
+            return
+        if action == "delete_type":
+            await show_asset_delete_type_picker(db, chat_id, user)
+            return
+        if action == "delete_confirm" and arg:
+            await _confirm_asset_delete(db, chat_id, user, arg)
+            return
+        if action == "delete" and arg:
+            await _soft_delete_asset(db, chat_id, user, arg)
+            return
+        if action == "cancel":
+            await send_message(
+                chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋"
+            )
+            return
+
+    await asyncio.gather(answer_callback(callback_id), _act())
+    return True
+
+
+async def handle_asset_callback(db: AsyncSession, callback_query: dict) -> bool:
     """Route any ``asset_add:*`` callback. Returns True if handled."""
     data: str = callback_query.get("data") or ""
     if not data.startswith("asset_add"):
@@ -2147,12 +2387,11 @@ async def handle_asset_callback(
     return True  # consumed (any asset_add:* payload), even if no-op.
 
 
-async def _mark_onboarding_first_asset_done(
-    db: AsyncSession, user: User
-) -> None:
+async def _mark_onboarding_first_asset_done(db: AsyncSession, user: User) -> None:
     """Bridge for P3A-9 — see ``backend.bot.handlers.onboarding`` for usage.
 
     Imported lazily to avoid a circular import at module load.
     """
     from backend.bot.handlers import onboarding as onboarding_handlers
+
     await onboarding_handlers.note_first_asset_added_if_needed(db, user)
