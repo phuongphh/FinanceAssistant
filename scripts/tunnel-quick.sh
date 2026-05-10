@@ -37,8 +37,9 @@ cloudflared tunnel --url "http://localhost:${BACKEND_PORT}" 2>&1 | tee "$LOG_FIL
         echo "  API:                ${url}/miniapp/api/"
         echo "============================================"
         echo ""
-        echo "  Next: copy the tunnel URL and set it in BotFather:"
-        echo "  /setmenubutton → paste URL/miniapp/wealth"
+        echo "  Next: export MINIAPP_BASE_URL=${url} and restart the backend."
+        echo "  The backend re-registers the chat menu button on each boot"
+        echo "  (label + cache-busting URL) — no BotFather edit needed."
         echo ""
     fi
 done

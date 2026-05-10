@@ -23,6 +23,7 @@ from backend.routers import (
     telegram,
 )
 from backend.bot.setup_commands import setup_bot_commands
+from backend.bot.setup_menu_button import setup_chat_menu_button
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
@@ -88,6 +89,21 @@ async def lifespan(app: FastAPI):
         logger.info("Telegram bot commands registered")
     except Exception:
         logger.exception("Failed to register bot commands at startup; continuing")
+
+    # Re-register the Mini App chat menu button on every boot. The URL
+    # carries the current build hash so each deploy gives Telegram's
+    # WebView a URL it has never cached before — root-cause fix for the
+    # "users see old dashboard until they clear cache" problem. See
+    # bot/setup_menu_button.py for the full rationale. ``_GIT_SHA`` is
+    # imported lazily to avoid a circular import via the miniapp router.
+    try:
+        from backend.miniapp.routes import _GIT_SHA
+        await setup_chat_menu_button(_GIT_SHA)
+    except Exception:
+        logger.exception(
+            "Failed to register chat menu button at startup; continuing — "
+            "users keep whatever menu button BotFather has on file"
+        )
 
     # Pick up any telegram_updates that were mid-flight when the previous
     # process died. See docs/archive/scaling-refactor-A.md §A1.

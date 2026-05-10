@@ -376,3 +376,55 @@ class TestWealthDashboardPage:
         version = miniapp_routes._STATIC_VERSION
         assert f"dashboard.js?v={version}" in body
         assert f"style.css?v={version}" in body
+
+    def test_dashboard_injects_reload_bootstrap_with_current_version(self):
+        """Inline reload guard must appear in the served HTML and embed the
+        current build hash. Telegram WebView (especially iOS WebKit) can
+        ignore Cache-Control on HTML; this script forces a `?_b=<hash>`
+        reload the moment a fresh HTML reaches the WebView, so a stale
+        WebView state self-heals on the next genuine page-load instead of
+        requiring the user to manually clear Telegram's cache."""
+        resp = client.get("/miniapp/wealth")
+        body = resp.text
+        version = miniapp_routes._STATIC_VERSION
+        # Bootstrap must run before any other script — the placeholder is
+        # placed before the telegram-web-app.js include in the template.
+        assert body.index(f"'{version}'") < body.index("telegram-web-app.js")
+        assert "fa.app.build" in body
+        assert "localStorage.getItem" in body
+        assert "location.replace" in body
+
+    def test_legacy_dashboard_also_has_reload_bootstrap(self):
+        resp = client.get("/miniapp/dashboard")
+        body = resp.text
+        assert f"'{miniapp_routes._STATIC_VERSION}'" in body
+        assert "fa.app.build" in body
+
+    def test_dashboard_renders_visible_build_marker(self):
+        """User-facing footer prints git SHA + asset hash so a glance at the
+        Mini App reveals which build the VPS is running. Indispensable when
+        debugging "I pushed but UI didn't change" — without this the only
+        way to verify the deploy is to ssh into the VPS."""
+        resp = client.get("/miniapp/wealth")
+        body = resp.text
+        assert miniapp_routes._STATIC_VERSION in body
+        # Footer copy must contain the literal "build" prefix so users can
+        # search/screenshot it unambiguously.
+        assert "build " in body
+        assert f"assets {miniapp_routes._STATIC_VERSION}" in body
+
+
+class TestVersionEndpoint:
+    def test_returns_git_sha_and_static_version(self):
+        resp = client.get("/miniapp/api/version")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["error"] is None
+        assert body["data"]["static_version"] == miniapp_routes._STATIC_VERSION
+        assert body["data"]["git_sha"] == miniapp_routes._GIT_SHA
+
+    def test_no_auth_required(self):
+        # Diagnostic endpoint is intentionally public — values are non-sensitive
+        # and ssh-less verification of a deploy is the whole point.
+        resp = client.get("/miniapp/api/version")
+        assert resp.status_code == 200

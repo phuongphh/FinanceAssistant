@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     # briefing handler falls back to a placeholder message.
     miniapp_base_url: str = ""
 
+    # Label for the bot's chat menu button (next to the message input). Kept
+    # short because Telegram truncates long labels on narrow viewports — the
+    # legacy "Báo cáo tài sản" overflowed on iOS. Code-driven so each deploy
+    # can re-sync the menu (label + cache-bust URL) without a manual BotFather
+    # edit. Override via env var if product-renamed.
+    miniapp_menu_label: str = "💰 Tài sản"
+
     # ``extra="ignore"`` lets the .env file hold sibling env vars used by
     # docker-compose (e.g. POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
     # without pydantic-settings 2.x rejecting them as extras.
