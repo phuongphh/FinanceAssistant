@@ -10,11 +10,13 @@
 """
 from __future__ import annotations
 
+import hashlib
+import re
 import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -30,6 +32,70 @@ from backend.services import (
 _HERE = Path(__file__).parent
 _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
+
+# --- Static-asset cache busting ----------------------------------------
+#
+# Telegram's WebView caches /miniapp/static/css/*.css and /miniapp/static/js/*.js
+# very aggressively — re-opening the Mini App after a deploy still serves the
+# previous CSS/JS until cache eviction (often hours). Without cache busting,
+# a freshly-deployed UI change is invisible to users who already opened the
+# WebApp once. We compute a content hash over every referenced static asset
+# at process start and append it as ``?v=<hash>`` to every ``/miniapp/static/``
+# URL inside the HTML. The hash changes the moment any CSS/JS byte changes,
+# so the WebView treats it as a new resource and bypasses its cache. The HTML
+# itself is served with ``Cache-Control: no-cache`` so the WebView always
+# re-fetches the document (cheap — a few KB) and picks up the new version
+# string after every deploy.
+
+_STATIC_REF_FILES = (
+    "css/style.css",
+    "css/wealth.css",
+    "js/dashboard.js",
+    "js/wealth_dashboard.js",
+)
+_STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
+
+
+def _compute_static_version() -> str:
+    hasher = hashlib.sha256()
+    for rel_path in _STATIC_REF_FILES:
+        asset = _STATIC_DIR / rel_path
+        if asset.exists():
+            hasher.update(asset.read_bytes())
+    return hasher.hexdigest()[:10]
+
+
+_STATIC_VERSION = _compute_static_version()
+
+
+def _render_html_with_version(html_path: Path) -> str:
+    raw = html_path.read_text(encoding="utf-8")
+    return _STATIC_URL_PATTERN.sub(rf"\1?v={_STATIC_VERSION}", raw)
+
+
+_HTML_CACHE: dict[str, str] = {}
+
+
+def _serve_html(filename: str) -> HTMLResponse:
+    path = _TEMPLATES_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{filename} missing")
+    rendered = _HTML_CACHE.get(filename)
+    if rendered is None:
+        rendered = _render_html_with_version(path)
+        _HTML_CACHE[filename] = rendered
+    return HTMLResponse(
+        content=rendered,
+        headers={
+            # Force the WebView to revalidate the HTML on every open so a new
+            # deploy's `?v=` query strings reach the user immediately. The
+            # static assets behind those URLs remain cacheable for the long
+            # haul because the version string acts as the cache key.
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
+
 
 router = APIRouter(prefix="/miniapp", tags=["miniapp"])
 
@@ -73,14 +139,11 @@ def invalidate_wealth_cache_for_user(user_id) -> None:
 @router.get("/dashboard", include_in_schema=False)
 async def dashboard_page():
     """Serve the dashboard HTML. Auth happens in the API layer (per-request)."""
-    html_path = _TEMPLATES_DIR / "dashboard.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Dashboard page missing")
     # `miniapp_opened` here fires before the JS verifies user via initData, so
     # we don't have a user_id yet — the per-user dimension arrives via the
     # `miniapp_loaded` beacon once the dashboard finishes loading.
     analytics.track(analytics.EventType.MINIAPP_OPENED)
-    return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    return _serve_html("dashboard.html")
 
 
 @router.post("/api/events/loaded")
@@ -186,14 +249,11 @@ async def wealth_page():
     initData hasn't been verified yet — the JS sends an authenticated
     ``WEALTH_DASHBOARD_VIEWED`` event once the API call succeeds.
     """
-    html_path = _TEMPLATES_DIR / "wealth_dashboard.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Wealth dashboard page missing")
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "wealth"},
     )
-    return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    return _serve_html("wealth_dashboard.html")
 
 
 @router.get("/api/wealth/overview")
