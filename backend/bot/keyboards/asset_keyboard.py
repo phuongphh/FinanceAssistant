@@ -29,6 +29,8 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_manage:delete:<uuid>            — soft-delete confirmed asset
     asset_manage:cancel                   — leave manage flow
 
+    dashboard:edit:<asset_uuid>            — edit one asset from dashboard report
+
 Total callback bytes stay well under Telegram's 64-byte cap
 (``asset_add:undo:`` + 36-char UUID = 51 bytes).
 """
@@ -47,6 +49,7 @@ CB_ASSET_ADD = "asset_add"
 # so the dispatcher can route by prefix without inspecting the action.
 CB_ASSET_RENTAL = "asset_rental"
 CB_ASSET_MANAGE = "asset_manage"
+CB_DASHBOARD = "dashboard"
 
 
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
@@ -683,3 +686,27 @@ def add_more_keyboard(
             ]
         )
     return {"inline_keyboard": rows}
+
+
+def asset_dashboard_edit_keyboard(rows: list[tuple[uuid.UUID, str]]) -> InlineKeyboardMarkup | None:
+    """One edit button per dashboard asset row.
+
+    Callback shape is required by Phase 3.9.5 S4: ``dashboard:edit:<asset_id>``.
+    Labels are truncated defensively so a large portfolio stays readable on
+    mobile while callback data remains the source of truth.
+    """
+    if not rows:
+        return None
+    keyboard = []
+    for asset_id, label in rows:
+        clean = " ".join(str(label).split())
+        if len(clean) > 38:
+            clean = clean[:35].rstrip() + "…"
+        keyboard.append([
+            {
+                "text": f"✏️ {clean}",
+                "callback_data": build_callback(CB_DASHBOARD, "edit", asset_id),
+            }
+        ])
+    keyboard.append([{"text": "◀️ Quay về", "callback_data": "menu:assets"}])
+    return {"inline_keyboard": keyboard}

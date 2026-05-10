@@ -477,9 +477,11 @@ async def _maybe_auto_exit_asset_wizard(
     if not (is_asset_flow or is_income_flow or is_recurring_flow or is_goal_flow):
         return
 
-    cb_belongs_to_asset = callback_data.startswith(
-        "asset_add"
-    ) or callback_data.startswith("asset_rental")
+    cb_belongs_to_asset = (
+        callback_data.startswith("asset_add")
+        or callback_data.startswith("asset_rental")
+        or callback_data.startswith("dashboard:")
+    )
     cb_belongs_to_income = callback_data.startswith("income")
     cb_belongs_to_recurring = callback_data.startswith(
         "recurring"
@@ -585,6 +587,10 @@ async def _handle_callback(
 
     # Phase 3.8 — mark-existing-as-rental callbacks (asset_rental:*).
     if await asset_entry_handlers.handle_asset_rental_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Phase 3.9.5 — dashboard row edit callbacks (dashboard:edit:*).
+    if await asset_entry_handlers.handle_dashboard_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Phase 3.9.5 — asset manage/delete callbacks (asset_manage:*).

@@ -256,6 +256,39 @@ async def start_asset_wizard_route(
     return {"data": {"ok": True}, "error": None}
 
 
+@router.post("/api/wealth/start-asset-edit")
+async def start_asset_edit_route(
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger the asset edit wizard from a clicked dashboard row.
+
+    Ownership is checked inside ``start_asset_edit_wizard`` via
+    ``asset_service.get_asset_by_id``; the Mini App only passes the row id.
+    """
+    user = await _resolve_user(auth, db)
+    body = payload or {}
+    asset_id = str(body.get("asset_id") or "")
+    asset_ids = body.get("asset_ids")
+    if not asset_id and not asset_ids:
+        raise HTTPException(status_code=422, detail="asset_id is required")
+
+    from backend.bot.handlers.asset_entry import (
+        show_asset_edit_picker,
+        start_asset_edit_wizard,
+    )
+
+    if isinstance(asset_ids, list) and len(asset_ids) > 1:
+        await show_asset_edit_picker(
+            db, user.telegram_id, user, [str(item) for item in asset_ids]
+        )
+    else:
+        await start_asset_edit_wizard(db, user.telegram_id, user, asset_id)
+    _wealth_cache.pop((user.id, "overview"), None)
+    return {"data": {"ok": True}, "error": None}
+
+
 @router.get("/api/wealth/trend")
 async def get_wealth_trend(
     days: int = Query(

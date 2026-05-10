@@ -739,16 +739,14 @@ class TestActionCoverage:
 
     def test_assets_net_worth_and_report_routes_are_not_swapped(self):
         """User feedback caught these inverted: ``📊 Tổng tài sản``
-        should show the SHORT summary and ``📈 Báo cáo chi tiết`` should
-        show the per-asset list. Pin the orientation even though net worth
-        now uses a direct fast handler instead of the intent dispatcher.
+        should show the SHORT summary and ``📈 Báo cáo`` should show
+        the interactive per-asset report.
         """
-        from backend.bot.handlers.menu_handler import _DIRECT_HANDLERS, _INTENT_MAP
-        from backend.intent.intents import IntentType
+        from backend.bot.handlers.menu_handler import _DIRECT_HANDLERS
 
         assert ("assets", "net_worth") in _DIRECT_HANDLERS, (
             "📊 Tổng tài sản must use the fast short net-worth summary"
         )
-        assert _INTENT_MAP[("assets", "report")] == (IntentType.QUERY_ASSETS, {}), (
-            "📈 Báo cáo chi tiết must list every asset"
+        assert ("assets", "report") in _DIRECT_HANDLERS, (
+            "📈 Báo cáo must list every asset with edit callbacks"
         )
