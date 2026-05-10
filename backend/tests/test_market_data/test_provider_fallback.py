@@ -102,3 +102,21 @@ async def test_get_quotes_fetches_cache_misses_in_one_batch():
 
     assert set(cached_quotes) == {"SJC_GOLD", "RING_24K"}
     assert provider.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_get_fast_crypto_quotes_uses_fail_fast_provider():
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+
+    with patch("backend.market_data.client.get_price_cache", return_value=cache), \
+         patch("backend.market_data.client.get_fast_crypto_provider") as provider_factory:
+        from backend.market_data.client import get_fast_crypto_quotes
+
+        provider = _Provider("coingecko-fast", price=Decimal("100"), asset_type="crypto")
+        provider_factory.return_value = provider
+        quotes = await get_fast_crypto_quotes(["BTC", "ETH", "SOL"])
+
+    assert set(quotes) == {"BTC", "ETH", "SOL"}
+    assert provider.calls == 3
+    provider_factory.assert_called_once_with()

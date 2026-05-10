@@ -604,17 +604,21 @@ async def test_query_market_handler_crypto_category_shows_top_crypto_prices():
         ),
     }
 
-    async def fake_get_crypto_quote(symbol):
-        if symbol in quotes:
-            return quotes[symbol]
-        return PriceQuote(
-            symbol,
-            Decimal("1000000"),
-            "VND",
-            "crypto",
-            datetime(2026, 5, 8, tzinfo=timezone.utc),
-            "coingecko",
-        )
+    async def fake_get_fast_crypto_quotes(symbols):
+        return {
+            symbol: quotes.get(
+                symbol,
+                PriceQuote(
+                    symbol,
+                    Decimal("1000000"),
+                    "VND",
+                    "crypto",
+                    datetime(2026, 5, 8, tzinfo=timezone.utc),
+                    "coingecko",
+                ),
+            )
+            for symbol in symbols
+        }
 
     intent = IntentResult(
         intent=IntentType.QUERY_MARKET,
@@ -624,8 +628,8 @@ async def test_query_market_handler_crypto_category_shows_top_crypto_prices():
     )
 
     with patch(
-        "backend.intent.handlers.query_market.get_crypto_quote",
-        side_effect=fake_get_crypto_quote,
+        "backend.intent.handlers.query_market.get_fast_crypto_quotes",
+        side_effect=fake_get_fast_crypto_quotes,
     ):
         response = await QueryMarketHandler().handle(intent, _user(), _fake_db())
 

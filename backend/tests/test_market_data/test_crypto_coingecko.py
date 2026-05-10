@@ -75,3 +75,22 @@ async def test_429_retries_with_exponential_backoff_then_raises():
             await CoinGeckoCryptoProvider(client=client, sleep=fake_sleep).fetch_quote("BTC")
 
     assert sleeps == [1, 2, 4]
+
+
+@pytest.mark.asyncio
+async def test_429_can_fail_fast_without_backoff():
+    sleeps = []
+    transport = httpx.MockTransport(lambda request: httpx.Response(429, json={}, request=request))
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    async with httpx.AsyncClient(base_url="https://example.test", transport=transport) as client:
+        with pytest.raises(RateLimitError):
+            await CoinGeckoCryptoProvider(
+                client=client,
+                sleep=fake_sleep,
+                rate_limit_retry_delays=(),
+            ).fetch_quote("BTC")
+
+    assert sleeps == []

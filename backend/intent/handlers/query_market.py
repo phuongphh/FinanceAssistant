@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.market_data.client import (
-    get_crypto_quote,
+    get_fast_crypto_quotes,
     get_gold_quotes,
     get_stock_quote,
 )
@@ -131,17 +131,20 @@ class QueryMarketHandler(IntentHandler):
         lines = ["₿ *Giá tiền số phổ biến hôm nay:*"]
         had_quote = False
 
+        try:
+            quote_by_symbol = await get_fast_crypto_quotes(list(symbols))
+        except Exception as exc:
+            logger.warning(
+                "Unable to fetch crypto quote batch (%s): %s",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            quote_by_symbol = {}
+
         for symbol in symbols:
-            try:
-                quote = await get_crypto_quote(symbol)
-            except Exception as exc:
-                logger.warning(
-                    "Unable to fetch crypto quote for %s (%s): %s",
-                    symbol,
-                    type(exc).__name__,
-                    exc,
-                    exc_info=True,
-                )
+            quote = quote_by_symbol.get(symbol)
+            if quote is None:
                 lines.append(f"• {symbol}: chưa có dữ liệu")
                 continue
 
