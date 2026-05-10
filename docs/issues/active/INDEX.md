@@ -22,7 +22,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #343 | [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo" | [issue-343.md](issue-343.md) |
 | #344 | [Story] P3.9.5-S6: Sửa label "Dòng tiền hiện tại của từng tháng" | [issue-344.md](issue-344.md) |
 | #345 | [Story] P3.9.5-S7: Dedupe — bỏ "So sánh tháng trước" trùng | [issue-345.md](issue-345.md) |
+| #346 | [Story] P3.9.5-S8: Tách riêng card Thu nhập / Chi tiêu | [issue-346.md](issue-346.md) |
 | #347 | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [issue-347.md](issue-347.md) |
 | #348 | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [issue-348.md](issue-348.md) |
 
-**Total active:** 20
+**Total active:** 21
