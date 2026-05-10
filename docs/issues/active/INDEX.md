@@ -20,5 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #340 | [Story] P3.9.5-S2: Bỏ button "Phân bổ chi tiết" + sửa logic YTD return | [issue-340.md](issue-340.md) |
 | #341 | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [issue-341.md](issue-341.md) |
 | #344 | [Story] P3.9.5-S6: Sửa label "Dòng tiền hiện tại của từng tháng" | [issue-344.md](issue-344.md) |
+| #345 | [Story] P3.9.5-S7: Dedupe — bỏ "So sánh tháng trước" trùng | [issue-345.md](issue-345.md) |
 
-**Total active:** 16
+**Total active:** 17
