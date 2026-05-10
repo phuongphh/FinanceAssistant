@@ -7,12 +7,12 @@
 > **Type:** Epic | **Day:** 6 | **Stories:** 3
 
 ## Mục tiêu
-Upgrade từ static Unicode emoji sang Telegram premium animation emoji ở high-frequency touchpoints: briefing, milestones, menu intros, transaction success.
+Upgrade static Unicode emoji → Telegram premium animation emoji ở touchpoints chính.
 
 ## Stories in this Epic
-- [ ] [Story] P3.9.5-S17: Audit static emoji + lập mapping
-- [ ] [Story] P3.9.5-S18: Helper utility render animation emoji
-- [ ] [Story] P3.9.5-S19: Integration ở touchpoint chính
+- [ ] #355 [Story] P3.9.5-S17: Audit static emoji + lập mapping
+- [ ] #356 [Story] P3.9.5-S18: Helper utility render animation emoji
+- [ ] #357 [Story] P3.9.5-S19: Integration ở touchpoint chính
 
 ## Reference
 `docs/current/phase-3.9.5/phase-3.9.5-detailed.md` § Epic 5
