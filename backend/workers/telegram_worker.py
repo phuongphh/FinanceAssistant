@@ -14,6 +14,7 @@ The webhook route claims an ``update_id`` row and spawns
 
 See docs/archive/scaling-refactor-A.md §A3 + §A1 for context.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -101,7 +102,8 @@ async def route_update(data: dict) -> None:
             message = data.get("message")
             if message:
                 user_id = await _handle_message(
-                    db, message,
+                    db,
+                    message,
                     onboarding_handlers=onboarding_handlers,
                     asset_entry_handlers=asset_entry_handlers,
                     income_entry_handlers=income_entry_handlers,
@@ -120,7 +122,8 @@ async def route_update(data: dict) -> None:
                 callback_query = data.get("callback_query")
                 if callback_query:
                     user_id = await _handle_callback(
-                        db, callback_query,
+                        db,
+                        callback_query,
                         about_handlers=about_handlers,
                         onboarding_handlers=onboarding_handlers,
                         asset_entry_handlers=asset_entry_handlers,
@@ -262,25 +265,19 @@ async def _handle_message(
     # or to stamp user_id on the queue row).
     resolved_user = None
     if telegram_id is not None:
-        resolved_user = await dashboard_service.get_user_by_telegram_id(
-            db, telegram_id
-        )
+        resolved_user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
 
     # /taisan — list all active assets for the user.
     if command == "/taisan":
         if resolved_user is not None:
-            await asset_entry_handlers.list_assets(
-                db, chat_id, resolved_user
-            )
+            await asset_entry_handlers.list_assets(db, chat_id, resolved_user)
             return resolved_user.id
         return None
 
     # /assets — open the asset-entry wizard (Phase 3A).
     if command in ("/assets", "/asset", "/themtaisan"):
         if resolved_user is not None:
-            await asset_entry_handlers.start_asset_wizard(
-                db, chat_id, resolved_user
-            )
+            await asset_entry_handlers.start_asset_wizard(db, chat_id, resolved_user)
             return resolved_user.id
         return None
 
@@ -306,9 +303,13 @@ async def _handle_message(
     # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            if (resolved_user.wizard_state or {}).get("flow") == profile_handlers.FLOW_PROFILE:
+            if (resolved_user.wizard_state or {}).get(
+                "flow"
+            ) == profile_handlers.FLOW_PROFILE:
                 await profile_handlers.handle_profile_text_input(db, message)
-            elif (resolved_user.wizard_state or {}).get("flow") == feedback_handlers.FLOW_FEEDBACK:
+            elif (resolved_user.wizard_state or {}).get(
+                "flow"
+            ) == feedback_handlers.FLOW_FEEDBACK:
                 await feedback_handlers.handle_feedback_text_input(db, message)
             elif not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
@@ -328,9 +329,7 @@ async def _handle_message(
         and (resolved_user.wizard_state or {}).get("flow")
         == storytelling_handlers.FLOW_STORYTELLING
     ):
-        consumed = await storytelling_handlers.handle_storytelling_input(
-            db, message
-        )
+        consumed = await storytelling_handlers.handle_storytelling_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -340,6 +339,7 @@ async def _handle_message(
     # voice messages aren't ignored.
     if message.get("voice") and resolved_user is not None:
         from backend.bot.handlers.voice_query import handle_voice_query
+
         consumed = await handle_voice_query(db, message)
         if consumed:
             return resolved_user.id
@@ -393,9 +393,7 @@ async def _handle_message(
         and (resolved_user.wizard_state or {}).get("flow")
         == storytelling_handlers.FLOW_STORYTELLING
     ):
-        consumed = await storytelling_handlers.handle_storytelling_input(
-            db, message
-        )
+        consumed = await storytelling_handlers.handle_storytelling_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -408,18 +406,14 @@ async def _handle_message(
         and not command.startswith("/")
         and resolved_user.wizard_state
     ):
-        consumed = await asset_entry_handlers.handle_asset_text_input(
-            db, message
-        )
+        consumed = await asset_entry_handlers.handle_asset_text_input(db, message)
         if consumed:
             return resolved_user.id
 
         # Phase 3.8 Epic 2 — income wizard mid-flow text. Same defensive
         # pattern as the asset wizard above: catch the text before the
         # NL expense parser claims it.
-        consumed = await income_entry_handlers.handle_income_text_input(
-            db, message
-        )
+        consumed = await income_entry_handlers.handle_income_text_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -431,9 +425,7 @@ async def _handle_message(
             return resolved_user.id
 
         # Phase 3.8 Epic 5 — goals wizard mid-flow text.
-        consumed = await goal_entry_handlers.handle_goals_text_input(
-            db, message
-        )
+        consumed = await goal_entry_handlers.handle_goals_text_input(db, message)
         if consumed:
             return resolved_user.id
 
@@ -482,16 +474,16 @@ async def _maybe_auto_exit_asset_wizard(
     is_income_flow = flow.startswith("income_")
     is_recurring_flow = flow.startswith("recurring_")
     is_goal_flow = flow.startswith("goal_")
-    if not (
-        is_asset_flow or is_income_flow or is_recurring_flow or is_goal_flow
-    ):
+    if not (is_asset_flow or is_income_flow or is_recurring_flow or is_goal_flow):
         return
 
-    cb_belongs_to_asset = callback_data.startswith("asset_add") or callback_data.startswith("asset_rental")
+    cb_belongs_to_asset = callback_data.startswith(
+        "asset_add"
+    ) or callback_data.startswith("asset_rental")
     cb_belongs_to_income = callback_data.startswith("income")
-    cb_belongs_to_recurring = (
-        callback_data.startswith("recurring") or callback_data.startswith("reminder")
-    )
+    cb_belongs_to_recurring = callback_data.startswith(
+        "recurring"
+    ) or callback_data.startswith("reminder")
     cb_belongs_to_goal = callback_data.startswith("goals")
     if is_asset_flow and cb_belongs_to_asset:
         return
@@ -516,7 +508,8 @@ async def _maybe_auto_exit_asset_wizard(
     step = (user.wizard_state or {}).get("step")
     await wizard_service.clear(db, user.id)
     analytics.track(
-        event, user_id=user.id,
+        event,
+        user_id=user.id,
         properties={
             "flow": flow,
             "step": step,
@@ -594,15 +587,17 @@ async def _handle_callback(
     if await asset_entry_handlers.handle_asset_rental_callback(db, callback_query):
         return await _resolved_user_id()
 
+    # Phase 3.9.5 — asset manage/delete callbacks (asset_manage:*).
+    if await asset_entry_handlers.handle_asset_manage_callback(db, callback_query):
+        return await _resolved_user_id()
+
     # Phase 3.8 Epic 2 — income-stream wizard + list (income:*).
     if await income_entry_handlers.handle_income_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Phase 3.8 Epic 3 — recurring patterns + reminder actions
     # (recurring:* and reminder:*).
-    if await recurring_entry_handlers.handle_recurring_callback(
-        db, callback_query
-    ):
+    if await recurring_entry_handlers.handle_recurring_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Phase 3.8 Epic 5 — goals wizard + list (goals:*).
@@ -624,10 +619,9 @@ async def _handle_callback(
     # Phase 3.5 intent callbacks (intent_confirm:*, intent_clarify:*,
     # followup:*). Routed before the transaction handler because
     # those prefixes are distinct and the user is mid-flow.
-    if callback_data.startswith("intent_") or callback_data.startswith(
-        "followup:"
-    ):
+    if callback_data.startswith("intent_") or callback_data.startswith("followup:"):
         from backend.bot.handlers.message import handle_intent_callback
+
         await answer_callback(callback_id)
         if await handle_intent_callback(db, callback_query):
             return await _resolved_user_id()
@@ -751,7 +745,8 @@ async def recover_orphaned_updates() -> int:
     if spawned:
         logger.info(
             "Recovered %d orphaned Telegram update(s) (%d candidates inspected)",
-            spawned, len(candidates),
+            spawned,
+            len(candidates),
         )
     return spawned
 

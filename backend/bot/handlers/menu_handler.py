@@ -42,6 +42,7 @@ Action wiring philosophy (Epic 1 plumbing rule):
   * Genuinely missing capability → friendly "coming soon" with a hint
     about the free-form alternative. Never silent fail.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -90,16 +91,13 @@ _dispatcher = IntentDispatcher()
 
 
 DASHBOARD_NOT_CONFIGURED_TEXT = (
-    "📊 Dashboard chưa sẵn sàng — admin cần cấu hình "
-    "`MINIAPP_BASE_URL` trước nhé."
+    "📊 Dashboard chưa sẵn sàng — admin cần cấu hình `MINIAPP_BASE_URL` trước nhé."
 )
 
 NET_WORTH_WAIT_DELAY_SECONDS = 0.7
 
 
-async def cmd_dashboard(
-    db: AsyncSession, chat_id: int, user: User | None
-) -> None:
+async def cmd_dashboard(db: AsyncSession, chat_id: int, user: User | None) -> None:
     """Handle the ``/dashboard`` command — open the wealth Mini App.
 
     The Mini App opens in-place inside Telegram, so the user never
@@ -121,9 +119,11 @@ async def cmd_dashboard(
         chat_id=chat_id,
         text="📊 Mở dashboard tài sản:",
         reply_markup={
-            "inline_keyboard": [[
-                {"text": "Mở Dashboard", "web_app": {"url": url}},
-            ]],
+            "inline_keyboard": [
+                [
+                    {"text": "Mở Dashboard", "web_app": {"url": url}},
+                ]
+            ],
         },
     )
     if user is not None:
@@ -460,9 +460,7 @@ async def _route_action(
 
     # 4. Genuinely unwired — friendly stub with escape route.
     await _send_coming_soon(chat_id, category, action)
-    analytics.track(
-        "menu_action_tapped", user_id=user.id, properties=track_properties
-    )
+    analytics.track("menu_action_tapped", user_id=user.id, properties=track_properties)
 
 
 async def _dispatch_synthesised(
@@ -499,7 +497,7 @@ async def _send_coming_soon(chat_id: int, category: str, action: str) -> None:
         text=(
             "🚧 Tính năng này mình đang phát triển nhé.\n\n"
             "Trong lúc chờ, bạn có thể hỏi mình thẳng — "
-            "ví dụ \"chi tiêu tháng này\" hoặc \"tài sản của tôi\" — "
+            'ví dụ "chi tiêu tháng này" hoặc "tài sản của tôi" — '
             "mình hiểu mà 🌱"
         ),
         parse_mode="Markdown",
@@ -608,13 +606,10 @@ async def _action_assets_add(
 async def _action_assets_edit(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Show the user's asset list — full inline-edit wizard is a later
-    phase. The list gives the names the user needs to update via
-    natural language ("update VCB to 100tr").
-    """
-    from backend.bot.handlers.asset_entry import list_assets
+    """Open the type-gated asset management surface."""
+    from backend.bot.handlers.asset_entry import show_asset_manage_menu
 
-    await list_assets(db, chat_id, user)
+    await show_asset_manage_menu(db, chat_id, user)
 
 
 async def _action_expenses_recurring(
@@ -670,9 +665,9 @@ async def _action_expenses_add(
         text=(
             "✏️ *Thêm chi tiêu nhanh*\n\n"
             "Gõ hoặc nói cho mình biết, ví dụ:\n"
-            "• _\"vừa chi 200k cafe\"_\n"
-            "• _\"mua xe máy 35tr\"_\n"
-            "• _\"trả tiền điện 1.2tr\"_\n\n"
+            '• _"vừa chi 200k cafe"_\n'
+            '• _"mua xe máy 35tr"_\n'
+            '• _"trả tiền điện 1.2tr"_\n\n'
             "Mình sẽ tự ghi lại và phân loại."
         ),
         parse_mode="Markdown",

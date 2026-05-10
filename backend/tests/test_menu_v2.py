@@ -6,6 +6,7 @@ Three concerns covered:
   2. Formatter output shape (text + dict-based inline keyboard).
   3. Callback router routes / declines correctly.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -190,7 +191,9 @@ class TestFormatMainMenu:
 
 
 class TestFormatSubmenu:
-    @pytest.mark.parametrize("cat", ["assets", "expenses", "cashflow", "goals", "market"])
+    @pytest.mark.parametrize(
+        "cat", ["assets", "expenses", "cashflow", "goals", "market"]
+    )
     def test_submenu_has_back_button_last(self, cat):
         _, kb = format_submenu(_user(), cat)
         rows = kb["inline_keyboard"]
@@ -198,7 +201,9 @@ class TestFormatSubmenu:
         assert last_btn["callback_data"] == "menu:main"
         assert "Quay về" in last_btn["text"]
 
-    @pytest.mark.parametrize("cat", ["assets", "expenses", "cashflow", "goals", "market"])
+    @pytest.mark.parametrize(
+        "cat", ["assets", "expenses", "cashflow", "goals", "market"]
+    )
     def test_submenu_layout_is_one_per_row(self, cat):
         _, kb = format_submenu(_user(), cat)
         for row in kb["inline_keyboard"]:
@@ -281,19 +286,16 @@ class TestHandleMenuCallback:
         from backend.bot.handlers.menu_handler import handle_menu_callback
 
         # Empty data string is treated as "not for me".
+        assert await handle_menu_callback(db=None, callback_query={"id": "x"}) is False
         assert (
-            await handle_menu_callback(db=None, callback_query={"id": "x"})
-            is False
-        )
-        assert (
-            await handle_menu_callback(
-                db=None, callback_query={"data": "", "id": "x"}
-            )
+            await handle_menu_callback(db=None, callback_query={"data": "", "id": "x"})
             is False
         )
 
     @pytest.mark.asyncio
-    async def test_profile_navigation_tracks_with_snapshotted_user_id(self, monkeypatch):
+    async def test_profile_navigation_tracks_with_snapshotted_user_id(
+        self, monkeypatch
+    ):
         """Profile fallback can rollback the session, which expires ORM users.
 
         The menu handler must snapshot ``user.id`` before rendering Profile so
@@ -320,11 +322,13 @@ class TestHandleMenuCallback:
         tracked: dict = {}
 
         def fake_track(event_type, user_id=None, properties=None):
-            tracked.update({
-                "event_type": event_type,
-                "user_id": user_id,
-                "properties": properties,
-            })
+            tracked.update(
+                {
+                    "event_type": event_type,
+                    "user_id": user_id,
+                    "properties": properties,
+                }
+            )
 
         monkeypatch.setattr(profile_menu, "handle_profile_view", fake_profile_view)
         monkeypatch.setattr(menu_handler.analytics, "track", fake_track)
@@ -427,11 +431,9 @@ class TestAdaptiveIntros:
         # All 4 levels must render different text — otherwise the
         # adaptive layer is a no-op. Compare pairwise (6 pairs).
         levels = ["starter", "young_prof", "mass_affluent", "hnw"]
-        renders = {
-            lvl: format_main_menu(_user(), level=lvl)[0] for lvl in levels
-        }
+        renders = {lvl: format_main_menu(_user(), level=lvl)[0] for lvl in levels}
         for i, a in enumerate(levels):
-            for b in levels[i + 1:]:
+            for b in levels[i + 1 :]:
                 assert renders[a] != renders[b], (
                     f"Levels {a} and {b} render identical main menu text"
                 )
@@ -442,11 +444,10 @@ class TestAdaptiveIntros:
     def test_each_level_produces_distinct_submenu_text(self, category):
         levels = ["starter", "young_prof", "mass_affluent", "hnw"]
         renders = {
-            lvl: format_submenu(_user(), category, level=lvl)[0]
-            for lvl in levels
+            lvl: format_submenu(_user(), category, level=lvl)[0] for lvl in levels
         }
         for i, a in enumerate(levels):
-            for b in levels[i + 1:]:
+            for b in levels[i + 1 :]:
                 assert renders[a] != renders[b], (
                     f"{category}: levels {a} and {b} render identically"
                 )
@@ -454,8 +455,7 @@ class TestAdaptiveIntros:
     def test_buttons_identical_across_levels(self):
         levels = ["starter", "young_prof", "mass_affluent", "hnw"]
         keyboards = [
-            format_main_menu(_user(), level=lvl)[1]["inline_keyboard"]
-            for lvl in levels
+            format_main_menu(_user(), level=lvl)[1]["inline_keyboard"] for lvl in levels
         ]
         button_lists = [
             [(btn["text"], btn["callback_data"]) for row in kb for btn in row]
@@ -630,9 +630,7 @@ class TestNetWorthFastPath:
             "calculate_stored_current",
             AsyncMock(return_value=breakdown),
         )
-        monkeypatch.setattr(
-            net_worth_calculator, "calculate", fail_change
-        )
+        monkeypatch.setattr(net_worth_calculator, "calculate", fail_change)
         monkeypatch.setattr(
             net_worth_calculator, "calculate_change_from_current", fail_change
         )
@@ -652,17 +650,12 @@ class TestNetWorthFastPath:
             "Mình đã dùng giá thị trường mới nhất đang có để cập nhật "
             "chứng khoán, tiền số và vàng."
         ) in sent["text"]
-        assert (
-            "Đây là ảnh chụp nhanh để bạn theo dõi tổng tài sản "
-            "gọn hơn nhé."
-        ) in sent["text"]
+        assert "Đây là ảnh" not in sent["text"]
         assert "tháng trước" not in sent["text"]
         assert sent["reply_markup"] == back_to_main_keyboard()
 
     @pytest.mark.asyncio
-    async def test_assets_net_worth_waits_only_after_700ms(
-        self, monkeypatch
-    ):
+    async def test_assets_net_worth_waits_only_after_700ms(self, monkeypatch):
         from backend.bot.handlers import menu_handler
         from backend.wealth.services import net_worth_calculator
 
@@ -756,6 +749,6 @@ class TestActionCoverage:
         assert ("assets", "net_worth") in _DIRECT_HANDLERS, (
             "📊 Tổng tài sản must use the fast short net-worth summary"
         )
-        assert _INTENT_MAP[("assets", "report")] == (
-            IntentType.QUERY_ASSETS, {}
-        ), "📈 Báo cáo chi tiết must list every asset"
+        assert _INTENT_MAP[("assets", "report")] == (IntentType.QUERY_ASSETS, {}), (
+            "📈 Báo cáo chi tiết must list every asset"
+        )

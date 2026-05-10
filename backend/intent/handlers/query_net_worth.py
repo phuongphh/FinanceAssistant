@@ -1,4 +1,5 @@
 """Handler for ``query_net_worth`` — total + change vs last month."""
+
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,7 @@ from backend.wealth.services import net_worth_calculator
 
 
 class QueryNetWorthHandler(IntentHandler):
-    async def handle(
-        self, intent: IntentResult, user: User, db: AsyncSession
-    ) -> str:
+    async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
         breakdown = await net_worth_calculator.calculate(db, user.id)
         if breakdown.total <= 0:
             name = user.display_name or "bạn"
@@ -53,23 +52,20 @@ class QueryNetWorthHandler(IntentHandler):
             lines.append("")
             lines.append(f"_Theo dõi qua {breakdown.asset_count} tài sản_")
 
-        # HNW gets a coarse YTD-style line. We don't have a real YTD
-        # calculator yet (Phase 4 dashboard handles that) so we use the
-        # year-period approximation from net_worth_calculator.
         if style.show_ytd_return:
-            try:
-                yearly = await net_worth_calculator.calculate_change_from_current(
-                    db,
-                    user.id,
-                    breakdown.total,
-                    period=net_worth_calculator.PERIOD_YEAR,
-                )
-            except ValueError:
-                yearly = None
-            if yearly is not None and yearly.previous > 0:
-                sign = "+" if yearly.change_percentage >= 0 else ""
+            ytd = await net_worth_calculator.calculate_ytd_return_from_current(
+                db,
+                user.id,
+                breakdown.total,
+                account_created_at=user.created_at,
+            )
+            if ytd.change_percentage is None:
+                lines.append(f"_{ytd.period_label}: —_")
+            else:
+                sign = "+" if ytd.change_percentage >= 0 else ""
+                arrow = "📈" if ytd.change_percentage >= 0 else "📉"
                 lines.append(
-                    f"_Lợi nhuận năm (ước tính): {sign}{yearly.change_percentage:.1f}%_"
+                    f"_{arrow} {ytd.period_label}: {sign}{ytd.change_percentage:.1f}%_"
                 )
 
         return decorate("\n".join(lines), style)

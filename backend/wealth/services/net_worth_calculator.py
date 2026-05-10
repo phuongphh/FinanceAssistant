@@ -8,11 +8,12 @@ N+1 queries.
 All math goes through ``Decimal`` — money MUST NOT touch ``float`` per
 CLAUDE.md § 13.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import bindparam, text
@@ -46,6 +47,7 @@ _PERIOD_LABELS = {
 @dataclass
 class NetWorthBreakdown:
     """Snapshot of a user's net worth at a moment in time."""
+
     total: Decimal = Decimal(0)
     by_type: dict[str, Decimal] = field(default_factory=dict)
     asset_count: int = 0
@@ -54,8 +56,21 @@ class NetWorthBreakdown:
 
 
 @dataclass
+class NetWorthYtdReturn:
+    """Year-to-date return using Jan-1 as the baseline when available."""
+
+    current: Decimal
+    base: Decimal
+    change_absolute: Decimal
+    change_percentage: float | None
+    period_label: str
+    is_join_date_fallback: bool = False
+
+
+@dataclass
 class NetWorthChange:
     """Change between two points (current vs ``period`` ago)."""
+
     current: Decimal
     previous: Decimal
     change_absolute: Decimal
@@ -63,9 +78,7 @@ class NetWorthChange:
     period_label: str
 
 
-async def calculate(
-    db: AsyncSession, user_id: uuid.UUID
-) -> NetWorthBreakdown:
+async def calculate(db: AsyncSession, user_id: uuid.UUID) -> NetWorthBreakdown:
     """Sum every active asset's ``current_value`` and break down by type.
 
     Edge case: user with 0 assets returns an empty breakdown — never
@@ -161,9 +174,7 @@ async def calculate_historical(
         bindparam("user_id"),
         bindparam("target_date"),
     )
-    result = await db.execute(
-        stmt, {"user_id": user_id, "target_date": target_date}
-    )
+    result = await db.execute(stmt, {"user_id": user_id, "target_date": target_date})
     total = result.scalar() or Decimal(0)
     return Decimal(total)
 
@@ -208,6 +219,55 @@ async def calculate_change_from_current(
         change_absolute=change_absolute,
         change_percentage=change_pct,
         period_label=_PERIOD_LABELS[period],
+    )
+
+
+async def calculate_ytd_return_from_current(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    current: Decimal,
+    *,
+    account_created_at: datetime | date | None = None,
+    today: date | None = None,
+) -> NetWorthYtdReturn:
+    """Calculate true YTD return from Jan 1 of the current year.
+
+    If the account was created after Jan 1, the label falls back to
+    ``Từ ngày tham gia`` and the baseline date becomes the join date.
+    A zero/missing baseline returns ``change_percentage=None`` so callers
+    can render ``—`` instead of divide-by-zero or misleading infinity.
+    """
+    today = today or date.today()
+    year_start = date(today.year, 1, 1)
+    baseline_date = year_start
+    is_join_date_fallback = False
+
+    if account_created_at is not None:
+        joined_date = (
+            account_created_at.date()
+            if isinstance(account_created_at, datetime)
+            else account_created_at
+        )
+        if joined_date > year_start:
+            baseline_date = joined_date
+            is_join_date_fallback = True
+
+    current = Decimal(current or 0)
+    base = await calculate_historical(db, user_id, baseline_date)
+    change_absolute = current - base
+    change_pct: float | None
+    if base > 0:
+        change_pct = float(change_absolute / base * 100)
+    else:
+        change_pct = None
+
+    return NetWorthYtdReturn(
+        current=current,
+        base=base,
+        change_absolute=change_absolute,
+        change_percentage=change_pct,
+        period_label="Từ ngày tham gia" if is_join_date_fallback else "YTD",
+        is_join_date_fallback=is_join_date_fallback,
     )
 
 
