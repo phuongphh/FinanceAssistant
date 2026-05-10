@@ -374,3 +374,16 @@ class TestCancel:
             consumed = await goal_entry.cancel_wizard(db, 100, user)
         assert consumed is False
         clear.assert_not_awaited()
+
+
+def test_goals_footer_can_return_to_cashflow_context():
+    from backend.bot.keyboards.goals_keyboard import goals_list_footer_keyboard
+
+    keyboard = goals_list_footer_keyboard(
+        back_callback="menu:cashflow",
+        back_label="◀️ Quay về Dòng tiền",
+    )
+
+    back = keyboard["inline_keyboard"][-1][0]
+    assert back["callback_data"] == "menu:cashflow"
+    assert back["text"] == "◀️ Quay về Dòng tiền"

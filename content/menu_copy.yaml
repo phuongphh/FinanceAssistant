@@ -220,28 +220,35 @@ submenu_cashflow:
 
   intro:
     starter: |-
-      Dòng tiền = thu nhập − chi tiêu của {name}.
+      Dòng tiền tháng này = thu nhập − chi tiêu của {name}.
 
-      Đây là chỉ số quan trọng nhất để biết bạn có đang
-      tiết kiệm được tiền không.
+      Mình tóm tắt thu, chi và phần còn dư để bạn biết
+      tháng này đang ổn hay cần chậm lại một chút.
 
     young_prof: |-
-      Theo dõi thu − chi và tỷ lệ tiết kiệm của {name}.
+      Theo dõi dòng tiền tháng này và so sánh nhẹ với tháng trước
+      để {name} thấy thu, chi, tỷ lệ tiết kiệm rõ hơn.
 
       Tỷ lệ tiết kiệm 20–30% là mức an toàn cho phần lớn người trẻ.
 
     mass_affluent: |-
-      Quản lý dòng tiền tổng và tối ưu tỷ lệ tiết kiệm.
+      Quản lý dòng tiền tháng này của {name}: thu nhập chủ động,
+      thu nhập thụ động, chi tiêu và tỷ lệ tiết kiệm.
 
-      Bao gồm thu nhập thụ động (cổ tức, lãi tiết kiệm).
+      Mình giữ báo cáo gọn để bạn scan nhanh và hành động ngay.
 
     hnw: |-
-      Dòng tiền chủ động + thụ động, phân tích thời gian dự trữ.
+      Dòng tiền tháng này của {name}: thu chủ động + thụ động,
+      chi tiêu và phần còn lại để điều phối mục tiêu.
 
   buttons:
     - label: "📊 Tổng quan"
       callback: "menu:cashflow:overview"
       description: "Thu, chi, tiết kiệm tháng này"
+
+    - label: "📅 Dòng tiền tháng này"
+      callback: "menu:cashflow:monthly_report"
+      description: "Báo cáo chi tiết tháng hiện tại"
 
     - label: "💼 Thu nhập"
       callback: "menu:cashflow:income"
@@ -254,6 +261,10 @@ submenu_cashflow:
     - label: "💎 Tỷ lệ tiết kiệm"
       callback: "menu:cashflow:saving_rate"
       description: "% thu nhập bạn tiết kiệm được"
+
+    - label: "🎯 Mục tiêu"
+      callback: "menu:cashflow:goals"
+      description: "Xem mục tiêu liên quan tới phần dư"
 
     - label: "◀️ Quay về"
       callback: "menu:main"

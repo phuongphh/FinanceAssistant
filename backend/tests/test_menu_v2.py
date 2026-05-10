@@ -209,6 +209,16 @@ class TestFormatSubmenu:
         for row in kb["inline_keyboard"]:
             assert len(row) == 1, f"{cat}: expected single-column layout"
 
+    def test_cashflow_submenu_has_monthly_report_and_goals_link(self):
+        _, kb = format_submenu(_user("Phương"), "cashflow")
+        labels = [row[0]["text"] for row in kb["inline_keyboard"]]
+        callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
+
+        assert "📅 Dòng tiền tháng này" in labels
+        assert "🎯 Mục tiêu" in labels
+        assert "menu:cashflow:monthly_report" in callbacks
+        assert "menu:cashflow:goals" in callbacks
+
     def test_unknown_category_raises_value_error(self):
         with pytest.raises(ValueError):
             format_submenu(_user(), "nonexistent")

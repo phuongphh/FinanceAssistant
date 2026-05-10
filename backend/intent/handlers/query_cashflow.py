@@ -7,13 +7,17 @@ streams are configured.
 """
 from __future__ import annotations
 
-from datetime import date
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_full, format_money_short
+from backend.config.categories import get_category
 from backend.intent.extractors.time_range import TimeRange
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.handlers.query_expenses import (
@@ -21,10 +25,20 @@ from backend.intent.handlers.query_expenses import (
     _TIME_LABELS_VI,
     _fetch_expenses,
 )
+from backend.intent.handlers.query_income import _SOURCE_ICONS, _SOURCE_LABELS
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
+from backend.models.expense import Expense
 from backend.models.user import User
 from backend.wealth.models.income_stream import IncomeStream
+
+
+@dataclass(frozen=True)
+class CashflowPeriod:
+    income: Decimal
+    spend: Decimal
+    net: Decimal
+    expenses: list[Expense]
 
 
 class QueryCashflowHandler(IntentHandler):
@@ -32,89 +46,198 @@ class QueryCashflowHandler(IntentHandler):
         self, intent: IntentResult, user: User, db: AsyncSession
     ) -> str:
         time_range = _resolve_time_range(intent)
-
-        # Income for the period — sum of active streams' monthly amount,
-        # prorated by the number of months the period covers. Falls back
-        # to the legacy user.monthly_income field when no streams.
-        income = await _income_for_period(db, user, time_range)
-        expenses = await _fetch_expenses(
-            db, user, start=time_range.start, end=time_range.end
-        )
-        spend = sum(Decimal(tx.amount or 0) for tx in expenses)
-        net = income - spend
+        streams = await _fetch_income_streams(db, user)
+        current = await _build_period(db, user, time_range, streams=streams)
 
         style = await resolve_style(db, user)
-        text = self._format(
-            user, time_range, income=income, spend=spend, net=net, style=style
-        )
+        focus = intent.parameters.get("focus")
+        if focus == "current_month_detail":
+            text = self._format_monthly_detail(user, time_range, current, streams)
+        else:
+            previous_range = _previous_period(time_range)
+            previous = await _build_period(db, user, previous_range, streams=streams)
+            text = self._format_overview(
+                user,
+                time_range,
+                current=current,
+                previous=previous,
+                streams=streams,
+                style=style,
+            )
         return decorate(text, style)
 
-    def _format(
+    def _format_overview(
         self,
         user: User,
         time_range: TimeRange,
         *,
-        income: Decimal,
-        spend: Decimal,
-        net: Decimal,
+        current: CashflowPeriod,
+        previous: CashflowPeriod,
+        streams: list[IncomeStream],
         style: LevelStyle,
     ) -> str:
         name = user.display_name or "bạn"
         label_vi = _TIME_LABELS_VI.get(time_range.label, time_range.label)
-        if income <= 0 and spend <= 0:
+        if current.income <= 0 and current.spend <= 0:
             return (
                 f"{name} chưa có dữ liệu thu / chi {label_vi} 🌱\n"
                 "Mình cần ít nhất một nguồn thu và vài giao dịch để tính dòng tiền."
             )
 
-        arrow = "💚" if net >= 0 else "🟥"
-        sign = "+" if net >= 0 else "−"
-        # Starter: simple. Don't drown them in numbers.
         if style.is_starter:
-            if net >= 0:
+            if current.net >= 0:
                 return (
                     f"💰 Dòng tiền {label_vi}:\n"
-                    f"Bạn dư *{format_money_short(net)}* {label_vi} 💚"
+                    f"Bạn dư *{format_money_short(current.net)}* {label_vi} 💚"
                 )
             return (
                 f"💰 Dòng tiền {label_vi}:\n"
-                f"Tháng này hơi căng — đang vượt thu {format_money_short(abs(net))} 🟥"
+                f"Tháng này hơi căng — đang vượt thu {format_money_short(abs(current.net))} 🟥"
             )
 
-        # Young Pro+: breakdown + savings rate when income > 0.
+        saving_rate = _safe_rate(current.net, current.income)
+        arrow = "💚" if current.net >= 0 else "🟥"
+        sign = "+" if current.net >= 0 else "−"
         lines = [
             f"💰 Dòng tiền {label_vi}:",
-            f"Thu: *{format_money_full(income)}*",
-            f"Chi: *{format_money_full(spend)}*",
-            f"{arrow} Dư: *{sign}{format_money_full(abs(net))}*",
+            "",
+            self._income_card(current, previous, streams, time_range),
+            "",
+            self._expense_card(current, previous),
+            "",
+            "💎 *Tỷ lệ tiết kiệm*",
+            f"{_format_percent(saving_rate) if saving_rate is not None else '—'}",
+            "",
+            f"{arrow} *Dư / thiếu*: {sign}{format_money_full(abs(current.net))}",
         ]
-        if style.show_percent_change and income > 0:
-            savings_rate = float(net / income * 100)
+        return "\n".join(lines)
+
+    def _income_card(
+        self,
+        current: CashflowPeriod,
+        previous: CashflowPeriod,
+        streams: list[IncomeStream],
+        time_range: TimeRange,
+    ) -> str:
+        income_delta = _delta_text(current.income, previous.income)
+        lines = [
+            "💼 *Thu nhập tháng*",
+            f"Tổng: *{format_money_full(current.income)}* "
+            f"({income_delta} vs tháng trước)",
+        ]
+        top_sources = _top_income_sources(streams, time_range=time_range, limit=3)
+        if not top_sources:
             lines.append(
-                f"_Tỷ lệ tiết kiệm: {savings_rate:+.1f}%_"
+                "Chưa có nguồn thu nào. Thêm thu nhập để mình theo dõi đều hơn nhé 🌱"
             )
+            return "\n".join(lines)
+        for label, amount in top_sources:
+            lines.append(f"• {label}: {format_money_short(amount)}")
+        return "\n".join(lines)
+
+    def _expense_card(
+        self, current: CashflowPeriod, previous: CashflowPeriod
+    ) -> str:
+        spend_delta = _delta_text(current.spend, previous.spend)
+        lines = [
+            "💸 *Chi tiêu tháng*",
+            f"Tổng: *{format_money_full(current.spend)}* "
+            f"({spend_delta} vs tháng trước)",
+        ]
+        top_categories = _top_expense_categories(current.expenses, limit=3)
+        if not top_categories:
+            lines.append("Tháng này chưa có khoản chi nào được ghi nhận 🌱")
+            return "\n".join(lines)
+        for category, amount in top_categories:
+            lines.append(f"• {category}: {format_money_short(amount)}")
+        return "\n".join(lines)
+
+    def _format_monthly_detail(
+        self,
+        user: User,
+        time_range: TimeRange,
+        period: CashflowPeriod,
+        streams: list[IncomeStream],
+    ) -> str:
+        label_vi = _TIME_LABELS_VI.get(time_range.label, "tháng này")
+        sign = "+" if period.net >= 0 else "−"
+        lines = [
+            f"📅 *Dòng tiền {label_vi}*",
+            f"Thu: *{format_money_full(period.income)}*",
+            f"Chi: *{format_money_full(period.spend)}*",
+            f"Net flow: *{sign}{format_money_full(abs(period.net))}*",
+            "",
+            "💼 *Top nguồn thu*",
+        ]
+        income_sources = _top_income_sources(streams, time_range=time_range, limit=3)
+        if income_sources:
+            lines.extend(
+                f"• {label}: {format_money_short(amount)}"
+                for label, amount in income_sources
+            )
+        else:
+            lines.append("Chưa có nguồn thu nào được ghi nhận.")
+
+        lines.extend(["", "💸 *Top nhóm chi*"])
+        expense_categories = _top_expense_categories(period.expenses, limit=3)
+        if expense_categories:
+            lines.extend(
+                f"• {label}: {format_money_short(amount)}"
+                for label, amount in expense_categories
+            )
+        else:
+            lines.append("Chưa có chi tiêu nào trong tháng này.")
+
+        lines.extend(["", "📈 *Nhịp chi tiêu theo ngày*"])
+        lines.extend(_daily_flow_lines(period.expenses))
+
+        lines.extend(["", "🔎 *3 giao dịch lớn nhất*"])
+        biggest = sorted(
+            period.expenses, key=lambda tx: Decimal(tx.amount or 0), reverse=True
+        )[:3]
+        if biggest:
+            for tx in biggest:
+                day = getattr(tx, "expense_date", None)
+                day_text = day.strftime("%d/%m") if day else "--/--"
+                merchant = (getattr(tx, "merchant", None) or "Giao dịch").strip()
+                cat = get_category(getattr(tx, "category", None) or "other")
+                lines.append(
+                    f"• {day_text} — {cat.emoji} {merchant}: {format_money_short(tx.amount)}"
+                )
+        else:
+            lines.append("Chưa có giao dịch để xếp hạng.")
+
         return "\n".join(lines)
 
 
-async def _income_for_period(
-    db: AsyncSession, user: User, time_range: TimeRange
-) -> Decimal:
-    """Compute income for the period from active streams.
-
-    Streams are stored as a monthly average so we prorate by the number
-    of days the period covers vs an average 30-day month. Imperfect, but
-    the right ballpark for cashflow questions where users want "thu vs
-    chi" not exact accruals.
-    """
+async def _fetch_income_streams(db: AsyncSession, user: User) -> list[IncomeStream]:
     stmt = select(IncomeStream).where(
         IncomeStream.user_id == user.id,
         IncomeStream.is_active.is_(True),
     )
-    streams = list((await db.execute(stmt)).scalars().all())
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def _build_period(
+    db: AsyncSession,
+    user: User,
+    time_range: TimeRange,
+    *,
+    streams: list[IncomeStream],
+) -> CashflowPeriod:
+    income = _income_for_period_from_streams(user, time_range, streams)
+    expenses = await _fetch_expenses(
+        db, user, start=time_range.start, end=time_range.end
+    )
+    spend = sum(Decimal(tx.amount or 0) for tx in expenses)
+    net = income - spend
+    return CashflowPeriod(income=income, spend=spend, net=net, expenses=expenses)
+
+
+def _income_for_period_from_streams(
+    user: User, time_range: TimeRange, streams: list[IncomeStream]
+) -> Decimal:
     if streams:
-        # Phase 3.8 Epic 2: aggregate via ``monthly_equivalent`` so
-        # non-monthly streams (annual dividend, quarterly interest)
-        # don't get silently treated as monthly amounts.
         monthly = sum((s.monthly_equivalent for s in streams), Decimal(0))
     elif user.monthly_income:
         monthly = Decimal(user.monthly_income)
@@ -123,3 +246,99 @@ async def _income_for_period(
 
     days = (time_range.end - time_range.start).days + 1
     return (monthly * Decimal(days) / Decimal(30)).quantize(Decimal("1"))
+
+
+async def _income_for_period(
+    db: AsyncSession, user: User, time_range: TimeRange
+) -> Decimal:
+    """Compute income for a period from active streams.
+
+    Kept for existing callers/tests; the main handler fetches streams once
+    and reuses them for current + previous periods to avoid duplicate DB work.
+    """
+    streams = await _fetch_income_streams(db, user)
+    return _income_for_period_from_streams(user, time_range, streams)
+
+
+def _previous_period(time_range: TimeRange) -> TimeRange:
+    days = (time_range.end - time_range.start).days
+    previous_end = time_range.start - timedelta(days=1)
+    previous_start = previous_end - timedelta(days=days)
+    return TimeRange(previous_start, previous_end, "previous_period")
+
+
+def _top_income_sources(
+    streams: Iterable[IncomeStream],
+    *,
+    time_range: TimeRange,
+    limit: int,
+) -> list[tuple[str, Decimal]]:
+    totals: dict[str, Decimal] = defaultdict(Decimal)
+    labels: dict[str, str] = {}
+    days = (time_range.end - time_range.start).days + 1
+    for stream in streams:
+        monthly = Decimal(stream.monthly_equivalent or 0)
+        amount = (monthly * Decimal(days) / Decimal(30)).quantize(Decimal("1"))
+        key = getattr(stream, "stream_type", None)
+        if not isinstance(key, str) or not key:
+            key = "other"
+        icon = _SOURCE_ICONS.get(key, "💰")
+        type_label = _SOURCE_LABELS.get(key, key)
+        raw_name = getattr(stream, "name", None)
+        name = (
+            raw_name.strip()
+            if isinstance(raw_name, str) and raw_name.strip()
+            else type_label
+        )
+        label = f"{icon} {name}"
+        totals[label] += amount
+        labels[label] = label
+    ranked = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    return [(labels[label], amount) for label, amount in ranked[:limit]]
+
+
+def _top_expense_categories(
+    expenses: Iterable[Expense], *, limit: int) -> list[tuple[str, Decimal]]:
+    totals: dict[str, Decimal] = defaultdict(Decimal)
+    for tx in expenses:
+        category = get_category(getattr(tx, "category", None) or "other")
+        label = f"{category.emoji} {category.name_vi}"
+        totals[label] += Decimal(tx.amount or 0)
+    return sorted(totals.items(), key=lambda item: item[1], reverse=True)[:limit]
+
+
+def _daily_flow_lines(expenses: list[Expense]) -> list[str]:
+    if not expenses:
+        return ["Chưa có giao dịch trong tháng này."]
+    totals: dict[date, Decimal] = defaultdict(Decimal)
+    for tx in expenses:
+        day = getattr(tx, "expense_date", None)
+        if day is not None:
+            totals[day] += Decimal(tx.amount or 0)
+    if not totals:
+        return ["Chưa đủ ngày giao dịch để vẽ nhịp chi tiêu."]
+    best_day = min(totals.items(), key=lambda item: item[1])
+    worst_day = max(totals.items(), key=lambda item: item[1])
+    return [
+        f"Ngày nhẹ nhất: {best_day[0].strftime('%d/%m')} — {format_money_short(best_day[1])}",
+        f"Ngày chi cao nhất: {worst_day[0].strftime('%d/%m')} — {format_money_short(worst_day[1])}",
+    ]
+
+
+def _safe_rate(numerator: Decimal, denominator: Decimal) -> float | None:
+    if denominator <= 0:
+        return None
+    return float(numerator / denominator * 100)
+
+
+def _format_percent(value: float | None) -> str:
+    if value is None:
+        return "—"
+    return f"{value:+.1f}%"
+
+
+def _delta_text(current: Decimal, previous: Decimal) -> str:
+    if previous <= 0:
+        return "—"
+    delta = (current - previous) / previous * Decimal(100)
+    return f"{float(delta):+.1f}%"
