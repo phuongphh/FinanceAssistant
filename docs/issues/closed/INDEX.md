@@ -174,9 +174,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #341 | Pre-Phase | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [pre-phase/issue-341.md](by-phase/pre-phase/issue-341.md) |
 | #342 | Pre-Phase | [Story] P3.9.5-S4: Click vào dòng tài sản → mở edit flow | [pre-phase/issue-342.md](by-phase/pre-phase/issue-342.md) |
 | #343 | Pre-Phase | [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo" | [pre-phase/issue-343.md](by-phase/pre-phase/issue-343.md) |
+| #344 | Pre-Phase | [Story] P3.9.5-S6: Sửa label "Dòng tiền hiện tại của từng tháng" | [pre-phase/issue-344.md](by-phase/pre-phase/issue-344.md) |
 | #346 | Pre-Phase | [Story] P3.9.5-S8: Tách riêng card Thu nhập / Chi tiêu | [pre-phase/issue-346.md](by-phase/pre-phase/issue-346.md) |
 | #347 | Pre-Phase | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [pre-phase/issue-347.md](by-phase/pre-phase/issue-347.md) |
 | #348 | Pre-Phase | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [pre-phase/issue-348.md](by-phase/pre-phase/issue-348.md) |
 
-**Total:** 173 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 156 Pre-Phase)
+**Total:** 174 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 157 Pre-Phase)
