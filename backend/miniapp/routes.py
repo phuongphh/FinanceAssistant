@@ -55,6 +55,54 @@ _STATIC_REF_FILES = (
 )
 _STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
 _VERSION_MARKER_PATTERN = re.compile(r"<!--\s*APP_VERSION_MARKER\s*-->")
+_BOOTSTRAP_MARKER_PATTERN = re.compile(r"<!--\s*BUILD_BOOTSTRAP\s*-->")
+
+
+def _build_bootstrap_script(version: str) -> str:
+    """Inline reload guard that runs before any other asset loads.
+
+    Telegram WebView (especially iOS WebKit) often ignores ``Cache-Control:
+    no-cache`` on HTML and serves a previously-cached document without
+    revalidating. When that happens, the cached HTML still references the
+    old (un-versioned or stale-versioned) JS, so the cache-busting query
+    string never reaches the WebView at all and a UI fix can stay invisible
+    for hours/days.
+
+    This bootstrap closes that loop *for every subsequent deploy*: the
+    moment the WebView ever does fetch a fresh HTML (whether through normal
+    revalidation, a Telegram cache wipe, or a network change), the script
+    sees that the build hash on disk doesn't match the one stored in
+    ``localStorage`` from the previous session and triggers a
+    ``location.replace`` with a unique ``?_b=<hash>`` query string. That
+    URL is genuinely new from the WebView's POV, so it bypasses every
+    cache layer (HTML and assets) on the next request and the user lands
+    on the freshly-rendered dashboard.
+
+    Idempotent: after a successful refresh, ``localStorage`` matches the
+    current hash so the script no-ops on every subsequent open. First-time
+    visitors (no stored hash) only seed the value — no reload — so cold
+    opens are not slowed down. ``try/catch`` guards against
+    ``localStorage`` throwing in private mode / sandboxed iframes.
+    """
+    return (
+        "<script>"
+        "(function(){"
+        f"var CURRENT={version!r};"
+        "try{"
+        "var KEY='fa.app.build';"
+        "var stored=localStorage.getItem(KEY);"
+        "if(stored&&stored!==CURRENT){"
+        "localStorage.setItem(KEY,CURRENT);"
+        "var url=new URL(location.href);"
+        "url.searchParams.set('_b',CURRENT);"
+        "location.replace(url.toString());"
+        "return;"
+        "}"
+        "if(!stored)localStorage.setItem(KEY,CURRENT);"
+        "}catch(e){}"
+        "})();"
+        "</script>"
+    )
 
 
 def _compute_static_version() -> str:
@@ -98,6 +146,23 @@ _GIT_SHA = _detect_git_sha()
 def _render_html_with_version(html_path: Path) -> str:
     raw = html_path.read_text(encoding="utf-8")
     bumped = _STATIC_URL_PATTERN.sub(rf"\1?v={_STATIC_VERSION}", raw)
+    # Inject the reload bootstrap as early as possible — this script must
+    # run before any other resource loads so a stale-cache reload can
+    # ``location.replace`` without first executing the old JS.
+    bootstrap = _build_bootstrap_script(_STATIC_VERSION)
+    if _BOOTSTRAP_MARKER_PATTERN.search(bumped):
+        bumped = _BOOTSTRAP_MARKER_PATTERN.sub(
+            lambda _m: bootstrap, bumped, count=1
+        )
+    else:
+        # Fallback for templates without the marker — still wedge it inside
+        # <head> so the guard runs before anything else parses.
+        bumped = re.sub(
+            r"(<head[^>]*>)",
+            lambda m: m.group(1) + bootstrap,
+            bumped,
+            count=1,
+        )
     # Inject a visible footer marker so users can read the running build
     # straight from the dashboard — much faster than tailing server logs
     # when verifying a deploy reached the VPS.
@@ -108,7 +173,9 @@ def _render_html_with_version(html_path: Path) -> str:
         "</div>"
     )
     if _VERSION_MARKER_PATTERN.search(bumped):
-        bumped = _VERSION_MARKER_PATTERN.sub(footer_html, bumped)
+        bumped = _VERSION_MARKER_PATTERN.sub(
+            lambda _m: footer_html, bumped, count=1
+        )
     else:
         # Templates that haven't added the marker yet still get the footer
         # right before </body> so the diagnostic is universal.

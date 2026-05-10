@@ -377,6 +377,29 @@ class TestWealthDashboardPage:
         assert f"dashboard.js?v={version}" in body
         assert f"style.css?v={version}" in body
 
+    def test_dashboard_injects_reload_bootstrap_with_current_version(self):
+        """Inline reload guard must appear in the served HTML and embed the
+        current build hash. Telegram WebView (especially iOS WebKit) can
+        ignore Cache-Control on HTML; this script forces a `?_b=<hash>`
+        reload the moment a fresh HTML reaches the WebView, so a stale
+        WebView state self-heals on the next genuine page-load instead of
+        requiring the user to manually clear Telegram's cache."""
+        resp = client.get("/miniapp/wealth")
+        body = resp.text
+        version = miniapp_routes._STATIC_VERSION
+        # Bootstrap must run before any other script — the placeholder is
+        # placed before the telegram-web-app.js include in the template.
+        assert body.index(f"'{version}'") < body.index("telegram-web-app.js")
+        assert "fa.app.build" in body
+        assert "localStorage.getItem" in body
+        assert "location.replace" in body
+
+    def test_legacy_dashboard_also_has_reload_bootstrap(self):
+        resp = client.get("/miniapp/dashboard")
+        body = resp.text
+        assert f"'{miniapp_routes._STATIC_VERSION}'" in body
+        assert "fa.app.build" in body
+
     def test_dashboard_renders_visible_build_marker(self):
         """User-facing footer prints git SHA + asset hash so a glance at the
         Mini App reveals which build the VPS is running. Indispensable when
