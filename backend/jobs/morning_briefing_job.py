@@ -179,6 +179,7 @@ async def run_morning_briefing_job(
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,
                 text=result.text,
+                parse_mode="HTML",
                 reply_markup=briefing_actions_keyboard(),
             )
             # Notifier returns ``None`` on adapter error (it logs but

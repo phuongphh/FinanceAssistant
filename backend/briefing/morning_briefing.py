@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from html import escape
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -13,6 +14,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
+from backend.config import get_settings
 from backend.market_data.analytics.news_relevance import get_relevant_news
 from backend.market_data.analytics.portfolio_metrics import (
     compute_diversification_score,
@@ -47,6 +49,30 @@ class EnrichedBriefingResult:
 def _load_template() -> dict[str, Any]:
     with open(_TEMPLATE_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _morning_emoji() -> str:
+    """Animated Telegram custom emoji when configured; plain emoji fallback.
+
+    Telegram renders ``<tg-emoji>`` only in HTML parse mode and only when the
+    ``emoji-id`` is valid for a custom emoji. Keeping the id configurable lets
+    production rotate to the latest branded emoji set without code changes; CI
+    and local dev still see the normal sunrise emoji.
+    """
+    emoji_id = (get_settings().telegram_morning_custom_emoji_id or "").strip()
+    if not emoji_id:
+        return "🌅"
+    return f'<tg-emoji emoji-id="{escape(emoji_id, quote=True)}">🌅</tg-emoji>'
+
+
+def _greeting_name(user: User) -> str:
+    if hasattr(user, "get_greeting_name"):
+        return escape(user.get_greeting_name())
+    return escape((getattr(user, "display_name", None) or "bạn").strip() or "bạn")
+
+
+def _greeting_line(user: User) -> str:
+    return f"{_morning_emoji()} Chào buổi sáng, {_greeting_name(user)}!"
 
 
 def _fmt_decimal(value: Decimal | int | float | None, suffix: str = "") -> str:
@@ -141,7 +167,7 @@ def _insights(assets: list[Asset], vcb_rate: Decimal | None) -> list[str]:
 
 
 async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> EnrichedBriefingResult:
-    """Render five real-data sections; independent data fetches run concurrently."""
+    """Render greeting plus five real-data sections; external fetches run concurrently."""
     import time
 
     started = time.perf_counter()
@@ -184,6 +210,9 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     insight_lines.append(f"Đa dạng hóa: {diversification['score']}/100 ({diversification['label']}).")
 
     sections = {
+        "greeting": template["sections"]["greeting"].format(
+            greeting=_greeting_line(user),
+        ),
         "net_worth": template["sections"]["net_worth"].format(
             net_worth=format_money_short(breakdown.total),
             change_label="So với hôm qua",
@@ -202,7 +231,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         "news": template["sections"]["news"].format(news_lines=_news_lines(news)),
         "insights": template["sections"]["insights"].format(insight_lines="\n".join(f"• {line}" for line in insight_lines[:4])),
     }
-    text = "\n\n".join(sections.values())
+    text = "\n\n".join(section.strip() for section in sections.values() if section)
     if is_stale:
         text = f"{text}\n\n{template['footer']['stale']}"
     return EnrichedBriefingResult(

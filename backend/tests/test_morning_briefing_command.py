@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from backend.bot.handlers.morning_briefing_command import send_morning_briefing_now
+from backend.briefing.morning_briefing import EnrichedBriefingResult
+from backend.models.user import User
+from backend.wealth.ladder import WealthLevel
+
+
+@pytest.mark.asyncio
+async def test_manual_morning_briefing_uses_html_and_does_not_mark_scheduled_sent():
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 999
+    user.display_name = "Minh"
+    result = EnrichedBriefingResult(
+        text="🌅 Chào buổi sáng, Minh!",
+        level=WealthLevel.STARTER,
+        is_empty_state=False,
+        sections={},
+    )
+    notifier = MagicMock()
+    notifier.send_message = AsyncMock(return_value={"ok": True})
+
+    with patch(
+        "backend.bot.handlers.morning_briefing_command.render_enriched_morning_briefing",
+        new_callable=AsyncMock,
+        return_value=result,
+    ), patch(
+        "backend.bot.handlers.morning_briefing_command.get_notifier",
+        return_value=notifier,
+    ), patch(
+        "backend.bot.handlers.morning_briefing_command.analytics.atrack",
+        new_callable=AsyncMock,
+    ) as mock_track:
+        sent = await send_morning_briefing_now(MagicMock(), chat_id=123, user=user)
+
+    assert sent is True
+    notifier.send_message.assert_awaited_once()
+    _, kwargs = notifier.send_message.await_args
+    assert kwargs["parse_mode"] == "HTML"
+    mock_track.assert_awaited_once()
+    assert mock_track.await_args.args[0] == "morning_briefing_requested"

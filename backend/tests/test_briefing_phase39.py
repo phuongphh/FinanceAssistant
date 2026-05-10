@@ -42,6 +42,7 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
     user = User()
     user.id = uuid.uuid4()
     user.telegram_id = 123
+    user.display_name = "Minh"
     breakdown = NetWorthBreakdown(total=Decimal("100000000"), by_type={"stock": Decimal("60000000"), "cash": Decimal("40000000")}, asset_count=2)
     change = NetWorthChange(Decimal("100000000"), Decimal("99000000"), Decimal("1000000"), 1.0, "hôm qua")
 
@@ -53,6 +54,7 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
          patch("backend.briefing.morning_briefing.get_best_worst_from_assets", AsyncMock(return_value=(None, None))):
         result = await render_enriched_morning_briefing(_DB(), user)
 
+    assert "Chào buổi sáng, Minh!" in result.text
     assert "Tổng tài sản" in result.text
     assert "Thị trường sáng nay" in result.text
     assert "Danh mục" in result.text
@@ -60,3 +62,17 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
     assert "Gợi ý nhanh" in result.text
     assert "dữ liệu gần nhất" in result.text
     assert result.is_stale is True
+
+
+def test_greeting_uses_configured_telegram_custom_emoji():
+    user = User()
+    user.display_name = "An <VIP>"
+    settings = MagicMock(telegram_morning_custom_emoji_id='sunrise"id')
+
+    with patch("backend.briefing.morning_briefing.get_settings", return_value=settings):
+        from backend.briefing.morning_briefing import _greeting_line
+
+        line = _greeting_line(user)
+
+    assert '<tg-emoji emoji-id="sunrise&quot;id">🌅</tg-emoji>' in line
+    assert "An &lt;VIP&gt;" in line

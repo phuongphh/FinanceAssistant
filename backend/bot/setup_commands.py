@@ -6,8 +6,9 @@ These are **shortcuts**, not the rich /menu inline UI:
   /start     — onboarding entry
   /menu      — opens the rich 5-category inline menu (the real UX)
   /help      — short usage guide (handled via Phase 3.5 HELP intent)
-  /dashboard — opens the wealth Mini App in-place
-  /about    — product version, privacy and support info
+  /dashboard  — opens the wealth Mini App in-place
+  /baocaosang — resend today's morning briefing on demand
+  /about      — product version, privacy and support info
 
 The bot menu button is a Telegram-native list of slash commands — tapping
 one inserts the command into the input and sends it. So each command
@@ -19,6 +20,7 @@ Routing of these slash commands lives in ``workers/telegram_worker._handle_messa
   - ``/help`` matches the rule-based pattern in ``intent_patterns.yaml``
     and resolves through the normal text path
   - ``/dashboard`` is wired in the worker as part of Epic 2
+  - ``/baocaosang`` renders the enriched morning briefing on demand
   - ``/about`` is wired in the worker and renders static product info
 
 Old Phase 3A commands (``/themtaisan``, ``/taisan``, ``/report``, ``/goals``,
@@ -40,6 +42,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "menu", "description": "Menu chính"},
     {"command": "help", "description": "Hướng dẫn sử dụng"},
     {"command": "dashboard", "description": "Mở Mini App dashboard"},
+    {"command": "baocaosang", "description": "Gửi lại briefing sáng"},
     {"command": "feedback", "description": "Gửi góp ý nhanh"},
     {"command": "about", "description": "Thông tin ứng dụng"},
 ]
