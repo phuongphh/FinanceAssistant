@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #337 | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [issue-337.md](issue-337.md) |
 | #338 | [Epic] Phase 3.9.5 — Epic 5: Telegram Animation Emojis | [issue-338.md](issue-338.md) |
-| #345 | [Story] P3.9.5-S7: Dedupe — bỏ "So sánh tháng trước" trùng | [issue-345.md](issue-345.md) |
 | #349 | [Story] P3.9.5-S11: Cổ phiếu — bảng giá portfolio + query CK theo mã | [issue-349.md](issue-349.md) |
 | #350 | [Story] P3.9.5-S12: Perf Tiền số — target p95 < 2s | [issue-350.md](issue-350.md) |
 | #351 | [Story] P3.9.5-S13: BUG — "Portfolios của tôi" trong Tiền số nhảy sang Chứng khoán | [issue-351.md](issue-351.md) |
@@ -24,4 +23,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #356 | [Story] P3.9.5-S18: Helper utility render animation emoji | [issue-356.md](issue-356.md) |
 | #357 | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [issue-357.md](issue-357.md) |
 
-**Total active:** 19
+**Total active:** 18
