@@ -15,7 +15,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #336 | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [issue-336.md](issue-336.md) |
 | #337 | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [issue-337.md](issue-337.md) |
 | #338 | [Epic] Phase 3.9.5 — Epic 5: Telegram Animation Emojis | [issue-338.md](issue-338.md) |
-| #341 | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [issue-341.md](issue-341.md) |
 | #342 | [Story] P3.9.5-S4: Click vào dòng tài sản → mở edit flow | [issue-342.md](issue-342.md) |
 | #343 | [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo" | [issue-343.md](issue-343.md) |
 | #344 | [Story] P3.9.5-S6: Sửa label "Dòng tiền hiện tại của từng tháng" | [issue-344.md](issue-344.md) |
@@ -33,4 +32,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #356 | [Story] P3.9.5-S18: Helper utility render animation emoji | [issue-356.md](issue-356.md) |
 | #357 | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [issue-357.md](issue-357.md) |
 
-**Total active:** 28
+**Total active:** 27
