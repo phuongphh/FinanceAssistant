@@ -825,3 +825,295 @@ Pass Criteria: All expected results met
 
 ---
 
+# Epic 5 — Telegram Animation Emojis (TC-061 → TC-072)
+
+## TC-061: Emoji mapping file tồn tại + valid YAML
+- **Type:** Integration
+- **Story:** P3.9.5-S17
+- **Persona:** dev
+- **Steps:**
+  1. Inspect `content/emoji_animation_map.yaml`
+- **Expected:**
+  - File tồn tại
+  - Valid YAML, parse được bằng `yaml.safe_load`
+  - Cover ít nhất 15 emoji: 💰 💎 🎯 📊 📈 📉 💡 🔥 ✅ 🎉 ⚠️ 💸 🏆 📅 💼
+  - Mỗi entry có fields: `static`, `animation_id`, `contexts`
+- **Pass:** schema đúng
+
+## TC-062: Emoji audit grep coverage
+- **Type:** Integration
+- **Story:** P3.9.5-S17
+- **Persona:** dev
+- **Steps:**
+  1. Grep tất cả static emoji trong `content/*.yaml`
+  2. Cross-reference với mapping file
+- **Expected:**
+  - Top 20 emoji theo frequency có trong mapping
+  - Document source của animation_id
+- **Pass:** coverage đủ cao
+
+## TC-063: render_with_animation utility — all mapped
+- **Type:** Happy
+- **Story:** P3.9.5-S18
+- **Persona:** dev (unit test)
+- **Steps:**
+  1. Call `render_with_animation("💰 Net worth: 45tr", mapping)`
+- **Expected:**
+  - Returns tuple (text, entities)
+  - Entities chứa 1 entity type=custom_emoji với offset/length đúng (UTF-16 code units)
+- **Pass:** unit test pass
+
+## TC-064: render_with_animation — partial mapping
+- **Type:** Corner
+- **Story:** P3.9.5-S18
+- **Persona:** dev
+- **Steps:**
+  1. Call với text chứa 2 emoji, mapping chỉ có 1
+- **Expected:**
+  - Mapped emoji → entity
+  - Unmapped → giữ nguyên static
+- **Pass:** partial handle ok
+
+## TC-065: render_with_animation — no emoji
+- **Type:** Corner
+- **Story:** P3.9.5-S18
+- **Persona:** dev
+- **Steps:**
+  1. Call với plain text "Hello"
+- **Expected:**
+  - Returns ("Hello", [])
+  - No crash
+- **Pass:** edge case ok
+
+## TC-066: Telegram adapter accept entities param
+- **Type:** Integration
+- **Story:** P3.9.5-S18
+- **Persona:** dev
+- **Steps:**
+  1. Inspect `telegram_adapter.send_message` signature
+- **Expected:**
+  - Accept optional `entities: list[MessageEntity]`
+  - Pass-through Telegram Bot API
+- **Pass:** signature extended
+
+## TC-067: Morning briefing — animation emoji render (premium)
+- **Type:** Happy
+- **Story:** P3.9.5-S19
+- **Persona:** Phương (premium account)
+- **Steps:**
+  1. Trigger morning briefing (`/briefing` hoặc scheduled)
+  2. Quan sát message trên Telegram
+- **Expected:**
+  - 💰 net worth emoji **animate**
+  - 📈/📉 delta emoji **animate**
+  - 🌤️ greeting emoji **animate**
+  - Rest of text render bình thường
+- **Pass:** animation visible trên premium
+
+## TC-068: Morning briefing — fallback static (non-premium)
+- **Type:** Corner
+- **Story:** P3.9.5-S19
+- **Persona:** Hà (non-premium)
+- **Steps:**
+  1. Trigger morning briefing
+  2. Quan sát message
+- **Expected:**
+  - Emoji hiển thị **static** (Telegram tự fallback)
+  - Không có error, không có placeholder lạ
+- **Pass:** fallback graceful
+
+## TC-069: Milestone celebration — animation 🎉 + 🏆
+- **Type:** Happy
+- **Story:** P3.9.5-S19
+- **Persona:** Phương (premium)
+- **Preconditions:** Trigger 1 milestone (e.g. 30 ngày streak)
+- **Steps:**
+  1. Đợi milestone message
+- **Expected:**
+  - 🎉 và 🏆 animate
+- **Pass:** celebration emoji animate
+
+## TC-070: Transaction success ✅ animate
+- **Type:** Happy
+- **Story:** P3.9.5-S19
+- **Persona:** Phương
+- **Steps:**
+  1. Add 1 transaction → confirmation message
+- **Expected:**
+  - ✅ animate
+- **Pass:** success emoji animate
+
+## TC-071: Submenu intros — header emoji animate
+- **Type:** Happy
+- **Story:** P3.9.5-S19
+- **Persona:** Phương
+- **Steps:**
+  1. Click các submenu (Tài sản, Cashflow, Market, Goals)
+  2. Quan sát header emoji
+- **Expected:**
+  - Header emoji của mỗi submenu animate
+- **Pass:** intro emoji upgraded
+
+## TC-072: Emoji upgrade — không break parsing
+- **Type:** Regression
+- **Story:** P3.9.5-S17, S18, S19
+- **Persona:** any
+- **Steps:**
+  1. Trigger 5+ messages khác nhau với mix emoji
+  2. Kiểm tra MessageEntity offsets/lengths
+- **Expected:**
+  - All messages render đúng
+  - Không bị overlap entities
+  - vi-localization-checker compatibility
+- **Pass:** zero parsing issue
+
+---
+
+# Cross-Epic Regression + Edge Cases (TC-073 → TC-080)
+
+## TC-073: Layer contract checker pass
+- **Type:** Integration
+- **Story:** all
+- **Persona:** dev
+- **Steps:**
+  1. Run `layer-contract-checker` agent
+- **Expected:**
+  - No `db.commit()` in services
+  - No raw SQL in handlers
+  - No env reads in services
+  - No direct telegram_service imports outside adapters
+- **Pass:** clean
+
+## TC-074: vi-localization-checker pass full suite
+- **Type:** Integration
+- **Story:** all
+- **Persona:** dev
+- **Steps:**
+  1. Run `vi-localization-checker` agent
+- **Expected:**
+  - No hardcoded Vietnamese strings introduced
+  - All copy in `content/*.yaml`
+  - Bé Tiền persona consistent
+  - Wealth level mapping unchanged
+- **Pass:** clean
+
+## TC-075: Ruff format + lint clean
+- **Type:** Integration
+- **Story:** all
+- **Persona:** dev
+- **Steps:**
+  1. `uv run ruff check .`
+  2. `uv run ruff format --check .`
+- **Expected:**
+  - No new warnings
+  - Format consistent
+- **Pass:** clean
+
+## TC-076: Pytest full suite pass
+- **Type:** Integration
+- **Story:** all
+- **Persona:** dev
+- **Steps:**
+  1. `uv run pytest`
+- **Expected:**
+  - All existing tests pass
+  - New tests `test_phase_3_9_5/*` pass
+- **Pass:** green
+
+## TC-077: Soft launch readiness — onboarding flow
+- **Type:** Integration
+- **Story:** all
+- **Persona:** new user (fresh account)
+- **Steps:**
+  1. Mở bot lần đầu, đi qua full onboarding
+  2. Add 2 assets (1 stock + 1 crypto)
+  3. Add 1 income, 1 expense
+  4. Mở Dashboard, Tài sản, Cashflow, Market
+- **Expected:**
+  - Toàn bộ flow smooth
+  - Mọi menu render đúng với new structure
+  - Không có copy lạ hoặc bug
+- **Pass:** end-to-end smooth
+
+## TC-078: Wealth level transitions vẫn đúng
+- **Type:** Regression
+- **Story:** Phase 3.8.5 → 3.9.5
+- **Persona:** Mai → Hà → Phương → Anh Tùng
+- **Steps:**
+  1. Mỗi persona xem profile + dashboard
+- **Expected:**
+  - Wealth level tier đúng (Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa)
+  - Không break sau Phase 3.9.5 changes
+- **Pass:** zero regression Phase 3.8.5
+
+## TC-079: Voice query end-to-end vẫn hoạt động
+- **Type:** Regression
+- **Story:** Phase 3.5 → 3.9.5
+- **Persona:** Hà
+- **Steps:**
+  1. Voice "tài sản tôi bao nhiêu"
+  2. Voice "thu chi tháng này"
+  3. Voice "giá Bitcoin"
+- **Expected:**
+  - Cả 3 voice queries → intent classified + render đúng
+  - Crypto query không bị routing bug nữa (S13 fixed)
+- **Pass:** voice path intact
+
+## TC-080: Soft launch checklist
+- **Type:** Critical (gate)
+- **Story:** all
+- **Persona:** PM + dev
+- **Steps:**
+  1. Review checklist:
+     - [ ] All 5 Epics shipped
+     - [ ] All 19 Stories AC checked
+     - [ ] TC-001 → TC-079 sign off
+     - [ ] phase-status.yaml updated (3.9.5 → done, 4A → current)
+     - [ ] Release notes drafted
+     - [ ] Monitoring alerts configured
+     - [ ] Rollback plan documented
+- **Expected:**
+  - All items checked
+  - Branch ready merge to main
+- **Pass:** ready for soft launch tháng 6/2026
+
+---
+
+## 📊 Test Coverage Summary
+
+| Epic | Stories | TC count | Type breakdown |
+|------|---------|----------|----------------|
+| Epic 1: Wealth | S1, S2, S3 | 10 | 5 Happy, 4 Corner, 1 Critical |
+| Epic 2: Dashboard | S4, S5 | 10 | 6 Happy, 2 Corner, 1 Performance, 1 Regression |
+| Epic 3: Cashflow | S6-S10 | 20 | 10 Happy, 5 Corner, 2 Regression, 2 Integration, 1 Performance |
+| Epic 4: Market | S11-S16 | 20 | 9 Happy, 4 Corner, 3 Performance, 1 Regression, **3 Critical (P1 bug)** |
+| Epic 5: Emoji | S17-S19 | 12 | 6 Happy, 3 Corner, 2 Integration, 1 Regression |
+| Cross-epic | all | 8 | 5 Integration, 2 Regression, 1 Critical (gate) |
+| **Total** | **19 stories** | **80 TC** | |
+
+---
+
+## 🚦 Sign-off Process
+
+**Tester:** ___________________ **Date completed:** ___________
+
+**Pass count:** ____ / 80
+**Fail count:** ____
+**Blocked count:** ____
+
+**Critical TC (must pass for ship):** TC-010, TC-041, TC-042, TC-043, TC-073, TC-080
+
+**Notes:**
+___________________________________________________________
+___________________________________________________________
+
+When all critical TC pass + ≥95% overall pass rate → flip top-of-file marker:
+`<!-- testing-signoff: signed -->`
+
+This triggers `scripts/archive_phase.py` to move issues + test-cases docs to `docs/archive/`.
+
+---
+
+*Document version: 1.0 — 2026-05-10*
+
+
