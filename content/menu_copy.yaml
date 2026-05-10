@@ -78,6 +78,15 @@ main_menu:
     • "tháng này tiêu bao nhiêu?"
     • "VNM giá hôm nay?"
 
+# Direct-action copy for Phase 3.9.5 market portfolio views.
+action_market_portfolio:
+  stock_hint: "Đây là các mã chứng khoán bạn đang nắm giữ; bảng giá chỉ lọc theo portfolio của bạn."
+  crypto_hint: "Đây là toàn bộ tiền số bạn đang nắm giữ, cập nhật theo giá thị trường mới nhất."
+  gold_hint: "Đây là toàn bộ vàng bạn đang nắm giữ, định giá theo SJC realtime."
+  stock_empty: "Thêm CK vào portfolio để theo dõi bảng giá riêng của bạn nhé."
+  crypto_empty: "Chưa có tài sản loại này. Bạn có thể thêm crypto đầu tiên để theo dõi realtime."
+  gold_empty: "Chưa có tài sản loại này. Bạn có thể thêm vàng đầu tiên để theo dõi theo giá SJC."
+
 # ============================================================
 # SUB-MENU: TÀI SẢN (Level 2)
 # ============================================================
@@ -368,9 +377,9 @@ submenu_market:
       callback: "menu:market:crypto"
       description: "BTC, ETH, các đồng phổ biến"
 
-    - label: "🥇 Vàng SJC"
+    - label: "🥇 Vàng"
       callback: "menu:market:gold"
-      description: "Giá vàng SJC, PNJ"
+      description: "Giá theo SJC, PNJ"
 
     - label: "💡 Cơ hội đầu tư"
       callback: "menu:market:advisor"

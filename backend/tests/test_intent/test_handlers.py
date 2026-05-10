@@ -551,6 +551,44 @@ async def test_query_portfolio_gold_empty_state_is_personalized():
     assert "cổ phiếu" not in response
 
 
+@pytest.mark.asyncio
+async def test_query_portfolio_handler_lists_crypto_assets_when_requested():
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    crypto_assets = [
+        _fake_asset(
+            name="Bitcoin",
+            asset_type="crypto",
+            current_value=Decimal("250000000"),
+            initial_value=Decimal("200000000"),
+            extra={"symbol": "BTC", "quantity": 0.1},
+        ),
+    ]
+    with (
+        patch(
+            "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+            AsyncMock(return_value=crypto_assets),
+        ) as mock_get,
+        patch(
+            "backend.intent.handlers.query_portfolio.resolve_style",
+            AsyncMock(return_value=_young_prof_style()),
+        ),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_PORTFOLIO,
+            confidence=0.95,
+            parameters={"asset_type": "crypto"},
+            raw_text="portfolio crypto",
+        )
+        response = await QueryPortfolioHandler().handle(intent, _user(), _fake_db())
+
+    mock_get.assert_awaited_once()
+    assert mock_get.await_args.kwargs["asset_type"] == "crypto"
+    assert "Crypto Portfolio" in response
+    assert "BTC" in response
+    assert "VNM" not in response
+
+
 # ---------------------- query_market ----------------------
 
 

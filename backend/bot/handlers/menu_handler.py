@@ -751,6 +751,198 @@ async def _action_goals_update(
     await show_goals_list(db, chat_id, user)
 
 
+def _market_portfolio_keyboard(asset_type: str, *, include_search: bool = False) -> dict:
+    """Action keyboard for Phase 3.9.5 market portfolio surfaces."""
+    rows = [
+        [
+            {
+                "text": "💼 Portfolios của tôi",
+                "callback_data": f"menu:market:{asset_type}_portfolio",
+            }
+        ],
+        [
+            {
+                "text": "✏️ Sửa tài sản",
+                "callback_data": f"asset_manage:edit_type:{asset_type}",
+            }
+        ],
+    ]
+    if include_search:
+        rows.insert(1, [{"text": "🔍 Tìm CK theo mã", "callback_data": "menu:market:stock_search"}])
+    rows.append([{"text": "◀️ Quay về Thị trường", "callback_data": "menu:market"}])
+    return {"inline_keyboard": rows}
+
+
+async def _action_market_stock_board(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Show a stock price board filtered to the user's own portfolio."""
+    from decimal import Decimal
+
+    from backend.bot.formatters.money import format_money_short
+    from backend.market_data.client import get_stock_quotes
+    from backend.wealth.services import asset_service
+
+    assets = await asset_service.get_user_assets(db, user.id, asset_type="stock")
+    if not assets:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "📈 *Bảng giá cổ phiếu của bạn*\n\n"
+                f"{get_action_copy('action_market_portfolio', 'stock_empty')}"
+            ),
+            parse_mode="Markdown",
+            reply_markup=_market_portfolio_keyboard("stock", include_search=True),
+        )
+        return
+
+    tickers = []
+    for asset in assets:
+        ticker = str((asset.extra or {}).get("ticker") or asset.name or "").upper()
+        if ticker and ticker not in tickers:
+            tickers.append(ticker)
+
+    try:
+        quotes = await get_stock_quotes(tickers)
+    except Exception:
+        logger.exception("Unable to fetch portfolio stock quotes")
+        quotes = {}
+
+    lines = [
+        "📈 *Bảng giá cổ phiếu của bạn*",
+        f"_{get_action_copy('action_market_portfolio', 'stock_hint')}_",
+        "",
+    ]
+    for asset in assets:
+        ticker = str((asset.extra or {}).get("ticker") or asset.name or "").upper()
+        quote = quotes.get(ticker)
+        if quote is not None:
+            change = quote.metadata.get("change_pct")
+            change_text = ""
+            if change is not None:
+                pct = Decimal(str(change))
+                sign = "+" if pct >= 0 else ""
+                change_text = f" · {sign}{pct:.2f}%"
+            stale = " · dữ liệu cũ" if quote.is_stale else ""
+            lines.append(f"• *{ticker}*: {quote.price:,.0f}đ{change_text}{stale}")
+        else:
+            lines.append(
+                f"• *{ticker}*: {format_money_short(asset.current_value)} _(giá trong portfolio)_"
+            )
+
+    await send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=_market_portfolio_keyboard("stock", include_search=True),
+    )
+
+
+async def _action_market_crypto_prices(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.intent.handlers.query_market import QueryMarketHandler
+
+    result = IntentResult(
+        intent=IntentType.QUERY_MARKET,
+        confidence=1.0,
+        parameters={"category": "crypto"},
+        raw_text="[menu:market:crypto]",
+        classifier_used=CLASSIFIER_RULE,
+    )
+    text = await QueryMarketHandler().handle(result, user, db)
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup=_market_portfolio_keyboard("crypto"),
+    )
+
+
+async def _action_market_gold_prices(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.intent.handlers.query_market import QueryMarketHandler
+
+    result = IntentResult(
+        intent=IntentType.QUERY_MARKET,
+        confidence=1.0,
+        parameters={"category": "gold"},
+        raw_text="[menu:market:gold]",
+        classifier_used=CLASSIFIER_RULE,
+    )
+    text = await QueryMarketHandler().handle(result, user, db)
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup=_market_portfolio_keyboard("gold"),
+    )
+
+
+async def _action_market_portfolio(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None, asset_type: str
+) -> None:
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    result = IntentResult(
+        intent=IntentType.QUERY_PORTFOLIO,
+        confidence=1.0,
+        parameters={"asset_type": asset_type},
+        raw_text=f"[menu:market:{asset_type}_portfolio]",
+        classifier_used=CLASSIFIER_RULE,
+    )
+    text = await QueryPortfolioHandler().handle(result, user, db)
+    hint_key = f"{asset_type}_hint"
+    with contextlib.suppress(KeyError):
+        text = f"{text}\n\n_{get_action_copy('action_market_portfolio', hint_key)}_"
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup=_market_portfolio_keyboard(asset_type, include_search=asset_type == "stock"),
+    )
+
+
+async def _action_market_stock_portfolio(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await _action_market_portfolio(
+        db=db, user=user, chat_id=chat_id, message_id=message_id, asset_type="stock"
+    )
+
+
+async def _action_market_crypto_portfolio(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await _action_market_portfolio(
+        db=db, user=user, chat_id=chat_id, message_id=message_id, asset_type="crypto"
+    )
+
+
+async def _action_market_gold_portfolio(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await _action_market_portfolio(
+        db=db, user=user, chat_id=chat_id, message_id=message_id, asset_type="gold"
+    )
+
+
+async def _action_market_stock_search(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            "🔍 *Tìm cổ phiếu theo mã*\n\n"
+            "Gõ mã bạn muốn xem, ví dụ: `VNM`, `FPT`, `VCB`. "
+            "Mình sẽ lấy giá qua provider SSI khi mã được hỗ trợ."
+        ),
+        parse_mode="Markdown",
+        reply_markup=_market_portfolio_keyboard("stock", include_search=False),
+    )
+
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
@@ -769,6 +961,13 @@ _DIRECT_HANDLERS = {
     ("goals", "add"): _action_goals_add,
     ("goals", "list"): _action_goals_list,
     ("goals", "update"): _action_goals_update,
+    ("market", "stocks"): _action_market_stock_board,
+    ("market", "crypto"): _action_market_crypto_prices,
+    ("market", "gold"): _action_market_gold_prices,
+    ("market", "stock_portfolio"): _action_market_stock_portfolio,
+    ("market", "crypto_portfolio"): _action_market_crypto_portfolio,
+    ("market", "gold_portfolio"): _action_market_gold_portfolio,
+    ("market", "stock_search"): _action_market_stock_search,
 }
 
 

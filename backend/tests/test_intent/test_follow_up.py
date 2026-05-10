@@ -57,7 +57,7 @@ def test_starter_sees_beginner_overrides():
     )
     labels = [fu.label for fu in fus]
     # Starter pool includes "Thêm tài sản" — beginner cue.
-    assert any("Thêm tài sản" in l for l in labels)
+    assert any("Thêm tài sản" in label for label in labels)
 
 
 def test_hnw_sees_advanced_overrides():
@@ -113,6 +113,30 @@ def test_gold_market_follow_up_routes_portfolio_to_gold_assets():
     assert parsed is not None
     assert parsed.intent == IntentType.QUERY_PORTFOLIO
     assert parsed.parameters == {"asset_type": "gold"}
+
+
+def test_crypto_market_follow_up_routes_portfolio_to_crypto_assets():
+    fus = get_follow_ups(
+        IntentType.QUERY_MARKET,
+        parameters={"category": "crypto"},
+        avoid_intent=IntentType.QUERY_MARKET,
+    )
+
+    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].intent == IntentType.QUERY_PORTFOLIO
+    assert fus[0].parameters == {"asset_type": "crypto"}
+
+
+def test_stock_market_follow_up_routes_portfolio_to_stock_assets():
+    fus = get_follow_ups(
+        IntentType.QUERY_MARKET,
+        parameters={"category": "stocks"},
+        avoid_intent=IntentType.QUERY_MARKET,
+    )
+
+    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].intent == IntentType.QUERY_PORTFOLIO
+    assert fus[0].parameters == {"asset_type": "stock"}
 
 
 def test_callback_data_under_telegram_64_byte_limit():

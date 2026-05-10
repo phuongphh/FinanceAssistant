@@ -15,7 +15,7 @@ from backend.wealth.asset_types import get_quantity_unit, get_subtype_label
 from backend.wealth.services import asset_service
 
 _DEFAULT_ASSET_TYPE = "stock"
-_SUPPORTED_ASSET_TYPES = {"stock", "gold"}
+_SUPPORTED_ASSET_TYPES = {"stock", "crypto", "gold"}
 
 
 class QueryPortfolioHandler(IntentHandler):
@@ -46,9 +46,14 @@ class QueryPortfolioHandler(IntentHandler):
                 f"🥇 {name} chưa có tài sản vàng nào trong portfolio.\n\n"
                 "Bé Tiền có thể giúp bạn thêm vàng qua /themtaisan nhé."
             )
+        if asset_type == "crypto":
+            return (
+                f"₿ {name} chưa có tiền số nào trong portfolio.\n\n"
+                "Thêm crypto đầu tiên qua /themtaisan để mình theo dõi realtime nhé."
+            )
         return (
             f"📈 {name} chưa có cổ phiếu / quỹ nào trong portfolio.\n\n"
-            "Thêm vào nhanh qua /themtaisan nhé."
+            "Thêm CK vào portfolio để theo dõi bảng giá riêng của bạn nhé."
         )
 
     def _format(
@@ -72,10 +77,21 @@ class QueryPortfolioHandler(IntentHandler):
             lines = [
                 f"🥇 Portfolio vàng của {name}:",
                 f"Tổng giá trị: *{format_money_full(total)}*",
+                "_Định giá theo SJC realtime khi có dữ liệu thị trường._",
                 "",
             ]
             for asset in ordered:
                 lines.append(self._format_gold_line(asset, style=style))
+            return "\n".join(lines)
+
+        if asset_type == "crypto":
+            lines = [
+                f"₿ Crypto Portfolio của {name}:",
+                f"Tổng giá trị: *{format_money_full(total)}*",
+                "",
+            ]
+            for asset in ordered:
+                lines.append(self._format_crypto_line(asset, style=style))
             return "\n".join(lines)
 
         lines = [
@@ -99,6 +115,18 @@ class QueryPortfolioHandler(IntentHandler):
         )
         value = format_money_short(asset.current_value)
         return f"• *{ticker}*{qty_str} — {value}{self._pnl(asset, style=style)}"
+
+    def _format_crypto_line(self, asset, *, style: LevelStyle) -> str:
+        extra: dict[str, Any] = asset.extra or {}
+        symbol = str(extra.get("symbol") or extra.get("ticker") or asset.name).upper()
+        quantity = extra.get("quantity")
+        qty_str = (
+            f" ({quantity:g} {symbol})"
+            if isinstance(quantity, (int, float))
+            else ""
+        )
+        value = format_money_short(asset.current_value)
+        return f"• *{symbol}*{qty_str} — {value}{self._pnl(asset, style=style)}"
 
     def _format_gold_line(self, asset, *, style: LevelStyle) -> str:
         extra: dict[str, Any] = asset.extra or {}

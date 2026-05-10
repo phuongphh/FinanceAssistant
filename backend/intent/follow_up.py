@@ -193,19 +193,20 @@ def get_follow_ups(
     """
     pool: list[FollowUp] = []
     category = str((parameters or {}).get("category") or "").lower()
-    if intent == IntentType.QUERY_MARKET and category == "gold":
+    if intent == IntentType.QUERY_MARKET and category in {"stock", "stocks", "crypto", "gold"}:
+        asset_type = "stock" if category in {"stock", "stocks"} else category
         pool.extend(
             (
                 FollowUp(
                     "💼 Portfolio của tôi",
                     IntentType.QUERY_PORTFOLIO,
-                    {"asset_type": "gold"},
+                    {"asset_type": asset_type},
                 ),
                 FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
                 FollowUp(
                     "💎 Tài sản chi tiết",
                     IntentType.QUERY_ASSETS,
-                    {"asset_type": "gold"},
+                    {"asset_type": asset_type},
                 ),
             )
         )

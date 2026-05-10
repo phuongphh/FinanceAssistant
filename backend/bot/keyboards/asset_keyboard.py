@@ -23,6 +23,8 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_rental:pick:<asset_uuid>        — Phase 3.8: pick existing RE asset
     asset_rental:cancel                   — abort mark-as-rental flow
 
+    asset_manage:edit_type:<asset_type>   — list active assets filtered by type for edit
+    asset_manage:edit:<uuid>:<asset_type> — edit one asset, then return to market portfolio
     asset_manage:delete_type              — choose type before delete list
     asset_manage:delete_type:<asset_type> — list active assets filtered by type
     asset_manage:delete_confirm:<uuid>    — show confirmation for one asset
@@ -557,6 +559,63 @@ def asset_delete_type_keyboard() -> InlineKeyboardMarkup:
             ],
         ]
     }
+
+
+def asset_market_manage_keyboard(asset_type: str) -> InlineKeyboardMarkup:
+    """Portfolio-view actions for one market asset type."""
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✏️ Sửa tài sản",
+                    "callback_data": build_callback(CB_ASSET_MANAGE, "edit_type", asset_type),
+                }
+            ],
+            [
+                {
+                    "text": "➕ Thêm tài sản",
+                    "callback_data": build_callback(CB_ASSET_ADD, "start"),
+                }
+            ],
+            [{"text": "◀️ Quay về Thị trường", "callback_data": "menu:market"}],
+        ]
+    }
+
+
+def asset_edit_list_keyboard(
+    candidates: list[tuple[uuid.UUID | str, str]],
+    *,
+    asset_type: str,
+) -> InlineKeyboardMarkup:
+    """Render filtered edit rows plus navigation for market portfolio context."""
+    rows = [
+        [
+            {
+                "text": f"✏️ {label}"[:60],
+                "callback_data": build_callback(
+                    CB_ASSET_MANAGE, "edit", str(asset_id), asset_type
+                ),
+            }
+        ]
+        for asset_id, label in candidates
+    ]
+    rows.append(
+        [
+            {
+                "text": "➕ Thêm tài sản",
+                "callback_data": build_callback(CB_ASSET_ADD, "start"),
+            }
+        ]
+    )
+    rows.append(
+        [
+            {
+                "text": "◀️ Quay lại portfolio",
+                "callback_data": f"menu:market:{asset_type}_portfolio",
+            }
+        ]
+    )
+    return {"inline_keyboard": rows}
 
 
 def asset_delete_list_keyboard(
