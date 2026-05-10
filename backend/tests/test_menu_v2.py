@@ -647,9 +647,14 @@ class TestNetWorthFastPath:
         assert sent["chat_id"] == 42
         assert "Tổng tài sản của An" in sent["text"]
         assert "500,000,000" in sent["text"]
+        assert "🧾 _Ghi chú từ Bé Tiền:_" in sent["text"]
         assert (
-            "tài sản đã được cập nhật theo giá trị thị trường "
-            "(giá chứng khoán, giá tiền số, giá vàng)"
+            "Mình đã dùng giá thị trường mới nhất đang có để cập nhật "
+            "chứng khoán, tiền số và vàng."
+        ) in sent["text"]
+        assert (
+            "Đây là ảnh chụp nhanh để bạn theo dõi tổng tài sản "
+            "gọn hơn nhé."
         ) in sent["text"]
         assert "tháng trước" not in sent["text"]
         assert sent["reply_markup"] == back_to_main_keyboard()
@@ -688,8 +693,8 @@ class TestNetWorthFastPath:
 
         assert len(sent_messages) == 2
         assert sent_messages[0]["text"] == (
-            "⏳ Mình đang tính lại tài sản theo giá trị thị trường, "
-            "chờ mình một chút nhé..."
+            "🔄 _Bé Tiền đang cập nhật theo giá thị trường..._\n"
+            "Chờ mình một chút nhé ✨"
         )
         assert "Tổng tài sản của An" in sent_messages[1]["text"]
 
