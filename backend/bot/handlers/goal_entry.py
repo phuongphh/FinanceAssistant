@@ -99,7 +99,12 @@ _FEASIBILITY_LABELS = {
 
 
 async def show_goals_list(
-    db: AsyncSession, chat_id: int, user: User
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    *,
+    back_callback: str = "menu:main",
+    back_label: str = "◀️ Quay về menu",
 ) -> None:
     """Render menu:goals:list — active goals with progress bars +
     per-row action buttons. Empty state if no goals."""
@@ -112,7 +117,9 @@ async def show_goals_list(
                 "Chưa có mục tiêu nào! Mục tiêu đầu tiên của bạn là gì?"
             ),
             parse_mode="HTML",
-            reply_markup=goals_list_footer_keyboard(),
+            reply_markup=goals_list_footer_keyboard(
+                back_callback=back_callback, back_label=back_label
+            ),
         )
         return
 
@@ -132,7 +139,9 @@ async def show_goals_list(
 
     await send_message(
         chat_id=chat_id, text="—",
-        reply_markup=goals_list_footer_keyboard(),
+        reply_markup=goals_list_footer_keyboard(
+            back_callback=back_callback, back_label=back_label
+        ),
     )
 
 

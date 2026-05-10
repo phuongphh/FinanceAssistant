@@ -161,13 +161,17 @@ def goals_delete_confirm_keyboard(
     }
 
 
-def goals_list_footer_keyboard() -> InlineKeyboardMarkup:
+def goals_list_footer_keyboard(
+    *,
+    back_callback: str = "menu:main",
+    back_label: str = "◀️ Quay về menu",
+) -> InlineKeyboardMarkup:
     return {
         "inline_keyboard": [
             [{
                 "text": "➕ Thêm mục tiêu",
                 "callback_data": build_callback(CB_GOALS, "start"),
             }],
-            [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
+            [{"text": back_label, "callback_data": back_callback}],
         ]
     }

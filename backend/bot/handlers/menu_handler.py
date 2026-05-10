@@ -366,6 +366,10 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # handler (CRUD list view); the rest still synthesise an intent
     # so personality wrap + follow-up keyboards stay consistent.
     ("cashflow", "overview"): (IntentType.QUERY_CASHFLOW, {}),
+    ("cashflow", "monthly_report"): (
+        IntentType.QUERY_CASHFLOW,
+        {"focus": "current_month_detail", "time_range": "this_month"},
+    ),
     ("cashflow", "compare"): (IntentType.QUERY_CASHFLOW, {"compare_months": 6}),
     ("cashflow", "saving_rate"): (IntentType.QUERY_CASHFLOW, {"focus": "saving_rate"}),
     # Mục tiêu
@@ -647,6 +651,21 @@ async def _action_cashflow_income(
     await show_income_list(db, chat_id, user)
 
 
+async def _action_cashflow_goals(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Open the existing Goals list from the Cashflow context."""
+    from backend.bot.handlers.goal_entry import show_goals_list
+
+    await show_goals_list(
+        db,
+        chat_id,
+        user,
+        back_callback="menu:cashflow",
+        back_label="◀️ Quay về Dòng tiền",
+    )
+
+
 async def _action_assets_mark_rental(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -742,6 +761,7 @@ _DIRECT_HANDLERS = {
     ("expenses", "ocr"): _action_expenses_ocr,
     ("expenses", "recurring"): _action_expenses_recurring,
     ("cashflow", "income"): _action_cashflow_income,
+    ("cashflow", "goals"): _action_cashflow_goals,
     # Phase 3.8 Epic 5 — full CRUD via direct handlers (Phase 3A had
     # stub intents). ``advisor`` still routes via the synthesised
     # ADVISORY intent so the LLM gets to use the new ``get_goals``
