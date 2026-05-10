@@ -13,5 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #334 | [Epic] Phase 3.9.5 — Epic 1: Tài sản (Wealth Menu Polish) | [issue-334.md](issue-334.md) |
 | #335 | [Epic] Phase 3.9.5 — Epic 2: Dashboard | [issue-335.md](issue-335.md) |
+| #336 | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [issue-336.md](issue-336.md) |
 
-**Total active:** 9
+**Total active:** 10
