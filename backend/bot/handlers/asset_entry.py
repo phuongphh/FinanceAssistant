@@ -62,7 +62,9 @@ from backend.bot.keyboards.asset_keyboard import (
     asset_delete_list_keyboard,
     asset_delete_type_keyboard,
     asset_dashboard_edit_keyboard,
+    asset_edit_list_keyboard,
     asset_manage_keyboard,
+    asset_market_manage_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
     crypto_current_price_keyboard,
@@ -271,6 +273,7 @@ async def start_asset_edit_wizard(
     asset_id_text: str,
     *,
     return_to_dashboard: bool = True,
+    return_to_portfolio: str | None = None,
 ) -> None:
     """Start the lightweight edit flow for one ownership-checked asset."""
     try:
@@ -295,6 +298,7 @@ async def start_asset_edit_wizard(
             "asset_id": str(asset.id),
             "asset_name": asset.name,
             "return_to_dashboard": return_to_dashboard,
+            "return_to_portfolio": return_to_portfolio,
         },
     )
     safe_name = html.escape(asset.name or "Tài sản")
@@ -356,6 +360,34 @@ async def _handle_edit_current_value_input(
     )
     if draft.get("return_to_dashboard"):
         await show_asset_dashboard_report(db, chat_id, user)
+        return
+    return_to_portfolio = draft.get("return_to_portfolio")
+    if return_to_portfolio in {"stock", "crypto", "gold"}:
+        await show_asset_market_portfolio_after_edit(
+            db, chat_id, user, str(return_to_portfolio)
+        )
+
+
+async def show_asset_market_portfolio_after_edit(
+    db: AsyncSession, chat_id: int, user: User, asset_type: str
+) -> None:
+    """Return to the filtered market portfolio after an edit flow."""
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+    from backend.intent.intents import IntentResult, IntentType
+
+    result = IntentResult(
+        intent=IntentType.QUERY_PORTFOLIO,
+        confidence=1.0,
+        parameters={"asset_type": asset_type},
+        raw_text=f"[market:{asset_type}:portfolio_after_edit]",
+    )
+    text = await QueryPortfolioHandler().handle(result, user, db)
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup=asset_market_manage_keyboard(asset_type),
+    )
 
 
 async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> None:
@@ -371,6 +403,33 @@ async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> 
 def _asset_delete_row_label(asset) -> str:
     icon = get_subtype_icon(asset.asset_type, asset.subtype)
     return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
+
+
+async def show_asset_edit_list(
+    db: AsyncSession, chat_id: int, user: User, asset_type: str
+) -> None:
+    """List only active assets of one type for quick market-context edits."""
+    assets = await asset_service.get_user_assets(db, user.id, asset_type=asset_type)
+    label = get_label(asset_type)
+    if not assets:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                f"Chưa có tài sản loại này ({html.escape(label)}).\n\n"
+                "Bạn có thể thêm tài sản đầu tiên để Bé Tiền theo dõi giúp nhé."
+            ),
+            parse_mode="HTML",
+            reply_markup=asset_edit_list_keyboard([], asset_type=asset_type),
+        )
+        return
+
+    candidates = [(asset.id, _asset_delete_row_label(asset)) for asset in assets]
+    await send_message(
+        chat_id=chat_id,
+        text=f"Chọn tài sản <b>{html.escape(label)}</b> muốn sửa:",
+        parse_mode="HTML",
+        reply_markup=asset_edit_list_keyboard(candidates, asset_type=asset_type),
+    )
 
 
 async def show_asset_delete_type_picker(
@@ -2538,6 +2597,20 @@ async def handle_asset_manage_callback(db: AsyncSession, callback_query: dict) -
     async def _act() -> None:
         if action == "menu":
             await show_asset_manage_menu(db, chat_id, user)
+            return
+        if action == "edit_type" and arg:
+            await show_asset_edit_list(db, chat_id, user, arg)
+            return
+        if action == "edit" and arg:
+            return_asset_type = parts[2] if len(parts) > 2 else None
+            await start_asset_edit_wizard(
+                db,
+                chat_id,
+                user,
+                arg,
+                return_to_dashboard=False,
+                return_to_portfolio=return_asset_type,
+            )
             return
         if action == "delete_type" and arg:
             await show_asset_delete_list(db, chat_id, user, arg)
