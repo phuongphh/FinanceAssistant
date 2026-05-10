@@ -16,6 +16,7 @@ import asyncio
 import logging
 
 from backend import analytics
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.database import get_session_factory
 from backend.jobs._active_users import get_active_users
 from backend.models.user import User
@@ -92,7 +93,8 @@ async def _process_user(user: User) -> None:
             result = await send_message(
                 chat_id=user.telegram_id,
                 text=message,
-                parse_mode="HTML",
+                parse_mode=None,
+                **message_kwargs_for_animation(message, "milestones"),
             )
             # `send_message` returns None on API errors without
             # raising — treat a missing result as a failed delivery

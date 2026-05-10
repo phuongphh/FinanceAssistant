@@ -62,6 +62,7 @@ from backend.bot.formatters.menu_formatter import (
 )
 from backend.bot.formatters.money import format_money_full
 from backend.bot.handlers.free_form_text import _send_outcome
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.intent.dispatcher import IntentDispatcher
 from backend.intent.intents import (
     CLASSIFIER_RULE,
@@ -151,7 +152,11 @@ async def cmd_menu(db: AsyncSession, chat_id: int, user: User | None) -> None:
     level = user.wealth_level if user else None
     text, keyboard = format_main_menu(user, level=level)
     await send_message(
-        chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=keyboard
+        chat_id=chat_id,
+        text=text,
+        parse_mode=None,
+        reply_markup=keyboard,
+        **message_kwargs_for_animation(text, "submenu"),
     )
     user_id = user.id if user else None
     analytics.track(
@@ -326,8 +331,9 @@ async def _navigate(
         await send_message(
             chat_id=chat_id,
             text=text,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=keyboard,
+            **message_kwargs_for_animation(text, "submenu"),
         )
         return
 
@@ -335,8 +341,9 @@ async def _navigate(
         chat_id=chat_id,
         message_id=message_id,
         text=text,
-        parse_mode="Markdown",
+        parse_mode=None,
         reply_markup=keyboard,
+        **message_kwargs_for_animation(text, "submenu"),
     )
     analytics.track(
         "menu_navigated",

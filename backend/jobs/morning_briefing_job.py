@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.briefing.morning_briefing import render_enriched_morning_briefing
 from backend.bot.keyboards.briefing_keyboard import briefing_actions_keyboard
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.database import get_session_factory
 from backend.models.event import Event
 from backend.models.expense import Expense
@@ -179,8 +180,9 @@ async def run_morning_briefing_job(
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,
                 text=result.text,
-                parse_mode="HTML",
+                parse_mode=None,
                 reply_markup=briefing_actions_keyboard(),
+                **message_kwargs_for_animation(result.text, "briefing"),
             )
             # Notifier returns ``None`` on adapter error (it logs but
             # doesn't raise — that's the contract). Treat as failure

@@ -108,6 +108,46 @@ class TestSendTelegram:
         assert retry_payload["chat_id"] == 123
 
     @pytest.mark.asyncio
+    async def test_retries_without_entities_on_parse_entities_error(
+        self, mock_settings, mock_httpx
+    ):
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: can\'t parse entities: custom emoji invalid"}'
+        )
+        good_response = MagicMock()
+        good_response.status_code = 200
+        good_response.json.return_value = {"ok": True, "result": {"message_id": 1}}
+        good_response.text = '{"ok": true}'
+        mock_httpx.post.side_effect = [bad_response, good_response]
+
+        result = await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "💰 hello",
+                "entities": [
+                    {
+                        "type": "custom_emoji",
+                        "offset": 0,
+                        "length": 2,
+                        "custom_emoji_id": "bad-id",
+                    }
+                ],
+            },
+        )
+
+        assert result == {"ok": True, "result": {"message_id": 1}}
+        retry_payload = mock_httpx.post.call_args_list[1][1]["json"]
+        assert "entities" not in retry_payload
+        assert "parse_mode" not in retry_payload
+        assert retry_payload["text"] == "💰 hello"
+
+    @pytest.mark.asyncio
     async def test_no_retry_when_400_is_not_parse_entities(
         self, mock_settings, mock_httpx
     ):
@@ -139,6 +179,23 @@ class TestSendMessage:
         assert payload["chat_id"] == 123
         assert payload["text"] == "hello"
         assert payload["parse_mode"] == "Markdown"
+
+    @pytest.mark.asyncio
+    async def test_sends_entities_without_parse_mode(self, mock_settings, mock_httpx):
+        entities = [
+            {
+                "type": "custom_emoji",
+                "offset": 0,
+                "length": 2,
+                "custom_emoji_id": "money-id",
+            }
+        ]
+        await send_message(123, "💰 hello", parse_mode="Markdown", entities=entities)
+        payload = mock_httpx.post.call_args[1]["json"]
+        assert payload["chat_id"] == 123
+        assert payload["text"] == "💰 hello"
+        assert payload["entities"] == entities
+        assert "parse_mode" not in payload
 
 
 class TestPreSendSanitization:
@@ -270,7 +327,7 @@ class TestSetupBotCommands:
         payload = mock_httpx.post.call_args[1]["json"]
         commands = payload["commands"]
         names = [c["command"] for c in commands]
-        assert names == ["start", "menu", "help", "dashboard", "feedback", "about"]
+        assert names == ["start", "menu", "help", "dashboard", "baocaosang", "feedback", "about"]
         # No deprecated V1 commands surfaced — Phase 3.6 cuts the list.
         for legacy in ("themtaisan", "taisan", "report", "goals", "market"):
             assert legacy not in names
