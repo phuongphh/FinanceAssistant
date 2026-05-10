@@ -180,6 +180,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #346 | Pre-Phase | [Story] P3.9.5-S8: Tách riêng card Thu nhập / Chi tiêu | [pre-phase/issue-346.md](by-phase/pre-phase/issue-346.md) |
 | #347 | Pre-Phase | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [pre-phase/issue-347.md](by-phase/pre-phase/issue-347.md) |
 | #348 | Pre-Phase | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [pre-phase/issue-348.md](by-phase/pre-phase/issue-348.md) |
+| #353 | Pre-Phase | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [pre-phase/issue-353.md](by-phase/pre-phase/issue-353.md) |
 
-**Total:** 176 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 159 Pre-Phase)
+**Total:** 177 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 160 Pre-Phase)
