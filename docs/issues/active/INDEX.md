@@ -27,5 +27,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #347 | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [issue-347.md](issue-347.md) |
 | #348 | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [issue-348.md](issue-348.md) |
 | #349 | [Story] P3.9.5-S11: Cổ phiếu — bảng giá portfolio + query CK theo mã | [issue-349.md](issue-349.md) |
+| #350 | [Story] P3.9.5-S12: Perf Tiền số — target p95 < 2s | [issue-350.md](issue-350.md) |
 
-**Total active:** 23
+**Total active:** 24
