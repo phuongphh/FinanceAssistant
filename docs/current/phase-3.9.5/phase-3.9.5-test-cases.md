@@ -585,3 +585,243 @@ Pass Criteria: All expected results met
 - **Pass:** checker clean
 
 ---
+
+# Epic 4 — Market Menu (TC-041 → TC-060)
+
+## TC-041: 🚨 P1 BUG — Crypto Portfolios không nhảy sang Stocks
+- **Type:** Critical
+- **Story:** P3.9.5-S13
+- **Persona:** Hà (3 crypto coins)
+- **Preconditions:** Hà có cả stocks lẫn crypto trong portfolio
+- **Steps:**
+  1. Menu Thị trường → "₿ Tiền số"
+  2. Click "Portfolios của tôi"
+- **Expected:**
+  - Hiển thị **3 coins của Hà** (BTC, ETH, SOL)
+  - **KHÔNG** hiển thị stocks (VNM, FPT...)
+  - Header rõ "Crypto Portfolio"
+- **Pass:** routing đúng asset_type=crypto
+
+## TC-042: P1 BUG regression — Stocks Portfolios vẫn đúng
+- **Type:** Regression
+- **Story:** P3.9.5-S13
+- **Persona:** Hà
+- **Steps:**
+  1. Menu Thị trường → "📈 Cổ phiếu"
+  2. Click "Portfolios của tôi"
+- **Expected:**
+  - Hiển thị 5 cổ phiếu của Hà
+  - Không lẫn crypto
+- **Pass:** stocks routing không bị break
+
+## TC-043: P1 BUG audit — Vàng Portfolios cùng pattern
+- **Type:** Critical
+- **Story:** P3.9.5-S13
+- **Persona:** Phương (30 chỉ vàng)
+- **Steps:**
+  1. Menu Thị trường → "🥇 Vàng" (renamed)
+  2. Click "Portfolios của tôi"
+- **Expected:**
+  - Hiển thị vàng holdings
+  - **KHÔNG** lẫn stocks/crypto
+- **Pass:** Vàng không cùng bug
+
+## TC-044: Tiền số performance — cached p95 < 2s
+- **Type:** Performance
+- **Story:** P3.9.5-S12
+- **Persona:** Hà
+- **Preconditions:** Cache warm (đã fetch trong 120s qua)
+- **Steps:**
+  1. Menu Thị trường → Tiền số
+  2. Đo time message render
+  3. Repeat 10 lần, lấy p95
+- **Expected:**
+  - p95 < 2s
+- **Pass:** within target
+
+## TC-045: Tiền số performance — cold cache p95 < 4s
+- **Type:** Performance
+- **Story:** P3.9.5-S12
+- **Persona:** Hà
+- **Preconditions:** Flush Redis cache crypto
+- **Steps:**
+  1. Click Tiền số (cold)
+  2. Đo time
+- **Expected:**
+  - p95 < 4s
+- **Pass:** cold case acceptable
+
+## TC-046: Tiền số stale-data fallback
+- **Type:** Corner
+- **Story:** P3.9.5-S12
+- **Persona:** Hà
+- **Preconditions:** CoinGecko mock down (provider unavailable)
+- **Steps:**
+  1. Click Tiền số
+- **Expected:**
+  - Hiển thị giá last_known
+  - Banner "⚠️ Dữ liệu cập nhật lần cuối: HH:mm"
+  - Không crash, không 500 error
+- **Pass:** fallback hoạt động
+
+## TC-047: Tiền số batch fetch khi portfolio nhiều coin
+- **Type:** Performance
+- **Story:** P3.9.5-S12
+- **Persona:** Phương (5 crypto coins)
+- **Steps:**
+  1. Click Tiền số
+  2. Inspect network calls (dev mode)
+- **Expected:**
+  - Single batch call (không phải 5 calls riêng lẻ)
+  - p95 < 2s với cached
+- **Pass:** batching hoạt động
+
+## TC-048: Cổ phiếu — Bảng giá filter theo portfolio
+- **Type:** Happy
+- **Story:** P3.9.5-S11
+- **Persona:** Hà (5 stocks)
+- **Steps:**
+  1. Menu Thị trường → Cổ phiếu → "Bảng giá"
+- **Expected:**
+  - Chỉ hiển thị 5 mã của Hà
+  - Không show all VN30
+- **Pass:** filter đúng
+
+## TC-049: Cổ phiếu — Bảng giá empty portfolio
+- **Type:** Corner
+- **Story:** P3.9.5-S11
+- **Persona:** Mai (no stocks)
+- **Steps:**
+  1. Cổ phiếu → Bảng giá
+- **Expected:**
+  - Empty state với hint "Thêm CK vào portfolio để theo dõi"
+  - CTA add stock
+- **Pass:** empty state ok
+
+## TC-050: Cổ phiếu — Tìm CK theo mã
+- **Type:** Happy
+- **Story:** P3.9.5-S11
+- **Persona:** any
+- **Steps:**
+  1. Cổ phiếu → "🔍 Tìm CK theo mã"
+  2. Gõ "VNM"
+- **Expected:**
+  - Hiển thị quote VNM (giá, change, volume)
+  - Source SSI
+- **Pass:** query path hoạt động
+
+## TC-051: Cổ phiếu — Tìm CK invalid ticker
+- **Type:** Corner
+- **Story:** P3.9.5-S11
+- **Persona:** any
+- **Steps:**
+  1. Tìm CK theo mã → gõ "XYZZZZ"
+- **Expected:**
+  - Friendly error "Không tìm thấy mã XYZZZZ. Bạn check lại nhé."
+  - Không crash
+- **Pass:** error handle
+
+## TC-052: Cổ phiếu — Tìm CK 5-phút cache
+- **Type:** Performance
+- **Story:** P3.9.5-S11
+- **Persona:** any
+- **Steps:**
+  1. Tìm "VNM" → ghi nhận giá
+  2. Tìm "VNM" lại trong 5 phút
+- **Expected:**
+  - Lần 2 nhanh hơn (cache hit)
+  - Giá giống lần 1 (cùng cache)
+- **Pass:** cache TTL hoạt động
+
+## TC-053: Button "Sửa tài sản" trong Crypto Portfolios
+- **Type:** Happy
+- **Story:** P3.9.5-S14
+- **Persona:** Hà
+- **Steps:**
+  1. Tiền số → Portfolios của tôi
+- **Expected:**
+  - Có button "✏️ Sửa tài sản" trong view
+  - Click → list 3 coins của Hà (filtered crypto only)
+  - Edit 1 coin → save → quay về Crypto Portfolios
+- **Pass:** filtered edit + return context
+
+## TC-054: Button "Sửa tài sản" trong Stocks Portfolios
+- **Type:** Happy
+- **Story:** P3.9.5-S14
+- **Persona:** Hà
+- **Steps:**
+  1. Cổ phiếu → Portfolios của tôi → Sửa tài sản
+- **Expected:**
+  - List filtered chỉ stocks
+  - Quay về Stocks Portfolios sau edit
+- **Pass:** consistent pattern
+
+## TC-055: Button "Sửa tài sản" trong Vàng Portfolios
+- **Type:** Happy
+- **Story:** P3.9.5-S14
+- **Persona:** Phương
+- **Steps:**
+  1. Vàng → Portfolios của tôi → Sửa tài sản
+- **Expected:**
+  - List filtered chỉ vàng
+  - Quay về Vàng Portfolios sau edit
+- **Pass:** consistent
+
+## TC-056: Button "Sửa tài sản" empty state
+- **Type:** Corner
+- **Story:** P3.9.5-S14
+- **Persona:** Mai (no crypto)
+- **Steps:**
+  1. Tiền số → Portfolios → Sửa tài sản
+- **Expected:**
+  - Empty state "Chưa có tài sản loại này"
+  - CTA "Thêm crypto đầu tiên"
+- **Pass:** empty state per type
+
+## TC-057: Vàng → Portfolios có hint UX
+- **Type:** Happy
+- **Story:** P3.9.5-S15
+- **Persona:** Phương
+- **Steps:**
+  1. Vàng → Portfolios của tôi
+- **Expected:**
+  - Hint string xuất hiện: "Đây là toàn bộ vàng bạn đang nắm giữ, định giá theo SJC realtime" (hoặc tương đương)
+  - Hint vắng trong empty state nếu redundant
+- **Pass:** hint visible
+
+## TC-058: Stocks/Crypto Portfolios cũng có hint consistent
+- **Type:** Happy
+- **Story:** P3.9.5-S15
+- **Persona:** Hà
+- **Steps:**
+  1. Quan sát hint ở Cổ phiếu Portfolios + Crypto Portfolios
+- **Expected:**
+  - 3 portfolios (stocks/crypto/gold) có hint pattern consistent
+  - Mỗi hint phù hợp với asset type
+- **Pass:** consistency
+
+## TC-059: Rename "Vàng JSC" → "Vàng" trong submenu Market
+- **Type:** Happy
+- **Story:** P3.9.5-S16
+- **Persona:** any
+- **Steps:**
+  1. Menu Thị trường
+- **Expected:**
+  - Button hiển thị "🥇 Vàng" (KHÔNG phải "Vàng JSC")
+  - Bên trong view có thể clarify "Giá theo SJC" trong intro/footer
+- **Pass:** rename applied
+
+## TC-060: Market regression — VNINDEX, advisor flow vẫn hoạt động
+- **Type:** Regression
+- **Story:** P3.9.5-S11-S16
+- **Persona:** Hà
+- **Steps:**
+  1. Menu Thị trường → VN-Index
+  2. Menu Thị trường → "💡 Cơ hội đầu tư"
+- **Expected:**
+  - Cả 2 flows render đúng như trước
+  - Không break sau routing/perf changes
+- **Pass:** zero regression
+
+---
+
