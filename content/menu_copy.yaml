@@ -114,9 +114,9 @@ submenu_assets:
       callback: "menu:assets:net_worth"
       description: "Tóm tắt tổng giá trị + thay đổi tháng này"
 
-    - label: "📈 Báo cáo chi tiết"
+    - label: "📈 Báo cáo"
       callback: "menu:assets:report"
-      description: "Liệt kê toàn bộ tài sản theo loại"
+      description: "Liệt kê tài sản theo loại, tap để sửa"
 
     - label: "➕ Thêm tài sản"
       callback: "menu:assets:add"

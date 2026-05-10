@@ -358,8 +358,7 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # Tài sản — "Tổng tài sản" uses a direct fast handler because the
     # callback is deterministic and should answer from the already-current
     # asset values without waiting for historical snapshot comparisons.
-    # "Báo cáo chi tiết" still maps to the existing per-asset list intent.
-    ("assets", "report"): (IntentType.QUERY_ASSETS, {}),
+    # "Báo cáo" is a direct handler now so rows can carry edit callbacks.
     # Chi tiêu
     ("expenses", "report"): (IntentType.QUERY_EXPENSES, {}),
     ("expenses", "by_category"): (IntentType.QUERY_EXPENSES_BY_CATEGORY, {}),
@@ -594,6 +593,15 @@ async def _action_assets_net_worth(
     )
 
 
+async def _action_assets_report(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Render the interactive asset dashboard report."""
+    from backend.bot.handlers.asset_entry import show_asset_dashboard_report
+
+    await show_asset_dashboard_report(db, chat_id, user)
+
+
 async def _action_assets_add(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -726,6 +734,7 @@ async def _action_goals_update(
 
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
+    ("assets", "report"): _action_assets_report,
     ("assets", "add"): _action_assets_add,
     ("assets", "edit"): _action_assets_edit,
     ("assets", "mark_rental"): _action_assets_mark_rental,

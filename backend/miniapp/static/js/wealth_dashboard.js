@@ -67,6 +67,7 @@
     els.retryBtn.addEventListener('click', renderDashboard);
     els.addAssetBtn.addEventListener('click', closeAndAddAsset);
     els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
+    els.assetsList.addEventListener('click', onAssetRowClick);
 
     document.querySelectorAll('.period-btn').forEach((btn) => {
         btn.addEventListener('click', () => onPeriodChange(btn));
@@ -386,8 +387,9 @@
             const countBadge = (a.count || 1) > 1
                 ? `<span class="asset-count">×${a.count}</span>`
                 : '';
+            const memberIds = Array.isArray(a.member_ids) ? a.member_ids : [a.id];
             return `
-                <div class="asset-card">
+                <button class="asset-card" type="button" data-asset-id="${escapeHtml(a.id)}" data-asset-ids="${escapeHtml(memberIds.join(','))}" aria-label="Sửa ${escapeHtml(a.name)}">
                     <span class="asset-icon">${escapeHtml(a.icon)}</span>
                     <div class="asset-info">
                         <div class="asset-name">${escapeHtml(a.name)}${countBadge}</div>
@@ -397,7 +399,7 @@
                         <div class="asset-current">${formatMoneyShort(a.current_value)}</div>
                         <div class="asset-change ${cls}">${sign}${(a.change_pct || 0).toFixed(1)}%</div>
                     </div>
-                </div>
+                </button>
             `;
         }).join('');
     }
@@ -459,6 +461,30 @@
     }
 
     // -- Misc -------------------------------------------------------------
+
+    async function onAssetRowClick(event) {
+        const card = event.target.closest('.asset-card[data-asset-id]');
+        if (!card) return;
+        const assetId = card.dataset.assetId;
+        const assetIds = (card.dataset.assetIds || '').split(',').filter(Boolean);
+        if (!assetId && !assetIds.length) return;
+        card.disabled = true;
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const response = await fetch('/miniapp/api/wealth/start-asset-edit', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ asset_id: assetId, asset_ids: assetIds }),
+            });
+            if (!response.ok) throw new Error('API ' + response.status);
+        } catch (_err) {
+            if (tg && tg.showAlert) tg.showAlert('Không mở được màn sửa, thử lại nhé.');
+            card.disabled = false;
+            return;
+        }
+        if (tg && tg.close) tg.close();
+    }
 
     async function closeAndAddAsset() {
         // Disable both buttons to prevent a double-tap firing the wizard

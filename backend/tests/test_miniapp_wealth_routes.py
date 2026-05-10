@@ -269,6 +269,74 @@ class TestStartAssetWizardRoute:
             app.dependency_overrides.pop(get_db, None)
 
 
+class TestStartAssetEditRoute:
+    def teardown_method(self):
+        _clear_overrides()
+
+    def test_invokes_single_asset_edit_from_member_ids(self):
+        _override_auth()
+        user = _fake_user(telegram_id=98765)
+        asset_id = str(uuid.uuid4())
+
+        async def _fake_resolve(auth, db):
+            return user
+
+        edit_mock = AsyncMock()
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
+             patch(
+                 "backend.bot.handlers.asset_entry.start_asset_edit_wizard",
+                 edit_mock,
+             ):
+            resp = client.post(
+                "/miniapp/api/wealth/start-asset-edit",
+                headers={"X-Telegram-Init-Data": "stub"},
+                json={"asset_ids": [asset_id]},
+            )
+
+        assert resp.status_code == 200
+        edit_mock.assert_awaited_once()
+        args = edit_mock.await_args.args
+        assert args[1] == 98765
+        assert args[2] is user
+        assert args[3] == asset_id
+
+    def test_invokes_group_picker_for_multiple_member_ids(self):
+        _override_auth()
+        user = _fake_user(telegram_id=98765)
+        asset_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+
+        async def _fake_resolve(auth, db):
+            return user
+
+        picker_mock = AsyncMock()
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
+             patch(
+                 "backend.bot.handlers.asset_entry.show_asset_edit_picker",
+                 picker_mock,
+             ):
+            resp = client.post(
+                "/miniapp/api/wealth/start-asset-edit",
+                headers={"X-Telegram-Init-Data": "stub"},
+                json={"asset_ids": asset_ids},
+            )
+
+        assert resp.status_code == 200
+        picker_mock.assert_awaited_once()
+        args = picker_mock.await_args.args
+        assert args[1] == 98765
+        assert args[2] is user
+        assert args[3] == asset_ids
+
+    def test_requires_asset_id(self):
+        _override_auth()
+        resp = client.post(
+            "/miniapp/api/wealth/start-asset-edit",
+            headers={"X-Telegram-Init-Data": "stub"},
+            json={},
+        )
+        assert resp.status_code == 422
+
+
 class TestWealthDashboardPage:
     def test_serves_html(self):
         resp = client.get("/miniapp/wealth")

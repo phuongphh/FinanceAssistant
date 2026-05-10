@@ -63,6 +63,13 @@ def _wealth_cache_clear() -> None:
     _wealth_cache.clear()
 
 
+def invalidate_wealth_cache_for_user(user_id) -> None:
+    """Drop wealth-dashboard cache entries for one user after an edit."""
+    stale_keys = [key for key in _wealth_cache if key and key[0] == user_id]
+    for key in stale_keys:
+        _wealth_cache.pop(key, None)
+
+
 @router.get("/dashboard", include_in_schema=False)
 async def dashboard_page():
     """Serve the dashboard HTML. Auth happens in the API layer (per-request)."""
@@ -253,6 +260,42 @@ async def start_asset_wizard_route(
     from backend.bot.handlers.asset_entry import start_asset_wizard
 
     await start_asset_wizard(db, user.telegram_id, user)
+    return {"data": {"ok": True}, "error": None}
+
+
+@router.post("/api/wealth/start-asset-edit")
+async def start_asset_edit_route(
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger the asset edit wizard from a clicked dashboard row.
+
+    Ownership is checked inside ``start_asset_edit_wizard`` via
+    ``asset_service.get_asset_by_id``; the Mini App only passes the row id.
+    """
+    body = payload or {}
+    asset_id = str(body.get("asset_id") or "")
+    asset_ids = body.get("asset_ids")
+    if not asset_id and not asset_ids:
+        raise HTTPException(status_code=422, detail="asset_id is required")
+
+    user = await _resolve_user(auth, db)
+
+    from backend.bot.handlers.asset_entry import (
+        show_asset_edit_picker,
+        start_asset_edit_wizard,
+    )
+
+    if isinstance(asset_ids, list) and asset_ids:
+        clean_ids = [str(item) for item in asset_ids]
+        if len(clean_ids) > 1:
+            await show_asset_edit_picker(db, user.telegram_id, user, clean_ids)
+        else:
+            await start_asset_edit_wizard(db, user.telegram_id, user, clean_ids[0])
+    else:
+        await start_asset_edit_wizard(db, user.telegram_id, user, asset_id)
+    invalidate_wealth_cache_for_user(user.id)
     return {"data": {"ok": True}, "error": None}
 
 

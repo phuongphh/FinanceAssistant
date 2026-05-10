@@ -39,6 +39,8 @@ never commits — the worker owns the transaction boundary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import html
 import logging
 import re
 import uuid
@@ -59,6 +61,7 @@ from backend.bot.keyboards.asset_keyboard import (
     asset_delete_confirm_keyboard,
     asset_delete_list_keyboard,
     asset_delete_type_keyboard,
+    asset_dashboard_edit_keyboard,
     asset_manage_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
@@ -129,6 +132,9 @@ FLOW_REAL_ESTATE = "asset_add_real_estate"
 # FLOW_REAL_ESTATE because it skips the create-asset path and only
 # attaches rental data to an existing row.
 FLOW_MARK_RENTAL = "asset_add_mark_rental"
+# Phase 3.9.5 — launched from dashboard:edit:<asset_id>.
+# Keep the asset_add prefix so existing wizard cancellation/auto-exit logic applies.
+FLOW_EDIT_ASSET = "asset_add_edit_asset"
 
 
 # ---------- Entry point ----------------------------------------------
@@ -185,6 +191,171 @@ async def list_assets(db: AsyncSession, chat_id: int, user: User) -> None:
         text=format_asset_list(assets),
         parse_mode="HTML",
     )
+
+def _asset_dashboard_row_label(asset) -> str:
+    icon = get_subtype_icon(asset.asset_type, asset.subtype)
+    return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
+
+
+async def show_asset_dashboard_report(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Render the asset dashboard report with one edit callback per row."""
+    assets = await asset_service.get_user_assets(db, user.id)
+    if not assets:
+        await send_message(
+            chat_id=chat_id,
+            text=(
+                "📊 <b>Báo cáo</b>\n\n"
+                "Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé."
+            ),
+            parse_mode="HTML",
+        )
+        return
+
+    rows = [(asset.id, _asset_dashboard_row_label(asset)) for asset in assets]
+    await send_message(
+        chat_id=chat_id,
+        text=format_asset_list(assets).replace(
+            "📊 <b>Tài sản của bạn</b>", "📊 <b>Báo cáo</b>", 1
+        )
+        + "\n\n👆 Tap vào một dòng bên dưới để sửa giá trị.",
+        parse_mode="HTML",
+        reply_markup=asset_dashboard_edit_keyboard(rows),
+    )
+
+
+async def show_asset_edit_picker(
+    db: AsyncSession, chat_id: int, user: User, asset_id_texts: list[str]
+) -> None:
+    """Show concrete asset rows when a dashboard card represents a group."""
+    requested_ids: set[uuid.UUID] = set()
+    for raw in asset_id_texts[:20]:
+        with contextlib.suppress(ValueError):
+            requested_ids.add(uuid.UUID(str(raw)))
+
+    if not requested_ids:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    # One ownership-scoped query is faster and avoids leaking whether ids
+    # outside this user exist. Preserve dashboard order from ``asset_id_texts``.
+    assets = await asset_service.get_user_assets(db, user.id)
+    by_id = {asset.id: asset for asset in assets if asset.id in requested_ids}
+    rows = []
+    for raw in asset_id_texts[:20]:
+        with contextlib.suppress(ValueError):
+            asset = by_id.get(uuid.UUID(str(raw)))
+            if asset is not None and asset.is_active:
+                rows.append((asset.id, _asset_dashboard_row_label(asset)))
+
+    if not rows:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+    if len(rows) == 1:
+        await start_asset_edit_wizard(db, chat_id, user, str(rows[0][0]))
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text="✏️ Card này gồm nhiều tài sản. Chọn dòng cụ thể để sửa nhé:",
+        parse_mode="HTML",
+        reply_markup=asset_dashboard_edit_keyboard(rows),
+    )
+
+
+async def start_asset_edit_wizard(
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    asset_id_text: str,
+    *,
+    return_to_dashboard: bool = True,
+) -> None:
+    """Start the lightweight edit flow for one ownership-checked asset."""
+    try:
+        asset_uuid = uuid.UUID(asset_id_text)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None or not asset.is_active:
+        await send_message(
+            chat_id=chat_id, text="Tài sản này không còn trong danh sách."
+        )
+        return
+
+    await wizard_service.start_flow(
+        db,
+        user.id,
+        FLOW_EDIT_ASSET,
+        step="current_value",
+        draft={
+            "asset_id": str(asset.id),
+            "asset_name": asset.name,
+            "return_to_dashboard": return_to_dashboard,
+        },
+    )
+    safe_name = html.escape(asset.name or "Tài sản")
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✏️ <b>Sửa {safe_name}</b>\n\n"
+            f"Giá trị hiện tại: <b>{format_money_full(asset.current_value)}</b>\n"
+            "Nhập giá trị mới nhé. Ví dụ: <code>120 triệu</code>"
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def _handle_edit_current_value_input(
+    db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
+) -> None:
+    if has_negative_sign(text):
+        await send_message(chat_id=chat_id, text="Giá trị mới phải từ 0 trở lên nhé 🙂")
+        return
+
+    new_value = parse_amount(text)
+    if new_value is None or new_value < 0:
+        await send_message(
+            chat_id=chat_id,
+            text="Mình chưa đọc được số tiền. Ví dụ: <code>120 triệu</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    try:
+        asset_uuid = uuid.UUID(str(draft.get("asset_id") or ""))
+    except ValueError:
+        await wizard_service.clear(db, user.id)
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.update_current_value(
+        db, user.id, asset_uuid, Decimal(new_value)
+    )
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    await update_user_level(db, user.id, breakdown.total)
+    await wizard_service.clear(db, user.id)
+
+    with contextlib.suppress(Exception):
+        from backend.miniapp.routes import invalidate_wealth_cache_for_user
+
+        invalidate_wealth_cache_for_user(user.id)
+
+    safe_name = html.escape(asset.name or "Tài sản")
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Đã cập nhật <b>{safe_name}</b>: "
+            f"<b>{format_money_full(asset.current_value)}</b>\n"
+            f"💎 Tổng tài sản mới: <b>{format_money_full(breakdown.total)}</b>"
+        ),
+        parse_mode="HTML",
+    )
+    if draft.get("return_to_dashboard"):
+        await show_asset_dashboard_report(db, chat_id, user)
 
 
 async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> None:
@@ -2073,6 +2244,7 @@ _TEXT_DISPATCH = {
     (FLOW_MARK_RENTAL, "rental_expenses"): _handle_rental_expenses_input,
     (FLOW_MARK_RENTAL, "rental_tenant_input"): _handle_rental_tenant_input,
     (FLOW_MARK_RENTAL, "rental_lease_input"): _handle_rental_lease_input,
+    (FLOW_EDIT_ASSET, "current_value"): _handle_edit_current_value_input,
 }
 
 
@@ -2302,6 +2474,39 @@ async def handle_asset_rental_callback(db: AsyncSession, callback_query: dict) -
         if action == "pick" and arg:
             await _handle_rental_pick(db, chat_id, user, arg)
             return
+
+    await asyncio.gather(answer_callback(callback_id), _act())
+    return True
+
+
+async def handle_dashboard_callback(db: AsyncSession, callback_query: dict) -> bool:
+    """Route dashboard row actions such as ``dashboard:edit:<asset_id>``."""
+    data: str = callback_query.get("data") or ""
+    if not data.startswith("dashboard:"):
+        return False
+
+    callback_id = callback_query["id"]
+    message = callback_query.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    telegram_id = (callback_query.get("from") or {}).get("id")
+    if chat_id is None or telegram_id is None:
+        await answer_callback(callback_id)
+        return True
+
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        await answer_callback(callback_id, text="Bạn cần /start trước nhé.")
+        return True
+
+    _, parts = parse_callback(data)
+    action = parts[0] if parts else ""
+    arg = parts[1] if len(parts) > 1 else None
+
+    async def _act() -> None:
+        if action == "edit" and arg:
+            await start_asset_edit_wizard(db, chat_id, user, arg)
+            return
+        await send_message(chat_id=chat_id, text="Mình chưa hỗ trợ thao tác này.")
 
     await asyncio.gather(answer_callback(callback_id), _act())
     return True
