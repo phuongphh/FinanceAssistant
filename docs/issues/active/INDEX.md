@@ -34,5 +34,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #354 | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [issue-354.md](issue-354.md) |
 | #355 | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [issue-355.md](issue-355.md) |
 | #356 | [Story] P3.9.5-S18: Helper utility render animation emoji | [issue-356.md](issue-356.md) |
+| #357 | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [issue-357.md](issue-357.md) |
 
-**Total active:** 30
+**Total active:** 31
