@@ -30,6 +30,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #350 | [Story] P3.9.5-S12: Perf Tiền số — target p95 < 2s | [issue-350.md](issue-350.md) |
 | #351 | [Story] P3.9.5-S13: BUG — "Portfolios của tôi" trong Tiền số nhảy sang Chứng khoán | [issue-351.md](issue-351.md) |
 | #352 | [Story] P3.9.5-S14: Button "Sửa tài sản" filtered theo type đang xem | [issue-352.md](issue-352.md) |
+| #353 | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [issue-353.md](issue-353.md) |
 | #354 | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [issue-354.md](issue-354.md) |
 
-**Total active:** 27
+**Total active:** 28
