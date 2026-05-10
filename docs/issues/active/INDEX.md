@@ -14,5 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #334 | [Epic] Phase 3.9.5 — Epic 1: Tài sản (Wealth Menu Polish) | [issue-334.md](issue-334.md) |
 | #335 | [Epic] Phase 3.9.5 — Epic 2: Dashboard | [issue-335.md](issue-335.md) |
 | #336 | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [issue-336.md](issue-336.md) |
+| #337 | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [issue-337.md](issue-337.md) |
 
-**Total active:** 10
+**Total active:** 11
