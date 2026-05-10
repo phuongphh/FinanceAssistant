@@ -26,6 +26,16 @@ async def test_manual_morning_briefing_uses_entities_and_does_not_mark_scheduled
     notifier = MagicMock()
     notifier.send_message = AsyncMock(return_value={"ok": True})
 
+    # Inject a valid emoji map so the briefing pipeline produces entities.
+    # Production YAML keeps animation_id commented out until real Telegram
+    # custom_emoji_ids are harvested (see content/emoji_animation_map.yaml).
+    fake_emoji_map = {
+        "partly_sunny": {
+            "static": "🌤️",
+            "animation_id": "test-sun",
+            "contexts": ["briefing"],
+        },
+    }
     with patch(
         "backend.bot.handlers.morning_briefing_command.render_enriched_morning_briefing",
         new_callable=AsyncMock,
@@ -33,6 +43,9 @@ async def test_manual_morning_briefing_uses_entities_and_does_not_mark_scheduled
     ), patch(
         "backend.bot.handlers.morning_briefing_command.get_notifier",
         return_value=notifier,
+    ), patch(
+        "backend.bot.utils.emoji_animation.load_emoji_animation_map",
+        return_value=fake_emoji_map,
     ), patch(
         "backend.bot.handlers.morning_briefing_command.analytics.atrack",
         new_callable=AsyncMock,

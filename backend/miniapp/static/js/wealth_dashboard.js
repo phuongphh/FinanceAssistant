@@ -399,6 +399,7 @@
                         <div class="asset-current">${formatMoneyShort(a.current_value)}</div>
                         <div class="asset-change ${cls}">${sign}${(a.change_pct || 0).toFixed(1)}%</div>
                     </div>
+                    <span class="asset-edit-cue" aria-hidden="true">✏️</span>
                 </button>
             `;
         }).join('');
