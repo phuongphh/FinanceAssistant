@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "4A"
+current_phase: "3.9.5"
 
 phases:
   - id: "1"
@@ -130,6 +130,16 @@ phases:
     completed_date: "2026-05-08"
     icon: "✅"
 
+  - id: "3.9.5"
+    name: "Pre-Launch UX Polish"
+    status: current
+    duration: "5-7 ngày"
+    detail_doc: "docs/current/phase-3.9.5/phase-3.9.5-detailed.md"
+    issues_doc: "docs/current/phase-3.9.5/phase-3.9.5-issues.md"
+    description: "Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026."
+    completed_date: ""
+    icon: "🛠"
+
   - id: "3B"
     name: "Market Intelligence"
     status: planned
@@ -142,7 +152,7 @@ phases:
 
   - id: "4A"
     name: "Financial Twin Conservative MVP"
-    status: next
+    status: planned
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
