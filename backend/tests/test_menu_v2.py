@@ -617,10 +617,10 @@ class TestNetWorthFastPath:
             total=Decimal("500000000"),
             asset_count=3,
         )
-        sent: dict = {}
+        sent_messages: list[dict] = []
 
         async def fake_send_message(**kwargs):
-            sent.update(kwargs)
+            sent_messages.append(kwargs)
 
         async def fail_change(*_args, **_kwargs):
             raise AssertionError("menu fast path must not query snapshots")
@@ -642,6 +642,8 @@ class TestNetWorthFastPath:
             db=object(), user=_user("An"), chat_id=42, message_id=7
         )
 
+        assert len(sent_messages) == 1
+        sent = sent_messages[0]
         assert sent["chat_id"] == 42
         assert "Tổng tài sản của An" in sent["text"]
         assert "500,000,000" in sent["text"]
