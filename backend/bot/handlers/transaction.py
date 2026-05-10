@@ -17,6 +17,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     transaction_actions_keyboard,
     transaction_batch_actions_keyboard,
 )
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.models.expense import Expense
 from backend.services.dashboard_service import get_user_by_id
 from backend.services.telegram_service import send_message
@@ -61,8 +62,9 @@ async def send_transaction_confirmation(
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode="HTML",
+        parse_mode=None,
         reply_markup=keyboard,
+        **message_kwargs_for_animation(text, "transaction"),
     )
 
     # Onboarding hook: if this is the user's first transaction during
@@ -110,8 +112,9 @@ async def send_transaction_batch_confirmation(
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode="HTML",
+        parse_mode=None,
         reply_markup=transaction_batch_actions_keyboard(batch_id),
+        **message_kwargs_for_animation(text, "transaction"),
     )
 
 

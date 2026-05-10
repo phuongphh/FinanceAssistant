@@ -175,7 +175,7 @@ async def test_sends_and_tracks_when_eligible():
     notifier.send_message = AsyncMock(return_value={"ok": True, "result": {}})
 
     briefing_result = EnrichedBriefingResult(
-        text="🌅 Sáng Minh ơi", level=WealthLevel.STARTER,
+        text="🌤️ Sáng Minh ơi", level=WealthLevel.STARTER,
     )
 
     with patch(
@@ -206,6 +206,9 @@ async def test_sends_and_tracks_when_eligible():
 
     assert sent == 1
     notifier.send_message.assert_awaited_once()
+    _, send_kwargs = notifier.send_message.await_args
+    assert send_kwargs["parse_mode"] is None
+    assert send_kwargs["entities"]
     # Analytics row carries level for the funnel breakdown.
     atrack_mock.assert_awaited_once()
     args, kwargs = atrack_mock.await_args

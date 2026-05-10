@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.briefing.morning_briefing import render_enriched_morning_briefing
 from backend.bot.keyboards.briefing_keyboard import briefing_actions_keyboard
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
 from backend.services.telegram_service import send_message
@@ -39,8 +40,9 @@ async def send_morning_briefing_now(
     response = await get_notifier().send_message(
         chat_id=chat_id,
         text=result.text,
-        parse_mode="HTML",
+        parse_mode=None,
         reply_markup=briefing_actions_keyboard(),
+        **message_kwargs_for_animation(result.text, "briefing"),
     )
     if response is None:
         await send_message(

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from html import escape
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -14,7 +13,6 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
-from backend.config import get_settings
 from backend.market_data.analytics.news_relevance import get_relevant_news
 from backend.market_data.analytics.portfolio_metrics import (
     compute_diversification_score,
@@ -52,23 +50,19 @@ def _load_template() -> dict[str, Any]:
 
 
 def _morning_emoji() -> str:
-    """Animated Telegram custom emoji when configured; plain emoji fallback.
+    """Static fallback emoji for the morning greeting.
 
-    Telegram renders ``<tg-emoji>`` only in HTML parse mode and only when the
-    ``emoji-id`` is valid for a custom emoji. Keeping the id configurable lets
-    production rotate to the latest branded emoji set without code changes; CI
-    and local dev still see the normal sunrise emoji.
+    Phase 3.9.5 attaches Telegram ``custom_emoji`` entities at the transport
+    boundary instead of embedding HTML tags here, keeping this renderer plain
+    text and safe for non-Telegram consumers/tests.
     """
-    emoji_id = (get_settings().telegram_morning_custom_emoji_id or "").strip()
-    if not emoji_id:
-        return "🌅"
-    return f'<tg-emoji emoji-id="{escape(emoji_id, quote=True)}">🌅</tg-emoji>'
+    return "🌤️"
 
 
 def _greeting_name(user: User) -> str:
     if hasattr(user, "get_greeting_name"):
-        return escape(user.get_greeting_name())
-    return escape((getattr(user, "display_name", None) or "bạn").strip() or "bạn")
+        return user.get_greeting_name()
+    return (getattr(user, "display_name", None) or "bạn").strip() or "bạn"
 
 
 def _greeting_line(user: User) -> str:

@@ -73,7 +73,7 @@ main_menu:
       callback: "menu:profile"
 
   hint: |-
-    💡 _Mẹo:_ bạn có thể hỏi mình thẳng — không cần menu:
+    💡 Mẹo: bạn có thể hỏi mình thẳng — không cần menu:
     • "tài sản của tôi có gì?"
     • "tháng này tiêu bao nhiêu?"
     • "VNM giá hôm nay?"
@@ -92,7 +92,7 @@ action_market_portfolio:
 # ============================================================
 
 submenu_assets:
-  title: "💎 *TÀI SẢN*"
+  title: "💎 TÀI SẢN"
 
   intro:
     starter: |-
@@ -147,7 +147,7 @@ submenu_assets:
       callback: "menu:main"
 
   hint: |-
-    💡 _Hoặc hỏi nhanh:_
+    💡 Hoặc hỏi nhanh:
     • "tài sản của tôi có gì?"
     • "tổng tài sản tôi bao nhiêu?"
     • "danh mục cổ phiếu của tôi"
@@ -167,7 +167,7 @@ action_assets_net_worth:
 # ============================================================
 
 submenu_expenses:
-  title: "💸 *CHI TIÊU*"
+  title: "💸 CHI TIÊU"
 
   intro:
     starter: |-
@@ -215,7 +215,7 @@ submenu_expenses:
       callback: "menu:main"
 
   hint: |-
-    💡 _Hoặc hỏi nhanh:_
+    💡 Hoặc hỏi nhanh:
     • "chi tiêu tháng này"
     • "chi cho ăn uống tuần qua"
     • "vừa chi 200k cafe"
@@ -225,7 +225,7 @@ submenu_expenses:
 # ============================================================
 
 submenu_cashflow:
-  title: "💰 *DÒNG TIỀN*"
+  title: "💰 DÒNG TIỀN"
 
   intro:
     starter: |-
@@ -279,7 +279,7 @@ submenu_cashflow:
       callback: "menu:main"
 
   hint: |-
-    💡 _Hoặc hỏi nhanh:_
+    💡 Hoặc hỏi nhanh:
     • "thu nhập của tôi"
     • "tháng này dư bao nhiêu?"
     • "tỷ lệ tiết kiệm của tôi"
@@ -289,7 +289,7 @@ submenu_cashflow:
 # ============================================================
 
 submenu_goals:
-  title: "🎯 *MỤC TIÊU*"
+  title: "🎯 MỤC TIÊU"
 
   intro:
     starter: |-
@@ -333,7 +333,7 @@ submenu_goals:
       callback: "menu:main"
 
   hint: |-
-    💡 _Hoặc hỏi nhanh:_
+    💡 Hoặc hỏi nhanh:
     • "mục tiêu của tôi"
     • "muốn mua xe cần làm gì?"
     • "lộ trình mua nhà"
@@ -343,7 +343,7 @@ submenu_goals:
 # ============================================================
 
 submenu_market:
-  title: "📊 *THỊ TRƯỜNG*"
+  title: "📊 THỊ TRƯỜNG"
 
   intro:
     starter: |-
@@ -389,7 +389,7 @@ submenu_market:
       callback: "menu:main"
 
   hint: |-
-    💡 _Hoặc hỏi nhanh:_
+    💡 Hoặc hỏi nhanh:
     • "VNM giá bao nhiêu?"
     • "BTC hôm nay thế nào?"
     • "nên đầu tư gì?"

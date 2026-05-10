@@ -12,13 +12,13 @@ from backend.wealth.ladder import WealthLevel
 
 
 @pytest.mark.asyncio
-async def test_manual_morning_briefing_uses_html_and_does_not_mark_scheduled_sent():
+async def test_manual_morning_briefing_uses_entities_and_does_not_mark_scheduled_sent():
     user = User()
     user.id = uuid.uuid4()
     user.telegram_id = 999
     user.display_name = "Minh"
     result = EnrichedBriefingResult(
-        text="🌅 Chào buổi sáng, Minh!",
+        text="🌤️ Chào buổi sáng, Minh!",
         level=WealthLevel.STARTER,
         is_empty_state=False,
         sections={},
@@ -42,6 +42,7 @@ async def test_manual_morning_briefing_uses_html_and_does_not_mark_scheduled_sen
     assert sent is True
     notifier.send_message.assert_awaited_once()
     _, kwargs = notifier.send_message.await_args
-    assert kwargs["parse_mode"] == "HTML"
+    assert kwargs["parse_mode"] is None
+    assert kwargs["entities"]
     mock_track.assert_awaited_once()
     assert mock_track.await_args.args[0] == "morning_briefing_requested"

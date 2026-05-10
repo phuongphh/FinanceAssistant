@@ -38,6 +38,7 @@ from backend.bot.keyboards.goals_keyboard import (
     goals_template_keyboard,
 )
 from backend.models.goal import Goal
+from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.models.user import User
 from backend.schemas.goal import (
     FeasibilityBand,
@@ -591,14 +592,16 @@ async def _handle_edit_progress_input(
     )
 
     if updated.is_completed:
+        msg = (
+            f"🎉 Đạt mục tiêu {updated.name}!\n\n"
+            f"Chúc mừng — bạn đã hoàn thành "
+            f"{format_money_short(updated.target_amount)}."
+        )
         await send_message(
             chat_id=chat_id,
-            text=(
-                f"🎉 <b>Đạt mục tiêu {updated.name}!</b>\n\n"
-                f"Chúc mừng — bạn đã hoàn thành "
-                f"{format_money_short(updated.target_amount)}."
-            ),
-            parse_mode="HTML",
+            text=msg,
+            parse_mode=None,
+            **message_kwargs_for_animation(msg, "milestones"),
         )
         return
 

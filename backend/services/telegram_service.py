@@ -122,13 +122,17 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
     if (
         resp.status_code == 400
         and "can't parse entities" in resp.text
-        and payload.get("parse_mode")
+        and (payload.get("parse_mode") or payload.get("entities"))
     ):
         logger.warning(
             "Telegram parse_entities error on %s; retrying as plain text",
             method,
         )
-        plain = {k: v for k, v in payload.items() if k != "parse_mode"}
+        plain = {
+            k: v
+            for k, v in payload.items()
+            if k not in {"parse_mode", "entities"}
+        }
         retry = await client.post(url, json=plain)
         if retry.status_code == 200:
             return retry.json()
@@ -146,14 +150,21 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
 async def send_message(
     chat_id: int,
     text: str,
-    parse_mode: str = "Markdown",
+    parse_mode: str | None = "Markdown",
     reply_markup: dict | None = None,
+    entities: list[dict] | None = None,
 ) -> dict | None:
     payload: dict = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": parse_mode,
     }
+    if entities:
+        # Telegram expects either parse_mode OR explicit entities. Custom
+        # emoji needs entities, so callers that opt in get a plain-text body
+        # with exact UTF-16 spans and no markdown parser risk.
+        payload["entities"] = entities
+    elif parse_mode:
+        payload["parse_mode"] = parse_mode
     if reply_markup:
         payload["reply_markup"] = reply_markup
     return await send_telegram("sendMessage", payload)
@@ -212,15 +223,19 @@ async def edit_message_text(
     chat_id: int,
     message_id: int,
     text: str,
-    parse_mode: str = "Markdown",
+    parse_mode: str | None = "Markdown",
     reply_markup: dict | None = None,
+    entities: list[dict] | None = None,
 ) -> dict | None:
     payload: dict = {
         "chat_id": chat_id,
         "message_id": message_id,
         "text": text,
-        "parse_mode": parse_mode,
     }
+    if entities:
+        payload["entities"] = entities
+    elif parse_mode:
+        payload["parse_mode"] = parse_mode
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     return await send_telegram("editMessageText", payload)

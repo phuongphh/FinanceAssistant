@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -64,15 +64,13 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
     assert result.is_stale is True
 
 
-def test_greeting_uses_configured_telegram_custom_emoji():
+def test_greeting_stays_plain_text_for_entity_renderer():
     user = User()
     user.display_name = "An <VIP>"
-    settings = MagicMock(telegram_morning_custom_emoji_id='sunrise"id')
 
-    with patch("backend.briefing.morning_briefing.get_settings", return_value=settings):
-        from backend.briefing.morning_briefing import _greeting_line
+    from backend.briefing.morning_briefing import _greeting_line
 
-        line = _greeting_line(user)
+    line = _greeting_line(user)
 
-    assert '<tg-emoji emoji-id="sunrise&quot;id">🌅</tg-emoji>' in line
-    assert "An &lt;VIP&gt;" in line
+    assert line.startswith("🌤️ Chào buổi sáng")
+    assert "An <VIP>" in line
