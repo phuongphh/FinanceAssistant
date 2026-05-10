@@ -170,6 +170,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #335 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 2: Dashboard | [pre-phase/issue-335.md](by-phase/pre-phase/issue-335.md) |
 | #336 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [pre-phase/issue-336.md](by-phase/pre-phase/issue-336.md) |
 | #337 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [pre-phase/issue-337.md](by-phase/pre-phase/issue-337.md) |
+| #338 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 5: Telegram Animation Emojis | [pre-phase/issue-338.md](by-phase/pre-phase/issue-338.md) |
 | #339 | Pre-Phase | [Story] P3.9.5-S1: Xoá câu "Đây là hình ảnh..." trong Tổng tài sản | [pre-phase/issue-339.md](by-phase/pre-phase/issue-339.md) |
 | #340 | Pre-Phase | [Story] P3.9.5-S2: Bỏ button "Phân bổ chi tiết" + sửa logic YTD return | [pre-phase/issue-340.md](by-phase/pre-phase/issue-340.md) |
 | #341 | Pre-Phase | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [pre-phase/issue-341.md](by-phase/pre-phase/issue-341.md) |
@@ -188,5 +189,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #354 | Pre-Phase | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [pre-phase/issue-354.md](by-phase/pre-phase/issue-354.md) |
 | #355 | Pre-Phase | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [pre-phase/issue-355.md](by-phase/pre-phase/issue-355.md) |
 
-**Total:** 183 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 166 Pre-Phase)
+**Total:** 184 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 167 Pre-Phase)
