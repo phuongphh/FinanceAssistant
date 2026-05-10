@@ -186,6 +186,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #352 | Pre-Phase | [Story] P3.9.5-S14: Button "Sửa tài sản" filtered theo type đang xem | [pre-phase/issue-352.md](by-phase/pre-phase/issue-352.md) |
 | #353 | Pre-Phase | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [pre-phase/issue-353.md](by-phase/pre-phase/issue-353.md) |
 | #354 | Pre-Phase | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [pre-phase/issue-354.md](by-phase/pre-phase/issue-354.md) |
+| #355 | Pre-Phase | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [pre-phase/issue-355.md](by-phase/pre-phase/issue-355.md) |
 
-**Total:** 182 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 165 Pre-Phase)
+**Total:** 183 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 166 Pre-Phase)

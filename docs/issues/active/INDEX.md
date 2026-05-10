@@ -12,8 +12,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #338 | [Epic] Phase 3.9.5 — Epic 5: Telegram Animation Emojis | [issue-338.md](issue-338.md) |
-| #355 | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [issue-355.md](issue-355.md) |
 | #356 | [Story] P3.9.5-S18: Helper utility render animation emoji | [issue-356.md](issue-356.md) |
 | #357 | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [issue-357.md](issue-357.md) |
 
-**Total active:** 11
+**Total active:** 10
