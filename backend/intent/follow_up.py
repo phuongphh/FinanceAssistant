@@ -100,6 +100,7 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
     ),
     IntentType.QUERY_NET_WORTH: (
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("💼 Portfolio của tôi", IntentType.QUERY_PORTFOLIO),
         FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS),
     ),
     IntentType.QUERY_PORTFOLIO: (
