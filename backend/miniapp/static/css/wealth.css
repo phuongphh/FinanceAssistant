@@ -189,7 +189,7 @@
 
 .asset-card {
     display: grid;
-    grid-template-columns: 36px 1fr auto;
+    grid-template-columns: 36px 1fr auto 20px;
     gap: 12px;
     align-items: center;
     padding: 12px;
@@ -197,11 +197,33 @@
     background: rgba(0, 0, 0, 0.02);
     margin-bottom: 8px;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.asset-card:hover {
+    background: rgba(78, 205, 196, 0.08);
 }
 
 .asset-card:active {
     background: rgba(0, 0, 0, 0.05);
+    transform: scale(0.99);
+}
+
+.asset-card .asset-edit-cue {
+    font-size: 14px;
+    opacity: 0.55;
+    text-align: right;
+}
+
+.asset-card:hover .asset-edit-cue {
+    opacity: 1;
+}
+
+.section-hint {
+    margin: -4px 0 12px;
+    font-size: 12px;
+    color: var(--text-muted, #6b7280);
+    line-height: 1.4;
 }
 
 .asset-card .asset-icon {

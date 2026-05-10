@@ -178,6 +178,16 @@ async def test_sends_and_tracks_when_eligible():
         text="🌤️ Sáng Minh ơi", level=WealthLevel.STARTER,
     )
 
+    # Inject a valid emoji map so the briefing pipeline produces entities.
+    # Production YAML keeps animation_id commented out until real Telegram
+    # custom_emoji_ids are harvested (see content/emoji_animation_map.yaml).
+    fake_emoji_map = {
+        "partly_sunny": {
+            "static": "🌤️",
+            "animation_id": "test-sun",
+            "contexts": ["briefing"],
+        },
+    }
     with patch(
         "backend.jobs.morning_briefing_job.get_session_factory",
         return_value=factory,
@@ -193,6 +203,9 @@ async def test_sends_and_tracks_when_eligible():
     ), patch(
         "backend.jobs.morning_briefing_job.get_notifier",
         return_value=notifier,
+    ), patch(
+        "backend.bot.utils.emoji_animation.load_emoji_animation_map",
+        return_value=fake_emoji_map,
     ), patch(
         "backend.jobs.morning_briefing_job.analytics.atrack",
         new=AsyncMock(),
