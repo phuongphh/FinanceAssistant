@@ -181,9 +181,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #347 | Pre-Phase | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [pre-phase/issue-347.md](by-phase/pre-phase/issue-347.md) |
 | #348 | Pre-Phase | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [pre-phase/issue-348.md](by-phase/pre-phase/issue-348.md) |
 | #349 | Pre-Phase | [Story] P3.9.5-S11: Cổ phiếu — bảng giá portfolio + query CK theo mã | [pre-phase/issue-349.md](by-phase/pre-phase/issue-349.md) |
+| #350 | Pre-Phase | [Story] P3.9.5-S12: Perf Tiền số — target p95 < 2s | [pre-phase/issue-350.md](by-phase/pre-phase/issue-350.md) |
 | #351 | Pre-Phase | [Story] P3.9.5-S13: BUG — "Portfolios của tôi" trong Tiền số nhảy sang Chứng khoán | [pre-phase/issue-351.md](by-phase/pre-phase/issue-351.md) |
 | #352 | Pre-Phase | [Story] P3.9.5-S14: Button "Sửa tài sản" filtered theo type đang xem | [pre-phase/issue-352.md](by-phase/pre-phase/issue-352.md) |
 | #353 | Pre-Phase | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [pre-phase/issue-353.md](by-phase/pre-phase/issue-353.md) |
 
-**Total:** 180 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 163 Pre-Phase)
+**Total:** 181 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 164 Pre-Phase)
