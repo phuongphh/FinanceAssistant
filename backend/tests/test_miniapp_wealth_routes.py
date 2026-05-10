@@ -347,3 +347,32 @@ class TestWealthDashboardPage:
         # Must reference the wealth-specific JS + CSS bundles.
         assert "wealth_dashboard.js" in body
         assert "wealth.css" in body
+
+    def test_static_refs_carry_cache_busting_version(self):
+        """Telegram WebView caches /miniapp/static aggressively; without a
+        ``?v=`` query string a freshly-deployed UI change is invisible to
+        users until cache eviction. The hash must change whenever any
+        referenced asset changes — see _compute_static_version."""
+        resp = client.get("/miniapp/wealth")
+        body = resp.text
+        version = miniapp_routes._STATIC_VERSION
+        assert version  # non-empty hash
+        assert f"wealth_dashboard.js?v={version}" in body
+        assert f"wealth.css?v={version}" in body
+        assert f"style.css?v={version}" in body
+
+    def test_html_response_disables_browser_cache(self):
+        """HTML doc must revalidate every open so a new deploy's ``?v=``
+        version reaches the user immediately."""
+        resp = client.get("/miniapp/wealth")
+        cache_control = resp.headers.get("cache-control", "")
+        assert "no-cache" in cache_control
+        assert "no-store" in cache_control or "must-revalidate" in cache_control
+
+    def test_legacy_dashboard_also_versioned(self):
+        resp = client.get("/miniapp/dashboard")
+        assert resp.status_code == 200
+        body = resp.text
+        version = miniapp_routes._STATIC_VERSION
+        assert f"dashboard.js?v={version}" in body
+        assert f"style.css?v={version}" in body
