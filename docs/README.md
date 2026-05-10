@@ -45,8 +45,9 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 | Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](docs/current/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
 | Pre-Launch Readiness | ✅ done | 3-4 ngày | [phase-3.8.5-detailed.md](docs/current/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
 | Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](docs/current/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
+| Pre-Launch UX Polish | 🚀 current | 5-7 ngày | [phase-3.9.5-detailed.md](docs/current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
 | Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
-| Financial Twin Conservative MVP | 📋 next | TBD | — | Conservative Financial Twin MVP building on real market data from Phase 3.9 |
+| Financial Twin Conservative MVP | 🔮 planned | TBD | — | Conservative Financial Twin MVP building on real market data from Phase 3.9 |
 | Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
 | Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
 | Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
