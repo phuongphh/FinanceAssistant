@@ -54,6 +54,7 @@ _STATIC_REF_FILES = (
     "js/wealth_dashboard.js",
 )
 _STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
+_VERSION_MARKER_PATTERN = re.compile(r"<!--\s*APP_VERSION_MARKER\s*-->")
 
 
 def _compute_static_version() -> str:
@@ -65,12 +66,54 @@ def _compute_static_version() -> str:
     return hasher.hexdigest()[:10]
 
 
+def _detect_git_sha() -> str:
+    """Best-effort short SHA of the running build.
+
+    Reads ``.git/HEAD`` directly so we don't require a ``git`` binary inside
+    the runtime container. Returns ``"unknown"`` when the repo metadata is
+    unavailable (e.g. minimal Docker images that strip ``.git``). The result
+    is exposed via ``/miniapp/api/version`` and rendered into the dashboard
+    footer so a quick glance tells you which commit the VPS is actually
+    running — invaluable when debugging "I pushed but nothing changed".
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    head_file = repo_root / ".git" / "HEAD"
+    try:
+        if not head_file.exists():
+            return "unknown"
+        head = head_file.read_text(encoding="utf-8").strip()
+        if head.startswith("ref:"):
+            ref_path = repo_root / ".git" / head.split(maxsplit=1)[1].strip()
+            if ref_path.exists():
+                return ref_path.read_text(encoding="utf-8").strip()[:7]
+        return head[:7]
+    except OSError:
+        return "unknown"
+
+
 _STATIC_VERSION = _compute_static_version()
+_GIT_SHA = _detect_git_sha()
 
 
 def _render_html_with_version(html_path: Path) -> str:
     raw = html_path.read_text(encoding="utf-8")
-    return _STATIC_URL_PATTERN.sub(rf"\1?v={_STATIC_VERSION}", raw)
+    bumped = _STATIC_URL_PATTERN.sub(rf"\1?v={_STATIC_VERSION}", raw)
+    # Inject a visible footer marker so users can read the running build
+    # straight from the dashboard — much faster than tailing server logs
+    # when verifying a deploy reached the VPS.
+    footer_html = (
+        '<div style="text-align:center;margin:18px 0 8px;font-size:11px;'
+        'opacity:0.45;letter-spacing:0.02em;font-family:system-ui,sans-serif;">'
+        f"build {_GIT_SHA} · assets {_STATIC_VERSION}"
+        "</div>"
+    )
+    if _VERSION_MARKER_PATTERN.search(bumped):
+        bumped = _VERSION_MARKER_PATTERN.sub(footer_html, bumped)
+    else:
+        # Templates that haven't added the marker yet still get the footer
+        # right before </body> so the diagnostic is universal.
+        bumped = bumped.replace("</body>", footer_html + "\n</body>", 1)
+    return bumped
 
 
 _HTML_CACHE: dict[str, str] = {}
@@ -144,6 +187,26 @@ async def dashboard_page():
     # `miniapp_loaded` beacon once the dashboard finishes loading.
     analytics.track(analytics.EventType.MINIAPP_OPENED)
     return _serve_html("dashboard.html")
+
+
+@router.get("/api/version")
+async def get_app_version():
+    """Public diagnostic — returns the running build's git SHA and asset hash.
+
+    Use this to verify a deploy actually reached the VPS:
+
+        curl https://<host>/miniapp/api/version
+
+    Same values are rendered into the dashboard footer for in-app inspection.
+    No auth on purpose — values are non-sensitive (publicly committed code).
+    """
+    return {
+        "data": {
+            "git_sha": _GIT_SHA,
+            "static_version": _STATIC_VERSION,
+        },
+        "error": None,
+    }
 
 
 @router.post("/api/events/loaded")

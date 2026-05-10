@@ -376,3 +376,32 @@ class TestWealthDashboardPage:
         version = miniapp_routes._STATIC_VERSION
         assert f"dashboard.js?v={version}" in body
         assert f"style.css?v={version}" in body
+
+    def test_dashboard_renders_visible_build_marker(self):
+        """User-facing footer prints git SHA + asset hash so a glance at the
+        Mini App reveals which build the VPS is running. Indispensable when
+        debugging "I pushed but UI didn't change" — without this the only
+        way to verify the deploy is to ssh into the VPS."""
+        resp = client.get("/miniapp/wealth")
+        body = resp.text
+        assert miniapp_routes._STATIC_VERSION in body
+        # Footer copy must contain the literal "build" prefix so users can
+        # search/screenshot it unambiguously.
+        assert "build " in body
+        assert f"assets {miniapp_routes._STATIC_VERSION}" in body
+
+
+class TestVersionEndpoint:
+    def test_returns_git_sha_and_static_version(self):
+        resp = client.get("/miniapp/api/version")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["error"] is None
+        assert body["data"]["static_version"] == miniapp_routes._STATIC_VERSION
+        assert body["data"]["git_sha"] == miniapp_routes._GIT_SHA
+
+    def test_no_auth_required(self):
+        # Diagnostic endpoint is intentionally public — values are non-sensitive
+        # and ssh-less verification of a deploy is the whole point.
+        resp = client.get("/miniapp/api/version")
+        assert resp.status_code == 200
