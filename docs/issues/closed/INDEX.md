@@ -169,6 +169,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #334 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 1: Tài sản (Wealth Menu Polish) | [pre-phase/issue-334.md](by-phase/pre-phase/issue-334.md) |
 | #335 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 2: Dashboard | [pre-phase/issue-335.md](by-phase/pre-phase/issue-335.md) |
 | #336 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [pre-phase/issue-336.md](by-phase/pre-phase/issue-336.md) |
+| #337 | Pre-Phase | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [pre-phase/issue-337.md](by-phase/pre-phase/issue-337.md) |
 | #339 | Pre-Phase | [Story] P3.9.5-S1: Xoá câu "Đây là hình ảnh..." trong Tổng tài sản | [pre-phase/issue-339.md](by-phase/pre-phase/issue-339.md) |
 | #340 | Pre-Phase | [Story] P3.9.5-S2: Bỏ button "Phân bổ chi tiết" + sửa logic YTD return | [pre-phase/issue-340.md](by-phase/pre-phase/issue-340.md) |
 | #341 | Pre-Phase | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [pre-phase/issue-341.md](by-phase/pre-phase/issue-341.md) |
@@ -180,5 +181,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #347 | Pre-Phase | [Story] P3.9.5-S9: Thêm báo cáo "Dòng tiền tháng này" | [pre-phase/issue-347.md](by-phase/pre-phase/issue-347.md) |
 | #348 | Pre-Phase | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [pre-phase/issue-348.md](by-phase/pre-phase/issue-348.md) |
 
-**Total:** 175 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 158 Pre-Phase)
+**Total:** 176 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 159 Pre-Phase)
