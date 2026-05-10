@@ -185,6 +185,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #351 | Pre-Phase | [Story] P3.9.5-S13: BUG — "Portfolios của tôi" trong Tiền số nhảy sang Chứng khoán | [pre-phase/issue-351.md](by-phase/pre-phase/issue-351.md) |
 | #352 | Pre-Phase | [Story] P3.9.5-S14: Button "Sửa tài sản" filtered theo type đang xem | [pre-phase/issue-352.md](by-phase/pre-phase/issue-352.md) |
 | #353 | Pre-Phase | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [pre-phase/issue-353.md](by-phase/pre-phase/issue-353.md) |
+| #354 | Pre-Phase | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [pre-phase/issue-354.md](by-phase/pre-phase/issue-354.md) |
 
-**Total:** 181 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 164 Pre-Phase)
+**Total:** 182 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 165 Pre-Phase)
