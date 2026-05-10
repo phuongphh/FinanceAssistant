@@ -174,6 +174,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #341 | Pre-Phase | [Story] P3.9.5-S3: Flow xoá tài sản — chọn type trước | [pre-phase/issue-341.md](by-phase/pre-phase/issue-341.md) |
 | #342 | Pre-Phase | [Story] P3.9.5-S4: Click vào dòng tài sản → mở edit flow | [pre-phase/issue-342.md](by-phase/pre-phase/issue-342.md) |
 | #343 | Pre-Phase | [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo" | [pre-phase/issue-343.md](by-phase/pre-phase/issue-343.md) |
+| #348 | Pre-Phase | [Story] P3.9.5-S10: Thêm "Mục tiêu" link tới existing Goals | [pre-phase/issue-348.md](by-phase/pre-phase/issue-348.md) |
 
-**Total:** 170 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 153 Pre-Phase)
+**Total:** 171 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 154 Pre-Phase)
