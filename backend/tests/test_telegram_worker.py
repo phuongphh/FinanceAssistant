@@ -115,6 +115,40 @@ class TestRouteUpdate:
         assert args[2] is None
         fake_session.commit.assert_awaited_once()
 
+
+    @pytest.mark.asyncio
+    async def test_baocaosang_message_sends_manual_briefing(self):
+        fake_session = _make_fake_session()
+        factory = MagicMock(return_value=fake_session)
+        fake_user = MagicMock()
+        fake_user.id = "user-1"
+        fake_user.telegram_id = 999
+
+        with patch.object(
+            telegram_worker, "get_session_factory", return_value=factory
+        ), patch(
+            "backend.services.dashboard_service.get_user_by_telegram_id",
+            new_callable=AsyncMock,
+            return_value=fake_user,
+        ), patch(
+            "backend.bot.handlers.morning_briefing_command.send_morning_briefing_now",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_send:
+            await telegram_worker.route_update(
+                {
+                    "update_id": 7,
+                    "message": {
+                        "text": "/baocaosang",
+                        "chat": {"id": 123},
+                        "from": {"id": 999},
+                    },
+                }
+            )
+
+        mock_send.assert_awaited_once_with(fake_session, chat_id=123, user=fake_user)
+        fake_session.commit.assert_awaited_once()
+
     @pytest.mark.asyncio
     async def test_stamps_resolved_user_id_on_row(self):
         """After a handler resolves the user, route_update must issue an

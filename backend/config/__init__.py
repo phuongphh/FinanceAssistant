@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""  # Validates webhook requests from Telegram
     owner_telegram_id: str = ""
+    # Optional Telegram custom emoji id for the animated sunrise in morning briefings.
+    telegram_morning_custom_emoji_id: str = ""
 
     # Market data
     redis_url: str = "redis://localhost:6379/0"

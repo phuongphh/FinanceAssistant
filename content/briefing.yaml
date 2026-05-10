@@ -1,6 +1,9 @@
 # Phase 3.9 real-data morning briefing template.
-# 5 sections, intentionally compact for Telegram.
+# Greeting plus 5 compact data sections, intentionally Telegram-friendly.
 sections:
+  greeting: |
+    {greeting}
+    Chúc bạn một ngày đầu tư tỉnh táo và nhẹ nhàng.
   net_worth: |
     💰 Tổng tài sản: {net_worth}
     {change_label}: {change_abs} ({change_pct}%)

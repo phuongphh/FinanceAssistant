@@ -233,6 +233,23 @@ async def _handle_message(
             await cmd_menu(db, chat_id, resolved_user)
         return resolved_user.id if resolved_user else None
 
+    if command == "/baocaosang":
+        from backend.bot.handlers.morning_briefing_command import (
+            send_morning_briefing_now,
+        )
+
+        resolved_user = (
+            await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            if telegram_id is not None
+            else None
+        )
+        await send_morning_briefing_now(
+            db,
+            chat_id=chat_id,
+            user=resolved_user,
+        )
+        return resolved_user.id if resolved_user else None
+
     if command == "/report":
         await handle_report_command(db, message)
         if telegram_id is not None:

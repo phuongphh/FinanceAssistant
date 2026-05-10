@@ -96,7 +96,7 @@ def _asset(user_id: uuid.UUID, asset_type: str, name: str, initial: str, current
 
 @pytest.mark.asyncio
 async def test_briefing_full_flow_provider_cache_wealth_and_sections():
-    user = User(id=uuid.uuid4(), telegram_id=1001)
+    user = User(id=uuid.uuid4(), telegram_id=1001, display_name="An")
     assets = [
         _asset(user.id, "stock", "VNM", "100000", "100000", {"ticker": "VNM", "quantity": "10", "avg_price": "10000"}),
         _asset(user.id, "stock", "FPT", "200000", "200000", {"ticker": "FPT", "quantity": "5", "avg_price": "40000"}),
@@ -136,6 +136,7 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
          patch("backend.briefing.morning_briefing.get_relevant_news", AsyncMock(return_value=[])):
         result = await render_enriched_morning_briefing(_BriefingDB(assets), user)
 
+    assert "Chào buổi sáng, An!" in result.text
     assert "Tổng tài sản" in result.text
     assert "Thị trường sáng nay" in result.text
     assert "Danh mục" in result.text
