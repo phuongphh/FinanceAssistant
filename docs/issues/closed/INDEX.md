@@ -166,6 +166,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #287 | Pre-Phase | [Story] P3.9-S20: Integration tests end-to-end | [pre-phase/issue-287.md](by-phase/pre-phase/issue-287.md) |
 | #288 | Pre-Phase | [Story] P3.9-S21: Performance benchmarks + cache hit rate | [pre-phase/issue-288.md](by-phase/pre-phase/issue-288.md) |
 | #289 | Pre-Phase | [Story] P3.9-S22: Documentation + ADR + phase-status update | [pre-phase/issue-289.md](by-phase/pre-phase/issue-289.md) |
+| #339 | Pre-Phase | [Story] P3.9.5-S1: Xoá câu "Đây là hình ảnh..." trong Tổng tài sản | [pre-phase/issue-339.md](by-phase/pre-phase/issue-339.md) |
 
-**Total:** 162 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 145 Pre-Phase)
+**Total:** 163 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 146 Pre-Phase)
