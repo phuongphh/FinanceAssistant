@@ -12,5 +12,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #334 | [Epic] Phase 3.9.5 — Epic 1: Tài sản (Wealth Menu Polish) | [issue-334.md](issue-334.md) |
+| #335 | [Epic] Phase 3.9.5 — Epic 2: Dashboard | [issue-335.md](issue-335.md) |
 
-**Total active:** 8
+**Total active:** 9
