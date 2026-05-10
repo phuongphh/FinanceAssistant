@@ -10,8 +10,8 @@
 Dashboard từ static report → interactive (click-to-edit), rename ngắn gọn.
 
 ## Stories in this Epic
-- [ ] [Story] P3.9.5-S4: Click vào dòng tài sản → mở edit flow
-- [ ] [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo"
+- [ ] #342 [Story] P3.9.5-S4: Click vào dòng tài sản → mở edit flow
+- [ ] #343 [Story] P3.9.5-S5: Rename "Báo cáo tài sản" → "Báo cáo"
 
 ## Reference
 `docs/current/phase-3.9.5/phase-3.9.5-detailed.md` § Epic 2
