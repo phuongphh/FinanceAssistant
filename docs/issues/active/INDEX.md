@@ -32,5 +32,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #352 | [Story] P3.9.5-S14: Button "Sửa tài sản" filtered theo type đang xem | [issue-352.md](issue-352.md) |
 | #353 | [Story] P3.9.5-S15: Hint UX cho Vàng → Portfolios của tôi | [issue-353.md](issue-353.md) |
 | #354 | [Story] P3.9.5-S16: Rename "Vàng JSC" → "Vàng" | [issue-354.md](issue-354.md) |
+| #355 | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [issue-355.md](issue-355.md) |
 
-**Total active:** 28
+**Total active:** 29
