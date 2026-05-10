@@ -1843,3 +1843,124 @@ async def test_asset_manage_delete_empty_type_shows_empty_state():
 
     assert consumed is True
     assert "Không có tài sản loại Tiền số" in send.await_args.kwargs["text"]
+
+
+# -----------------------------------------------------------------
+# Phase 3.9.5 dashboard edit flow
+# -----------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_dashboard_edit_callback_starts_ownership_checked_edit_wizard():
+    user = _user()
+    db = _db(user)
+    asset = _asset()
+    asset.user_id = user.id
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=asset)
+        ) as get_asset,
+        patch.object(asset_entry.wizard_service, "start_flow", AsyncMock()) as start,
+        patch.object(asset_entry, "answer_callback", AsyncMock()) as answer,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_dashboard_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": f"dashboard:edit:{asset.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    answer.assert_awaited_once_with("cb1")
+    get_asset.assert_awaited_once_with(db, user.id, asset.id)
+    start.assert_awaited_once()
+    assert start.await_args.args[:4] == (db, user.id, asset_entry.FLOW_EDIT_ASSET)
+    assert start.await_args.kwargs["step"] == "current_value"
+    assert start.await_args.kwargs["draft"]["asset_id"] == str(asset.id)
+    assert "Giá trị hiện tại" in send.await_args.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_edit_text_updates_value_and_refreshes_report():
+    asset = _asset(value=100_000_000)
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_EDIT_ASSET,
+            "step": "current_value",
+            "draft": {"asset_id": str(asset.id), "return_to_dashboard": True},
+        }
+    )
+    db = _db(user)
+    updated = _asset(value=120_000_000)
+    updated.id = asset.id
+    updated.user_id = user.id
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "update_current_value",
+            AsyncMock(return_value=updated),
+        ) as update_value,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=MagicMock(total=Decimal("120000000"))),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch.object(asset_entry, "show_asset_dashboard_report", AsyncMock()) as report,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_asset_text_input(
+            db,
+            {"text": "120 triệu", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+
+    assert consumed is True
+    update_value.assert_awaited_once_with(
+        db, user.id, asset.id, Decimal("120000000")
+    )
+    clear.assert_awaited_once_with(db, user.id)
+    assert "Đã cập nhật" in send.await_args.kwargs["text"]
+    report.assert_awaited_once_with(db, 100, user)
+
+
+@pytest.mark.asyncio
+async def test_grouped_dashboard_picker_uses_one_user_scoped_asset_query():
+    user = _user()
+    db = _db(user)
+    first = _asset(value=10_000_000)
+    second = _asset(value=20_000_000)
+    first.user_id = second.user_id = user.id
+
+    with (
+        patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[first, second]),
+        ) as get_assets,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        await asset_entry.show_asset_edit_picker(
+            db, 100, user, [str(first.id), str(second.id)]
+        )
+
+    get_assets.assert_awaited_once_with(db, user.id)
+    callbacks = [
+        button["callback_data"]
+        for row in send.await_args.kwargs["reply_markup"]["inline_keyboard"]
+        for button in row
+    ]
+    assert f"dashboard:edit:{first.id}" in callbacks
+    assert f"dashboard:edit:{second.id}" in callbacks

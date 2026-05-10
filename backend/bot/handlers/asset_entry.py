@@ -39,6 +39,8 @@ never commits — the worker owns the transaction boundary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import html
 import logging
 import re
 import uuid
@@ -227,15 +229,25 @@ async def show_asset_edit_picker(
     db: AsyncSession, chat_id: int, user: User, asset_id_texts: list[str]
 ) -> None:
     """Show concrete asset rows when a dashboard card represents a group."""
+    requested_ids: set[uuid.UUID] = set()
+    for raw in asset_id_texts[:20]:
+        with contextlib.suppress(ValueError):
+            requested_ids.add(uuid.UUID(str(raw)))
+
+    if not requested_ids:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    # One ownership-scoped query is faster and avoids leaking whether ids
+    # outside this user exist. Preserve dashboard order from ``asset_id_texts``.
+    assets = await asset_service.get_user_assets(db, user.id)
+    by_id = {asset.id: asset for asset in assets if asset.id in requested_ids}
     rows = []
     for raw in asset_id_texts[:20]:
-        try:
-            asset_uuid = uuid.UUID(str(raw))
-        except ValueError:
-            continue
-        asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
-        if asset is not None and asset.is_active:
-            rows.append((asset.id, _asset_dashboard_row_label(asset)))
+        with contextlib.suppress(ValueError):
+            asset = by_id.get(uuid.UUID(str(raw)))
+            if asset is not None and asset.is_active:
+                rows.append((asset.id, _asset_dashboard_row_label(asset)))
 
     if not rows:
         await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
@@ -285,10 +297,11 @@ async def start_asset_edit_wizard(
             "return_to_dashboard": return_to_dashboard,
         },
     )
+    safe_name = html.escape(asset.name or "Tài sản")
     await send_message(
         chat_id=chat_id,
         text=(
-            f"✏️ <b>Sửa {asset.name}</b>\n\n"
+            f"✏️ <b>Sửa {safe_name}</b>\n\n"
             f"Giá trị hiện tại: <b>{format_money_full(asset.current_value)}</b>\n"
             "Nhập giá trị mới nhé. Ví dụ: <code>120 triệu</code>"
         ),
@@ -326,10 +339,16 @@ async def _handle_edit_current_value_input(
     await update_user_level(db, user.id, breakdown.total)
     await wizard_service.clear(db, user.id)
 
+    with contextlib.suppress(Exception):
+        from backend.miniapp.routes import invalidate_wealth_cache_for_user
+
+        invalidate_wealth_cache_for_user(user.id)
+
+    safe_name = html.escape(asset.name or "Tài sản")
     await send_message(
         chat_id=chat_id,
         text=(
-            f"✅ Đã cập nhật <b>{asset.name}</b>: "
+            f"✅ Đã cập nhật <b>{safe_name}</b>: "
             f"<b>{format_money_full(asset.current_value)}</b>\n"
             f"💎 Tổng tài sản mới: <b>{format_money_full(breakdown.total)}</b>"
         ),
