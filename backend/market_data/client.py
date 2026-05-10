@@ -46,6 +46,11 @@ def get_crypto_provider() -> CoinGeckoCryptoProvider:
     return CoinGeckoCryptoProvider(timeout=get_settings().market_data_timeout_seconds)
 
 
+def get_fast_crypto_provider() -> CoinGeckoCryptoProvider:
+    """Provider tuned for user-facing menus: fail fast and use cache fallback."""
+    return CoinGeckoCryptoProvider(timeout=1.2, rate_limit_retry_delays=())
+
+
 def get_gold_provider() -> Dispatcher:
     return build_gold_dispatcher(get_redis_client(), timeout=5.0)
 
@@ -150,6 +155,10 @@ async def get_stock_quotes(symbols: list[str]) -> dict[str, PriceQuote]:
 
 async def get_crypto_quotes(symbols: list[str]) -> dict[str, PriceQuote]:
     return await get_quotes("crypto", symbols, get_crypto_provider())
+
+
+async def get_fast_crypto_quotes(symbols: list[str]) -> dict[str, PriceQuote]:
+    return await get_quotes("crypto", symbols, get_fast_crypto_provider())
 
 
 async def get_gold_quote(symbol: str = "SJC_GOLD") -> PriceQuote:

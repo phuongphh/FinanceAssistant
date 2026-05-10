@@ -29,11 +29,13 @@ class CoinGeckoCryptoProvider(BaseProvider):
         timeout: float = 3.0,
         client: httpx.AsyncClient | None = None,
         sleep: SleepFunc = asyncio.sleep,
+        rate_limit_retry_delays: tuple[float, ...] = (1, 2, 4),
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._client = client
         self._sleep = sleep
+        self._rate_limit_retry_delays = rate_limit_retry_delays
 
     @property
     def asset_type(self) -> str:
@@ -88,7 +90,7 @@ class CoinGeckoCryptoProvider(BaseProvider):
         return quotes
 
     async def _get_json(self, path: str, *, params: dict[str, str]) -> Any:
-        delays = (1, 2, 4)
+        delays = self._rate_limit_retry_delays
         last_rate_limit: RateLimitError | None = None
         for attempt in range(len(delays) + 1):
             response = await self._request(path, params=params)
