@@ -16,6 +16,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #336 | [Epic] Phase 3.9.5 — Epic 3: Dòng tiền (Cashflow Menu) | [issue-336.md](issue-336.md) |
 | #337 | [Epic] Phase 3.9.5 — Epic 4: Thị trường (Market Menu — Highest Priority) | [issue-337.md](issue-337.md) |
 | #338 | [Epic] Phase 3.9.5 — Epic 5: Telegram Animation Emojis | [issue-338.md](issue-338.md) |
+| #339 | [Story] P3.9.5-S1: Xoá câu "Đây là hình ảnh..." trong Tổng tài sản | [issue-339.md](issue-339.md) |
 | #340 | [Story] P3.9.5-S2: Bỏ button "Phân bổ chi tiết" + sửa logic YTD return | [issue-340.md](issue-340.md) |
 
-**Total active:** 13
+**Total active:** 14
