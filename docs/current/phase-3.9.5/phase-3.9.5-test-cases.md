@@ -349,3 +349,239 @@ Pass Criteria: All expected results met
 - **Pass:** zero regression
 
 ---
+
+# Epic 3 — Cashflow Menu (TC-021 → TC-040)
+
+## TC-021: Cashflow Tổng quan — label rõ ràng
+- **Type:** Happy
+- **Story:** P3.9.5-S6
+- **Persona:** Hà
+- **Preconditions:** Hà có thu/chi trong tháng
+- **Steps:**
+  1. Menu Dòng tiền → "📊 Tổng quan"
+- **Expected:**
+  - Label đầu trang rõ scope (e.g. "Dòng tiền tháng này" hoặc "30 ngày qua")
+  - **KHÔNG** còn câu mơ hồ "Dòng tiền hiện tại của từng tháng"
+- **Pass:** label hiểu được ngay
+
+## TC-022: Cashflow Tổng quan — Bé Tiền tone
+- **Type:** Happy
+- **Story:** P3.9.5-S6
+- **Persona:** Hà
+- **Steps:**
+  1. Menu Dòng tiền → Tổng quan
+- **Expected:**
+  - Intro câu warm, không robotic
+  - Tone consistent với Phase 3.6/3.8.5
+- **Pass:** đọc lên không cringy
+
+## TC-023: Cashflow Tổng quan — không còn duplicate metric
+- **Type:** Happy
+- **Story:** P3.9.5-S7
+- **Persona:** Phương
+- **Steps:**
+  1. Menu Dòng tiền → Tổng quan
+  2. Đếm số lần "tỷ lệ tiết kiệm" xuất hiện
+  3. Đếm số lần "Thu vs Chi" hoặc tương đương xuất hiện
+- **Expected:**
+  - Mỗi metric chỉ xuất hiện 1 lần
+  - Card "So sánh tháng trước" không còn trùng lặp
+- **Pass:** zero duplicate
+
+## TC-024: Cashflow Tổng quan — 2 cards Thu / Chi tách biệt
+- **Type:** Happy
+- **Story:** P3.9.5-S8
+- **Persona:** Phương
+- **Steps:**
+  1. Menu Dòng tiền → Tổng quan
+- **Expected:**
+  - Card riêng "💼 Thu nhập tháng" với total + top 2-3 sources + delta
+  - Card riêng "💸 Chi tiêu tháng" với total + top 2-3 categories + delta
+  - 2 cards layout consistent với nhau
+- **Pass:** tách biệt rõ ràng
+
+## TC-025: Card Thu nhập — top sources đúng
+- **Type:** Happy
+- **Story:** P3.9.5-S8
+- **Persona:** Phương (multi-income)
+- **Preconditions:** Phương có 3+ income streams
+- **Steps:**
+  1. Tổng quan → quan sát card Thu nhập
+- **Expected:**
+  - Top 3 sources ranked by amount tháng này
+  - Format money: "45tr", "12tr", "5tr"
+  - Delta vs tháng trước: "+10%" hoặc "-5%"
+- **Pass:** ranking + format đúng
+
+## TC-026: Card Chi tiêu — top categories đúng
+- **Type:** Happy
+- **Story:** P3.9.5-S8
+- **Persona:** Hà
+- **Steps:**
+  1. Tổng quan → quan sát card Chi tiêu
+- **Expected:**
+  - Top 3 categories ranked
+  - Money format short
+  - Delta vs tháng trước
+- **Pass:** ranking + format đúng
+
+## TC-027: Card Thu / Chi với empty data
+- **Type:** Corner
+- **Story:** P3.9.5-S8
+- **Persona:** Mai
+- **Preconditions:** Mai chưa log thu/chi
+- **Steps:**
+  1. Tổng quan
+- **Expected:**
+  - Mỗi card có empty state riêng ("Chưa có thu nhập tháng này", CTA add)
+  - Không crash
+- **Pass:** empty state per card
+
+## TC-028: Cashflow money formatting compliance
+- **Type:** Integration
+- **Story:** P3.9.5-S8 (incidental)
+- **Persona:** Phương
+- **Steps:**
+  1. Quan sát mọi số tiền trong Cashflow view
+- **Expected:**
+  - Dùng `format_money_short` (45k, 1.2tr, 4.5 tỷ)
+  - Decimal preservation, không float
+- **Pass:** format consistent với CLAUDE.md rule
+
+## TC-029: Button "📅 Dòng tiền tháng này" xuất hiện
+- **Type:** Happy
+- **Story:** P3.9.5-S9
+- **Persona:** any
+- **Steps:**
+  1. Menu Dòng tiền
+- **Expected:**
+  - Submenu có button mới "📅 Dòng tiền tháng này"
+  - Distinct với "📊 Tổng quan"
+- **Pass:** button visible
+
+## TC-030: Báo cáo "Dòng tiền tháng này" — content đầy đủ
+- **Type:** Happy
+- **Story:** P3.9.5-S9
+- **Persona:** Phương
+- **Steps:**
+  1. Menu Dòng tiền → "📅 Dòng tiền tháng này"
+- **Expected:**
+  - Tổng thu / tổng chi / net flow tháng hiện tại
+  - Thu nhập theo source (top 3)
+  - Chi tiêu theo category (top 3)
+  - Daily flow text-chart (best/worst day)
+  - Top 3 biggest transactions
+- **Pass:** content đầy đủ 5 sections
+
+## TC-031: Báo cáo "Dòng tiền tháng này" — empty case
+- **Type:** Corner
+- **Story:** P3.9.5-S9
+- **Persona:** Mai
+- **Steps:**
+  1. Click "📅 Dòng tiền tháng này"
+- **Expected:**
+  - Empty state friendly
+  - Bé Tiền tone, suggest add transaction
+- **Pass:** graceful empty
+
+## TC-032: Báo cáo "Dòng tiền tháng này" — performance
+- **Type:** Performance
+- **Story:** P3.9.5-S9
+- **Persona:** Phương
+- **Steps:**
+  1. Click button, đo time đến khi render
+- **Expected:**
+  - p95 < 2s
+- **Pass:** within target
+
+## TC-033: Báo cáo "Dòng tiền tháng này" — first vs middle of month
+- **Type:** Corner
+- **Story:** P3.9.5-S9
+- **Persona:** Hà
+- **Steps:**
+  1. Click vào ngày 1 tháng (ít data)
+  2. Click vào ngày 25 tháng (nhiều data)
+- **Expected:**
+  - Both render đúng, không crash
+  - Ngày 1 hiển thị "Mới đầu tháng, data ít"
+  - Ngày 25 hiển thị full breakdown
+- **Pass:** time-of-month aware
+
+## TC-034: Button "🎯 Mục tiêu" trong Cashflow xuất hiện
+- **Type:** Happy
+- **Story:** P3.9.5-S10
+- **Persona:** any
+- **Steps:**
+  1. Menu Dòng tiền
+- **Expected:**
+  - Submenu có button mới "🎯 Mục tiêu"
+- **Pass:** button visible
+
+## TC-035: Cashflow → Mục tiêu → redirect Goals existing
+- **Type:** Integration
+- **Story:** P3.9.5-S10
+- **Persona:** Phương (có 2 goals)
+- **Steps:**
+  1. Menu Dòng tiền → "🎯 Mục tiêu"
+- **Expected:**
+  - Render goals list existing (giống menu Goals)
+  - Phương thấy 2 goals của mình
+  - Không tạo Goals layer khác
+- **Pass:** redirect đúng
+
+## TC-036: Cashflow → Mục tiêu → back button quay về Cashflow
+- **Type:** Integration
+- **Story:** P3.9.5-S10
+- **Persona:** Phương
+- **Steps:**
+  1. Cashflow → Mục tiêu → back
+- **Expected:**
+  - Quay về submenu Cashflow (không phải submenu Goals)
+- **Pass:** back context giữ đúng
+
+## TC-037: Cashflow → Mục tiêu — empty goals
+- **Type:** Corner
+- **Story:** P3.9.5-S10
+- **Persona:** Mai (chưa có goal)
+- **Steps:**
+  1. Cashflow → Mục tiêu
+- **Expected:**
+  - Empty state Goals + CTA "Tạo mục tiêu đầu tiên"
+- **Pass:** empty state ok
+
+## TC-038: Cashflow regression — Tổng quan vẫn render
+- **Type:** Regression
+- **Story:** P3.9.5-S6, S7, S8
+- **Persona:** Hà
+- **Steps:**
+  1. Menu Dòng tiền → Tổng quan
+- **Expected:**
+  - View render thành công, không bị broken sau restructure
+  - Tỷ lệ tiết kiệm vẫn correct
+  - Thu vs Chi card vẫn correct
+- **Pass:** zero regression
+
+## TC-039: Cashflow regression — voice query "thu chi tháng này"
+- **Type:** Regression
+- **Story:** P3.9.5-S6 (intent layer)
+- **Persona:** Hà
+- **Steps:**
+  1. Voice query "thu chi tháng này"
+- **Expected:**
+  - Intent classified correctly QUERY_CASHFLOW
+  - Response render new layout
+- **Pass:** voice intent vẫn hoạt động
+
+## TC-040: Cashflow vi-localization-checker pass
+- **Type:** Integration
+- **Story:** P3.9.5-S6, S7, S8, S9, S10
+- **Persona:** dev
+- **Steps:**
+  1. Run `vi-localization-checker` agent on changes
+- **Expected:**
+  - No hardcoded Vietnamese strings introduced
+  - All copy in `content/menu_copy.yaml`
+  - Bé Tiền tone consistent
+- **Pass:** checker clean
+
+---
