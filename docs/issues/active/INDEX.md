@@ -23,8 +23,9 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #377 | [Story] P4A-S3: Multi-asset portfolio simulation | [issue-377.md](issue-377.md) |
 | #378 | [Story] P4A-S4: Cone aggregator (P10/P50/P90) | [issue-378.md](issue-378.md) |
 | #379 | [Story] P4A-S5: Engine integration test | [issue-379.md](issue-379.md) |
+| #381 | [Story] P4A-S7: Migration twin_projections table | [issue-381.md](issue-381.md) |
 | #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 
-**Total active:** 22
+**Total active:** 23
