@@ -32,5 +32,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
 | #390 | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [issue-390.md](issue-390.md) |
 | #392 | [Story] P4A-S18: Twin dashboard layout | [issue-392.md](issue-392.md) |
+| #394 | [Story] P4A-S20: Deep-link from Telegram | [issue-394.md](issue-394.md) |
 
-**Total active:** 28
+**Total active:** 29
