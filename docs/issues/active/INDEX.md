@@ -31,5 +31,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
 | #390 | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [issue-390.md](issue-390.md) |
+| #392 | [Story] P4A-S18: Twin dashboard layout | [issue-392.md](issue-392.md) |
 
-**Total active:** 27
+**Total active:** 28
