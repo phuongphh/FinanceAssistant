@@ -376,6 +376,164 @@ class TestCancel:
         clear.assert_not_awaited()
 
 
+# ---------------------------------------------------------------------
+# Issue #450 §2 — edit-date auto-recalculates monthly savings
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestEditDateAutoRecalc:
+    async def _run(self, goal: Goal, text: str = "2028-12-31"):
+        gid = uuid.uuid4()
+        goal.id = gid
+        user = _user({
+            "flow": goal_entry.FLOW_EDIT_DATE, "step": "date_input",
+            "draft": {"goal_id": str(gid)},
+        })
+        db = _db(user)
+        with patch.object(goal_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(goal_entry.goal_service, "update_goal",
+                          AsyncMock(return_value=goal)), \
+             patch.object(goal_entry.goal_projection, "get_avg_monthly_savings",
+                          AsyncMock(return_value=Decimal("10000000"))), \
+             patch.object(goal_entry.wizard_service, "clear", AsyncMock()), \
+             patch.object(goal_entry, "send_message", AsyncMock()) as send:
+            await goal_entry.handle_goals_text_input(
+                db,
+                {"text": text, "chat": {"id": 100}, "from": {"id": 100}},
+            )
+        return goal, send
+
+    async def test_recalculates_and_writes_to_cache(self):
+        """After a target_date change the new monthly_savings_required
+        must be written onto the Goal row so the list view picks it up."""
+        goal = _saved_goal()
+        goal.current_amount = Decimal("100000000")
+        goal.target_amount = Decimal("800000000")
+
+        goal, send = await self._run(goal)
+
+        # Cache column populated with a positive number, not the
+        # pre-edit value (which was None on _saved_goal).
+        assert goal.monthly_savings_required is not None
+        assert goal.monthly_savings_required > 0
+        send.assert_awaited()
+        msg = send.await_args.kwargs.get("text") or send.await_args.args[1]
+        assert "Cần tiết kiệm" in msg
+
+    async def test_already_met_shows_celebration_not_savings(self):
+        """Edge case spec'd in issue: target_amount <= current_amount
+        should NOT compute required savings — show celebration."""
+        goal = _saved_goal()
+        goal.current_amount = Decimal("800000000")
+        goal.target_amount = Decimal("800000000")
+
+        _, send = await self._run(goal)
+
+        msg = send.await_args.kwargs.get("text") or send.await_args.args[1]
+        assert "đã đạt" in msg.lower() or "🎉" in msg
+
+    async def test_past_due_input_rejected(self):
+        """target_date <= today must be rejected with the spec'd Vi
+        message before any DB write."""
+        gid = uuid.uuid4()
+        user = _user({
+            "flow": goal_entry.FLOW_EDIT_DATE, "step": "date_input",
+            "draft": {"goal_id": str(gid)},
+        })
+        db = _db(user)
+        with patch.object(goal_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(goal_entry.goal_service, "update_goal",
+                          AsyncMock()) as update_mock, \
+             patch.object(goal_entry, "send_message", AsyncMock()) as send:
+            # 2000-01-01 is firmly in the past — rejection is unambiguous.
+            await goal_entry.handle_goals_text_input(
+                db,
+                {"text": "2000-01-01", "chat": {"id": 100},
+                 "from": {"id": 100}},
+            )
+        update_mock.assert_not_called()
+        msg = send.await_args.kwargs.get("text") or send.await_args.args[1]
+        assert "sau hôm nay" in msg
+
+    async def test_skip_clears_target_date(self):
+        """``skip`` resets the goal to open-ended — issue allows this
+        and the cancellation copy must reflect that."""
+        goal = _saved_goal()
+        goal.target_date = None
+
+        _, send = await self._run(goal, text="skip")
+
+        msg = send.await_args.kwargs.get("text") or send.await_args.args[1]
+        assert "open-ended" in msg or "bỏ hạn" in msg.lower()
+
+
+# ---------------------------------------------------------------------
+# Issue #450 §4 — cancel navigates back to goals list (not dead-end)
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestCancelNavigatesToList:
+    async def test_cancel_callback_lands_on_goals_list(self):
+        user = _user({
+            "flow": goal_entry.FLOW_ADD, "step": "template", "draft": {},
+        })
+        db = _db(user)
+        with patch.object(goal_entry, "get_user_by_telegram_id",
+                          AsyncMock(return_value=user)), \
+             patch.object(goal_entry.wizard_service, "clear",
+                          AsyncMock()) as clear, \
+             patch.object(goal_entry, "show_goals_list",
+                          AsyncMock()) as show, \
+             patch.object(goal_entry, "answer_callback", AsyncMock()), \
+             patch.object(goal_entry, "send_message", AsyncMock()):
+            await goal_entry.handle_goals_callback(
+                db,
+                {"id": "cb1", "data": "goals:cancel",
+                 "message": {"chat": {"id": 100}, "message_id": 1},
+                 "from": {"id": 100}},
+            )
+        clear.assert_awaited_once()
+        show.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------
+# Issue #450 §4 — keyboard labels updated
+# ---------------------------------------------------------------------
+
+
+def test_template_keyboard_uses_quay_ve_label():
+    from backend.bot.keyboards.goals_keyboard import goals_template_keyboard
+
+    rows = goals_template_keyboard()["inline_keyboard"]
+    flat = [btn for row in rows for btn in row]
+    cancel = next(b for b in flat if b["callback_data"].endswith(":cancel"))
+    assert cancel["text"] == "◀️ Quay về"
+    # No legacy destructive copy lingers.
+    assert "Hủy" not in cancel["text"]
+
+
+def test_date_keyboard_uses_quay_ve_label():
+    from backend.bot.keyboards.goals_keyboard import goals_date_keyboard
+
+    rows = goals_date_keyboard()["inline_keyboard"]
+    flat = [btn for row in rows for btn in row]
+    cancel = next(b for b in flat if b["callback_data"].endswith(":cancel"))
+    assert cancel["text"] == "◀️ Quay về"
+
+
+def test_save_keyboard_uses_quay_ve_label():
+    from backend.bot.keyboards.goals_keyboard import goals_save_keyboard
+
+    rows = goals_save_keyboard()["inline_keyboard"]
+    flat = [btn for row in rows for btn in row]
+    cancel = next(b for b in flat if b["callback_data"].endswith(":cancel"))
+    assert cancel["text"] == "◀️ Quay về"
+
+
 def test_goals_footer_can_return_to_cashflow_context():
     from backend.bot.keyboards.goals_keyboard import goals_list_footer_keyboard
 

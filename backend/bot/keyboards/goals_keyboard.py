@@ -53,7 +53,7 @@ def goals_template_keyboard() -> InlineKeyboardMarkup:
             "callback_data": build_callback(CB_GOALS, "custom"),
         },
         {
-            "text": "❌ Hủy",
+            "text": "◀️ Quay về",
             "callback_data": build_callback(CB_GOALS, "cancel"),
         },
     ])
@@ -82,7 +82,7 @@ def goals_date_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {"text": "⏭️ Bỏ qua", "callback_data": build_callback(CB_GOALS, "date", "skip")},
-                {"text": "❌ Hủy",     "callback_data": build_callback(CB_GOALS, "cancel")},
+                {"text": "◀️ Quay về", "callback_data": build_callback(CB_GOALS, "cancel")},
             ],
         ]
     }
@@ -103,7 +103,7 @@ def goals_save_keyboard() -> InlineKeyboardMarkup:
                 },
             ],
             [{
-                "text": "❌ Hủy",
+                "text": "◀️ Quay về",
                 "callback_data": build_callback(CB_GOALS, "cancel"),
             }],
         ]

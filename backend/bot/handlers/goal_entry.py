@@ -741,7 +741,8 @@ async def _handle_edit_date_input(
             return
         if target_date <= date.today():
             await send_message(
-                chat_id=chat_id, text="Hạn phải sau hôm nay nhé.",
+                chat_id=chat_id,
+                text="Ngày hoàn thành phải sau hôm nay nhé 🙂",
             )
             return
     try:
@@ -750,20 +751,84 @@ async def _handle_edit_date_input(
         await wizard_service.clear(db, user.id)
         await send_message(chat_id=chat_id, text="Có lỗi với wizard.")
         return
-    await goal_service.update_goal(
+    updated = await goal_service.update_goal(
         db, user.id, goal_id,
         GoalUpdate(target_date=target_date),
     )
+    if updated is None:
+        await wizard_service.clear(db, user.id)
+        await send_message(chat_id=chat_id, text="Không tìm thấy mục tiêu.")
+        return
+
+    # Issue #450 §2 — auto-recalculate required monthly savings + cache
+    # so the list view shows the fresh figure without a separate
+    # interaction. The cache column (``Goal.monthly_savings_required``)
+    # is the source of truth for the list/dashboard readers.
+    avg_savings = await goal_projection.get_avg_monthly_savings(db, user.id)
+    projection = goal_projection.project_goal_with_savings(updated, avg_savings)
+    updated.monthly_savings_required = projection.required_monthly_savings
+
     await wizard_service.clear(db, user.id)
     analytics.track(
         GoalEvent.GOAL_UPDATED, user_id=user.id,
         properties={"field": "target_date"},
     )
-    if target_date:
-        msg = f"✅ Hạn mới: <b>{target_date.strftime('%d/%m/%Y')}</b>"
-    else:
-        msg = "✅ Đã bỏ hạn — mục tiêu giờ là open-ended."
-    await send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+    await send_message(
+        chat_id=chat_id,
+        text=_format_date_change_summary(updated, projection),
+        parse_mode="HTML",
+    )
+
+
+def _format_date_change_summary(
+    goal: Goal, projection,
+) -> str:
+    """Issue #450 §2 — projection summary shown after a target_date
+    edit. Branches on the spec'd edge cases (already met, no remaining
+    months, open-ended) so the user always reads a coherent next step.
+    """
+    if goal.target_date is None:
+        return "✅ Đã bỏ hạn — mục tiêu giờ là open-ended."
+
+    date_line = (
+        f"✅ Hạn mới: <b>{goal.target_date.strftime('%d/%m/%Y')}</b>"
+    )
+
+    # Already met — celebrate instead of computing required savings.
+    if projection.remaining_amount <= 0:
+        return (
+            f"{date_line}\n\n"
+            "🎉 Mục tiêu đã đạt — không cần tiết kiệm thêm."
+        )
+
+    # months_remaining == 0 means the target_date is so close that the
+    # whole-month rounding floored to zero. Caller should treat this
+    # as a lump-sum requirement.
+    if projection.months_remaining == 0:
+        return (
+            f"{date_line}\n\n"
+            "⚡ Cần hoàn thành ngay — hạn quá gần để chia theo tháng."
+        )
+
+    if projection.required_monthly_savings:
+        lines = [
+            date_line,
+            "",
+            (
+                f"💰 Cần tiết kiệm "
+                f"<b>{format_money_short(projection.required_monthly_savings)}"
+                f"/tháng</b> để đạt mục tiêu vào "
+                f"{goal.target_date.strftime('%d/%m/%Y')}."
+            ),
+        ]
+        if projection.feasibility:
+            label = _FEASIBILITY_LABELS.get(
+                projection.feasibility, projection.feasibility,
+            )
+            lines.append(f"Đánh giá: <b>{label}</b>")
+        return "\n".join(lines)
+
+    return date_line
 
 
 # ---------- Delete (2-tap) ------------------------------------------
@@ -879,9 +944,13 @@ async def _dispatch(
         await show_goals_list(db, chat_id, user)
         return
     if action == "cancel":
+        # Issue #450 §4 — the button label is now "◀️ Quay về", so the
+        # right behaviour is to land the user on the goals list instead
+        # of a dead-end "Đã huỷ" message. We still clear wizard state
+        # so any in-progress draft is dropped before showing the list.
         await wizard_service.clear(db, user.id)
         analytics.track(GoalEvent.WIZARD_CANCELED, user_id=user.id)
-        await send_message(chat_id=chat_id, text="Đã huỷ. 👋")
+        await show_goals_list(db, chat_id, user)
         return
     if action == "custom":
         await _handle_custom_pick(db, chat_id, user)
