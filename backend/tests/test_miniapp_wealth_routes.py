@@ -421,6 +421,135 @@ class TestVersionEndpoint:
         assert body["data"]["static_version"] == miniapp_routes._STATIC_VERSION
         assert body["data"]["git_sha"] == miniapp_routes._GIT_SHA
 
+
+class TestBuildHashRedirect:
+    """Stale or missing ``?b=`` on dashboard URLs 302s to the current hash.
+
+    This is the second half of the cache-bust strategy: ``wealth_dashboard_url``
+    emits new URLs with the current hash for every future click, and this
+    redirect catches old inline buttons still in users' chat history so the
+    server-hit path also lands on a fresh URL Telegram hasn't cached.
+    """
+
+    def test_missing_b_redirects_to_current_hash(self):
+        resp = client.get("/miniapp/wealth", follow_redirects=False)
+        assert resp.status_code == 302
+        location = resp.headers["location"]
+        assert location.startswith("/miniapp/wealth?")
+        assert f"b={miniapp_routes._STATIC_VERSION}" in location
+
+    def test_stale_b_redirects_and_preserves_source(self):
+        resp = client.get(
+            "/miniapp/wealth?b=oldhash&source=briefing", follow_redirects=False
+        )
+        assert resp.status_code == 302
+        location = resp.headers["location"]
+        assert f"b={miniapp_routes._STATIC_VERSION}" in location
+        assert "source=briefing" in location, (
+            "Source attribution must survive the redirect so analytics "
+            "still distinguish briefing vs. /dashboard funnels"
+        )
+
+    def test_current_b_serves_html_directly(self):
+        resp = client.get(
+            f"/miniapp/wealth?b={miniapp_routes._STATIC_VERSION}",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+
+    def test_twin_page_also_protected(self):
+        resp = client.get("/miniapp/twin", follow_redirects=False)
+        assert resp.status_code == 302
+        assert f"b={miniapp_routes._STATIC_VERSION}" in resp.headers["location"]
+
+    def test_cashflow_page_also_protected(self):
+        resp = client.get("/miniapp/cashflow", follow_redirects=False)
+        assert resp.status_code == 302
+        assert f"b={miniapp_routes._STATIC_VERSION}" in resp.headers["location"]
+
+    def test_html_template_change_bumps_static_version(self, tmp_path, monkeypatch):
+        """Without HTML in the hash, an HTML-only edit (sort buttons, copy,
+        layout) wouldn't move ``_STATIC_VERSION`` and every cache-bust URL
+        would stay the same as the previous deploy. Verify HTML files are
+        actually included in ``_compute_static_version``."""
+        baseline = miniapp_routes._compute_static_version()
+
+        # Mutate the HTML file on disk and confirm the hash moves.
+        wealth_tpl = miniapp_routes._TEMPLATES_DIR / "wealth_dashboard.html"
+        original = wealth_tpl.read_text(encoding="utf-8")
+        try:
+            wealth_tpl.write_text(original + "\n<!-- bust -->\n", encoding="utf-8")
+            bumped = miniapp_routes._compute_static_version()
+            assert bumped != baseline, (
+                "HTML edits must change the build hash — otherwise the "
+                "?b= cache-bust on the menu button URL stays constant "
+                "across HTML-only deploys"
+            )
+        finally:
+            wealth_tpl.write_text(original, encoding="utf-8")
+
+
+class TestMiniappUrlHelpers:
+    """Every Mini App URL helper must emit ``?b=<build_hash>`` so Telegram's
+    WebView treats each deploy as a fresh URL — bug repro: PR #452 changed
+    HTML but ``/dashboard`` command kept serving cached HTML because the
+    URL ``?source=dashboard_command`` was identical across deploys.
+    """
+
+    def _with_base_url(self, monkeypatch, base: str | None):
+        from backend.config import get_settings
+
+        settings = get_settings()
+        original = settings.miniapp_base_url
+        settings.miniapp_base_url = base
+        monkeypatch.setattr(
+            "backend.miniapp.urls.get_settings", lambda: settings
+        )
+        return original
+
+    def test_wealth_url_includes_build_hash(self, monkeypatch):
+        from backend.miniapp.urls import wealth_dashboard_url
+
+        original = self._with_base_url(monkeypatch, "https://example.com")
+        try:
+            url = wealth_dashboard_url(source="briefing")
+        finally:
+            from backend.config import get_settings
+
+            get_settings().miniapp_base_url = original
+
+        assert url is not None
+        assert url.startswith("https://example.com/miniapp/wealth?")
+        assert f"b={miniapp_routes._STATIC_VERSION}" in url
+        assert "source=briefing" in url
+
+    def test_twin_url_includes_build_hash(self, monkeypatch):
+        from backend.miniapp.urls import twin_dashboard_url
+
+        original = self._with_base_url(monkeypatch, "https://example.com")
+        try:
+            url = twin_dashboard_url(source="telegram_twin")
+        finally:
+            from backend.config import get_settings
+
+            get_settings().miniapp_base_url = original
+
+        assert url is not None
+        assert f"b={miniapp_routes._STATIC_VERSION}" in url
+        assert "source=telegram_twin" in url
+
+    def test_returns_none_when_base_url_unset(self, monkeypatch):
+        from backend.miniapp.urls import wealth_dashboard_url
+
+        original = self._with_base_url(monkeypatch, "")
+        try:
+            assert wealth_dashboard_url(source="x") is None
+        finally:
+            from backend.config import get_settings
+
+            get_settings().miniapp_base_url = original
+
     def test_no_auth_required(self):
         # Diagnostic endpoint is intentionally public — values are non-sensitive
         # and ssh-less verification of a deploy is the whole point.

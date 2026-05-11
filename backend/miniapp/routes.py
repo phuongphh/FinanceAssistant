@@ -16,8 +16,10 @@ import re
 import time
 from pathlib import Path
 
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -52,9 +54,23 @@ _STATIC_REF_FILES = (
     "css/style.css",
     "css/wealth.css",
     "css/twin.css",
+    "css/cashflow.css",
     "js/dashboard.js",
     "js/wealth_dashboard.js",
     "js/twin_dashboard.js",
+    "js/cashflow_dashboard.js",
+)
+# HTML templates contribute to the version hash so an HTML-only change
+# (e.g., adding a new sort button, changing copy) still bumps the build
+# hash and busts every URL-keyed cache. Without this, an edit that only
+# touches markup leaves ``_STATIC_VERSION`` unchanged, the chat menu
+# button URL stays identical to the previous deploy, and Telegram's
+# WebView keeps serving the cached HTML.
+_TEMPLATE_REF_FILES = (
+    "wealth_dashboard.html",
+    "twin_dashboard.html",
+    "cashflow_dashboard.html",
+    "dashboard.html",
 )
 _STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
 _VERSION_MARKER_PATTERN = re.compile(r"<!--\s*APP_VERSION_MARKER\s*-->")
@@ -114,7 +130,47 @@ def _compute_static_version() -> str:
         asset = _STATIC_DIR / rel_path
         if asset.exists():
             hasher.update(asset.read_bytes())
+    for rel_path in _TEMPLATE_REF_FILES:
+        template = _TEMPLATES_DIR / rel_path
+        if template.exists():
+            # Prefix with the path so a swap-in-place (two templates with
+            # identical bytes after a rename) still moves the hash.
+            hasher.update(rel_path.encode("utf-8"))
+            hasher.update(template.read_bytes())
     return hasher.hexdigest()[:10]
+
+
+def current_build_hash() -> str:
+    """Public accessor for the cache-bust key used in Mini App URLs.
+
+    Returns the content hash of every CSS/JS/HTML file the dashboards
+    reference. Use this anywhere we need to emit a ``?b=<hash>`` query
+    param so Telegram's WebView treats each deploy as a fresh URL.
+    """
+    return _STATIC_VERSION
+
+
+def _redirect_if_stale_build(
+    path: str, b: str | None, extra_params: dict[str, str] | None = None
+) -> RedirectResponse | None:
+    """Redirect ``/miniapp/<page>?b=<old>`` to the same page with the current
+    hash so any URL that escaped the helper (legacy inline buttons in chat
+    history, hand-typed URLs, share links from older clients) self-heals on
+    the first request the server actually sees.
+
+    Returns ``None`` when the request already carries the current hash so
+    the caller can fall through to serving the page. We keep
+    ``extra_params`` (e.g., ``source=briefing``) on the redirect target so
+    analytics attribution survives the bounce.
+    """
+    if b == _STATIC_VERSION:
+        return None
+    params: dict[str, str] = {"b": _STATIC_VERSION}
+    if extra_params:
+        params.update({k: v for k, v in extra_params.items() if v is not None})
+    # 302 (not 301) so a future deploy can change the target without
+    # browsers honoring a permanent redirect to a now-stale hash.
+    return RedirectResponse(f"{path}?{urlencode(params)}", status_code=302)
 
 
 def _detect_git_sha() -> str:
@@ -368,8 +424,16 @@ async def get_recent(
 
 
 @router.get("/twin", response_class=HTMLResponse)
-async def twin_dashboard():
+async def twin_dashboard(
+    b: str | None = Query(None),
+    source: str | None = Query(None),
+):
     """Serve the Phase 4A Financial Twin dashboard shell."""
+    redirect = _redirect_if_stale_build(
+        "/miniapp/twin", b, {"source": source} if source else None
+    )
+    if redirect is not None:
+        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "twin"},
@@ -378,14 +442,26 @@ async def twin_dashboard():
 
 
 @router.get("/wealth", include_in_schema=False)
-async def wealth_page():
+async def wealth_page(
+    b: str | None = Query(None),
+    source: str | None = Query(None),
+):
     """Serve the wealth dashboard HTML.
 
     Auth happens in the API layer per-request (the page itself is static).
     The ``MINIAPP_OPENED`` event here is anonymous (no user_id) because
     initData hasn't been verified yet — the JS sends an authenticated
     ``WEALTH_DASHBOARD_VIEWED`` event once the API call succeeds.
+
+    A stale or missing ``?b=`` triggers a 302 to the current build URL so
+    any link that didn't go through :func:`wealth_dashboard_url` (legacy
+    inline buttons, hand-typed URLs) lands on the canonical cache key.
     """
+    redirect = _redirect_if_stale_build(
+        "/miniapp/wealth", b, {"source": source} if source else None
+    )
+    if redirect is not None:
+        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "wealth"},
@@ -394,8 +470,16 @@ async def wealth_page():
 
 
 @router.get("/cashflow", include_in_schema=False)
-async def cashflow_page():
+async def cashflow_page(
+    b: str | None = Query(None),
+    source: str | None = Query(None),
+):
     """Serve the Phase 4B Cashflow dashboard shell (Epic 3, S20)."""
+    redirect = _redirect_if_stale_build(
+        "/miniapp/cashflow", b, {"source": source} if source else None
+    )
+    if redirect is not None:
+        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "cashflow"},

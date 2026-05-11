@@ -21,7 +21,6 @@ from backend.ports.content_renderer import (
 )
 from backend.ports.notifier import Notifier, get_notifier
 from backend.adapters.telegram_content_renderer import TelegramContentRenderer
-from backend.config import get_settings
 from backend.models.user import User
 from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
@@ -99,10 +98,11 @@ async def _send_channel_content(
 
 
 def _miniapp_url() -> str | None:
-    base = (get_settings().miniapp_base_url or "").rstrip("/")
-    if not base:
-        return None
-    return f"{base}/miniapp/twin?source=telegram_twin"
+    # Delegate to the shared helper so the ``?b=<build_hash>`` cache-bust
+    # query stays consistent across every Mini App entry point.
+    from backend.miniapp.urls import twin_dashboard_url
+
+    return twin_dashboard_url(source="telegram_twin")
 
 
 async def send_twin_current(

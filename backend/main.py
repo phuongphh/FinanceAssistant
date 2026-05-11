@@ -99,11 +99,17 @@ async def lifespan(app: FastAPI):
     # carries the current build hash so each deploy gives Telegram's
     # WebView a URL it has never cached before — root-cause fix for the
     # "users see old dashboard until they clear cache" problem. See
-    # bot/setup_menu_button.py for the full rationale. ``_GIT_SHA`` is
-    # imported lazily to avoid a circular import via the miniapp router.
+    # bot/setup_menu_button.py for the full rationale.
+    #
+    # We use ``current_build_hash()`` (a content-derived SHA over every
+    # CSS/JS/HTML file the dashboards reference) rather than the git SHA.
+    # Container images that strip ``.git`` make ``_GIT_SHA`` return
+    # ``"unknown"`` — a literal that doesn't change between deploys —
+    # which used to leave the menu URL stuck on ``?b=unknown`` and
+    # silently neutralise the entire cache-bust mechanism.
     try:
-        from backend.miniapp.routes import _GIT_SHA
-        await setup_chat_menu_button(_GIT_SHA)
+        from backend.miniapp.routes import current_build_hash
+        await setup_chat_menu_button(current_build_hash())
     except Exception:
         logger.exception(
             "Failed to register chat menu button at startup; continuing — "

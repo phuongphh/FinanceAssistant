@@ -940,7 +940,12 @@ class TestCmdDashboard:
         url = keyboard[0][0]["web_app"]["url"]
         # Pin the path + the analytics-attribution query param so the
         # briefing funnel and the /dashboard funnel stay distinguishable.
-        assert url == "https://example.com/miniapp/wealth?source=dashboard_command"
+        # ``b=<build_hash>`` is appended by wealth_dashboard_url so every
+        # deploy gives Telegram's WebView a never-seen URL — verify it's
+        # present, but don't pin the hash value (it changes per commit).
+        assert url.startswith("https://example.com/miniapp/wealth?")
+        assert "source=dashboard_command" in url
+        assert "b=" in url
 
 
 class TestNetWorthFastPath:
