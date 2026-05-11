@@ -26,7 +26,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #380 | [Story] P4A-S6: Engine version stamp | [issue-380.md](issue-380.md) |
 | #381 | [Story] P4A-S7: Migration twin_projections table | [issue-381.md](issue-381.md) |
 | #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
+| #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 
-**Total active:** 24
+**Total active:** 25
