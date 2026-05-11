@@ -204,6 +204,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #383 | Pre-Phase | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [pre-phase/issue-383.md](by-phase/pre-phase/issue-383.md) |
 | #384 | Pre-Phase | [Story] P4A-S10: On-demand recompute trigger | [pre-phase/issue-384.md](by-phase/pre-phase/issue-384.md) |
 | #385 | Pre-Phase | [Story] P4A-S11: Daily snapshot delta read service | [pre-phase/issue-385.md](by-phase/pre-phase/issue-385.md) |
+| #389 | Pre-Phase | [Story] P4A-S15: Morning briefing Twin line | [pre-phase/issue-389.md](by-phase/pre-phase/issue-389.md) |
 
-**Total:** 200 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 183 Pre-Phase)
+**Total:** 201 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 184 Pre-Phase)
