@@ -8,6 +8,7 @@
 - `GET /miniapp/api/wealth/trend?days=30|90|365` — net worth time series
 - `GET /miniapp/static/*` — CSS/JS assets
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -153,9 +154,7 @@ def _render_html_with_version(html_path: Path) -> str:
     # ``location.replace`` without first executing the old JS.
     bootstrap = _build_bootstrap_script(_STATIC_VERSION)
     if _BOOTSTRAP_MARKER_PATTERN.search(bumped):
-        bumped = _BOOTSTRAP_MARKER_PATTERN.sub(
-            lambda _m: bootstrap, bumped, count=1
-        )
+        bumped = _BOOTSTRAP_MARKER_PATTERN.sub(lambda _m: bootstrap, bumped, count=1)
     else:
         # Fallback for templates without the marker — still wedge it inside
         # <head> so the guard runs before anything else parses.
@@ -175,9 +174,7 @@ def _render_html_with_version(html_path: Path) -> str:
         "</div>"
     )
     if _VERSION_MARKER_PATTERN.search(bumped):
-        bumped = _VERSION_MARKER_PATTERN.sub(
-            lambda _m: footer_html, bumped, count=1
-        )
+        bumped = _VERSION_MARKER_PATTERN.sub(lambda _m: footer_html, bumped, count=1)
     else:
         # Templates that haven't added the marker yet still get the footer
         # right before </body> so the diagnostic is universal.
@@ -309,9 +306,7 @@ async def record_loaded(
     return {"data": {"ok": True}, "error": None}
 
 
-async def _resolve_user(
-    auth: dict, db: AsyncSession
-):
+async def _resolve_user(auth: dict, db: AsyncSession):
     telegram_id = auth.get("user_id")
     if not telegram_id:
         raise HTTPException(status_code=401, detail="Missing Telegram user id")
@@ -406,6 +401,12 @@ async def get_wealth_overview(
         pattern=r"^[a-z_]{1,32}$",
         description="Where the open came from: briefing|menu|deep_link",
     ),
+    sort: str | None = Query(
+        None,
+        max_length=16,
+        pattern=r"^[a-z_]{1,16}$",
+        description="Asset sort: alpha|type|value_desc|value_asc",
+    ),
     auth: dict = Depends(require_miniapp_auth),
     db: AsyncSession = Depends(get_db),
 ):
@@ -415,14 +416,15 @@ async def get_wealth_overview(
     message — Mini App JS shows a retry button rather than crashing.
     """
     user = await _resolve_user(auth, db)
-    cache_key = (user.id, "overview")
+    sort_key = wealth_dashboard_service.normalize_sort(sort)
+    cache_key = (user.id, "overview", sort_key)
     cached = _cache_get(cache_key)
     if cached is not None:
         payload = cached
     else:
         try:
             payload = await wealth_dashboard_service.build_overview(
-                db, user.id, trend_days=90
+                db, user.id, trend_days=90, sort=sort_key
             )
         except Exception as exc:  # noqa: BLE001 — surface friendly error
             raise HTTPException(
@@ -524,9 +526,7 @@ async def get_wealth_trend(
         trend = cached
     else:
         try:
-            trend = await wealth_dashboard_service.get_trend(
-                db, user.id, days=days
-            )
+            trend = await wealth_dashboard_service.get_trend(db, user.id, days=days)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=500,
@@ -562,9 +562,7 @@ def _require_admin_api_key(
     settings = get_settings()
     expected = (settings.internal_api_key or "").strip()
     if not expected:
-        raise HTTPException(
-            status_code=503, detail="Admin API key not configured"
-        )
+        raise HTTPException(status_code=503, detail="Admin API key not configured")
     if x_admin_key != expected:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -592,9 +590,7 @@ async def get_intent_metrics(
     histogram_since = datetime.now(timezone.utc) - timedelta(days=histogram_days)
 
     summary = await intent_metrics.daily_summary(db, since=summary_since)
-    histogram = await intent_metrics.confidence_histogram(
-        db, since=histogram_since
-    )
+    histogram = await intent_metrics.confidence_histogram(db, since=histogram_since)
     top_unclear = await intent_metrics.top_unclear_intents(
         db, since=histogram_since, limit=top_unclear_limit
     )

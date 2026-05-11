@@ -1,4 +1,5 @@
 """Tests for report_service — intent detection, month parsing, and orchestration."""
+
 from datetime import date
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -131,7 +132,9 @@ class TestProcessReportRequest:
     @pytest.mark.asyncio
     async def test_returns_not_registered_when_no_user(self):
         db = AsyncMock()
-        with patch("backend.services.report_service.get_user_by_telegram_id", return_value=None):
+        with patch(
+            "backend.services.report_service.get_user_by_telegram_id", return_value=None
+        ):
             result = await process_report_request(db, telegram_id=12345, text="báo cáo")
         assert "chưa đăng ký" in result
 
@@ -143,9 +146,16 @@ class TestProcessReportRequest:
         mock_report = MagicMock()
         mock_report.report_text = "📊 Báo cáo tháng 4: bạn đã chi 5,000,000 VND"
 
-        with patch("backend.services.report_service.get_user_by_telegram_id", return_value=mock_user), \
-             patch("backend.services.report_service.generate_monthly_report", return_value=mock_report):
-            result = await process_report_request(db, telegram_id=99, text="tổng chi tiêu")
+        with patch(
+            "backend.services.report_service.get_user_by_telegram_id",
+            return_value=mock_user,
+        ), patch(
+            "backend.services.report_service.generate_monthly_report",
+            return_value=mock_report,
+        ):
+            result = await process_report_request(
+                db, telegram_id=99, text="tổng chi tiêu"
+            )
 
         assert result == mock_report.report_text
 
@@ -157,8 +167,13 @@ class TestProcessReportRequest:
         mock_report = MagicMock()
         mock_report.report_text = None
 
-        with patch("backend.services.report_service.get_user_by_telegram_id", return_value=mock_user), \
-             patch("backend.services.report_service.generate_monthly_report", return_value=mock_report):
+        with patch(
+            "backend.services.report_service.get_user_by_telegram_id",
+            return_value=mock_user,
+        ), patch(
+            "backend.services.report_service.generate_monthly_report",
+            return_value=mock_report,
+        ):
             result = await process_report_request(db, telegram_id=99, text="")
 
         assert "Không có dữ liệu" in result
@@ -169,8 +184,13 @@ class TestProcessReportRequest:
         mock_user = MagicMock()
         mock_user.id = "user-uuid"
 
-        with patch("backend.services.report_service.get_user_by_telegram_id", return_value=mock_user), \
-             patch("backend.services.report_service.generate_monthly_report", side_effect=RuntimeError("db down")):
+        with patch(
+            "backend.services.report_service.get_user_by_telegram_id",
+            return_value=mock_user,
+        ), patch(
+            "backend.services.report_service.generate_monthly_report",
+            side_effect=RuntimeError("db down"),
+        ):
             result = await process_report_request(db, telegram_id=99, text="báo cáo")
 
         assert "Không thể tổng hợp" in result
@@ -183,9 +203,15 @@ class TestProcessReportRequest:
         mock_report = MagicMock()
         mock_report.report_text = "ok"
 
-        with patch("backend.services.report_service.get_user_by_telegram_id", return_value=mock_user), \
-             patch("backend.services.report_service.generate_monthly_report", return_value=mock_report) as mock_gen, \
-             patch("backend.services.report_service.date") as mock_date:
+        with patch(
+            "backend.services.report_service.get_user_by_telegram_id",
+            return_value=mock_user,
+        ), patch(
+            "backend.services.report_service.generate_monthly_report",
+            return_value=mock_report,
+        ) as mock_gen, patch(
+            "backend.services.report_service.date"
+        ) as mock_date:
             mock_date.today.return_value = date(2026, 4, 22)
             await process_report_request(db, telegram_id=99, text="báo cáo tháng trước")
 
@@ -215,7 +241,7 @@ class TestBuildReportPrompt:
     def test_includes_wealth_level_label(self):
         ctx = self._ctx(WealthLevel.HIGH_NET_WORTH)
         prompt = _build_report_prompt("Tổng chi tiêu: 20tr", ctx)
-        assert "High Net Worth" in prompt
+        assert "Tinh Hoa" in prompt
 
     def test_hnw_prompt_carries_personal_cfo_framing(self):
         ctx = self._ctx(WealthLevel.HIGH_NET_WORTH)
@@ -237,9 +263,7 @@ class TestBuildReportPrompt:
         starter = _build_report_prompt(
             "x", self._ctx(WealthLevel.STARTER, net_worth=Decimal("5_000_000"))
         )
-        hnw = _build_report_prompt(
-            "x", self._ctx(WealthLevel.HIGH_NET_WORTH)
-        )
+        hnw = _build_report_prompt("x", self._ctx(WealthLevel.HIGH_NET_WORTH))
         assert _LEVEL_GUIDANCE[WealthLevel.STARTER] in starter
         assert _LEVEL_GUIDANCE[WealthLevel.HIGH_NET_WORTH] in hnw
         assert _LEVEL_GUIDANCE[WealthLevel.STARTER] not in hnw
@@ -263,4 +287,4 @@ class TestBuildReportPrompt:
         prompt = _build_report_prompt("Tổng chi tiêu: 500k", ctx)
         # Doesn't crash, doesn't fabricate a percentage.
         assert "không tính được" in prompt
-        assert "Starter" in prompt
+        assert "Khởi Đầu" in prompt

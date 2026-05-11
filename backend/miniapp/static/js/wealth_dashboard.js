@@ -48,6 +48,7 @@
     let pieChart = null;
     let trendChart = null;
     let currentPeriod = 90;
+    let currentAssetSort = window.sessionStorage.getItem('wealth.asset_sort') || 'value_desc';
     let lastOverview = null;
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
@@ -56,10 +57,10 @@
     // (?source=briefing). Same pattern used by the deep-link from /menu.
     const SOURCE = new URLSearchParams(window.location.search).get('source');
     const LEVEL_LABELS = {
-        starter: 'Khởi đầu',
-        young_prof: 'Young Professional',
-        mass_affluent: 'Mass Affluent',
-        hnw: 'High Net Worth',
+        starter: 'Khởi Đầu',
+        young_prof: 'Trẻ Năng Động',
+        mass_affluent: 'Trung Lưu Vững',
+        hnw: 'Tinh Hoa',
     };
     const LEVEL_RANK = ['starter', 'young_prof', 'mass_affluent', 'hnw'];
     const LAST_LEVEL_KEY = 'wealth.last_level';
@@ -72,6 +73,10 @@
     document.querySelectorAll('.period-btn').forEach((btn) => {
         btn.addEventListener('click', () => onPeriodChange(btn));
     });
+    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+        btn.addEventListener('click', () => onAssetSortChange(btn));
+    });
+    updateAssetSortButtons();
 
     renderDashboard();
 
@@ -142,7 +147,10 @@
     async function renderDashboard() {
         showState('loading');
         try {
-            const qs = SOURCE ? `?source=${encodeURIComponent(SOURCE)}` : '';
+            const params = new URLSearchParams();
+            if (SOURCE) params.set('source', SOURCE);
+            params.set('sort', currentAssetSort);
+            const qs = params.toString() ? `?${params.toString()}` : '';
             const data = await fetchAPI('/wealth/overview' + qs);
             lastOverview = data;
 
@@ -154,6 +162,9 @@
                 renderPie(data.breakdown || []);
                 renderBreakdownList(data.breakdown || []);
                 renderTrend(data.trend || []);
+                currentAssetSort = data.asset_sort || currentAssetSort;
+                window.sessionStorage.setItem('wealth.asset_sort', currentAssetSort);
+                updateAssetSortButtons();
                 renderAssets(data.assets || []);
             }
 
@@ -366,6 +377,23 @@
     }
 
     // -- Assets list ------------------------------------------------------
+
+    function onAssetSortChange(btn) {
+        const nextSort = btn.dataset.sort || 'alpha';
+        if (nextSort === currentAssetSort) return;
+        currentAssetSort = nextSort;
+        window.sessionStorage.setItem('wealth.asset_sort', currentAssetSort);
+        updateAssetSortButtons();
+        renderDashboard();
+    }
+
+    function updateAssetSortButtons() {
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            const active = btn.dataset.sort === currentAssetSort;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+    }
 
     function renderAssets(assets) {
         if (!assets.length) {

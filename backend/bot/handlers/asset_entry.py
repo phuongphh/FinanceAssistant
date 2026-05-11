@@ -61,6 +61,7 @@ from backend.bot.keyboards.asset_keyboard import (
     asset_delete_confirm_keyboard,
     asset_delete_list_keyboard,
     asset_delete_type_keyboard,
+    asset_dashboard_delete_confirm_keyboard,
     asset_dashboard_edit_keyboard,
     asset_edit_list_keyboard,
     asset_manage_keyboard,
@@ -85,6 +86,7 @@ from backend.services import wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
+    edit_message_text,
     send_message,
 )
 from backend.wealth.amount_parser import (
@@ -99,11 +101,20 @@ from backend.wealth.asset_types import (
     get_subtypes,
 )
 from backend.wealth.fx import USD_VND_RATE, parse_usd_amount, usd_to_vnd
+from backend.services.wealth_dashboard_service import (
+    SORT_ALPHA,
+    SORT_TYPE,
+    SORT_VALUE_ASC,
+    SORT_VALUE_DESC,
+    normalize_sort,
+)
 from backend.wealth.ladder import update_user_level
 from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import asset_service, net_worth_calculator, rental_service
 
 logger = logging.getLogger(__name__)
+
+_DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
 
 
 class AssetEvent:
@@ -190,41 +201,131 @@ async def list_assets(db: AsyncSession, chat_id: int, user: User) -> None:
     assets = await asset_service.get_user_assets(db, user.id)
     await send_message(
         chat_id=chat_id,
-        text=format_asset_list(assets),
+        text=format_asset_list(_sort_assets_for_dashboard(assets, SORT_VALUE_DESC)),
         parse_mode="HTML",
     )
+
 
 def _asset_dashboard_row_label(asset) -> str:
     icon = get_subtype_icon(asset.asset_type, asset.subtype)
     return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
 
 
-async def show_asset_dashboard_report(
-    db: AsyncSession, chat_id: int, user: User
-) -> None:
-    """Render the asset dashboard report with one edit callback per row."""
-    assets = await asset_service.get_user_assets(db, user.id)
-    if not assets:
-        await send_message(
-            chat_id=chat_id,
-            text=(
-                "📊 <b>Báo cáo</b>\n\n"
-                "Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé."
+def _asset_created_at_desc(asset) -> int:
+    value = getattr(asset, "created_at", None)
+    if value is None:
+        return 0
+    if hasattr(value, "timestamp"):
+        return -int(value.timestamp())
+    if hasattr(value, "toordinal"):
+        return -int(value.toordinal())
+    return 0
+
+
+def _sort_assets_for_dashboard(assets: list, sort: str | None) -> list:
+    sort_key = normalize_sort(sort)
+
+    def name_key(asset) -> str:
+        return str(getattr(asset, "name", "") or "").casefold()
+
+    if sort_key == SORT_TYPE:
+        return sorted(
+            assets,
+            key=lambda asset: (
+                get_label(getattr(asset, "asset_type", "")).casefold(),
+                name_key(asset),
+                _asset_created_at_desc(asset),
             ),
-            parse_mode="HTML",
         )
+    if sort_key == SORT_VALUE_DESC:
+        return sorted(
+            assets,
+            key=lambda asset: (
+                Decimal(getattr(asset, "current_value", 0) or 0),
+                name_key(asset),
+                _asset_created_at_desc(asset),
+            ),
+            reverse=True,
+        )
+    if sort_key == SORT_VALUE_ASC:
+        return sorted(
+            assets,
+            key=lambda asset: (
+                Decimal(getattr(asset, "current_value", 0) or 0),
+                name_key(asset),
+                _asset_created_at_desc(asset),
+            ),
+        )
+    return sorted(
+        assets,
+        key=lambda asset: (name_key(asset), _asset_created_at_desc(asset)),
+    )
+
+
+def _dashboard_sort_for_user(user: User) -> str:
+    return normalize_sort(_DASHBOARD_SORT_BY_USER.get(user.id))
+
+
+def _dashboard_sort_label(sort: str) -> str:
+    return {
+        SORT_VALUE_DESC: "Lớn → Nhỏ",
+        SORT_VALUE_ASC: "Nhỏ → Lớn",
+        SORT_TYPE: "Theo loại",
+        SORT_ALPHA: "A-Z",
+    }.get(normalize_sort(sort), "Lớn → Nhỏ")
+
+
+async def show_asset_dashboard_report(
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    *,
+    sort: str | None = None,
+    message_id: int | None = None,
+) -> None:
+    """Render the asset dashboard report with inline row actions."""
+    sort_key = normalize_sort(sort or _dashboard_sort_for_user(user))
+    _DASHBOARD_SORT_BY_USER[user.id] = sort_key
+    assets = _sort_assets_for_dashboard(
+        await asset_service.get_user_assets(db, user.id), sort_key
+    )
+    if not assets:
+        text = (
+            "📊 <b>Báo cáo</b>\n\n"
+            "Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé."
+        )
+        if message_id is not None:
+            await edit_message_text(
+                chat_id=chat_id, message_id=message_id, text=text, parse_mode="HTML"
+            )
+        else:
+            await send_message(chat_id=chat_id, text=text, parse_mode="HTML")
         return
 
     rows = [(asset.id, _asset_dashboard_row_label(asset)) for asset in assets]
-    await send_message(
-        chat_id=chat_id,
-        text=format_asset_list(assets).replace(
+    text = (
+        format_asset_list(assets).replace(
             "📊 <b>Tài sản của bạn</b>", "📊 <b>Báo cáo</b>", 1
         )
-        + "\n\n👆 Tap vào một dòng bên dưới để sửa giá trị.",
-        parse_mode="HTML",
-        reply_markup=asset_dashboard_edit_keyboard(rows),
+        + f"\n\nSắp xếp: <b>{html.escape(_dashboard_sort_label(sort_key))}</b>"
+        + "\n👆 Dùng ✏️ để sửa, 🗑️ để xoá."
     )
+    markup = asset_dashboard_edit_keyboard(rows, current_sort=sort_key)
+    if message_id is not None:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+    else:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
 
 
 async def show_asset_edit_picker(
@@ -274,6 +375,7 @@ async def start_asset_edit_wizard(
     *,
     return_to_dashboard: bool = True,
     return_to_portfolio: str | None = None,
+    dashboard_message_id: int | None = None,
 ) -> None:
     """Start the lightweight edit flow for one ownership-checked asset."""
     try:
@@ -299,6 +401,7 @@ async def start_asset_edit_wizard(
             "asset_name": asset.name,
             "return_to_dashboard": return_to_dashboard,
             "return_to_portfolio": return_to_portfolio,
+            "dashboard_message_id": dashboard_message_id,
         },
     )
     safe_name = html.escape(asset.name or "Tài sản")
@@ -343,9 +446,9 @@ async def _handle_edit_current_value_input(
     await update_user_level(db, user.id, breakdown.total)
     await wizard_service.clear(db, user.id)
 
-    with contextlib.suppress(Exception):
-        from backend.miniapp.routes import invalidate_wealth_cache_for_user
+    from backend.miniapp.routes import invalidate_wealth_cache_for_user
 
+    with contextlib.suppress(Exception):
         invalidate_wealth_cache_for_user(user.id)
 
     safe_name = html.escape(asset.name or "Tài sản")
@@ -359,7 +462,13 @@ async def _handle_edit_current_value_input(
         parse_mode="HTML",
     )
     if draft.get("return_to_dashboard"):
-        await show_asset_dashboard_report(db, chat_id, user)
+        dashboard_message_id = draft.get("dashboard_message_id")
+        if isinstance(dashboard_message_id, int):
+            await show_asset_dashboard_report(
+                db, chat_id, user, message_id=dashboard_message_id
+            )
+        else:
+            await show_asset_dashboard_report(db, chat_id, user)
         return
     return_to_portfolio = draft.get("return_to_portfolio")
     if return_to_portfolio in {"stock", "crypto", "gold"}:
@@ -394,7 +503,9 @@ async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> 
     """Open asset management actions from ``Tài sản → Sửa tài sản``."""
     await send_message(
         chat_id=chat_id,
-        text=("✏️ <b>Sửa tài sản</b>\n\nBạn muốn làm gì với danh mục tài sản hiện tại?"),
+        text=(
+            "✏️ <b>Sửa tài sản</b>\n\nBạn muốn làm gì với danh mục tài sản hiện tại?"
+        ),
         parse_mode="HTML",
         reply_markup=asset_manage_keyboard(),
     )
@@ -409,7 +520,10 @@ async def show_asset_edit_list(
     db: AsyncSession, chat_id: int, user: User, asset_type: str
 ) -> None:
     """List only active assets of one type for quick market-context edits."""
-    assets = await asset_service.get_user_assets(db, user.id, asset_type=asset_type)
+    assets = _sort_assets_for_dashboard(
+        await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
+        _dashboard_sort_for_user(user),
+    )
     label = get_label(asset_type)
     if not assets:
         await send_message(
@@ -451,7 +565,10 @@ async def show_asset_delete_list(
     db: AsyncSession, chat_id: int, user: User, asset_type: str
 ) -> None:
     """List only active assets of one type for deletion."""
-    assets = await asset_service.get_user_assets(db, user.id, asset_type=asset_type)
+    assets = _sort_assets_for_dashboard(
+        await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
+        _dashboard_sort_for_user(user),
+    )
     label = get_label(asset_type)
     if not assets:
         await send_message(
@@ -530,7 +647,7 @@ async def _soft_delete_asset(
         db, user.id, asset_uuid
     )
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
-    await update_user_level(db, user, breakdown.total)
+    await update_user_level(db, user.id, breakdown.total)
 
     rental_note = (
         "\n🏠 Dòng thuê hàng tháng đã tạm dừng." if was_rental and rental_paused else ""
@@ -550,6 +667,91 @@ async def _soft_delete_asset(
     # the previous "Chọn tài sản muốn xoá" message still shows the
     # row they just removed.
     await show_asset_delete_list(db, chat_id, user, asset_type)
+
+
+async def _confirm_dashboard_asset_delete(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    asset_id_text: str,
+) -> None:
+    try:
+        asset_uuid = uuid.UUID(asset_id_text)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None or not asset.is_active:
+        await _send_asset_already_gone(db, chat_id, user, asset)
+        return
+
+    sort_key = _dashboard_sort_for_user(user)
+    rental_warning = (
+        "\n• Dòng tiền thuê hàng tháng sẽ ngừng tính." if asset.is_rental else ""
+    )
+    text = (
+        "🗑 <b>Xác nhận xoá tài sản</b>\n\n"
+        f"{_asset_delete_row_label(asset)}\n\n"
+        "Sau khi xoá:\n"
+        "• Tài sản biến mất khỏi danh mục.\n"
+        "• Tổng tài sản và dòng tiền tự động tính lại."
+        f"{rental_warning}"
+    )
+    markup = asset_dashboard_delete_confirm_keyboard(asset.id, current_sort=sort_key)
+    if message_id is not None:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+    else:
+        await send_message(
+            chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=markup
+        )
+
+
+async def _soft_delete_dashboard_asset(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    asset_id_text: str,
+) -> None:
+    try:
+        asset_uuid = uuid.UUID(asset_id_text)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy tài sản này.")
+        return
+
+    asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
+    if asset is None or not asset.is_active:
+        await _send_asset_already_gone(db, chat_id, user, asset)
+        return
+
+    was_rental = bool(asset.is_rental)
+    await asset_service.soft_delete(db, user.id, asset_uuid)
+    rental_paused = await rental_service.pause_streams_for_asset(
+        db, user.id, asset_uuid
+    )
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    await update_user_level(db, user.id, breakdown.total)
+
+    from backend.miniapp.routes import invalidate_wealth_cache_for_user
+
+    with contextlib.suppress(Exception):
+        invalidate_wealth_cache_for_user(user.id)
+
+    await show_asset_dashboard_report(
+        db,
+        chat_id,
+        user,
+        sort=_dashboard_sort_for_user(user),
+        message_id=message_id,
+    )
 
 
 async def _send_asset_already_gone(
@@ -2581,14 +2783,20 @@ async def handle_asset_rental_callback(db: AsyncSession, callback_query: dict) -
 
 
 async def handle_dashboard_callback(db: AsyncSession, callback_query: dict) -> bool:
-    """Route dashboard row actions such as ``dashboard:edit:<asset_id>``."""
+    """Route dashboard row actions.
+
+    New callbacks use ``asset:*`` per Issue #412. The legacy
+    ``dashboard:edit:*`` shape remains accepted so old inline keyboards do
+    not break for users with a stale Telegram message.
+    """
     data: str = callback_query.get("data") or ""
-    if not data.startswith("dashboard:"):
+    if not (data.startswith("asset:") or data.startswith("dashboard:")):
         return False
 
     callback_id = callback_query["id"]
     message = callback_query.get("message") or {}
     chat_id = (message.get("chat") or {}).get("id")
+    message_id = message.get("message_id")
     telegram_id = (callback_query.get("from") or {}).get("id")
     if chat_id is None or telegram_id is None:
         await answer_callback(callback_id)
@@ -2599,13 +2807,33 @@ async def handle_dashboard_callback(db: AsyncSession, callback_query: dict) -> b
         await answer_callback(callback_id, text="Bạn cần /start trước nhé.")
         return True
 
-    _, parts = parse_callback(data)
+    prefix, parts = parse_callback(data)
     action = parts[0] if parts else ""
     arg = parts[1] if len(parts) > 1 else None
 
     async def _act() -> None:
+        if action == "sort" and arg:
+            sort_key = normalize_sort(arg)
+            _DASHBOARD_SORT_BY_USER[user.id] = sort_key
+            await show_asset_dashboard_report(
+                db, chat_id, user, sort=sort_key, message_id=message_id
+            )
+            return
         if action == "edit" and arg:
-            await start_asset_edit_wizard(db, chat_id, user, arg)
+            await start_asset_edit_wizard(
+                db, chat_id, user, arg, dashboard_message_id=message_id
+            )
+            return
+        if prefix == "asset" and action == "delete" and arg:
+            await _confirm_dashboard_asset_delete(db, chat_id, message_id, user, arg)
+            return
+        if prefix == "asset" and action == "delete_yes" and arg:
+            await _soft_delete_dashboard_asset(db, chat_id, message_id, user, arg)
+            return
+        if prefix == "asset" and action == "delete_no":
+            await show_asset_dashboard_report(
+                db, chat_id, user, sort=arg, message_id=message_id
+            )
             return
         await send_message(chat_id=chat_id, text="Mình chưa hỗ trợ thao tác này.")
 

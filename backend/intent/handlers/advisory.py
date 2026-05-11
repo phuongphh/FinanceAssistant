@@ -20,6 +20,7 @@ guard it with:
 
 The handler is wired in the dispatcher under ``IntentType.ADVISORY``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -82,9 +83,7 @@ Trả lời:"""
 
 
 class AdvisoryHandler(IntentHandler):
-    async def handle(
-        self, intent: IntentResult, user: User, db: AsyncSession
-    ) -> str:
+    async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
         # Rate-limit BEFORE building context so the expensive queries
         # don't run for capped users.
         used = await _advisory_calls_in_last_24h(db, user.id)
@@ -185,10 +184,10 @@ def _level_to_vi(level: str) -> str:
     # part the LLM has been observed to echo "Mass Affluent" verbatim
     # into the Vietnamese-language report — the parenthetical anchors it.
     return {
-        "starter": "Mới bắt đầu (Starter)",
-        "young_prof": "Người trẻ đi làm (Young Professional)",
-        "mass_affluent": "Trung lưu khá giả (Mass Affluent)",
-        "hnw": "Tài sản lớn (High Net Worth)",
+        "starter": "Khởi Đầu",
+        "young_prof": "Trẻ Năng Động",
+        "mass_affluent": "Trung Lưu Vững",
+        "hnw": "Tinh Hoa",
     }.get(level, level)
 
 
@@ -203,9 +202,7 @@ async def _format_breakdown(db: AsyncSession, user: User) -> str:
         )
     parts = [
         f"{kind}: {format_money_short(value)}"
-        for kind, value in sorted(
-            by_type.items(), key=lambda kv: kv[1], reverse=True
-        )
+        for kind, value in sorted(by_type.items(), key=lambda kv: kv[1], reverse=True)
     ]
     return ", ".join(parts)
 
@@ -268,17 +265,14 @@ async def _format_recent_spend(db: AsyncSession, user: User) -> str:
     if not rows:
         return "không có giao dịch lớn"
     return "; ".join(
-        f"{tx.merchant or tx.category}: {format_money_short(tx.amount)}"
-        for tx in rows
+        f"{tx.merchant or tx.category}: {format_money_short(tx.amount)}" for tx in rows
     )
 
 
 # -------------------- rate limiting --------------------
 
 
-async def _advisory_calls_in_last_24h(
-    db: AsyncSession, user_id
-) -> int:
+async def _advisory_calls_in_last_24h(db: AsyncSession, user_id) -> int:
     """Count this user's advisory responses in the last 24h.
 
     Uses the events table directly so the rate limit survives restarts
