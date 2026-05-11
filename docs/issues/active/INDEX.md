@@ -22,5 +22,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
 | #423 | [Story] P4B-S6: Life Event Data Model + Migration | [issue-423.md](issue-423.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
+| #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
 
-**Total active:** 18
+**Total active:** 19
