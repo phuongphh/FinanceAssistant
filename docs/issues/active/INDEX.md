@@ -18,7 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 | #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
 | #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
-| #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 | #386 | [Story] P4A-S12: Menu entry "🔮 Bé Tiền tương lai" | [issue-386.md](issue-386.md) |
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
 | #388 | [Story] P4A-S14: Twin handler — view trajectory | [issue-388.md](issue-388.md) |
@@ -36,4 +35,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 31
+**Total active:** 30
