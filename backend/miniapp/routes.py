@@ -50,8 +50,10 @@ _STATIC_DIR = _HERE / "static"
 _STATIC_REF_FILES = (
     "css/style.css",
     "css/wealth.css",
+    "css/twin.css",
     "js/dashboard.js",
     "js/wealth_dashboard.js",
+    "js/twin_dashboard.js",
 )
 _STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
 _VERSION_MARKER_PATTERN = re.compile(r"<!--\s*APP_VERSION_MARKER\s*-->")
@@ -368,6 +370,16 @@ async def get_recent(
 
 
 # --- Phase 3A — Wealth dashboard (Mini App) -----------------------------
+
+
+@router.get("/twin", response_class=HTMLResponse)
+async def twin_dashboard():
+    """Serve the Phase 4A Financial Twin dashboard shell."""
+    analytics.track(
+        analytics.EventType.MINIAPP_OPENED,
+        properties={"page": "twin"},
+    )
+    return _serve_html("twin_dashboard.html")
 
 
 @router.get("/wealth", include_in_schema=False)

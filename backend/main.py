@@ -21,6 +21,7 @@ from backend.routers import (
     portfolio,
     reports,
     telegram,
+    twin,
 )
 from backend.bot.setup_commands import setup_bot_commands
 from backend.bot.setup_menu_button import setup_chat_menu_button
@@ -183,6 +184,7 @@ app.include_router(market.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(income.router, prefix="/api/v1")
 app.include_router(telegram.router, prefix="/api/v1")
+app.include_router(twin.router, prefix="/api")
 app.include_router(admin_agent_metrics.router, prefix="/api/v1")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
