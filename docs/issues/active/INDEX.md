@@ -23,5 +23,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #423 | [Story] P4B-S6: Life Event Data Model + Migration | [issue-423.md](issue-423.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 | #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
+| #427 | [Story] P4B-S10: Life Event Impact Visualization | [issue-427.md](issue-427.md) |
 
-**Total active:** 19
+**Total active:** 20
