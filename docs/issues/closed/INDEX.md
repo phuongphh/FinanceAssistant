@@ -210,6 +210,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #388 | Pre-Phase | [Story] P4A-S14: Twin handler — view trajectory | [pre-phase/issue-388.md](by-phase/pre-phase/issue-388.md) |
 | #389 | Pre-Phase | [Story] P4A-S15: Morning briefing Twin line | [pre-phase/issue-389.md](by-phase/pre-phase/issue-389.md) |
 | #390 | Pre-Phase | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [pre-phase/issue-390.md](by-phase/pre-phase/issue-390.md) |
+| #391 | Pre-Phase | [Story] P4A-S17: Mini App webview shell | [pre-phase/issue-391.md](by-phase/pre-phase/issue-391.md) |
 
-**Total:** 206 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 189 Pre-Phase)
+**Total:** 207 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 190 Pre-Phase)

@@ -14,7 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #367 | fix(dashboard): asset name text overflow in wealth dashboard | [issue-367.md](issue-367.md) |
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 | #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
-| #391 | [Story] P4A-S17: Mini App webview shell | [issue-391.md](issue-391.md) |
 | #392 | [Story] P4A-S18: Twin dashboard layout | [issue-392.md](issue-392.md) |
 | #393 | [Story] P4A-S19: REST API endpoint GET /api/twin | [issue-393.md](issue-393.md) |
 | #394 | [Story] P4A-S20: Deep-link from Telegram | [issue-394.md](issue-394.md) |
@@ -26,4 +25,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 21
+**Total active:** 20
