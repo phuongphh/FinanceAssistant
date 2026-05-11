@@ -44,5 +44,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #398 | [Story] P4A-S24: ContentRenderer port | [issue-398.md](issue-398.md) |
 | #399 | [Story] P4A-S25: Trust framing audit | [issue-399.md](issue-399.md) |
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
+| #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 40
+**Total active:** 41
