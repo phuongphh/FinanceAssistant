@@ -20,7 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #381 | [Story] P4A-S7: Migration twin_projections table | [issue-381.md](issue-381.md) |
 | #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
 | #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
-| #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 | #386 | [Story] P4A-S12: Menu entry "🔮 Bé Tiền tương lai" | [issue-386.md](issue-386.md) |
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
@@ -39,4 +38,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 34
+**Total active:** 33

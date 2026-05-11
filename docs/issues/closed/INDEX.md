@@ -197,6 +197,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #378 | Pre-Phase | [Story] P4A-S4: Cone aggregator (P10/P50/P90) | [pre-phase/issue-378.md](by-phase/pre-phase/issue-378.md) |
 | #379 | Pre-Phase | [Story] P4A-S5: Engine integration test | [pre-phase/issue-379.md](by-phase/pre-phase/issue-379.md) |
 | #380 | Pre-Phase | [Story] P4A-S6: Engine version stamp | [pre-phase/issue-380.md](by-phase/pre-phase/issue-380.md) |
+| #384 | Pre-Phase | [Story] P4A-S10: On-demand recompute trigger | [pre-phase/issue-384.md](by-phase/pre-phase/issue-384.md) |
 
-**Total:** 193 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 176 Pre-Phase)
+**Total:** 194 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 177 Pre-Phase)
