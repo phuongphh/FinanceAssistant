@@ -14,5 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #367 | fix(dashboard): asset name text overflow in wealth dashboard | [issue-367.md](issue-367.md) |
 | #369 | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [issue-369.md](issue-369.md) |
 | #372 | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [issue-372.md](issue-372.md) |
+| #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 
-**Total active:** 10
+**Total active:** 11
