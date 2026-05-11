@@ -25,5 +25,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #379 | [Story] P4A-S5: Engine integration test | [issue-379.md](issue-379.md) |
 | #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
+| #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 
-**Total active:** 21
+**Total active:** 22
