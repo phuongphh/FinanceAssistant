@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Pre-Launch UX Polish** (current) — [detail](docs/current/phase-3.9.5/phase-3.9.5-detailed.md)
+🚀 **Twin Polish + Life Events + Cashflow v2 + Zalo** (current) — [detail](docs/current/phase-4B/phase-4B-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).

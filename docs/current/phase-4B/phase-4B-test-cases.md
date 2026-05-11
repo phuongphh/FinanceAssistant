@@ -1,5 +1,13 @@
 # Phase 4B — Manual Test Cases
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 **Total:** 56 test cases  
 **Organized by:** Epic → Feature area  
 **Format:** TC-{AREA}-{ID}: Title | Precondition | Steps | Expected Result
