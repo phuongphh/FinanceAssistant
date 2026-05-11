@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bé Tiền tương lai</title>
+    <!-- BUILD_BOOTSTRAP -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <link rel="stylesheet" href="/miniapp/static/css/style.css">
+    <link rel="stylesheet" href="/miniapp/static/css/twin.css">
+</head>
+<body class="twin-page">
+    <main id="app">
+        <section id="loading" class="twin-skeleton" aria-live="polite">
+            <div class="skeleton-card hero"></div>
+            <div class="skeleton-card chart"></div>
+            <div class="skeleton-grid"><span></span><span></span><span></span></div>
+            <p>Đang tải Bé Tiền tương lai…</p>
+        </section>
+
+        <section id="error" class="error" hidden>
+            <p id="error-message">Không tải được Twin Dashboard.</p>
+            <button id="retry-btn" type="button">Thử lại</button>
+        </section>
+
+        <section id="empty-state" class="section empty-card" hidden>
+            <div class="empty-emoji">🔮</div>
+            <h1>Bé Tiền cần thêm dữ liệu</h1>
+            <p id="empty-copy">Twin cần tối thiểu 10tr tài sản đã ghi nhận để mô phỏng có ý nghĩa.</p>
+            <button class="primary-btn" id="open-wealth-btn" type="button">Mở dashboard tài sản</button>
+        </section>
+
+        <section id="content" hidden>
+            <header class="twin-hero" aria-label="Tổng quan Twin">
+                <div class="eyebrow">🔮 Bé Tiền tương lai</div>
+                <div class="hero-row">
+                    <div>
+                        <div class="hero-label">Giá trị ròng hiện tại</div>
+                        <div class="hero-amount" id="net-worth">—</div>
+                    </div>
+                    <div class="delta-pill" id="delta-pill">—</div>
+                </div>
+                <p class="trust-copy">Mô phỏng xác suất P10/P50/P90 — không phải cam kết lợi nhuận.</p>
+            </header>
+
+            <section class="section scenario-section" aria-label="Chọn kịch bản">
+                <div class="scenario-toggle" role="tablist">
+                    <button class="scenario-btn active" data-scenario="current" type="button" role="tab" aria-selected="true">Hiện tại</button>
+                    <button class="scenario-btn" data-scenario="optimal" type="button" role="tab">Tối ưu</button>
+                </div>
+            </section>
+
+            <section class="section chart-section">
+                <div class="section-heading">
+                    <h2>Vùng xác suất 10 năm</h2>
+                    <span id="computed-at" class="muted">—</span>
+                </div>
+                <div class="chart-container twin-chart-wrap">
+                    <canvas id="cone-chart" role="img" aria-label="Biểu đồ vùng xác suất Twin"></canvas>
+                </div>
+                <p class="section-hint">👆 Chạm vào điểm trên biểu đồ để xem khoảng P10–P90 từng năm.</p>
+            </section>
+
+            <section class="section kpi-section">
+                <h2>Mốc chính</h2>
+                <div id="kpi-grid" class="kpi-grid"></div>
+            </section>
+
+            <section class="section allocation-section">
+                <h2>Phân bổ dùng cho mô phỏng</h2>
+                <div id="allocation-list" class="allocation-list"></div>
+            </section>
+
+            <button class="primary-btn full-width" id="cta-btn" type="button">Thay đổi để đạt Optimal</button>
+            <!-- APP_VERSION_MARKER -->
+        </section>
+    </main>
+    <script src="/miniapp/static/js/twin_dashboard.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #0f172a; background: #f8fafc; }
+body { margin: 0; }
+.shell { max-width: 768px; min-width: 320px; margin: 0 auto; padding: 16px; }
+.hero { color: white; border-radius: 22px; padding: 22px; background: linear-gradient(135deg, #6D5DFB, #14B8A6); }
+.hero h1 { margin: 8px 0; font-size: 34px; }
+.toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+button { border: 0; border-radius: 14px; padding: 12px; font-weight: 700; }
+button.active { background: #2563eb; color: white; }
+.card { background: white; border-radius: 18px; padding: 16px; margin-top: 12px; box-shadow: 0 10px 24px rgba(15, 23, 42, .06); }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kpis article { border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; }
+.kpis strong { display: block; margin-top: 6px; }
+.skeleton, .empty, .error { background: white; border-radius: 18px; margin: 16px; }
+@media (max-width: 360px) { .kpis { grid-template-columns: 1fr; } }
