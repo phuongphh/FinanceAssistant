@@ -102,13 +102,13 @@ def notification_keyboard(
         "inline_keyboard": [
             [
                 {
-                    "text": f"🌅 Daily Briefing: {briefing_status}",
+                    "text": f"🌅 Báo cáo sáng: {briefing_status}",
                     "callback_data": "profile:toggle:briefing",
                 }
             ],
             [
                 {
-                    "text": f"🕖 Giờ briefing: {_fmt_time(profile.briefing_time)}",
+                    "text": f"🕖 Giờ báo cáo sáng: {_fmt_time(profile.briefing_time)}",
                     "callback_data": "profile:time_menu:briefing",
                 }
             ],
@@ -430,7 +430,7 @@ def render_profile(
         "*Thông tin cá nhân*",
         f"• Tên hiển thị: *{name}*",
         f"• Nhóm tuổi: *{profile.age_range or 'Chưa chia sẻ'}*",
-        f"• Briefing: *{'Bật' if profile.briefing_enabled else 'Tắt'}* lúc *{_fmt_time(profile.briefing_time)}*",
+        f"• Báo cáo sáng: *{'Bật' if profile.briefing_enabled else 'Tắt'}* lúc *{_fmt_time(profile.briefing_time)}*",
         f"• Nhắc định kỳ: *{'Bật' if profile.reminder_enabled else 'Tắt'}* lúc *{_fmt_time(profile.reminder_time)}*",
         "",
         "*Tổng quan*",
@@ -458,7 +458,7 @@ def render_profile(
             f"*{stats['goals_completed']} hoàn tất*"
         ),
         f"• Chuỗi hoạt động: *{stats['current_streak']} ngày* 🔥",
-        f"• Briefing đã đọc: *{stats['briefing_read_count']}*",
+        f"• Báo cáo sáng đã đọc: *{stats['briefing_read_count']}*",
         "",
         (
             "_Profile này được tự động tổng hợp từ dữ liệu bạn đã dùng "
@@ -508,8 +508,8 @@ async def _render_notifications(
 ) -> None:
     text = (
         "🔔 *Cài thông báo*\n\n"
-        f"• Daily Briefing: *{'✅ Bật' if profile.briefing_enabled else '🔕 Tắt'}*\n"
-        f"• Giờ briefing: *{_fmt_time(profile.briefing_time)}*\n"
+        f"• Báo cáo sáng: *{'✅ Bật' if profile.briefing_enabled else '🔕 Tắt'}*\n"
+        f"• Giờ báo cáo sáng: *{_fmt_time(profile.briefing_time)}*\n"
         f"• Nhắc định kỳ: *{'✅ Bật' if profile.reminder_enabled else '🔕 Tắt'}*\n"
         f"• Giờ nhắc: *{_fmt_time(profile.reminder_time)}*"
     )
@@ -629,7 +629,7 @@ def _age_confirm_text(value: str | None) -> str:
 
 
 def _time_menu_text(kind: str) -> str:
-    label = "briefing" if kind == "briefing" else "nhắc định kỳ"
+    label = "báo cáo sáng" if kind == "briefing" else "nhắc định kỳ"
     return f"🕒 Chọn giờ {label}:"
 
 
