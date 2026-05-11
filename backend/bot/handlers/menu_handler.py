@@ -58,6 +58,7 @@ from backend.bot.formatters.menu_formatter import (
     format_main_menu,
     format_submenu,
     get_action_copy,
+    get_submenu_hint,
     known_categories,
 )
 from backend.bot.formatters.money import format_money_full
@@ -322,6 +323,14 @@ async def _navigate(
             properties={"source": "menu"},
         )
         return
+    elif target == "cashflow":
+        # Issue #445: show live cashflow overview inline so the user sees
+        # meaningful data immediately without a redundant "Tổng quan" tap.
+        await _navigate_cashflow(
+            db=db, user=user, chat_id=chat_id, message_id=message_id, level=level
+        )
+        analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
+        return
     else:
         text, keyboard = format_submenu(user, target, level=level)
 
@@ -352,6 +361,49 @@ async def _navigate(
     )
 
 
+async def _navigate_cashflow(
+    *,
+    db: AsyncSession,
+    user: User,
+    chat_id: int,
+    message_id: int | None,
+    level: str | None,
+) -> None:
+    """Issue #445: render cashflow overview inline when entering the submenu.
+
+    Dispatches QUERY_CASHFLOW and overlays the submenu keyboard so the user
+    sees live data + action buttons in one message, removing the old
+    redundant "Tổng quan" tap.
+    """
+    result = IntentResult(
+        intent=IntentType.QUERY_CASHFLOW,
+        confidence=1.0,
+        parameters={},
+        raw_text="[menu:cashflow]",
+        classifier_used=CLASSIFIER_RULE,
+    )
+    outcome = await _dispatcher.dispatch(result, user, db)
+    _, keyboard = format_submenu(user, "cashflow", level=level)
+    hint = get_submenu_hint("cashflow")
+    text = (outcome.text or "") + (f"\n\n{hint}" if hint else "")
+    anim_kwargs = message_kwargs_for_animation(text, "submenu")
+    if message_id is None:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=keyboard,
+            **anim_kwargs,
+        )
+        return
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=text,
+        reply_markup=keyboard,
+        **anim_kwargs,
+    )
+
+
 # -----------------------------------------------------------------
 # Action router — Level 3 leaves
 # -----------------------------------------------------------------
@@ -372,12 +424,18 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # Dòng tiền — Phase 3.8 Epic 2 promoted ``income`` to a direct
     # handler (CRUD list view); the rest still synthesise an intent
     # so personality wrap + follow-up keyboards stay consistent.
+    # Issue #445: overview is now shown inline on submenu entry (see _navigate);
+    # route kept for backward-compat with old chat-history bubbles.
     ("cashflow", "overview"): (IntentType.QUERY_CASHFLOW, {}),
     ("cashflow", "monthly_report"): (
         IntentType.QUERY_CASHFLOW,
         {"focus": "current_month_detail", "time_range": "this_month"},
     ),
+    # Issue #445: "Chi tiêu" button replaces "Thu vs Chi"; routes to expense report.
+    # ``compare`` kept for backward-compat with old chat-history bubbles.
+    ("cashflow", "expenses"): (IntentType.QUERY_EXPENSES, {}),
     ("cashflow", "compare"): (IntentType.QUERY_CASHFLOW, {"compare_months": 6}),
+    # ``saving_rate`` button removed (issue #445); kept for old chat-history bubbles.
     ("cashflow", "saving_rate"): (IntentType.QUERY_CASHFLOW, {"focus": "saving_rate"}),
     # Mục tiêu
     # Phase 3.8 Epic 5 — ``goals:list`` and ``goals:update`` are now

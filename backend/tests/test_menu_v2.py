@@ -220,6 +220,25 @@ class TestFormatSubmenu:
         assert "menu:cashflow:monthly_report" in callbacks
         assert "menu:cashflow:goals" in callbacks
 
+    def test_cashflow_submenu_issue_445_changes(self):
+        """Issue #445: Tổng quan removed, Thu vs Chi renamed, Tỷ lệ tiết kiệm removed."""
+        _, kb = format_submenu(_user("Phương"), "cashflow")
+        labels = [row[0]["text"] for row in kb["inline_keyboard"]]
+        callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
+
+        # Tổng quan button must be gone (now shown inline on submenu entry)
+        assert "📊 Tổng quan" not in labels
+        assert "menu:cashflow:overview" not in callbacks
+
+        # "Thu vs Chi" renamed to "Chi tiêu" with new callback
+        assert "💸 Chi tiêu" in labels
+        assert "menu:cashflow:expenses" in callbacks
+        assert "📉 Thu vs Chi" not in labels
+
+        # Tỷ lệ tiết kiệm button removed (shown inline in overview)
+        assert "💎 Tỷ lệ tiết kiệm" not in labels
+        assert "menu:cashflow:saving_rate" not in callbacks
+
     def test_unknown_category_raises_value_error(self):
         with pytest.raises(ValueError):
             format_submenu(_user(), "nonexistent")
@@ -481,6 +500,197 @@ class TestAdaptiveIntros:
         text, _ = format_main_menu(_user(), level="legendary")
         default_text, _ = format_main_menu(_user(), level=None)
         assert text == default_text
+
+
+# ============================================================
+# _navigate_cashflow — Issue #445 inline overview
+# ============================================================
+
+
+def _fake_user(name: str = "Phương"):
+    return SimpleNamespace(
+        display_name=name,
+        id="user-cf",
+        wealth_level="young_prof",
+        get_greeting_name=lambda: name,
+    )
+
+
+class TestNavigateCashflow:
+    """Unit tests for _navigate_cashflow (issue #445).
+
+    Covers dispatch path, text concatenation with hint, and the
+    send_message vs edit_message_text branching.
+    """
+
+    def _make_fake_outcome(self, text: str = "Tháng này dư 5tr 💚"):
+        from backend.intent.dispatcher import DispatchOutcome, OUTCOME_EXECUTED
+        from backend.intent.intents import IntentType
+
+        return DispatchOutcome(
+            text=text,
+            kind=OUTCOME_EXECUTED,
+            intent=IntentType.QUERY_CASHFLOW,
+            confidence=1.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_send_message_called_when_no_message_id(self, monkeypatch):
+        """When message_id is None, send_message is used (no existing bubble)."""
+        from backend.bot.handlers import menu_handler
+
+        sent: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        async def fake_dispatch(intent_result, user, db):
+            return self._make_fake_outcome()
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_cashflow(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
+        )
+
+        assert sent["chat_id"] == 42
+        assert "Tháng này dư 5tr" in sent["text"]
+        assert "inline_keyboard" in sent["reply_markup"]
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_called_when_message_id_set(self, monkeypatch):
+        """When message_id is provided, edit_message_text is used (edit in-place)."""
+        from backend.bot.handlers import menu_handler
+
+        edited: dict = {}
+
+        async def fake_edit_message_text(**kwargs):
+            edited.update(kwargs)
+
+        async def fake_dispatch(intent_result, user, db):
+            return self._make_fake_outcome()
+
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_cashflow(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=99,
+            level="young_prof",
+        )
+
+        assert edited["chat_id"] == 42
+        assert edited["message_id"] == 99
+        assert "Tháng này dư 5tr" in edited["text"]
+
+    @pytest.mark.asyncio
+    async def test_hint_appended_to_outcome_text(self, monkeypatch):
+        """The submenu hint from YAML is appended to the overview content."""
+        from backend.bot.handlers import menu_handler
+
+        captured_text: list[str] = []
+
+        async def fake_send_message(**kwargs):
+            captured_text.append(kwargs["text"])
+
+        async def fake_dispatch(intent_result, user, db):
+            return self._make_fake_outcome("Overview text")
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_cashflow(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
+        )
+
+        assert len(captured_text) == 1
+        text = captured_text[0]
+        assert text.startswith("Overview text")
+        # Hint from YAML should be present (starts with 💡)
+        assert "💡" in text
+
+    @pytest.mark.asyncio
+    async def test_cashflow_submenu_keyboard_is_used(self, monkeypatch):
+        """The submenu keyboard (without Tổng quan) is overlaid on the outcome."""
+        from backend.bot.handlers import menu_handler
+
+        captured_keyboard: list[dict] = []
+
+        async def fake_send_message(**kwargs):
+            captured_keyboard.append(kwargs.get("reply_markup", {}))
+
+        async def fake_dispatch(intent_result, user, db):
+            return self._make_fake_outcome()
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_cashflow(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
+        )
+
+        assert len(captured_keyboard) == 1
+        kb = captured_keyboard[0]
+        all_callbacks = [
+            row[0]["callback_data"] for row in kb["inline_keyboard"]
+        ]
+        # Submenu buttons present
+        assert "menu:cashflow:monthly_report" in all_callbacks
+        assert "menu:cashflow:expenses" in all_callbacks
+        # Tổng quan removed
+        assert "menu:cashflow:overview" not in all_callbacks
+
+    @pytest.mark.asyncio
+    async def test_query_cashflow_intent_is_dispatched(self, monkeypatch):
+        """Dispatcher is called with QUERY_CASHFLOW intent at full confidence."""
+        from backend.bot.handlers import menu_handler
+        from backend.intent.intents import IntentType
+
+        dispatched: list = []
+
+        async def fake_dispatch(intent_result, user, db):
+            dispatched.append(intent_result)
+            return self._make_fake_outcome()
+
+        async def fake_send_message(**kwargs):
+            pass
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_cashflow(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
+        )
+
+        assert len(dispatched) == 1
+        result = dispatched[0]
+        assert result.intent == IntentType.QUERY_CASHFLOW
+        assert result.confidence == 1.0
+        assert result.parameters == {}
 
 
 # ============================================================

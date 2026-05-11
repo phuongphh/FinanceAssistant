@@ -124,6 +124,13 @@ def known_categories() -> list[str]:
     ]
 
 
+def get_submenu_hint(category: str) -> str:
+    """Return the hint text for a submenu category, or empty string if absent."""
+    config_key = f"submenu_{category}"
+    config = _load_copy().get(config_key, {})
+    return config.get("hint", "")
+
+
 __all__ = [
     "DEFAULT_LEVEL",
     "VALID_LEVELS",
@@ -131,5 +138,6 @@ __all__ = [
     "format_main_menu",
     "format_submenu",
     "get_action_copy",
+    "get_submenu_hint",
     "known_categories",
 ]
