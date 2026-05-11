@@ -29,6 +29,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
+| #386 | [Story] P4A-S12: Menu entry "🔮 Bé Tiền tương lai" | [issue-386.md](issue-386.md) |
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
 | #388 | [Story] P4A-S14: Twin handler — view trajectory | [issue-388.md](issue-388.md) |
 | #389 | [Story] P4A-S15: Morning briefing Twin line | [issue-389.md](issue-389.md) |
@@ -38,4 +39,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #393 | [Story] P4A-S19: REST API endpoint GET /api/twin | [issue-393.md](issue-393.md) |
 | #394 | [Story] P4A-S20: Deep-link from Telegram | [issue-394.md](issue-394.md) |
 
-**Total active:** 33
+**Total active:** 34
