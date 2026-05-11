@@ -66,6 +66,7 @@ INTENTS:
 - query_market: Hỏi giá thị trường (VNM, BTC, VN-Index)
 - query_goals: Hỏi mục tiêu của user
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể
+- query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Muốn ghi giao dịch nhanh
 - advisory: Hỏi lời khuyên đầu tư / tài chính
@@ -140,6 +141,7 @@ class LLMClassifier:
                     db=db,
                     shared_cache=True,
                     use_cache=True,
+                    cache_ttl_days=self._cache_ttl_days,
                 )
                 if db is not None:
                     await db.commit()

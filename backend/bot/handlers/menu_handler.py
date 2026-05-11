@@ -950,6 +950,38 @@ async def _action_market_stock_search(
     )
 
 
+
+async def _action_twin_view_current(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.bot.handlers.twin_handler import send_twin_current
+
+    await send_twin_current(db, chat_id=chat_id, user=user)
+
+
+async def _action_twin_compare_optimal(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.bot.handlers.twin_handler import send_twin_compare_placeholder
+
+    await send_twin_compare_placeholder(chat_id=chat_id)
+
+
+async def _action_twin_open_miniapp(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.bot.handlers.twin_handler import send_twin_miniapp_link
+
+    await send_twin_miniapp_link(chat_id=chat_id)
+
+
+async def _action_twin_how_it_works(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.bot.handlers.twin_handler import send_twin_how_it_works
+
+    await send_twin_how_it_works(chat_id=chat_id)
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
@@ -975,6 +1007,10 @@ _DIRECT_HANDLERS = {
     ("market", "crypto_portfolio"): _action_market_crypto_portfolio,
     ("market", "gold_portfolio"): _action_market_gold_portfolio,
     ("market", "stock_search"): _action_market_stock_search,
+    ("twin", "view_current"): _action_twin_view_current,
+    ("twin", "compare_optimal"): _action_twin_compare_optimal,
+    ("twin", "open_miniapp"): _action_twin_open_miniapp,
+    ("twin", "how_it_works"): _action_twin_how_it_works,
 }
 
 

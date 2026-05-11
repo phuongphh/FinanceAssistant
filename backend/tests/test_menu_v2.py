@@ -52,11 +52,12 @@ class TestYamlSchema:
         assert isinstance(copy, dict)
         assert "main_menu" in copy
 
-    def test_main_menu_has_phase385_profile_entry(self):
+    def test_main_menu_has_phase4a_twin_entry(self):
         copy = menu_formatter._load_copy()
         buttons = copy["main_menu"]["buttons"]
-        assert len(buttons) == 6
-        assert buttons[-1]["callback"] == "menu:profile"
+        assert len(buttons) == 7
+        assert buttons[-2]["callback"] == "menu:profile"
+        assert buttons[-1]["callback"] == "menu:twin"
 
     def test_main_menu_buttons_route_to_known_categories(self):
         copy = menu_formatter._load_copy()
@@ -65,9 +66,9 @@ class TestYamlSchema:
             cat = btn["callback"].split(":")[1]
             assert cat in cats, f"Main menu button points to unknown category: {cat}"
 
-    def test_all_five_submenus_exist(self):
+    def test_all_phase4a_submenus_exist(self):
         cats = known_categories()
-        expected = {"assets", "expenses", "cashflow", "goals", "market"}
+        expected = {"assets", "expenses", "cashflow", "goals", "market", "twin"}
         assert expected == set(cats)
 
     def test_all_adaptive_sections_have_four_levels(self):
@@ -178,10 +179,10 @@ class TestFormatMainMenu:
     def test_keyboard_layout_is_2_column_grid(self):
         _, kb = format_main_menu(_user())
         rows = kb["inline_keyboard"]
-        # Phase 3.8.5 adds Profile: 6 buttons, 2 per row → 3 full rows.
-        assert len(rows) == 3
+        # Phase 4A adds Twin: 7 buttons, 2 per row → 3 full rows + final row.
+        assert len(rows) == 4
         assert len(rows[0]) == 2
-        assert len(rows[-1]) == 2
+        assert len(rows[-1]) == 1
 
     def test_unknown_level_falls_back_to_default(self):
         text, _ = format_main_menu(_user(), level="alien-level")

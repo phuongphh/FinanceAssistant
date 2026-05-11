@@ -125,3 +125,17 @@ def test_four_wealth_level_fixtures_do_not_raise():
 def test_engine_version_is_exported_and_consumed():
     assert ENGINE_VERSION == "4a.1.0"
     assert engine_version_for_projection() == ENGINE_VERSION
+
+
+def test_render_cone_chart_returns_png_bytes_fast():
+    from backend.twin.services.twin_chart_service import render_projection_chart
+
+    cone = [
+        {"year": 0, "p10": "100000000", "p50": "100000000", "p90": "100000000"},
+        {"year": 1, "p10": "95000000", "p50": "112000000", "p90": "135000000"},
+        {"year": 2, "p10": "98000000", "p50": "126000000", "p90": "170000000"},
+    ]
+    png = render_projection_chart(cone, width=400, height=300)
+
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(png) > 10_000

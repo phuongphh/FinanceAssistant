@@ -95,6 +95,7 @@ async def call_llm(
     user_id: uuid.UUID | None = None,
     use_cache: bool = True,
     shared_cache: bool = False,
+    cache_ttl_days: int = 30,
 ) -> str:
     """Call an LLM with optional caching.
 
@@ -141,7 +142,7 @@ async def call_llm(
     # Save to cache
     if use_cache and db:
         await _set_cache(
-            db, cache_key, "deepseek-chat", prompt_hash, result, tokens_used
+            db, cache_key, "deepseek-chat", prompt_hash, result, tokens_used, ttl_days=cache_ttl_days
         )
 
     return result

@@ -278,3 +278,10 @@ out_of_scope:
       confidence: 0.8
     - pattern: 'thi\s*truong\s+(?:my|us)'
       confidence: 0.8
+
+query_twin:
+  patterns:
+    - pattern: "\b(twin|be tien tuong lai|tuong lai tai san|du phong tai san)\b"
+      confidence: 0.95
+    - pattern: "\b(10 nam toi|nam 2036|tai san tuong lai)\b"
+      confidence: 0.86

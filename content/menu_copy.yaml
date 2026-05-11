@@ -71,6 +71,8 @@ main_menu:
       callback: "menu:market"
     - label: "👤 Profile"
       callback: "menu:profile"
+    - label: "🔮 Twin"
+      callback: "menu:twin"
 
   hint: |-
     💡 Mẹo: bạn có thể hỏi mình thẳng — không cần menu:
@@ -86,6 +88,54 @@ action_market_portfolio:
   stock_empty: "Thêm CK vào portfolio để theo dõi bảng giá riêng của bạn nhé."
   crypto_empty: "Chưa có tài sản loại này. Bạn có thể thêm crypto đầu tiên để theo dõi realtime."
   gold_empty: "Chưa có tài sản loại này. Bạn có thể thêm vàng đầu tiên để theo dõi theo giá SJC."
+
+
+# ============================================================
+# SUB-MENU: BÉ TIỀN TƯƠNG LAI (Phase 4A Twin)
+# ============================================================
+
+submenu_twin:
+  title: "🔮 BÉ TIỀN TƯƠNG LAI"
+
+  intro:
+    starter: |-
+      Mình sẽ vẽ thử Bé Tiền của bạn trong 10 năm tới bằng xác suất, không phải lời hứa.
+      Khi tài sản đạt từ 10tr, dự phóng sẽ hữu ích hơn nhé.
+
+    young_prof: |-
+      Mình mô phỏng 1.000 kịch bản để xem tài sản của bạn có thể đi về đâu trong 10 năm tới.
+      Bạn muốn xem lộ trình nào?
+
+    mass_affluent: |-
+      Đây là bản đồ xác suất cho tài sản tương lai: vùng an toàn, đường giữa và khoảng có thể đạt.
+      Mình luôn ưu tiên góc nhìn thận trọng.
+
+    hnw: |-
+      Financial Twin mô phỏng nhiều kịch bản thị trường cho danh mục hiện tại của bạn.
+      Dùng để tham khảo chiến lược, không thay thế tư vấn đầu tư cá nhân.
+
+  buttons:
+    - label: "📈 Lộ trình"
+      callback: "menu:twin:view_current"
+      description: "Xem cone P10/P50/P90 cho 10 năm tới"
+
+    - label: "⚖️ So tối ưu"
+      callback: "menu:twin:compare_optimal"
+      description: "So sánh hiện tại với lộ trình tối ưu"
+
+    - label: "📱 Mini App"
+      callback: "menu:twin:open_miniapp"
+      description: "Mở dashboard Twin"
+
+    - label: "❓ Cách hoạt động"
+      callback: "menu:twin:how_it_works"
+      description: "Giải thích mô phỏng xác suất"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 Twin dùng P10/P50/P90: 80% kịch bản có thể nằm giữa P10 và P90.
 
 # ============================================================
 # SUB-MENU: TÀI SẢN (Level 2)
