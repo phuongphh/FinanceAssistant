@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #372 | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [issue-372.md](issue-372.md) |
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 | #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
-| #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
 | #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 | #386 | [Story] P4A-S12: Menu entry "🔮 Bé Tiền tương lai" | [issue-386.md](issue-386.md) |
@@ -37,4 +36,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 32
+**Total active:** 31
