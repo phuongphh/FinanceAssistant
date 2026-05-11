@@ -369,6 +369,10 @@ class IntentDispatcher:
             from backend.intent.handlers.query_goals import QueryGoalsHandler
 
             return QueryGoalsHandler()
+        if intent == IntentType.QUERY_TWIN:
+            from backend.intent.handlers.query_twin import QueryTwinHandler
+
+            return QueryTwinHandler()
         if intent == IntentType.QUERY_GOAL_PROGRESS:
             from backend.intent.handlers.query_goals import (
                 QueryGoalProgressHandler,

@@ -27,6 +27,7 @@ from backend.wealth.models.asset import Asset
 from backend.wealth.services import net_worth_calculator
 
 _TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "content" / "briefing.yaml"
+_TWIN_COPY_PATH = Path(__file__).resolve().parents[2] / "content" / "twin_copy.yaml"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,12 @@ class EnrichedBriefingResult:
 def _load_template() -> dict[str, Any]:
     with open(_TEMPLATE_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+@lru_cache(maxsize=1)
+def _load_twin_copy() -> dict[str, Any]:
+    with open(_TWIN_COPY_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)["briefing"]
 
 
 def _morning_emoji() -> str:
@@ -133,6 +140,30 @@ def _news_lines(news: list[Any]) -> str:
     return "\n".join(f"• {item.title}" for item in news[:3])
 
 
+
+async def _twin_briefing_line(db: AsyncSession, user_id) -> str:
+    """Return one encouraging Twin delta line, or empty when no projection exists."""
+    try:
+        from backend.twin.services.twin_query_service import get_twin_snapshot
+
+        snapshot = await get_twin_snapshot(db, user_id)
+    except Exception:
+        return ""
+    if snapshot.projection is None or snapshot.delta_vs_p50 is None:
+        return ""
+    reference = snapshot.actual_nw - snapshot.delta_vs_p50
+    if reference <= 0:
+        return ""
+    delta_pct = snapshot.delta_vs_p50 / reference * Decimal(100)
+    copy = _load_twin_copy()
+    pct_text = f"{abs(delta_pct):.0f}"
+    if delta_pct > Decimal("5"):
+        return copy["ahead"].format(delta_pct=pct_text)
+    if delta_pct < Decimal("-5"):
+        return copy["behind"].format(delta_pct=pct_text)
+    return copy["on_track"].format(delta_pct=pct_text)
+
+
 def _insights(assets: list[Asset], vcb_rate: Decimal | None) -> list[str]:
     insights: list[str] = []
     for asset in assets:
@@ -191,6 +222,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         gold_quote(),
         get_relevant_news(user.id, limit=3),
     )
+    twin_line = await _twin_briefing_line(db, user.id)
     performers = await get_best_worst_from_assets(assets)
     diversification = compute_diversification_score([{"asset_type": asset.asset_type, "value": Decimal(asset.current_value or 0)} for asset in assets])
 
@@ -225,6 +257,8 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         "news": template["sections"]["news"].format(news_lines=_news_lines(news)),
         "insights": template["sections"]["insights"].format(insight_lines="\n".join(f"• {line}" for line in insight_lines[:4])),
     }
+    if twin_line:
+        sections["twin"] = twin_line
     text = "\n\n".join(section.strip() for section in sections.values() if section)
     if is_stale:
         text = f"{text}\n\n{template['footer']['stale']}"
