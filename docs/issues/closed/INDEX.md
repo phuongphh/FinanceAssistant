@@ -193,6 +193,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #369 | Pre-Phase | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [pre-phase/issue-369.md](by-phase/pre-phase/issue-369.md) |
 | #370 | Pre-Phase | [Epic] Phase 4A — Epic 2: Persistence & Scheduler | [pre-phase/issue-370.md](by-phase/pre-phase/issue-370.md) |
 | #371 | Pre-Phase | [Epic] Phase 4A — Epic 3: Telegram Twin Surface | [pre-phase/issue-371.md](by-phase/pre-phase/issue-371.md) |
+| #372 | Pre-Phase | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [pre-phase/issue-372.md](by-phase/pre-phase/issue-372.md) |
 | #375 | Pre-Phase | [Story] P4A-S1: Asset class return distributions | [pre-phase/issue-375.md](by-phase/pre-phase/issue-375.md) |
 | #376 | Pre-Phase | [Story] P4A-S2: Monte Carlo simulator (single asset) | [pre-phase/issue-376.md](by-phase/pre-phase/issue-376.md) |
 | #377 | Pre-Phase | [Story] P4A-S3: Multi-asset portfolio simulation | [pre-phase/issue-377.md](by-phase/pre-phase/issue-377.md) |
@@ -210,5 +211,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #389 | Pre-Phase | [Story] P4A-S15: Morning briefing Twin line | [pre-phase/issue-389.md](by-phase/pre-phase/issue-389.md) |
 | #390 | Pre-Phase | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [pre-phase/issue-390.md](by-phase/pre-phase/issue-390.md) |
 
-**Total:** 205 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 188 Pre-Phase)
+**Total:** 206 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 189 Pre-Phase)
