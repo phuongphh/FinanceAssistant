@@ -191,6 +191,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #356 | Pre-Phase | [Story] P3.9.5-S18: Helper utility render animation emoji | [pre-phase/issue-356.md](by-phase/pre-phase/issue-356.md) |
 | #357 | Pre-Phase | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [pre-phase/issue-357.md](by-phase/pre-phase/issue-357.md) |
 | #369 | Pre-Phase | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [pre-phase/issue-369.md](by-phase/pre-phase/issue-369.md) |
+| #370 | Pre-Phase | [Epic] Phase 4A — Epic 2: Persistence & Scheduler | [pre-phase/issue-370.md](by-phase/pre-phase/issue-370.md) |
 | #375 | Pre-Phase | [Story] P4A-S1: Asset class return distributions | [pre-phase/issue-375.md](by-phase/pre-phase/issue-375.md) |
 | #376 | Pre-Phase | [Story] P4A-S2: Monte Carlo simulator (single asset) | [pre-phase/issue-376.md](by-phase/pre-phase/issue-376.md) |
 | #377 | Pre-Phase | [Story] P4A-S3: Multi-asset portfolio simulation | [pre-phase/issue-377.md](by-phase/pre-phase/issue-377.md) |
@@ -202,5 +203,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #384 | Pre-Phase | [Story] P4A-S10: On-demand recompute trigger | [pre-phase/issue-384.md](by-phase/pre-phase/issue-384.md) |
 | #385 | Pre-Phase | [Story] P4A-S11: Daily snapshot delta read service | [pre-phase/issue-385.md](by-phase/pre-phase/issue-385.md) |
 
-**Total:** 197 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 180 Pre-Phase)
+**Total:** 198 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 181 Pre-Phase)
