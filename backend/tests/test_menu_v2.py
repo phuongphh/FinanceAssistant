@@ -220,6 +220,25 @@ class TestFormatSubmenu:
         assert "menu:cashflow:monthly_report" in callbacks
         assert "menu:cashflow:goals" in callbacks
 
+    def test_cashflow_submenu_issue_445_changes(self):
+        """Issue #445: Tổng quan removed, Thu vs Chi renamed, Tỷ lệ tiết kiệm removed."""
+        _, kb = format_submenu(_user("Phương"), "cashflow")
+        labels = [row[0]["text"] for row in kb["inline_keyboard"]]
+        callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
+
+        # Tổng quan button must be gone (now shown inline on submenu entry)
+        assert "📊 Tổng quan" not in labels
+        assert "menu:cashflow:overview" not in callbacks
+
+        # "Thu vs Chi" renamed to "Chi tiêu" with new callback
+        assert "💸 Chi tiêu" in labels
+        assert "menu:cashflow:expenses" in callbacks
+        assert "📉 Thu vs Chi" not in labels
+
+        # Tỷ lệ tiết kiệm button removed (shown inline in overview)
+        assert "💎 Tỷ lệ tiết kiệm" not in labels
+        assert "menu:cashflow:saving_rate" not in callbacks
+
     def test_unknown_category_raises_value_error(self):
         with pytest.raises(ValueError):
             format_submenu(_user(), "nonexistent")

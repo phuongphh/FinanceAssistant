@@ -301,10 +301,6 @@ submenu_cashflow:
       chi tiêu và phần còn lại để điều phối mục tiêu.
 
   buttons:
-    - label: "📊 Tổng quan"
-      callback: "menu:cashflow:overview"
-      description: "Thu, chi, tiết kiệm tháng này"
-
     - label: "📅 Dòng tiền tháng này"
       callback: "menu:cashflow:monthly_report"
       description: "Báo cáo chi tiết tháng hiện tại"
@@ -313,13 +309,9 @@ submenu_cashflow:
       callback: "menu:cashflow:income"
       description: "Lương, thu nhập thụ động, các nguồn khác"
 
-    - label: "📉 Thu vs Chi"
-      callback: "menu:cashflow:compare"
-      description: "Biểu đồ so sánh 6 tháng qua"
-
-    - label: "💎 Tỷ lệ tiết kiệm"
-      callback: "menu:cashflow:saving_rate"
-      description: "% thu nhập bạn tiết kiệm được"
+    - label: "💸 Chi tiêu"
+      callback: "menu:cashflow:expenses"
+      description: "Chi tiêu theo danh mục tháng này"
 
     - label: "🎯 Mục tiêu"
       callback: "menu:cashflow:goals"
