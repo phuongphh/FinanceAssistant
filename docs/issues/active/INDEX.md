@@ -41,6 +41,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #395 | [Story] P4A-S21: Target allocation per wealth level | [issue-395.md](issue-395.md) |
 | #396 | [Story] P4A-S22: Optimal trajectory simulator | [issue-396.md](issue-396.md) |
 | #398 | [Story] P4A-S24: ContentRenderer port | [issue-398.md](issue-398.md) |
+| #399 | [Story] P4A-S25: Trust framing audit | [issue-399.md](issue-399.md) |
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 
-**Total active:** 38
+**Total active:** 39
