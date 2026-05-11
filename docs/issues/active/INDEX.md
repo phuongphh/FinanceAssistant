@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #392 | [Story] P4A-S18: Twin dashboard layout | [issue-392.md](issue-392.md) |
 | #393 | [Story] P4A-S19: REST API endpoint GET /api/twin | [issue-393.md](issue-393.md) |
 | #394 | [Story] P4A-S20: Deep-link from Telegram | [issue-394.md](issue-394.md) |
+| #396 | [Story] P4A-S22: Optimal trajectory simulator | [issue-396.md](issue-396.md) |
 
-**Total active:** 34
+**Total active:** 35
