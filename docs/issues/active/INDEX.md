@@ -22,5 +22,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #376 | [Story] P4A-S2: Monte Carlo simulator (single asset) | [issue-376.md](issue-376.md) |
 | #377 | [Story] P4A-S3: Multi-asset portfolio simulation | [issue-377.md](issue-377.md) |
 | #379 | [Story] P4A-S5: Engine integration test | [issue-379.md](issue-379.md) |
+| #382 | [Story] P4A-S8: twin_projection_service.compute_and_store | [issue-382.md](issue-382.md) |
 
-**Total active:** 18
+**Total active:** 19
