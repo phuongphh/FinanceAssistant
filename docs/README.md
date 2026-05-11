@@ -47,7 +47,7 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 | Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](docs/current/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
 | Pre-Launch UX Polish | 🚀 current | 5-7 ngày | [phase-3.9.5-detailed.md](docs/current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
 | Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
-| Financial Twin Conservative MVP | 🔮 planned | TBD | — | Conservative Financial Twin MVP building on real market data from Phase 3.9 |
+| Financial Twin Conservative MVP | 🔮 planned | ~3 tuần | [phase-4A-detailed.md](docs/current/phase-4A/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
 | Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
 | Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
 | Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
