@@ -76,6 +76,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import briefing as briefing_handlers
     from backend.bot.handlers import goal_entry as goal_entry_handlers
     from backend.bot.handlers import income_entry as income_entry_handlers
+    from backend.bot.handlers import life_event_entry as life_event_entry_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
     from backend.bot.handlers import recurring_entry as recurring_entry_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
@@ -109,6 +110,7 @@ async def route_update(data: dict) -> None:
                     income_entry_handlers=income_entry_handlers,
                     recurring_entry_handlers=recurring_entry_handlers,
                     goal_entry_handlers=goal_entry_handlers,
+                    life_event_entry_handlers=life_event_entry_handlers,
                     storytelling_handlers=storytelling_handlers,
                     feedback_handlers=feedback_handlers,
                     profile_handlers=profile_handlers,
@@ -130,6 +132,7 @@ async def route_update(data: dict) -> None:
                         income_entry_handlers=income_entry_handlers,
                         recurring_entry_handlers=recurring_entry_handlers,
                         goal_entry_handlers=goal_entry_handlers,
+                        life_event_entry_handlers=life_event_entry_handlers,
                         briefing_handlers=briefing_handlers,
                         storytelling_handlers=storytelling_handlers,
                         feedback_handlers=feedback_handlers,
@@ -164,6 +167,7 @@ async def _handle_message(
     income_entry_handlers,
     recurring_entry_handlers,
     goal_entry_handlers,
+    life_event_entry_handlers,
     storytelling_handlers,
     feedback_handlers,
     profile_handlers,
@@ -281,6 +285,11 @@ async def _handle_message(
             return resolved_user.id
         return None
 
+    # /life_events — open the life-event planner menu (Phase 4B Epic 2).
+    if command in ("/life_events", "/lifeevents", "/kehoach", "/kế_hoạch"):
+        await life_event_entry_handlers.cmd_life_events(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
+
     # /feedback — zero-friction feedback capture (Phase 3.8.5 Epic 1).
     if command == "/feedback":
         if resolved_user is not None:
@@ -303,14 +312,15 @@ async def _handle_message(
     # so the user needs a non-button way to bail.
     if command in ("/huy", "/cancel"):
         if resolved_user is not None:
-            if (resolved_user.wizard_state or {}).get(
-                "flow"
-            ) == profile_handlers.FLOW_PROFILE:
+            flow = (resolved_user.wizard_state or {}).get("flow") or ""
+            if flow == profile_handlers.FLOW_PROFILE:
                 await profile_handlers.handle_profile_text_input(db, message)
-            elif (resolved_user.wizard_state or {}).get(
-                "flow"
-            ) == feedback_handlers.FLOW_FEEDBACK:
+            elif flow == feedback_handlers.FLOW_FEEDBACK:
                 await feedback_handlers.handle_feedback_text_input(db, message)
+            elif flow in life_event_entry_handlers.ALL_FLOWS:
+                await life_event_entry_handlers.cancel_wizard(
+                    db, chat_id, resolved_user
+                )
             elif not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
             ):
@@ -429,6 +439,15 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+        # Phase 4B Epic 2 — life-event wizard mid-flow text. Listens for
+        # year / amount / duration replies while a life_event_* flow is
+        # active so the user's "2028" doesn't reach the NL expense parser.
+        consumed = await life_event_entry_handlers.handle_life_event_text_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+
     # Natural-language message → NL expense parser / report intent / menu fallback.
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
@@ -474,7 +493,14 @@ async def _maybe_auto_exit_asset_wizard(
     is_income_flow = flow.startswith("income_")
     is_recurring_flow = flow.startswith("recurring_")
     is_goal_flow = flow.startswith("goal_")
-    if not (is_asset_flow or is_income_flow or is_recurring_flow or is_goal_flow):
+    is_life_event_flow = flow.startswith("life_event")
+    if not (
+        is_asset_flow
+        or is_income_flow
+        or is_recurring_flow
+        or is_goal_flow
+        or is_life_event_flow
+    ):
         return
 
     cb_belongs_to_asset = (
@@ -487,6 +513,7 @@ async def _maybe_auto_exit_asset_wizard(
         "recurring"
     ) or callback_data.startswith("reminder")
     cb_belongs_to_goal = callback_data.startswith("goals")
+    cb_belongs_to_life_event = callback_data.startswith("life_event")
     if is_asset_flow and cb_belongs_to_asset:
         return
     if is_income_flow and cb_belongs_to_income:
@@ -494,6 +521,8 @@ async def _maybe_auto_exit_asset_wizard(
     if is_recurring_flow and cb_belongs_to_recurring:
         return
     if is_goal_flow and cb_belongs_to_goal:
+        return
+    if is_life_event_flow and cb_belongs_to_life_event:
         return
 
     from backend import analytics
@@ -505,6 +534,8 @@ async def _maybe_auto_exit_asset_wizard(
         event = "income_wizard_auto_exited"
     elif is_recurring_flow:
         event = "recurring_wizard_auto_exited"
+    elif is_life_event_flow:
+        event = "life_event_wizard_auto_exited"
     else:
         event = "goal_wizard_auto_exited"
     step = (user.wizard_state or {}).get("step")
@@ -530,6 +561,7 @@ async def _handle_callback(
     income_entry_handlers,
     recurring_entry_handlers,
     goal_entry_handlers,
+    life_event_entry_handlers,
     briefing_handlers,
     storytelling_handlers,
     feedback_handlers,
@@ -608,6 +640,10 @@ async def _handle_callback(
 
     # Phase 3.8 Epic 5 — goals wizard + list (goals:*).
     if await goal_entry_handlers.handle_goals_callback(db, callback_query):
+        return await _resolved_user_id()
+
+    # Phase 4B Epic 2 — life-event wizard + menu (life_event:*).
+    if await life_event_entry_handlers.handle_life_event_callback(db, callback_query):
         return await _resolved_user_id()
 
     # Morning-briefing button taps (briefing:*). Handled before the

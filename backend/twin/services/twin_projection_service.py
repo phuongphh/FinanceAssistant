@@ -9,16 +9,20 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal, Mapping
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.life_events import service as life_event_service
+from backend.life_events.impact import event_to_injection
 from backend.models.twin_projection import TwinProjection
 from backend.services import cashflow_service
 from backend.twin.allocation.target_allocation import get_target_allocation
 from backend.twin.engine import ENGINE_VERSION
 from backend.twin.engine.cone_aggregator import ConePoint, aggregate_cone
+from backend.twin.engine.life_events import apply_life_events
 from backend.twin.engine.monte_carlo import Array2D, simulate_portfolio
 from backend.twin.engine.optimal_trajectory import simulate_optimal
 from backend.wealth.ladder import detect_level
@@ -84,6 +88,21 @@ async def compute_and_store(
     scenarios = (
         [SCENARIO_CURRENT, SCENARIO_OPTIMAL] if scenario == "both" else [scenario]
     )
+
+    # Load active life events ONCE up front. They apply identically to both
+    # scenarios (current and optimal) — the event is a planned life choice,
+    # not a portfolio strategy. Keeping the read outside the loop avoids a
+    # double query per recompute.
+    # Defensive: if the life-events table is missing (older deployments,
+    # legacy test fakes) or the read otherwise fails, fall through to a
+    # no-events recompute rather than blocking Twin entirely.
+    try:
+        life_events_rows = await life_event_service.list_for_user(db, user_id)
+        injections = [event_to_injection(ev) for ev in life_events_rows]
+    except Exception:
+        injections = []
+    base_year = datetime.now(timezone.utc).year
+
     projections: list[TwinProjection] = []
     for index, scenario_name in enumerate(scenarios):
         sim, monthly_savings, allocation_snapshot = _scenario_simulation(
@@ -93,7 +112,15 @@ async def compute_and_store(
             paths=paths,
             seed=None if seed is None else seed + index,
         )
-        cone = aggregate_cone(sim)
+        # Aggregate the pristine cone BEFORE injecting events so we can store
+        # both views. Mini App toggle UX (S11) reads ``base_cone_data`` to
+        # diff "with / without event X" without re-running Monte Carlo.
+        base_cone = aggregate_cone(sim)
+        if injections:
+            apply_life_events(sim, injections, base_year=base_year)
+            cone = aggregate_cone(sim)
+        else:
+            cone = base_cone
         projection = TwinProjection(
             user_id=user_id,
             horizon_years=horizon,
@@ -102,6 +129,7 @@ async def compute_and_store(
             monthly_savings=monthly_savings,
             allocation_snapshot=_decimal_mapping_to_json(allocation_snapshot),
             cone_data=_cone_to_json(cone),
+            base_cone_data=_cone_to_json(base_cone),
             sim_paths=paths,
             seed=None if seed is None else seed + index,
             engine_version=engine_version_for_projection(),

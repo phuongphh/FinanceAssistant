@@ -13,6 +13,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.life_events import service as life_event_service
+from backend.life_events.impact import (
+    adjust_cone_with_events,
+    base_year_from_computed_at,
+)
 from backend.twin.engine.uncertainty import compute_uncertainty_breakdown
 from backend.twin.services import twin_projection_service, twin_query_service
 
@@ -33,6 +38,7 @@ async def build_twin_payload(
     user_id: uuid.UUID,
     *,
     scenario: str = twin_projection_service.SCENARIO_CURRENT,
+    exclude_event_ids: set[uuid.UUID] | None = None,
 ) -> dict[str, Any]:
     """Return the latest Twin projection payload for a user.
 
@@ -76,6 +82,24 @@ async def build_twin_payload(
     )
     monthly_savings_needed = _compute_monthly_savings_needed(current_proj, optimal_proj)
 
+    # Phase 4B Epic 2: ``exclude_event_ids`` lets the Mini App toggle a single
+    # event off and re-render the cone WITHOUT a Monte Carlo recompute. We
+    # start from ``base_cone_data`` (no events applied) and re-add the deltas
+    # of the events the caller still wants — strictly arithmetic on the cone.
+    cone_payload = projection.cone_data or []
+    excluded_count = 0
+    if exclude_event_ids and projection.base_cone_data:
+        remaining_events = [
+            ev
+            for ev in await life_event_service.list_for_user(db, user_id)
+            if ev.id not in exclude_event_ids
+        ]
+        base_year = base_year_from_computed_at(projection.computed_at)
+        cone_payload = adjust_cone_with_events(
+            projection.base_cone_data, remaining_events, base_year
+        )
+        excluded_count = len(exclude_event_ids)
+
     return {
         "has_projection": True,
         "scenario": projection.scenario,
@@ -86,7 +110,7 @@ async def build_twin_payload(
         else None,
         "monthly_savings": _money(projection.monthly_savings),
         "allocation": _allocation_to_json(projection.allocation_snapshot or {}),
-        "cone": _cone_to_json(projection.cone_data or []),
+        "cone": _cone_to_json(cone_payload),
         "computed_at": _isoformat(projection.computed_at),
         "cone_age_days": snapshot.cone_age_days,
         "is_stale": snapshot.is_stale,
@@ -100,6 +124,7 @@ async def build_twin_payload(
         "uncertainty_contributors": _uncertainty_to_json(
             projection.allocation_snapshot or {}
         ),
+        "excluded_event_count": excluded_count,
     }
 
 
@@ -108,11 +133,18 @@ def etag_for_payload(payload: dict[str, Any]) -> str:
 
     Computed from fields that change whenever a new projection snapshot becomes
     visible. Empty-state ETags also vary by current net worth so add-asset flows
-    are not stuck behind a stale 304.
+    are not stuck behind a stale 304. ``excluded_event_count`` is folded in so
+    toggling life events on/off invalidates the cache predictably.
     """
     basis = "|".join(
         str(payload.get(key) or "")
-        for key in ("scenario", "computed_at", "actual_net_worth", "engine_version")
+        for key in (
+            "scenario",
+            "computed_at",
+            "actual_net_worth",
+            "engine_version",
+            "excluded_event_count",
+        )
     )
     digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
     return f'W/"twin-{digest}"'

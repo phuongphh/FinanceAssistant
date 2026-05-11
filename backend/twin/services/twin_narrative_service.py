@@ -130,7 +130,17 @@ async def build_twin_narrative(
     except Exception:
         top_changes = "không có dữ liệu"
 
-    life_events_summary = "không có"
+    # Phase 4B Epic 2: surface the user's planned life events to the LLM so
+    # narratives can reference "mua nhà 2028" / "con đầu lòng 2030" instead
+    # of the static "không có" placeholder from Phase 4A.
+    try:
+        from backend.life_events import service as life_event_service
+        from backend.life_events.narrative import summary_for_twin_narrative
+
+        events = await life_event_service.list_for_user(db, user.id)
+        life_events_summary = summary_for_twin_narrative(events)
+    except Exception:
+        life_events_summary = "không có"
 
     prompt = _copy()["prompt"].format(
         target_year=target_year,
