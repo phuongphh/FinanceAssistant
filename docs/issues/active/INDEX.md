@@ -29,5 +29,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #383 | [Story] P4A-S9: Weekly cron updater (Sunday 23:00) | [issue-383.md](issue-383.md) |
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
+| #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
 
-**Total active:** 25
+**Total active:** 26
