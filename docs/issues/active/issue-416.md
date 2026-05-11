@@ -4,20 +4,16 @@
 
 ## Phase 4B — Epic 3: Cashflow Forecasting v2
 
-> **Type:** Epic | **Estimate:** 7 ngày | **Stories:** 7
+> **Type:** Epic | **Estimate:** 7 ngay | **Stories:** 7
 
-## Mục tiêu
-Auto-detect thu chi định kỳ, dự báo 3 tháng, cảnh báo trước khi thiếu tiền.
+## Muc tieu
+Auto-detect thu chi dinh ky, du bao 3 thang, canh bao truoc khi thieu tien.
 
 ## Stories in this Epic
-_(Sẽ update)_
-- [ ] [Story] P4B-S14: Recurring Transaction Detector
-- [ ] [Story] P4B-S15: User Review Flow for Detected Patterns
-- [ ] [Story] P4B-S16: 3-Month Cashflow Forecast Model
-- [ ] [Story] P4B-S17: Low-Balance Alert Engine
-- [ ] [Story] P4B-S18: Cashflow Waterfall Chart
-- [ ] [Story] P4B-S19: Morning Briefing Cashflow Summary
-- [ ] [Story] P4B-S20: Cashflow Tab in Mini App
-
-## Reference
-`docs/current/phase-4B/phase-4B-detailed.md` § Epic 3
+- [ ] #431 [Story] P4B-S14: Recurring Transaction Detector
+- [ ] #432 [Story] P4B-S15: User Review Flow for Detected Patterns
+- [ ] #433 [Story] P4B-S16: 3-Month Cashflow Forecast Model
+- [ ] #434 [Story] P4B-S17: Low-Balance Alert Engine
+- [ ] #435 [Story] P4B-S18: Cashflow Waterfall Chart
+- [ ] #436 [Story] P4B-S19: Morning Briefing Cashflow Summary
+- [ ] #437 [Story] P4B-S20: Cashflow Tab in Mini App
