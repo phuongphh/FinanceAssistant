@@ -220,8 +220,9 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #395 | Pre-Phase | [Story] P4A-S21: Target allocation per wealth level | [pre-phase/issue-395.md](by-phase/pre-phase/issue-395.md) |
 | #396 | Pre-Phase | [Story] P4A-S22: Optimal trajectory simulator | [pre-phase/issue-396.md](by-phase/pre-phase/issue-396.md) |
 | #397 | Pre-Phase | [Story] P4A-S23: Comparison handler (Telegram) | [pre-phase/issue-397.md](by-phase/pre-phase/issue-397.md) |
+| #398 | Pre-Phase | [Story] P4A-S24: ContentRenderer port | [pre-phase/issue-398.md](by-phase/pre-phase/issue-398.md) |
 | #399 | Pre-Phase | [Story] P4A-S25: Trust framing audit | [pre-phase/issue-399.md](by-phase/pre-phase/issue-399.md) |
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 
-**Total:** 218 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 201 Pre-Phase)
+**Total:** 219 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 202 Pre-Phase)
