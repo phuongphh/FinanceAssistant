@@ -19,5 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 | #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
 | #375 | [Story] P4A-S1: Asset class return distributions | [issue-375.md](issue-375.md) |
+| #377 | [Story] P4A-S3: Multi-asset portfolio simulation | [issue-377.md](issue-377.md) |
 
-**Total active:** 15
+**Total active:** 16
