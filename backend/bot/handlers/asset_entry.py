@@ -108,6 +108,7 @@ from backend.services.wealth_dashboard_service import (
     SORT_VALUE_DESC,
     normalize_sort,
 )
+from backend.twin.services.recompute_service import enqueue_recompute_if_needed
 from backend.wealth.ladder import update_user_level
 from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import asset_service, net_worth_calculator, rental_service
@@ -444,6 +445,7 @@ async def _handle_edit_current_value_input(
     )
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user.id, breakdown.total)
+    await enqueue_recompute_if_needed(db, user.id, Decimal(new_value))
     await wizard_service.clear(db, user.id)
 
     from backend.miniapp.routes import invalidate_wealth_cache_for_user
@@ -732,9 +734,8 @@ async def _soft_delete_dashboard_asset(
         await _send_asset_already_gone(db, chat_id, user, asset)
         return
 
-    was_rental = bool(asset.is_rental)
     await asset_service.soft_delete(db, user.id, asset_uuid)
-    rental_paused = await rental_service.pause_streams_for_asset(
+    await rental_service.pause_streams_for_asset(
         db, user.id, asset_uuid
     )
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
@@ -2442,6 +2443,9 @@ async def _post_save(db: AsyncSession, chat_id: int, user: User, asset) -> None:
 
     breakdown = await net_worth_calculator.calculate(db, user.id)
     new_level = await update_user_level(db, user.id, breakdown.total)
+
+    asset_value = Decimal(str(asset.current_value or 0))
+    await enqueue_recompute_if_needed(db, user.id, asset_value)
 
     analytics.track(
         AssetEvent.ASSET_ADDED,

@@ -14,6 +14,7 @@ from time import perf_counter
 from backend import analytics
 from backend.database import get_session_factory
 from backend.jobs._active_users import get_active_users
+from backend.twin.accuracy import fill_previous_projection_accuracy
 from backend.twin.services.twin_projection_service import compute_and_store
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ async def run_weekly_twin_update(
         async with semaphore:
             async with session_factory() as db:
                 try:
+                    await fill_previous_projection_accuracy(db, user.id)
                     await compute_and_store(db, user.id, scenario="both")
                     await db.commit()
                     return True

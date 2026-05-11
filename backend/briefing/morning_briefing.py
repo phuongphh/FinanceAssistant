@@ -164,6 +164,29 @@ async def _twin_briefing_line(db: AsyncSession, user_id) -> str:
     return copy["on_track"].format(delta_pct=pct_text)
 
 
+async def _twin_accuracy_line(db: AsyncSession, user_id) -> str:
+    """Return accuracy comparison line when ≥2 projections exist."""
+    try:
+        from backend.twin.accuracy import get_accuracy_summary
+
+        summary = await get_accuracy_summary(db, user_id)
+    except Exception:
+        return ""
+    if summary is None:
+        return ""
+    copy = _load_twin_copy()
+    template_key = f"accuracy_{summary.tone}"
+    template = copy.get(template_key, copy.get("accuracy_neutral", ""))
+    if not template:
+        return ""
+    error_sign = "+" if summary.error_pct >= 0 else ""
+    return template.format(
+        predicted=format_money_short(summary.predicted_p50),
+        actual=format_money_short(summary.actual),
+        error_pct=f"{error_sign}{summary.error_pct:.1f}",
+    )
+
+
 def _insights(assets: list[Asset], vcb_rate: Decimal | None) -> list[str]:
     insights: list[str] = []
     for asset in assets:
@@ -223,6 +246,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         get_relevant_news(user.id, limit=3),
     )
     twin_line = await _twin_briefing_line(db, user.id)
+    twin_accuracy_line = await _twin_accuracy_line(db, user.id)
     performers = await get_best_worst_from_assets(assets)
     diversification = compute_diversification_score([{"asset_type": asset.asset_type, "value": Decimal(asset.current_value or 0)} for asset in assets])
 
@@ -259,6 +283,8 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     }
     if twin_line:
         sections["twin"] = twin_line
+    if twin_accuracy_line:
+        sections["twin_accuracy"] = twin_accuracy_line
     text = "\n\n".join(section.strip() for section in sections.values() if section)
     if is_stale:
         text = f"{text}\n\n{template['footer']['stale']}"

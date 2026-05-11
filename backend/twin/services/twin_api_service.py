@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.twin.engine.uncertainty import compute_uncertainty_breakdown
 from backend.twin.services import twin_projection_service, twin_query_service
 
 _ALLOWED_SCENARIOS = {
@@ -23,6 +24,8 @@ _EMPTY_COPY = (
     "Twin cần tối thiểu 10tr tài sản đã ghi nhận để mô phỏng có ý nghĩa. "
     "Thêm/cập nhật tài sản rồi quay lại nhé."
 )
+_MILESTONE_CALENDAR_YEARS = (2027, 2030, 2035)
+_SAVINGS_ROUND = Decimal("500000")
 
 
 async def build_twin_payload(
@@ -61,6 +64,18 @@ async def build_twin_payload(
             "empty_state": _EMPTY_COPY,
         }
 
+    # For comparison deltas: always load both scenarios regardless of view scenario
+    current_proj = await twin_query_service.get_latest_projection(
+        db, user_id, scenario=twin_projection_service.SCENARIO_CURRENT
+    )
+    optimal_proj = await twin_query_service.get_latest_projection(
+        db, user_id, scenario=twin_projection_service.SCENARIO_OPTIMAL
+    )
+    comparison_deltas = _compute_comparison_deltas(
+        current_proj, optimal_proj, projection.computed_at
+    )
+    monthly_savings_needed = _compute_monthly_savings_needed(current_proj, optimal_proj)
+
     return {
         "has_projection": True,
         "scenario": projection.scenario,
@@ -78,6 +93,13 @@ async def build_twin_payload(
         "horizon_years": projection.horizon_years,
         "sim_paths": projection.sim_paths,
         "engine_version": projection.engine_version,
+        "comparison_deltas": comparison_deltas,
+        "monthly_savings_needed": _money(monthly_savings_needed)
+        if monthly_savings_needed is not None
+        else None,
+        "uncertainty_contributors": _uncertainty_to_json(
+            projection.allocation_snapshot or {}
+        ),
     }
 
 
@@ -124,3 +146,75 @@ def _isoformat(value: datetime | None) -> str | None:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.isoformat()
+
+
+def _compute_comparison_deltas(
+    current_proj: Any,
+    optimal_proj: Any,
+    computed_at: datetime,
+) -> list[dict[str, Any]]:
+    """Return delta % at milestone years (2027, 2030, 2035) between optimal and current."""
+    if current_proj is None or optimal_proj is None:
+        return []
+
+    base_year = computed_at.year if computed_at else datetime.now(timezone.utc).year
+    current_by_idx = {
+        int(p.get("year", -1)): p
+        for p in (current_proj.cone_data or [])
+    }
+    optimal_by_idx = {
+        int(p.get("year", -1)): p
+        for p in (optimal_proj.cone_data or [])
+    }
+
+    deltas = []
+    for cal_year in _MILESTONE_CALENDAR_YEARS:
+        idx = cal_year - base_year
+        if idx < 0 or idx > (current_proj.horizon_years or 10):
+            continue
+        cur_point = current_by_idx.get(idx)
+        opt_point = optimal_by_idx.get(idx)
+        if cur_point is None or opt_point is None:
+            continue
+        cur_p50 = Decimal(str(cur_point.get("p50") or 0))
+        opt_p50 = Decimal(str(opt_point.get("p50") or 0))
+        if cur_p50 <= 0:
+            continue
+        delta_pct = (opt_p50 - cur_p50) / cur_p50 * Decimal("100")
+        deltas.append(
+            {
+                "year": cal_year,
+                "current_p50": _money(cur_p50),
+                "optimal_p50": _money(opt_p50),
+                "delta_pct": float(delta_pct.quantize(Decimal("0.1"))),
+            }
+        )
+    return deltas
+
+
+def _uncertainty_to_json(allocation: dict[str, Any]) -> list[dict[str, Any]]:
+    try:
+        contributors = compute_uncertainty_breakdown(allocation, top_n=2)
+    except Exception:
+        return []
+    return [
+        {"asset_class": c.asset_class, "contribution_pct": c.contribution_pct}
+        for c in contributors
+    ]
+
+
+def _compute_monthly_savings_needed(
+    current_proj: Any,
+    optimal_proj: Any,
+) -> Decimal | None:
+    """Return (optimal_savings - current_savings) rounded to nearest 500k, or None."""
+    if current_proj is None or optimal_proj is None:
+        return None
+    cur_savings = Decimal(str(current_proj.monthly_savings or 0))
+    opt_savings = Decimal(str(optimal_proj.monthly_savings or 0))
+    diff = opt_savings - cur_savings
+    if diff <= 0:
+        return None
+    # Round to nearest 500k
+    rounded = (diff / _SAVINGS_ROUND).quantize(Decimal("1")) * _SAVINGS_ROUND
+    return max(rounded, Decimal("0"))

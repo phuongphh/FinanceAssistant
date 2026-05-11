@@ -1,4 +1,4 @@
-// Financial Twin dashboard — Phase 4A Epic 4.
+// Financial Twin dashboard — Phase 4A Epic 4 + Phase 4B S4 Scenario Comparison.
 (function () {
     'use strict';
 
@@ -26,6 +26,13 @@
         scenarioBtns: Array.from(document.querySelectorAll('.scenario-btn')),
         ctaBtn: document.getElementById('cta-btn'),
         openWealthBtn: document.getElementById('open-wealth-btn'),
+        comparisonSection: document.getElementById('comparison-section'),
+        comparisonBadges: document.getElementById('comparison-badges'),
+        savingsCta: document.getElementById('savings-cta'),
+        optimalInfoBtn: document.getElementById('optimal-info-btn'),
+        uncertaintySection: document.getElementById('uncertainty-section'),
+        uncertaintyList: document.getElementById('uncertainty-list'),
+        uncertaintyHint: document.getElementById('uncertainty-hint'),
     };
 
     let currentScenario = new URLSearchParams(window.location.search).get('scenario') || 'current';
@@ -34,9 +41,9 @@
     const cache = Object.create(null);
 
     els.retryBtn.addEventListener('click', () => load(currentScenario, { force: true }));
-    els.ctaBtn.addEventListener('click', () => switchScenario('optimal'));
     els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
     els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
+    if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
 
     switchScenario(currentScenario);
 
@@ -93,6 +100,9 @@
         renderChart(data.cone || []);
         renderKpis(data.cone || []);
         renderAllocation(data.allocation || {});
+        renderComparisonDeltas(data);
+        renderUncertaintyBreakdown(data);
+        renderCtaBtn(data);
         showState('content');
         reportLoaded();
     }
@@ -159,6 +169,72 @@
             const pct = Math.round(Number(value) * 1000) / 10;
             return `<div class="allocation-row"><div><strong>${labelAsset(name)}</strong><div class="allocation-bar"><div class="allocation-fill" style="width:${Math.min(100, pct)}%"></div></div></div><span>${pct.toFixed(1)}%</span></div>`;
         }).join('');
+    }
+
+    function renderComparisonDeltas(data) {
+        if (!els.comparisonSection) return;
+        const deltas = data.comparison_deltas;
+        if (!deltas || !deltas.length || data.scenario !== 'current') {
+            els.comparisonSection.hidden = true;
+            return;
+        }
+        els.comparisonBadges.innerHTML = deltas.map((d) => {
+            const positive = d.delta_pct >= 0;
+            const sign = positive ? '+' : '';
+            return `<div class="comparison-badge">
+                <div class="badge-year">Năm ${d.year}</div>
+                <div class="badge-values">
+                    <span class="badge-label">Hiện tại: ${formatMoneyShort(Number(d.current_p50))}</span>
+                    <span class="delta-badge-pill ${positive ? 'positive' : 'negative'}">${sign}${d.delta_pct.toFixed(1)}%</span>
+                    <span class="badge-label">Tối ưu: ${formatMoneyShort(Number(d.optimal_p50))}</span>
+                </div>
+            </div>`;
+        }).join('');
+        if (data.monthly_savings_needed && Number(data.monthly_savings_needed) > 0) {
+            els.savingsCta.textContent = `Để đạt P50 tối ưu, bạn cần tiết kiệm thêm ~${formatMoneyShort(Number(data.monthly_savings_needed))}/tháng`;
+        } else {
+            els.savingsCta.textContent = 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
+        }
+        els.savingsCta.hidden = false;
+        els.comparisonSection.hidden = false;
+    }
+
+    function renderUncertaintyBreakdown(data) {
+        if (!els.uncertaintySection) return;
+        const contributors = data.uncertainty_contributors;
+        if (!contributors || !contributors.length) {
+            els.uncertaintySection.hidden = true;
+            return;
+        }
+        els.uncertaintyList.innerHTML = contributors.map((c) => {
+            const pct = c.contribution_pct;
+            return `<div class="uncertainty-row">
+                <span class="uncertainty-label">${labelAsset(c.asset_class)}</span>
+                <div class="uncertainty-bar-wrap">
+                    <div class="uncertainty-bar" style="width:${Math.min(100, pct)}%"></div>
+                </div>
+                <span class="uncertainty-pct">${pct.toFixed(1)}%</span>
+            </div>`;
+        }).join('');
+        const total = contributors.reduce((s, c) => s + c.contribution_pct, 0);
+        els.uncertaintyHint.textContent = `Hai nhóm này tạo ra ~${Math.round(total)}% độ rộng vùng P10–P90.`;
+        els.uncertaintySection.hidden = false;
+    }
+
+    function renderCtaBtn(data) {
+        if (data.scenario === 'optimal') {
+            els.ctaBtn.textContent = 'Quay lại Hiện tại';
+            els.ctaBtn.onclick = () => switchScenario('current');
+        } else {
+            els.ctaBtn.textContent = 'Thay đổi để đạt Optimal';
+            els.ctaBtn.onclick = () => switchScenario('optimal');
+        }
+    }
+
+    function showOptimalTooltip() {
+        const msg = 'Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt.';
+        if (tg && tg.showAlert) tg.showAlert(msg);
+        else alert(msg);
     }
 
     function showState(state) {

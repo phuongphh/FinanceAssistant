@@ -39,6 +39,24 @@
 .allocation-fill { height: 100%; background: linear-gradient(90deg, #14B8A6, #6D5DFB); border-radius: inherit; }
 .full-width { width: 100%; margin-top: 4px; }
 
+.comparison-section .section-heading { margin-bottom: 12px; }
+.info-btn { background: transparent; border: 1px solid rgba(100,116,139,.30); border-radius: 50%; width: 26px; height: 26px; font-size: 14px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+.comparison-badges { display: grid; gap: 10px; }
+.comparison-badge { border: 1px solid rgba(100,116,139,.14); border-radius: 16px; padding: 14px 12px; background: rgba(255,255,255,.64); }
+.badge-year { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+.badge-values { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.badge-label { color: var(--text-muted); }
+.delta-badge-pill { padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.delta-badge-pill.positive { background: rgba(20,184,166,.15); color: #0d9488; }
+.delta-badge-pill.negative { background: rgba(239,68,68,.12); color: #dc2626; }
+.savings-cta { margin-top: 10px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+.uncertainty-list { display: grid; gap: 10px; }
+.uncertainty-row { display: grid; grid-template-columns: 1fr 1fr 48px; gap: 8px; align-items: center; font-size: 14px; }
+.uncertainty-bar-wrap { height: 8px; background: rgba(100,116,139,.12); border-radius: 999px; overflow: hidden; }
+.uncertainty-bar { height: 100%; background: linear-gradient(90deg, #6D5DFB, #14B8A6); border-radius: inherit; }
+.uncertainty-pct { text-align: right; font-weight: 700; font-size: 13px; }
+
 .twin-skeleton { display: grid; gap: 12px; text-align: center; color: var(--text-muted); }
 .skeleton-card, .skeleton-grid span { border-radius: 18px; background: linear-gradient(90deg, rgba(148,163,184,.18), rgba(148,163,184,.34), rgba(148,163,184,.18)); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
 .skeleton-card.hero { height: 132px; }
