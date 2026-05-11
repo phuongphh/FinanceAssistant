@@ -1,0 +1,63 @@
+# Phase 4A Financial Twin assumptions.
+# Disclaimer: historical returns are not a promise of future results (historical ≠ future).
+# Values are annual nominal return assumptions used only for conservative scenario simulation.
+disclaimer: "Dữ liệu lịch sử không đảm bảo kết quả tương lai (historical ≠ future). Đây là dự phóng xác suất, không phải lời khuyên đầu tư."
+asset_classes:
+  stocks_vn:
+    mu: 0.11
+    sigma: 0.22
+    source_note: "VN-Index 2015-2025 historical proxy."
+  stocks_global:
+    mu: 0.08
+    sigma: 0.16
+    source_note: "S&P 500 long-term total-return benchmark proxy."
+  crypto:
+    mu: 0.25
+    sigma: 0.65
+    source_note: "BTC/ETH 2018-2025 proxy, capped to avoid extreme tails."
+  gold:
+    mu: 0.06
+    sigma: 0.14
+    source_note: "SJC/Vietnam gold 2015-2025 proxy."
+  cash_savings:
+    mu: 0.055
+    sigma: 0.01
+    source_note: "Vietnam bank deposit-rate range proxy."
+  real_estate_vn:
+    mu: 0.09
+    sigma: 0.12
+    source_note: "Vietnam residential real-estate index proxy."
+  bonds_vn:
+    mu: 0.06
+    sigma: 0.04
+    source_note: "Vietnam government-bond yield proxy."
+correlations:
+  default: 0.0
+  pairs:
+    stocks_vn:
+      stocks_global: 0.55
+      crypto: 0.30
+      gold: -0.10
+      real_estate_vn: 0.20
+      bonds_vn: 0.10
+      cash_savings: 0.00
+    stocks_global:
+      crypto: 0.35
+      gold: -0.05
+      real_estate_vn: 0.15
+      bonds_vn: 0.15
+      cash_savings: 0.00
+    crypto:
+      gold: 0.05
+      real_estate_vn: 0.10
+      bonds_vn: 0.00
+      cash_savings: 0.00
+    gold:
+      real_estate_vn: 0.05
+      bonds_vn: 0.10
+      cash_savings: 0.00
+    real_estate_vn:
+      bonds_vn: 0.20
+      cash_savings: 0.00
+    bonds_vn:
+      cash_savings: 0.15
