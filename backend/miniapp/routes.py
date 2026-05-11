@@ -80,33 +80,40 @@ _BOOTSTRAP_MARKER_PATTERN = re.compile(r"<!--\s*BUILD_BOOTSTRAP\s*-->")
 def _build_bootstrap_script(version: str) -> str:
     """Inline reload guard that runs before any other asset loads.
 
-    Telegram WebView (especially iOS WebKit) often ignores ``Cache-Control:
-    no-cache`` on HTML and serves a previously-cached document without
-    revalidating. When that happens, the cached HTML still references the
-    old (un-versioned or stale-versioned) JS, so the cache-busting query
-    string never reaches the WebView at all and a UI fix can stay invisible
-    for hours/days.
+    Two layers of defense against stale Mini App UIs:
 
-    This bootstrap closes that loop *for every subsequent deploy*: the
-    moment the WebView ever does fetch a fresh HTML (whether through normal
-    revalidation, a Telegram cache wipe, or a network change), the script
-    sees that the build hash on disk doesn't match the one stored in
-    ``localStorage`` from the previous session and triggers a
-    ``location.replace`` with a unique ``?_b=<hash>`` query string. That
-    URL is genuinely new from the WebView's POV, so it bypasses every
-    cache layer (HTML and assets) on the next request and the user lands
-    on the freshly-rendered dashboard.
+    1. **localStorage drift check (post-fresh-fetch)** — when the WebView
+       eventually does fetch a new HTML, the embedded ``CURRENT`` differs
+       from the value the previous session stored in ``localStorage``.
+       We bump localStorage and ``location.replace`` with ``?_b=<hash>`` so
+       every cache layer below us treats the next hop as a brand-new URL
+       and the user lands on the freshly-rendered dashboard.
 
-    Idempotent: after a successful refresh, ``localStorage`` matches the
-    current hash so the script no-ops on every subsequent open. First-time
-    visitors (no stored hash) only seed the value — no reload — so cold
-    opens are not slowed down. ``try/catch`` guards against
-    ``localStorage`` throwing in private mode / sandboxed iframes.
+    2. **Live server probe (no fresh fetch needed)** — Telegram Desktop
+       (and to a lesser extent the macOS / iPad clients) keeps the WebApp
+       WebView alive in memory across panel close/reopen, so a deploy
+       stays invisible until the user fully quits the Telegram app. The
+       probe hits ``/miniapp/api/version`` on initial load and again
+       every time the page becomes visible (tab focus, panel reopen,
+       Telegram WebApp ``viewportChanged`` after the panel re-expands).
+       If the server hash differs from the one baked into this script at
+       render time, we ``location.replace`` with the fresh hash and the
+       WebView is forced to re-navigate — no manual quit required. The
+       endpoint declares ``no-store`` and we set ``cache: 'no-store'``
+       on the fetch so the probe always reaches the network.
+
+    Idempotent: once the URL carries the current hash, both checks no-op
+    on every subsequent open. First-time visitors (no stored hash) only
+    seed the value — no reload — so cold opens aren't slowed down.
+    ``try/catch`` guards against ``localStorage`` throwing in private
+    mode / sandboxed iframes.
     """
     return (
         "<script>"
         "(function(){"
         f"var CURRENT={version!r};"
+        # Expose the build hash for downstream JS (analytics / debug).
+        "window.__FA_BUILD__=CURRENT;"
         "try{"
         "var KEY='fa.app.build';"
         "var stored=localStorage.getItem(KEY);"
@@ -119,6 +126,54 @@ def _build_bootstrap_script(version: str) -> str:
         "}"
         "if(!stored)localStorage.setItem(KEY,CURRENT);"
         "}catch(e){}"
+        # ---- Live probe ----
+        # Guard against re-entrancy: once we've decided to reload, ignore
+        # further probe ticks so the user doesn't see a flicker storm.
+        "var _faReloading=false;"
+        "function _faProbe(){"
+        "if(_faReloading)return;"
+        "try{"
+        "fetch('/miniapp/api/version',{cache:'no-store',credentials:'omit'})"
+        ".then(function(r){return r.ok?r.json():null;})"
+        ".then(function(j){"
+        "var v=j&&j.data&&j.data.static_version;"
+        "if(!v||v===CURRENT)return;"
+        "_faReloading=true;"
+        "var u=new URL(location.href);"
+        "u.searchParams.set('b',v);"
+        "location.replace(u.toString());"
+        "}).catch(function(){});"
+        "}catch(e){}"
+        "}"
+        # visibilitychange fires when the user switches Telegram tabs /
+        # reopens the WebApp panel on most clients.
+        "document.addEventListener('visibilitychange',function(){"
+        "if(!document.hidden)_faProbe();"
+        "});"
+        # pageshow with persisted=true catches Safari/iOS bfcache restores
+        # the WebView occasionally uses to rehydrate panels.
+        "window.addEventListener('pageshow',function(e){"
+        "if(e.persisted)_faProbe();"
+        "});"
+        # Telegram Desktop on macOS doesn't always fire visibilitychange
+        # when the WebApp panel collapses and re-expands, but the WebApp
+        # ``viewportChanged`` event does fire on the size transition.
+        "function _faHookTg(){"
+        "var w=window.Telegram&&window.Telegram.WebApp;"
+        "if(!w||!w.onEvent)return false;"
+        "try{w.onEvent('viewportChanged',_faProbe);return true;}"
+        "catch(e){return false;}"
+        "}"
+        "if(!_faHookTg()){"
+        # The Telegram WebApp script loads after this bootstrap on a few
+        # clients — retry once on DOMContentLoaded so we don't lose the
+        # hook to a load-order race.
+        "document.addEventListener('DOMContentLoaded',_faHookTg);"
+        "}"
+        # Initial probe so a stale-in-memory panel is caught even when
+        # the user hasn't yet switched tabs. 500ms delay keeps the
+        # network call off the first-paint critical path.
+        "setTimeout(_faProbe,500);"
         "})();"
         "</script>"
     )
@@ -321,14 +376,27 @@ async def get_app_version():
 
     Same values are rendered into the dashboard footer for in-app inspection.
     No auth on purpose — values are non-sensitive (publicly committed code).
+
+    Must never be cached. The dashboard bootstrap polls this endpoint on
+    every visibility change to detect a deploy and trigger a hard reload;
+    a cached response would lock users on the stale build until the cache
+    layer expires (which is exactly the bug Telegram Desktop users hit).
     """
-    return {
-        "data": {
-            "git_sha": _GIT_SHA,
-            "static_version": _STATIC_VERSION,
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        {
+            "data": {
+                "git_sha": _GIT_SHA,
+                "static_version": _STATIC_VERSION,
+            },
+            "error": None,
         },
-        "error": None,
-    }
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @router.post("/api/events/loaded")

@@ -421,6 +421,72 @@ class TestVersionEndpoint:
         assert body["data"]["static_version"] == miniapp_routes._STATIC_VERSION
         assert body["data"]["git_sha"] == miniapp_routes._GIT_SHA
 
+    def test_response_is_uncacheable(self):
+        """The dashboard bootstrap polls this endpoint on every visibility
+        change to detect a deploy. A cached response would defeat that —
+        Telegram Desktop users would stay locked on the previous build
+        until the browser cache expired."""
+        resp = client.get("/miniapp/api/version")
+        cache_control = resp.headers.get("cache-control", "")
+        assert "no-cache" in cache_control
+        assert "no-store" in cache_control
+
+    def test_no_auth_required(self):
+        # Diagnostic endpoint is intentionally public — values are non-sensitive
+        # and ssh-less verification of a deploy is the whole point.
+        resp = client.get("/miniapp/api/version")
+        assert resp.status_code == 200
+
+
+class TestDesktopLiveProbe:
+    """Telegram Desktop (macOS) keeps the WebApp WebView alive across panel
+    close/reopen, so a deploy stays invisible until the user fully quits
+    Telegram. The bootstrap embeds a JS probe that polls
+    /miniapp/api/version whenever the page becomes visible — when the
+    server hash drifts from the one baked into the cached HTML, the probe
+    triggers a hard reload to the fresh URL.
+    """
+
+    def _fetch_dashboard(self):
+        return client.get(
+            f"/miniapp/wealth?b={miniapp_routes._STATIC_VERSION}",
+            follow_redirects=False,
+        )
+
+    def test_bootstrap_exposes_build_to_window(self):
+        assert "window.__FA_BUILD__=" in self._fetch_dashboard().text
+
+    def test_bootstrap_fetches_version_endpoint_uncached(self):
+        body = self._fetch_dashboard().text
+        # Must hit the version endpoint with cache: 'no-store' so we always
+        # reach the network even if a proxy ignores the response headers.
+        assert "/miniapp/api/version" in body
+        assert "no-store" in body
+
+    def test_bootstrap_listens_to_visibility_signals(self):
+        """All three signals matter: visibilitychange catches normal tab
+        focus, pageshow catches bfcache restore (Safari/iOS), and Telegram
+        WebApp's viewportChanged catches Desktop's panel reopen — the
+        one signal that fires on macOS where the others stay silent.
+        """
+        body = self._fetch_dashboard().text
+        assert "visibilitychange" in body
+        assert "pageshow" in body
+        assert "viewportChanged" in body
+
+    def test_bootstrap_reload_uses_canonical_b_param(self):
+        """On mismatch the probe sets ``?b=`` (not the legacy ``?_b=``) so
+        the server-side stale-build redirect doesn't fire a second hop
+        after the JS reload."""
+        body = self._fetch_dashboard().text
+        assert "searchParams.set('b'," in body
+
+    def test_bootstrap_guards_against_repeat_reload(self):
+        """If the probe ticks twice before navigation completes, the
+        second invocation must no-op so users don't see a flicker storm."""
+        body = self._fetch_dashboard().text
+        assert "_faReloading" in body
+
 
 class TestBuildHashRedirect:
     """Stale or missing ``?b=`` on dashboard URLs 302s to the current hash.
@@ -549,9 +615,3 @@ class TestMiniappUrlHelpers:
             from backend.config import get_settings
 
             get_settings().miniapp_base_url = original
-
-    def test_no_auth_required(self):
-        # Diagnostic endpoint is intentionally public — values are non-sensitive
-        # and ssh-less verification of a deploy is the whole point.
-        resp = client.get("/miniapp/api/version")
-        assert resp.status_code == 200
