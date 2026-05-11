@@ -12,7 +12,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #367 | fix(dashboard): asset name text overflow in wealth dashboard | [issue-367.md](issue-367.md) |
-| #369 | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [issue-369.md](issue-369.md) |
 | #370 | [Epic] Phase 4A — Epic 2: Persistence & Scheduler | [issue-370.md](issue-370.md) |
 | #371 | [Epic] Phase 4A — Epic 3: Telegram Twin Surface | [issue-371.md](issue-371.md) |
 | #372 | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [issue-372.md](issue-372.md) |
@@ -44,4 +43,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 39
+**Total active:** 38
