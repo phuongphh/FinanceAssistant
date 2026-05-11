@@ -1,0 +1,264 @@
+/* Phase 4B Epic 3 — Cashflow Dashboard styles */
+
+.cashflow-page {
+  background: var(--tg-theme-bg-color, #f5f5f5);
+  min-height: 100vh;
+  padding-bottom: 80px; /* FAB clearance */
+}
+
+/* Alert banner */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFF3E0;
+  border-left: 4px solid #FF9800;
+  padding: 12px 16px;
+  margin: 0 0 12px;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+}
+
+.alert-banner .alert-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.alert-banner .alert-cta {
+  margin-left: auto;
+  background: #FF9800;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Chart image */
+.chart-img-container {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.chart-fallback {
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Monthly summary cards */
+.month-cards {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.month-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.month-card {
+  flex: 0 0 160px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.month-card .month-label {
+  font-size: 12px;
+  color: #757575;
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.month-card .net-amount {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.month-card .net-positive { color: #388E3C; }
+.month-card .net-negative { color: #D32F2F; }
+
+.month-card .balance-label {
+  font-size: 11px;
+  color: #9E9E9E;
+}
+
+.month-card .balance-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7C4DFF;
+}
+
+/* Pattern lists */
+.pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pattern-item {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pattern-item:active {
+  background: #F5F5F5;
+}
+
+.pattern-item .pattern-icon {
+  font-size: 22px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.pattern-item .pattern-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pattern-item .pattern-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #212121);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pattern-item .pattern-meta {
+  font-size: 12px;
+  color: #9E9E9E;
+  margin-top: 2px;
+}
+
+.pattern-item .pattern-amount {
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.pattern-income .pattern-amount { color: #388E3C; }
+.pattern-expense .pattern-amount { color: #D32F2F; }
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  background: #7C4DFF;
+  color: #fff;
+  border: none;
+  border-radius: 28px;
+  padding: 14px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(124,77,255,0.35);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  z-index: 100;
+}
+
+.fab:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(124,77,255,0.3);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: flex-end;
+  z-index: 200;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-content {
+  background: var(--tg-theme-bg-color, #fff);
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px 32px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modal-content label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #757575;
+  margin: 14px 0 4px;
+}
+
+.modal-content input,
+.modal-content select {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid #E0E0E0;
+  border-radius: 10px;
+  font-size: 16px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+}
+
+.modal-content input:focus,
+.modal-content select:focus {
+  border-color: #7C4DFF;
+  outline: none;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.primary-btn {
+  flex: 1;
+  background: #7C4DFF;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary-btn {
+  flex: 1;
+  background: #F5F5F5;
+  color: #424242;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}

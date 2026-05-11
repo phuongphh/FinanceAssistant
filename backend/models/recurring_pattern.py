@@ -1,22 +1,16 @@
-"""Recurring expense pattern — Phase 3.8 Epic 3.
+"""Recurring transaction pattern — Phase 3.8 Epic 3 + Phase 4B Epic 3.
 
-A pattern represents a *commitment* (rent, internet, gym, Netflix)
-that recurs on a regular schedule. The bot remembers patterns so it
-can:
-- Send reminders 2 days before the due date.
-- Match incoming transactions to the pattern (so cashflow forecast
-  knows the expense is already accounted for).
-- Avoid re-detecting the same recurring expense via the nightly
-  ``RecurringDetector`` scan.
+Phase 3.8: recurring *expense* patterns (rent, internet, gym, Netflix).
+Phase 4B:  extended with income patterns (salary, freelance) + confidence
+           scores + cashflow-v2 review flow fields.
 
-Two creation paths feed this table:
-- **Manual** — user enters via the menu wizard (Chi tiêu →
-  🔄 Khoản định kỳ → ➕ Thêm).
-- **Auto-detected** — ``RecurringDetector`` analyses 6 months of
-  history, suggests patterns, user confirms with a tap.
+Two creation paths:
+- **Manual** — user enters via the menu wizard.
+- **Auto-detected** — detector analyses transaction history, user confirms.
 
-The ``auto_detected`` flag preserves which path created the row —
-useful for analytics and for the future "suggest re-detection" UX.
+``pattern_type`` ('income'|'expense') added in Phase 4B so the cashflow
+forecast can sum income and expense separately without maintaining a
+separate table.
 
 Layer contract: service flushes only — caller commits.
 """
@@ -42,6 +36,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
+
+# Phase 4B — valid pattern_type values
+PATTERN_TYPE_INCOME = "income"
+PATTERN_TYPE_EXPENSE = "expense"
 
 
 class RecurringPattern(Base):
@@ -104,6 +102,38 @@ class RecurringPattern(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    # --- Phase 4B additions (Epic 3 — Cashflow Forecasting v2) --------
+    # 'income' or 'expense'. Defaults to 'expense' for Phase 3.8
+    # backcompat rows so the cashflow forecast can sum both directions.
+    pattern_type: Mapped[str] = mapped_column(
+        String(20), default=PATTERN_TYPE_EXPENSE, nullable=False
+    )
+    # Detector confidence in [0.0, 1.0]. NULL for manually-created rows.
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    # Dismiss the Telegram review prompt until this datetime without
+    # permanently rejecting the pattern (30-day snooze).
+    dismissed_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    # When did the detector first/last encounter this pattern?
+    first_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    # Human-readable description shown in Telegram review + Mini App.
+    description: Mapped[str | None] = mapped_column(String(200))
+
+    @property
+    def is_confirmed(self) -> bool:
+        """Alias for user_confirmed — Phase 4B cashflow uses this name."""
+        return self.user_confirmed
+
+    @is_confirmed.setter
+    def is_confirmed(self, value: bool) -> None:
+        self.user_confirmed = value
 
     __table_args__ = (
         Index("idx_patterns_user_active", "user_id", "is_active"),

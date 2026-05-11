@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import lru_cache
@@ -25,6 +26,8 @@ from backend.models.user import User
 from backend.wealth.ladder import WealthLevel, detect_level
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import net_worth_calculator
+
+logger = logging.getLogger(__name__)
 
 _TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "content" / "briefing.yaml"
 _TWIN_COPY_PATH = Path(__file__).resolve().parents[2] / "content" / "twin_copy.yaml"
@@ -164,6 +167,71 @@ async def _twin_briefing_line(db: AsyncSession, user_id) -> str:
     return copy["on_track"].format(delta_pct=pct_text)
 
 
+async def _cashflow_briefing_section(db: AsyncSession, user_id) -> str:
+    """Return 1-2 line cashflow summary for the morning briefing.
+
+    Only shown when the user has ≥ 2 confirmed recurring patterns
+    (per spec S19 — avoid false confidence with thin data).
+    Returns empty string when conditions are not met.
+    """
+    try:
+        from backend.cashflow.forecast import get_latest_forecast
+        from backend.cashflow.detector import load_confirmed_patterns
+        from pathlib import Path
+        import yaml
+
+        confirmed = await load_confirmed_patterns(db, user_id)
+        if len(confirmed) < 2:
+            return ""
+
+        forecast = await get_latest_forecast(db, user_id)
+        if forecast is None or not forecast.monthly_data:
+            return ""
+
+        content_path = Path(__file__).resolve().parents[2] / "content" / "cashflow.yaml"
+        with open(content_path, encoding="utf-8") as f:
+            copy = yaml.safe_load(f) or {}
+        briefing_copy = copy.get("briefing_cashflow", {})
+
+        # Use the first forecast month (next month data)
+        next_month = forecast.monthly_data[0]
+        from decimal import Decimal
+        income = Decimal(str(next_month.get("income", 0)))
+        expense = Decimal(str(next_month.get("expense", 0)))
+        net = Decimal(str(next_month.get("net", 0)))
+
+        net_sign = "+" if net >= 0 else "−"
+        section_line = briefing_copy.get("section", "").format(
+            net_sign=net_sign,
+            net=format_money_short(abs(net)),
+            income=format_money_short(income),
+            expense=format_money_short(expense),
+        )
+
+        lines = [section_line]
+
+        if forecast.low_balance_risk and forecast.low_balance_month:
+            low_month = forecast.low_balance_month
+            month_label = f"Tháng {low_month.month}/{low_month.year}"
+            # Find balance for that month
+            balance = Decimal(0)
+            for m in forecast.monthly_data:
+                if m.get("month") == low_month.isoformat():
+                    balance = Decimal(str(m.get("balance_eom", 0)))
+                    break
+            warn_line = briefing_copy.get("low_balance_warning", "").format(
+                month=month_label,
+                balance=format_money_short(balance),
+            )
+            if warn_line:
+                lines.append(warn_line)
+
+        return "\n".join(lines)
+    except Exception:
+        logger.debug("cashflow briefing section failed — skipping", exc_info=True)
+        return ""
+
+
 async def _twin_accuracy_line(db: AsyncSession, user_id) -> str:
     """Return accuracy comparison line when ≥2 projections exist."""
     try:
@@ -247,6 +315,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     )
     twin_line = await _twin_briefing_line(db, user.id)
     twin_accuracy_line = await _twin_accuracy_line(db, user.id)
+    cashflow_section = await _cashflow_briefing_section(db, user.id)
     performers = await get_best_worst_from_assets(assets)
     diversification = compute_diversification_score([{"asset_type": asset.asset_type, "value": Decimal(asset.current_value or 0)} for asset in assets])
 
@@ -285,6 +354,8 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         sections["twin"] = twin_line
     if twin_accuracy_line:
         sections["twin_accuracy"] = twin_accuracy_line
+    if cashflow_section:
+        sections["cashflow"] = cashflow_section
     text = "\n\n".join(section.strip() for section in sections.values() if section)
     if is_stale:
         text = f"{text}\n\n{template['footer']['stale']}"
