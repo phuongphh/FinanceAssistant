@@ -544,6 +544,55 @@ async def start_asset_edit_route(
     return {"data": {"ok": True}, "error": None}
 
 
+@router.post("/api/wealth/delete-asset")
+async def delete_asset_route(
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft-delete one or more assets owned by the authenticated user.
+
+    Accepts ``asset_ids`` (list of str UUIDs). Sets ``is_active = False``
+    on each matching asset, verifying ownership before touching any row.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from backend.wealth.models.asset import Asset
+
+    body = payload or {}
+    raw_ids = body.get("asset_ids") or []
+    if not raw_ids or not isinstance(raw_ids, list):
+        raise HTTPException(status_code=422, detail="asset_ids is required")
+
+    user = await _resolve_user(auth, db)
+
+    import uuid as _uuid
+
+    for raw_id in raw_ids[:20]:
+        try:
+            asset_id = _uuid.UUID(str(raw_id))
+        except (ValueError, AttributeError):
+            continue
+        result = await db.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == user.id,
+                Asset.is_active.is_(True),
+            )
+        )
+        asset = result.scalar_one_or_none()
+        if asset is None:
+            continue
+        asset.is_active = False
+        asset.sold_at = datetime.now(timezone.utc).date()
+
+    await db.flush()
+    invalidate_wealth_cache_for_user(user.id)
+    return {"data": {"ok": True}, "error": None}
+
+
 @router.get("/api/wealth/trend")
 async def get_wealth_trend(
     days: int = Query(

@@ -417,7 +417,7 @@
                 : '';
             const memberIds = Array.isArray(a.member_ids) ? a.member_ids : [a.id];
             return `
-                <button class="asset-card" type="button" data-asset-id="${escapeHtml(a.id)}" data-asset-ids="${escapeHtml(memberIds.join(','))}" aria-label="Sửa ${escapeHtml(a.name)}">
+                <div class="asset-card" data-asset-id="${escapeHtml(a.id)}" data-asset-ids="${escapeHtml(memberIds.join(','))}">
                     <span class="asset-icon">${escapeHtml(a.icon)}</span>
                     <div class="asset-info">
                         <div class="asset-name">${escapeHtml(a.name)}${countBadge}</div>
@@ -427,8 +427,11 @@
                         <div class="asset-current">${formatMoneyShort(a.current_value)}</div>
                         <div class="asset-change ${cls}">${sign}${(a.change_pct || 0).toFixed(1)}%</div>
                     </div>
-                    <span class="asset-edit-cue" aria-hidden="true">✏️</span>
-                </button>
+                    <div class="asset-actions">
+                        <button class="asset-action-btn asset-edit-btn" type="button" aria-label="Sửa ${escapeHtml(a.name)}">✏️</button>
+                        <button class="asset-action-btn asset-delete-btn" type="button" aria-label="Xoá ${escapeHtml(a.name)}">🗑️</button>
+                    </div>
+                </div>
             `;
         }).join('');
     }
@@ -492,12 +495,21 @@
     // -- Misc -------------------------------------------------------------
 
     async function onAssetRowClick(event) {
+        const deleteBtn = event.target.closest('.asset-delete-btn');
+        const editBtn = event.target.closest('.asset-edit-btn');
         const card = event.target.closest('.asset-card[data-asset-id]');
         if (!card) return;
+
+        if (deleteBtn) {
+            await onAssetDeleteClick(card);
+            return;
+        }
+        if (!editBtn) return;
+
         const assetId = card.dataset.assetId;
         const assetIds = (card.dataset.assetIds || '').split(',').filter(Boolean);
         if (!assetId && !assetIds.length) return;
-        card.disabled = true;
+        editBtn.disabled = true;
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
@@ -509,10 +521,40 @@
             if (!response.ok) throw new Error('API ' + response.status);
         } catch (_err) {
             if (tg && tg.showAlert) tg.showAlert('Không mở được màn sửa, thử lại nhé.');
-            card.disabled = false;
+            editBtn.disabled = false;
             return;
         }
         if (tg && tg.close) tg.close();
+    }
+
+    async function onAssetDeleteClick(card) {
+        const assetId = card.dataset.assetId;
+        const assetIds = (card.dataset.assetIds || '').split(',').filter(Boolean);
+        if (!assetId && !assetIds.length) return;
+
+        const assetName = card.querySelector('.asset-name')?.textContent?.trim() || 'tài sản này';
+        const confirmed = window.confirm(`Xoá "${assetName}"?\nThao tác này không thể hoàn tác.`);
+        if (!confirmed) return;
+
+        const deleteBtn = card.querySelector('.asset-delete-btn');
+        if (deleteBtn) deleteBtn.disabled = true;
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const idsToDelete = assetIds.length ? assetIds : [assetId];
+            const response = await fetch('/miniapp/api/wealth/delete-asset', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ asset_ids: idsToDelete }),
+            });
+            if (!response.ok) throw new Error('API ' + response.status);
+        } catch (_err) {
+            if (tg && tg.showAlert) tg.showAlert('Không xoá được tài sản, thử lại nhé.');
+            if (deleteBtn) deleteBtn.disabled = false;
+            return;
+        }
+        renderDashboard();
     }
 
     async function closeAndAddAsset() {
