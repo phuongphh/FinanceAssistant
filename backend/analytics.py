@@ -78,6 +78,9 @@ class EventType:
     WEALTH_TREND_VIEWED = "wealth_trend_viewed"
     WEALTH_LEVEL_UP = "wealth_level_up"
 
+    # Phase 4A — Financial Twin weekly batch metrics.
+    TWIN_WEEKLY_RUN = "twin_weekly_run"
+
 
 # Property keys that would carry PII if ever accepted — strip unconditionally.
 _PII_KEY_PATTERN = re.compile(
