@@ -16,5 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #416 | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [issue-416.md](issue-416.md) |
 | #417 | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [issue-417.md](issue-417.md) |
 | #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
+| #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
 
-**Total active:** 12
+**Total active:** 13
