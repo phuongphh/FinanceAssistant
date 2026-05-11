@@ -190,6 +190,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #355 | Pre-Phase | [Story] P3.9.5-S17: Audit static emoji + lập mapping | [pre-phase/issue-355.md](by-phase/pre-phase/issue-355.md) |
 | #356 | Pre-Phase | [Story] P3.9.5-S18: Helper utility render animation emoji | [pre-phase/issue-356.md](by-phase/pre-phase/issue-356.md) |
 | #357 | Pre-Phase | [Story] P3.9.5-S19: Integration emoji ở touchpoint chính | [pre-phase/issue-357.md](by-phase/pre-phase/issue-357.md) |
+| #375 | Pre-Phase | [Story] P4A-S1: Asset class return distributions | [pre-phase/issue-375.md](by-phase/pre-phase/issue-375.md) |
 
-**Total:** 186 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 169 Pre-Phase)
+**Total:** 187 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 170 Pre-Phase)
