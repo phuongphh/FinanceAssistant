@@ -10,12 +10,17 @@ Four bands from CLAUDE.md § 0:
 Boundaries are inclusive on the lower bound, exclusive on the upper —
 so 30tr exactly is Young Professional, not Starter.
 """
+
 from __future__ import annotations
 
 import uuid
 from decimal import Decimal
 from enum import Enum
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
+import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.user import User
@@ -28,13 +33,55 @@ class WealthLevel(str, Enum):
     HIGH_NET_WORTH = "hnw"
 
 
-# User-facing Vietnamese labels (Issue #155). Theme nông nghiệp/giàu sang —
-# "short" form xuất hiện trong tin chúc mừng, "full" form cho UI dài hơn.
+_WEALTH_LEVELS_PATH = (
+    Path(__file__).resolve().parents[2] / "content" / "wealth_levels.yaml"
+)
+_LEVEL_ID_BY_ENUM = {
+    WealthLevel.STARTER: "starter",
+    WealthLevel.YOUNG_PROFESSIONAL: "young_prof",
+    WealthLevel.MASS_AFFLUENT: "mass_affluent",
+    WealthLevel.HIGH_NET_WORTH: "hnw",
+}
+
+
+@lru_cache(maxsize=1)
+def _load_wealth_level_content() -> dict[str, dict[str, Any]]:
+    data = yaml.safe_load(_WEALTH_LEVELS_PATH.read_text(encoding="utf-8")) or {}
+    rows = data.get("levels") or []
+    return {str(row.get("id")): row for row in rows if row.get("id")}
+
+
+def wealth_level_meta(level: WealthLevel | str) -> dict[str, Any]:
+    """Return VN-native display metadata from ``content/wealth_levels.yaml``."""
+    enum_level = level if isinstance(level, WealthLevel) else WealthLevel(str(level))
+    level_id = _LEVEL_ID_BY_ENUM[enum_level]
+    row = _load_wealth_level_content().get(level_id) or {}
+    fallback = {
+        WealthLevel.STARTER: ("Khởi Đầu", "🌱"),
+        WealthLevel.YOUNG_PROFESSIONAL: ("Trẻ Năng Động", "🚀"),
+        WealthLevel.MASS_AFFLUENT: ("Trung Lưu Vững", "💎"),
+        WealthLevel.HIGH_NET_WORTH: ("Tinh Hoa", "🏆"),
+    }[enum_level]
+    return {
+        "id": level_id,
+        "name_vn": row.get("name_vn") or fallback[0],
+        "icon": row.get("icon") or fallback[1],
+        "description": row.get("description") or "",
+    }
+
+
+def wealth_level_label(level: WealthLevel | str, *, with_icon: bool = False) -> str:
+    meta = wealth_level_meta(level)
+    label = str(meta["name_vn"])
+    return f"{meta['icon']} {label}" if with_icon else label
+
+
+# User-facing Vietnamese labels loaded from Phase 3.8.5 content. Both
+# styles intentionally use the same VN-native product name for consistency
+# across profile, dashboard and briefing surfaces.
 LEVEL_LABELS: dict[WealthLevel, dict[str, str]] = {
-    WealthLevel.STARTER: {"short": "Trồng lúa", "full": "Bắt đầu tích luỹ"},
-    WealthLevel.YOUNG_PROFESSIONAL: {"short": "Kho thóc", "full": "Có chút tiết kiệm"},
-    WealthLevel.MASS_AFFLUENT: {"short": "Phú hộ", "full": "Của ăn của để"},
-    WealthLevel.HIGH_NET_WORTH: {"short": "Vương giả", "full": "Giàu sang phú quý"},
+    level: {"short": wealth_level_label(level), "full": wealth_level_label(level)}
+    for level in WealthLevel
 }
 
 

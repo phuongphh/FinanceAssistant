@@ -26,19 +26,28 @@ logger = logging.getLogger(__name__)
 # Intent detection + month parsing (consumed by the bot handler layer)
 # ---------------------------------------------------------------------------
 
-_REPORT_KEYWORDS = frozenset([
-    "báo cáo", "bao cao",
-    "tổng chi tiêu", "tong chi tieu",
-    "chi tiêu tháng", "chi tieu thang",
-    "xài bao nhiêu", "xai bao nhieu",
-    "tôi xài bao", "toi xai bao",
-    "tôi đã chi", "toi da chi",
-    "spending", "report",
-    # Removed "tháng trước tôi" / "thang truoc toi": too greedy, swallowed
-    # natural-language expense queries like "tháng trước tôi chi tiêu bao
-    # nhiêu?" that the Phase 3.5 intent pipeline routes to query_expenses
-    # with time_range=last_month.
-])
+_REPORT_KEYWORDS = frozenset(
+    [
+        "báo cáo",
+        "bao cao",
+        "tổng chi tiêu",
+        "tong chi tieu",
+        "chi tiêu tháng",
+        "chi tieu thang",
+        "xài bao nhiêu",
+        "xai bao nhieu",
+        "tôi xài bao",
+        "toi xai bao",
+        "tôi đã chi",
+        "toi da chi",
+        "spending",
+        "report",
+        # Removed "tháng trước tôi" / "thang truoc toi": too greedy, swallowed
+        # natural-language expense queries like "tháng trước tôi chi tiêu bao
+        # nhiêu?" that the Phase 3.5 intent pipeline routes to query_expenses
+        # with time_range=last_month.
+    ]
+)
 
 
 def is_report_query(text: str) -> bool:
@@ -99,13 +108,16 @@ async def process_report_request(db: AsyncSession, telegram_id: int, text: str) 
         report = await generate_monthly_report(db, user.id, month_key)
         return report.report_text or "Không có dữ liệu chi tiêu."
     except Exception:
-        logger.exception("Report generation failed for user %s month %s", user.id, month_key)
+        logger.exception(
+            "Report generation failed for user %s month %s", user.id, month_key
+        )
         return "❌ Không thể tổng hợp báo cáo. Thử lại sau nhé."
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _prev_month_key(month_key: str) -> str:
     year, month = int(month_key[:4]), int(month_key[5:7])
@@ -130,10 +142,10 @@ def _prev_month_key(month_key: str) -> str:
 # so the LLM stays grounded in the standard finance tier names without
 # echoing English at the user.
 _LEVEL_LABEL_VI = {
-    WealthLevel.STARTER: "Mới bắt đầu (<30tr, Starter)",
-    WealthLevel.YOUNG_PROFESSIONAL: "Người trẻ đi làm (30tr – 200tr, Young Professional)",
-    WealthLevel.MASS_AFFLUENT: "Trung lưu khá giả (200tr – 1 tỷ, Mass Affluent)",
-    WealthLevel.HIGH_NET_WORTH: "Tài sản lớn (>1 tỷ, High Net Worth)",
+    WealthLevel.STARTER: "Khởi Đầu (<30tr)",
+    WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 200tr)",
+    WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (200tr – 1 tỷ)",
+    WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (>1 tỷ)",
 }
 
 # Per-level guidance for the LLM. Keyed on WealthLevel; controls the tone
@@ -198,13 +210,15 @@ async def _build_wealth_context(
             breakdown.by_type.items(), key=lambda kv: kv[1], reverse=True
         ):
             label = get_label(asset_type)
-            pct = (
-                float(value / net_worth * 100) if net_worth > 0 else 0.0
-            )
+            pct = float(value / net_worth * 100) if net_worth > 0 else 0.0
             breakdown_lines.append(
                 f"  • {label}: {format_money_short(value)} ({pct:.1f}%)"
             )
-    breakdown_str = "\n".join(breakdown_lines) if breakdown_lines else "  (chưa khai báo tài sản nào)"
+    breakdown_str = (
+        "\n".join(breakdown_lines)
+        if breakdown_lines
+        else "  (chưa khai báo tài sản nào)"
+    )
 
     # Income streams. Phase 3.8 Epic 2: read monthly_equivalent so
     # quarterly dividends / annual interest don't double-count.
@@ -315,8 +329,12 @@ async def generate_monthly_report(
         month_key = today.strftime("%Y-%m")
 
     # Get user info
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    monthly_income = float(user.monthly_income) if user and user.monthly_income else None
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    monthly_income = (
+        float(user.monthly_income) if user and user.monthly_income else None
+    )
 
     # Current month breakdown
     breakdown = await _get_breakdown(db, user_id, month_key)
@@ -357,7 +375,11 @@ async def generate_monthly_report(
             "name": g.name,
             "target": float(g.target_amount),
             "current": float(g.current_amount),
-            "pct": round((float(g.current_amount) / float(g.target_amount)) * 100, 1) if g.target_amount else 0,
+            "pct": (
+                round((float(g.current_amount) / float(g.target_amount)) * 100, 1)
+                if g.target_amount
+                else 0
+            ),
         }
         for g in goals
     ]
@@ -382,7 +404,9 @@ Mục tiêu:
     try:
         wealth_ctx = await _build_wealth_context(db, user_id, total_expense)
     except Exception:
-        logger.exception("Failed to build wealth context for report prompt; falling back")
+        logger.exception(
+            "Failed to build wealth context for report prompt; falling back"
+        )
         wealth_ctx = None
 
     try:
@@ -407,12 +431,14 @@ Mục tiêu:
         report_text = report_context  # Fallback to raw data
 
     # Upsert report
-    existing = (await db.execute(
-        select(MonthlyReport).where(
-            MonthlyReport.user_id == user_id,
-            MonthlyReport.month_key == month_key,
+    existing = (
+        await db.execute(
+            select(MonthlyReport).where(
+                MonthlyReport.user_id == user_id,
+                MonthlyReport.month_key == month_key,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
 
     if existing:
         existing.total_expense = total_expense

@@ -13,6 +13,7 @@ which is the same shape as ``calculate_historical`` but batched across the
 window. For a user with ~10 assets and 365 days this is one round-trip,
 ~1ms in Postgres.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -24,19 +25,27 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.wealth.asset_types import get_asset_config, get_subtype_label
-from backend.wealth.ladder import WealthLevel, detect_level, next_milestone
+from backend.wealth.ladder import (
+    WealthLevel,
+    detect_level,
+    next_milestone,
+    wealth_level_label,
+)
 from backend.wealth.services import asset_service, net_worth_calculator
 
 # Trend window options the Mini App exposes in its period selector.
 TREND_DAYS_ALLOWED = (30, 90, 365)
 
 
-_LEVEL_LABELS_VI = {
-    WealthLevel.STARTER: "Khởi đầu",
-    WealthLevel.YOUNG_PROFESSIONAL: "Young Professional",
-    WealthLevel.MASS_AFFLUENT: "Mass Affluent",
-    WealthLevel.HIGH_NET_WORTH: "High Net Worth",
-}
+SORT_ALPHA = "alpha"
+SORT_TYPE = "type"
+SORT_VALUE_DESC = "value_desc"
+SORT_VALUE_ASC = "value_asc"
+SORT_OPTIONS = (SORT_VALUE_DESC, SORT_VALUE_ASC, SORT_TYPE, SORT_ALPHA)
+
+
+def normalize_sort(sort: str | None) -> str:
+    return sort if sort in SORT_OPTIONS else SORT_VALUE_DESC
 
 
 def _group_key(asset) -> tuple[str, str, str]:
@@ -88,29 +97,81 @@ def _serialize_group(members: list) -> dict:
         "acquired_at": earliest.isoformat() if earliest else None,
         "count": len(members),
         "member_ids": [str(m.id) for m in members],
+        "created_at": (
+            max(
+                (m.created_at for m in members if getattr(m, "created_at", None)),
+                default=None,
+            ).isoformat()
+            if any(getattr(m, "created_at", None) for m in members)
+            else None
+        ),
     }
 
 
-def _group_assets(assets: list) -> list[dict]:
-    """Group raw asset rows into dashboard cards, sorted largest-first.
+def _created_at_desc_key(value: str | None) -> str:
+    # Invert ISO timestamp characters so normal ascending sorts put newer
+    # timestamps first without datetime parsing on the hot dashboard path.
+    return "".join(chr(255 - ord(ch)) for ch in (value or ""))
 
-    Two rows with the same name + subtype merge into one card with
-    summed values. Different subtypes stay separate. Sorting by current
-    value puts the user's biggest holdings on top — what they care
-    about glancing at first.
+
+def _sort_grouped_assets(
+    grouped_assets: list[dict], sort: str | None = None
+) -> list[dict]:
+    sort_key = normalize_sort(sort)
+
+    def name_key(g: dict) -> str:
+        return str(g.get("name") or "").casefold()
+
+    if sort_key == SORT_TYPE:
+        return sorted(
+            grouped_assets,
+            key=lambda g: (
+                str(g.get("type_label") or g.get("asset_type") or "").casefold(),
+                name_key(g),
+                _created_at_desc_key(g.get("created_at")),
+            ),
+        )
+    if sort_key == SORT_VALUE_DESC:
+        return sorted(
+            grouped_assets,
+            key=lambda g: (
+                Decimal(str(g.get("current_value") or 0)),
+                name_key(g),
+                str(g.get("created_at") or ""),
+            ),
+            reverse=True,
+        )
+    if sort_key == SORT_VALUE_ASC:
+        return sorted(
+            grouped_assets,
+            key=lambda g: (
+                Decimal(str(g.get("current_value") or 0)),
+                name_key(g),
+                _created_at_desc_key(g.get("created_at")),
+            ),
+        )
+    return sorted(
+        grouped_assets,
+        key=lambda g: (name_key(g), _created_at_desc_key(g.get("created_at"))),
+    )
+
+
+def _group_assets(assets: list, *, sort: str | None = None) -> list[dict]:
+    """Group raw asset rows into dashboard cards and sort consistently.
+
+    Default sort is current value descending. Value sorting keeps Decimal
+    precision until serialization; equal names tie-break by the newest
+    ``created_at`` timestamp when available.
     """
     groups: dict[tuple[str, str, str], list] = defaultdict(list)
     for a in assets:
         groups[_group_key(a)].append(a)
 
     serialized = [_serialize_group(members) for members in groups.values()]
-    serialized.sort(key=lambda g: g["current_value"], reverse=True)
-    return serialized
+    return _sort_grouped_assets(serialized, sort=sort)
 
 
-def _build_breakdown(
-    by_type: dict[str, Decimal], total: Decimal
-) -> list[dict]:
+def _build_breakdown(by_type: dict[str, Decimal], total: Decimal) -> list[dict]:
     """Sort by value desc, attach icon/label/color/pct from YAML config."""
     breakdown: list[dict] = []
     total_f = float(total) if total else 0.0
@@ -158,8 +219,7 @@ async def get_trend(
     # Postgres ``::`` cast confuses SQLAlchemy's bindparam regex, so we use
     # ``CAST(... AS date)`` instead. Auto-detect of bind keys from ``:name``
     # keeps this readable without an explicit ``bindparams()`` declaration.
-    stmt = text(
-        """
+    stmt = text("""
         WITH days AS (
             SELECT generate_series(
                 CAST(:start_date AS date),
@@ -180,8 +240,7 @@ async def get_trend(
         ) latest ON TRUE
         GROUP BY d.day
         ORDER BY d.day
-        """
-    )
+        """)
     rows = (
         await db.execute(
             stmt,
@@ -194,13 +253,16 @@ async def get_trend(
     ).all()
 
     return [
-        {"date": row.day.isoformat(), "value": float(row.total or 0)}
-        for row in rows
+        {"date": row.day.isoformat(), "value": float(row.total or 0)} for row in rows
     ]
 
 
 async def build_overview(
-    db: AsyncSession, user_id: uuid.UUID, *, trend_days: int = 90
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    trend_days: int = 90,
+    sort: str | None = None,
 ) -> dict:
     """One-shot dashboard payload — net worth + change + breakdown + trend + assets."""
     breakdown_now = await net_worth_calculator.calculate(db, user_id)
@@ -216,7 +278,8 @@ async def build_overview(
 
     trend = await get_trend(db, user_id, days=trend_days)
     assets = await asset_service.get_user_assets(db, user_id)
-    grouped_assets = _group_assets(assets)
+    sort_key = normalize_sort(sort)
+    grouped_assets = _group_assets(assets, sort=sort_key)
 
     breakdown = _build_breakdown(breakdown_now.by_type, breakdown_now.total)
 
@@ -234,7 +297,7 @@ async def build_overview(
         "asset_count": len(grouped_assets),
         "currency": breakdown_now.currency,
         "level": level.value,
-        "level_label": _LEVEL_LABELS_VI.get(level, level.value),
+        "level_label": wealth_level_label(level),
         "change_day": {
             "amount": float(change_day.change_absolute),
             "pct": round(change_day.change_percentage, 2),
@@ -247,10 +310,11 @@ async def build_overview(
         "trend": trend,
         "trend_days": trend_days,
         "assets": grouped_assets,
+        "asset_sort": sort_key,
         "next_milestone": {
             "target": float(target_amount),
             "target_level": target_level.value,
-            "target_label": _LEVEL_LABELS_VI.get(target_level, target_level.value),
+            "target_label": wealth_level_label(target_level),
             "pct_progress": target_pct,
             "remaining": float(max(Decimal(0), target_amount - breakdown_now.total)),
         },

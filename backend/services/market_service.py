@@ -34,6 +34,7 @@ async def fetch_daily_snapshot() -> list[dict]:
     # 1. VN-Index and other indices via vnstock
     try:
         from vnstock import Vnstock
+
         stock = Vnstock()
         for index_code in ["VNINDEX", "VN30", "HNXINDEX"]:
             try:
@@ -48,17 +49,52 @@ async def fetch_daily_snapshot() -> list[dict]:
                     prev_1m = df.iloc[0] if len(df) > 20 else None
 
                     price = float(latest["close"])
-                    snapshots.append({
-                        "snapshot_date": today,
-                        "asset_code": index_code,
-                        "asset_type": "index",
-                        "asset_name": index_code,
-                        "price": price,
-                        "change_1d_pct": round(((price - float(prev_1d["close"])) / float(prev_1d["close"])) * 100, 4) if prev_1d is not None else None,
-                        "change_1w_pct": round(((price - float(prev_1w["close"])) / float(prev_1w["close"])) * 100, 4) if prev_1w is not None else None,
-                        "change_1m_pct": round(((price - float(prev_1m["close"])) / float(prev_1m["close"])) * 100, 4) if prev_1m is not None else None,
-                        "extra_data": {"volume": int(latest.get("volume", 0))},
-                    })
+                    snapshots.append(
+                        {
+                            "snapshot_date": today,
+                            "asset_code": index_code,
+                            "asset_type": "index",
+                            "asset_name": index_code,
+                            "price": price,
+                            "change_1d_pct": (
+                                round(
+                                    (
+                                        (price - float(prev_1d["close"]))
+                                        / float(prev_1d["close"])
+                                    )
+                                    * 100,
+                                    4,
+                                )
+                                if prev_1d is not None
+                                else None
+                            ),
+                            "change_1w_pct": (
+                                round(
+                                    (
+                                        (price - float(prev_1w["close"]))
+                                        / float(prev_1w["close"])
+                                    )
+                                    * 100,
+                                    4,
+                                )
+                                if prev_1w is not None
+                                else None
+                            ),
+                            "change_1m_pct": (
+                                round(
+                                    (
+                                        (price - float(prev_1m["close"]))
+                                        / float(prev_1m["close"])
+                                    )
+                                    * 100,
+                                    4,
+                                )
+                                if prev_1m is not None
+                                else None
+                            ),
+                            "extra_data": {"volume": int(latest.get("volume", 0))},
+                        }
+                    )
             except Exception as e:
                 logger.warning("Failed to fetch %s: %s", index_code, e)
     except ImportError:
@@ -74,27 +110,33 @@ async def fetch_daily_snapshot() -> list[dict]:
         for fund_code in TARGET_FUNDS:
             try:
                 url = f"https://cafef.vn/quy-mo/{fund_code}.chn"
-                resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+                resp = requests.get(
+                    url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}
+                )
                 if resp.status_code == 200:
                     soup = BeautifulSoup(resp.text, "lxml")
                     # Try to extract NAV — structure varies
                     nav_elem = soup.select_one(".nav-value, .price, #nav-value")
                     if nav_elem:
-                        nav_text = nav_elem.text.strip().replace(",", "").replace(".", "")
+                        nav_text = (
+                            nav_elem.text.strip().replace(",", "").replace(".", "")
+                        )
                         try:
                             nav = float(nav_text)
-                            snapshots.append({
-                                "snapshot_date": today,
-                                "asset_code": fund_code,
-                                "asset_type": "fund",
-                                "asset_name": fund_code,
-                                "price": nav,
-                                "change_1d_pct": None,
-                                "change_1w_pct": None,
-                                "change_1m_pct": None,
-                                "extra_data": {"source": "cafef.vn"},
-                                "source_url": url,
-                            })
+                            snapshots.append(
+                                {
+                                    "snapshot_date": today,
+                                    "asset_code": fund_code,
+                                    "asset_type": "fund",
+                                    "asset_name": fund_code,
+                                    "price": nav,
+                                    "change_1d_pct": None,
+                                    "change_1w_pct": None,
+                                    "change_1m_pct": None,
+                                    "extra_data": {"source": "cafef.vn"},
+                                    "source_url": url,
+                                }
+                            )
                         except ValueError:
                             pass
             except Exception as e:
@@ -105,17 +147,21 @@ async def fetch_daily_snapshot() -> list[dict]:
     return snapshots
 
 
-async def save_snapshots(db: AsyncSession, snapshots: list[dict]) -> list[MarketSnapshot]:
+async def save_snapshots(
+    db: AsyncSession, snapshots: list[dict]
+) -> list[MarketSnapshot]:
     """Save market snapshots to DB, skip duplicates."""
     saved = []
     for snap_data in snapshots:
         # Check for existing
-        existing = (await db.execute(
-            select(MarketSnapshot).where(
-                MarketSnapshot.snapshot_date == snap_data["snapshot_date"],
-                MarketSnapshot.asset_code == snap_data["asset_code"],
+        existing = (
+            await db.execute(
+                select(MarketSnapshot).where(
+                    MarketSnapshot.snapshot_date == snap_data["snapshot_date"],
+                    MarketSnapshot.asset_code == snap_data["asset_code"],
+                )
             )
-        )).scalar_one_or_none()
+        ).scalar_one_or_none()
 
         if existing:
             # Update
@@ -203,16 +249,14 @@ _INVEST_LEVEL_GUIDANCE = {
 
 def _level_label_vi(level: WealthLevel) -> str:
     return {
-        WealthLevel.STARTER: "Starter (mới bắt đầu, <30tr)",
-        WealthLevel.YOUNG_PROFESSIONAL: "Young Professional (30tr – 200tr)",
-        WealthLevel.MASS_AFFLUENT: "Mass Affluent (200tr – 1 tỷ)",
-        WealthLevel.HIGH_NET_WORTH: "High Net Worth (>1 tỷ)",
+        WealthLevel.STARTER: "Khởi Đầu (<30tr)",
+        WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 200tr)",
+        WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (200tr – 1 tỷ)",
+        WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (>1 tỷ)",
     }[level]
 
 
-async def generate_investment_advice(
-    db: AsyncSession, user_id: uuid.UUID
-) -> str:
+async def generate_investment_advice(db: AsyncSession, user_id: uuid.UUID) -> str:
     """Generate investment advice based on market + user wealth context.
 
     Personal CFO framing (issue #153): the prompt feeds the LLM the
@@ -222,7 +266,9 @@ async def generate_investment_advice(
     meaningless when they hold tỷ-class portfolios.
     """
     # Get user info
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
     if not user:
         return "Chưa thấy bạn trong danh sách — thử gõ /start để đăng ký nhé 🌱"
 
@@ -231,8 +277,10 @@ async def generate_investment_advice(
     market_data = []
     for s in snapshots:
         if s.change_1d_pct is not None and s.price is not None:
-            market_data.append(f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f} "
-                              f"[1d: {s.change_1d_pct:+.2f}%]")
+            market_data.append(
+                f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f} "
+                f"[1d: {s.change_1d_pct:+.2f}%]"
+            )
         elif s.price is not None:
             market_data.append(f"  • {s.asset_code} ({s.asset_type}): {s.price:,.0f}")
         else:
@@ -251,13 +299,19 @@ async def generate_investment_advice(
     total_expense = (await db.execute(expense_stmt)).scalar() or 0
 
     # Active goals — Phase 3.8 Epic 5 promoted is_active → status enum.
-    goals = (await db.execute(
-        select(Goal).where(
-            Goal.user_id == user_id,
-            Goal.status == "active",
-            Goal.deleted_at.is_(None),
+    goals = (
+        (
+            await db.execute(
+                select(Goal).where(
+                    Goal.user_id == user_id,
+                    Goal.status == "active",
+                    Goal.deleted_at.is_(None),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
 
     monthly_income = float(user.monthly_income) if user.monthly_income else 0
 
@@ -280,7 +334,9 @@ async def generate_investment_advice(
             breakdown_lines.append(
                 f"  • {label}: {format_money_short(value)} ({pct:.1f}%)"
             )
-    breakdown_str = "\n".join(breakdown_lines) if breakdown_lines else "  (chưa khai báo tài sản)"
+    breakdown_str = (
+        "\n".join(breakdown_lines) if breakdown_lines else "  (chưa khai báo tài sản)"
+    )
 
     income_stmt = select(IncomeStream).where(
         IncomeStream.user_id == user_id,
@@ -290,9 +346,7 @@ async def generate_investment_advice(
     # Phase 3.8 Epic 2: aggregate via monthly_equivalent so non-monthly
     # streams (annual dividend, quarterly interest) get the right
     # share of the headline income figure.
-    income_total = sum(
-        (s.monthly_equivalent for s in income_streams), Decimal(0)
-    )
+    income_total = sum((s.monthly_equivalent for s in income_streams), Decimal(0))
     if income_streams:
         income_str = (
             f"{format_money_full(income_total)}/tháng từ "
@@ -331,26 +385,33 @@ Hồ sơ tài chính:
 Viết ngắn gọn (max 200 từ), dùng emoji phù hợp."""
 
     advice = await call_llm(
-        prompt, task_type="investment_advice",
-        db=db, user_id=user_id, use_cache=False,
+        prompt,
+        task_type="investment_advice",
+        db=db,
+        user_id=user_id,
+        use_cache=False,
     )
 
     # Log the advice
     log = InvestmentLog(
         user_id=user_id,
         log_date=today,
-        market_context={"snapshots": [{
-            "code": s.asset_code, "price": float(s.price) if s.price else None,
-            "change_1d": float(s.change_1d_pct) if s.change_1d_pct else None,
-        } for s in snapshots]},
+        market_context={
+            "snapshots": [
+                {
+                    "code": s.asset_code,
+                    "price": float(s.price) if s.price else None,
+                    "change_1d": float(s.change_1d_pct) if s.change_1d_pct else None,
+                }
+                for s in snapshots
+            ]
+        },
         user_financial_context={
             "monthly_income": monthly_income,
             "total_expense": float(total_expense),
             "wealth_level": level.value,
             "net_worth": float(net_worth),
-            "asset_breakdown": {
-                k: float(v) for k, v in breakdown.by_type.items()
-            },
+            "asset_breakdown": {k: float(v) for k, v in breakdown.by_type.items()},
             "income_streams_total_monthly": float(income_total),
             "goals": [
                 {

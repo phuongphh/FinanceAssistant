@@ -31,7 +31,11 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_manage:delete:<uuid>            — soft-delete confirmed asset
     asset_manage:cancel                   — leave manage flow
 
-    dashboard:edit:<asset_uuid>            — edit one asset from dashboard report
+    asset:sort:<sort_key>                 — sort dashboard rows (default is value_desc)
+    asset:edit:<asset_uuid>               — edit one asset from dashboard report
+    asset:delete:<asset_uuid>             — show inline delete confirmation
+    asset:delete_yes:<asset_uuid>         — confirm inline soft delete
+    asset:delete_no:<sort_key>            — cancel inline delete and refresh
 
 Total callback bytes stay well under Telegram's 64-byte cap
 (``asset_add:undo:`` + 36-char UUID = 51 bytes).
@@ -52,6 +56,7 @@ CB_ASSET_ADD = "asset_add"
 CB_ASSET_RENTAL = "asset_rental"
 CB_ASSET_MANAGE = "asset_manage"
 CB_DASHBOARD = "dashboard"
+CB_ASSET_ROW = "asset"
 
 
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
@@ -568,7 +573,9 @@ def asset_market_manage_keyboard(asset_type: str) -> InlineKeyboardMarkup:
             [
                 {
                     "text": "✏️ Sửa tài sản",
-                    "callback_data": build_callback(CB_ASSET_MANAGE, "edit_type", asset_type),
+                    "callback_data": build_callback(
+                        CB_ASSET_MANAGE, "edit_type", asset_type
+                    ),
                 }
             ],
             [
@@ -747,25 +754,70 @@ def add_more_keyboard(
     return {"inline_keyboard": rows}
 
 
-def asset_dashboard_edit_keyboard(rows: list[tuple[uuid.UUID, str]]) -> InlineKeyboardMarkup | None:
-    """One edit button per dashboard asset row.
-
-    Callback shape is required by Phase 3.9.5 S4: ``dashboard:edit:<asset_id>``.
-    Labels are truncated defensively so a large portfolio stays readable on
-    mobile while callback data remains the source of truth.
-    """
+def asset_dashboard_edit_keyboard(
+    rows: list[tuple[uuid.UUID, str]],
+    *,
+    current_sort: str = "value_desc",
+) -> InlineKeyboardMarkup | None:
+    """Sort controls plus compact edit/delete buttons per dashboard row."""
     if not rows:
         return None
-    keyboard = []
+
+    def sort_button(key: str, label: str) -> dict:
+        prefix = "✅ " if key == current_sort else ""
+        return {
+            "text": prefix + label,
+            "callback_data": build_callback(CB_ASSET_ROW, "sort", key),
+        }
+
+    keyboard = [
+        [
+            sort_button("value_asc", "📉 Nhỏ→Lớn"),
+            sort_button("type", "📊 Loại"),
+            sort_button("alpha", "A-Z 🔤"),
+        ],
+    ]
     for asset_id, label in rows:
         clean = " ".join(str(label).split())
-        if len(clean) > 38:
-            clean = clean[:35].rstrip() + "…"
-        keyboard.append([
-            {
-                "text": f"✏️ {clean}",
-                "callback_data": build_callback(CB_DASHBOARD, "edit", asset_id),
-            }
-        ])
+        if len(clean) > 34:
+            clean = clean[:31].rstrip() + "…"
+        keyboard.append(
+            [
+                {
+                    "text": f"✏️ {clean}",
+                    "callback_data": build_callback(CB_ASSET_ROW, "edit", asset_id),
+                },
+                {
+                    "text": "🗑️",
+                    "callback_data": build_callback(CB_ASSET_ROW, "delete", asset_id),
+                },
+            ]
+        )
     keyboard.append([{"text": "◀️ Quay về", "callback_data": "menu:assets"}])
     return {"inline_keyboard": keyboard}
+
+
+def asset_dashboard_delete_confirm_keyboard(
+    asset_id: uuid.UUID | str,
+    *,
+    current_sort: str = "value_desc",
+) -> InlineKeyboardMarkup:
+    """Confirmation row used by inline dashboard delete."""
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✅ Xoá",
+                    "callback_data": build_callback(
+                        CB_ASSET_ROW, "delete_yes", asset_id
+                    ),
+                },
+                {
+                    "text": "❌ Hủy",
+                    "callback_data": build_callback(
+                        CB_ASSET_ROW, "delete_no", current_sort
+                    ),
+                },
+            ]
+        ]
+    }

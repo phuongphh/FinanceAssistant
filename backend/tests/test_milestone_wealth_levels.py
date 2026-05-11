@@ -16,6 +16,7 @@ The key behaviours under test:
 - Render: ``{level_label}``, ``{level_full}``, ``{next_target}``,
   ``{next_level_label}`` populate from the milestone's ``extra`` dict.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -60,14 +61,13 @@ def _fake_execute_conflict():
 
 # -- _check_wealth_level_changes -------------------------------------
 
+
 @pytest.mark.asyncio
 class TestCheckWealthLevelChanges:
     async def test_returns_empty_when_user_missing(self):
         db = MagicMock()
         db.get = AsyncMock(return_value=None)
-        out = await milestone_service._check_wealth_level_changes(
-            db, uuid.uuid4()
-        )
+        out = await milestone_service._check_wealth_level_changes(db, uuid.uuid4())
         assert out == []
 
     async def test_starter_at_zero_no_milestone(self):
@@ -78,12 +78,11 @@ class TestCheckWealthLevelChanges:
         db.execute = AsyncMock(return_value=_fake_execute_rows([]))
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("0"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert out == []
 
     async def test_starter_to_young_prof_fires_up(self):
@@ -94,12 +93,11 @@ class TestCheckWealthLevelChanges:
         db.execute = AsyncMock(return_value=_fake_execute_rows([]))
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("50_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert len(out) == 1
         assert out[0].milestone_type == MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF
         assert out[0].extra["new_level"] == "young_prof"
@@ -117,34 +115,31 @@ class TestCheckWealthLevelChanges:
         db.execute = AsyncMock(return_value=_fake_execute_rows([]))
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("500_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert len(out) == 1
-        assert (
-            out[0].milestone_type
-            == MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT
-        )
+        assert out[0].milestone_type == MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT
 
     async def test_down_to_starter_fires_after_having_been_yp(self):
         """User previously hit YP (UP_YP exists), now back to <30tr."""
         user = _fake_user()
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=_fake_execute_rows(
-            [(MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,)]
-        ))
+        db.execute = AsyncMock(
+            return_value=_fake_execute_rows(
+                [(MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,)]
+            )
+        )
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("20_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert len(out) == 1
         assert out[0].milestone_type == MilestoneType.WEALTH_LEVEL_DOWN_STARTER
         assert out[0].extra["new_level"] == "starter"
@@ -156,41 +151,44 @@ class TestCheckWealthLevelChanges:
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
         # User was HNW at some point.
-        db.execute = AsyncMock(return_value=_fake_execute_rows([
-            (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
-            (MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT,),
-            (MilestoneType.WEALTH_LEVEL_UP_HNW,),
-        ]))
+        db.execute = AsyncMock(
+            return_value=_fake_execute_rows(
+                [
+                    (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
+                    (MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT,),
+                    (MilestoneType.WEALTH_LEVEL_UP_HNW,),
+                ]
+            )
+        )
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("700_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert len(out) == 1
-        assert (
-            out[0].milestone_type
-            == MilestoneType.WEALTH_LEVEL_DOWN_MASS_AFFLUENT
-        )
+        assert out[0].milestone_type == MilestoneType.WEALTH_LEVEL_DOWN_MASS_AFFLUENT
 
     async def test_no_change_when_at_same_band(self):
         """Already celebrated YP, still in YP band → nothing new."""
         user = _fake_user()
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=_fake_execute_rows([
-            (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
-        ]))
+        db.execute = AsyncMock(
+            return_value=_fake_execute_rows(
+                [
+                    (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
+                ]
+            )
+        )
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("80_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         assert out == []
 
     async def test_yoyo_dedup_skips_second_up_celebration(self):
@@ -199,18 +197,21 @@ class TestCheckWealthLevelChanges:
         user = _fake_user()
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
-        db.execute = AsyncMock(return_value=_fake_execute_rows([
-            (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
-            (MilestoneType.WEALTH_LEVEL_DOWN_STARTER,),
-        ]))
+        db.execute = AsyncMock(
+            return_value=_fake_execute_rows(
+                [
+                    (MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,),
+                    (MilestoneType.WEALTH_LEVEL_DOWN_STARTER,),
+                ]
+            )
+        )
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("40_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         # Highest_ever = YP, current = YP → no transition fires.
         assert out == []
 
@@ -229,17 +230,17 @@ class TestCheckWealthLevelChanges:
         ]
 
         with patch.object(
-            milestone_service, "calculate_net_worth",
+            milestone_service,
+            "calculate_net_worth",
             AsyncMock(return_value=_fake_breakdown(Decimal("10_000_000"))),
         ):
-            out = await milestone_service._check_wealth_level_changes(
-                db, user.id
-            )
+            out = await milestone_service._check_wealth_level_changes(db, user.id)
         # _create_if_missing returns None on conflict → empty list.
         assert out == []
 
 
 # -- _render_context wealth placeholders -----------------------------
+
 
 class TestRenderContextWealthPlaceholders:
     def test_populates_level_and_next_target(self):
@@ -254,11 +255,11 @@ class TestRenderContextWealthPlaceholders:
             },
         )
         ctx = milestone_service._render_context(milestone, user)
-        assert ctx["level_label"] == "Kho thóc"
-        assert ctx["level_full"] == "Có chút tiết kiệm"
+        assert ctx["level_label"] == "Trẻ Năng Động"
+        assert ctx["level_full"] == "Trẻ Năng Động"
         # format_money_full of 100M
         assert "100" in ctx["next_target"]
-        assert ctx["next_level_label"] == "Kho thóc"
+        assert ctx["next_level_label"] == "Trẻ Năng Động"
 
     def test_blank_placeholders_for_non_wealth_milestones(self):
         """Existing time/streak templates don't reference wealth keys —
@@ -289,26 +290,28 @@ class TestRenderContextWealthPlaceholders:
 
 # -- ladder.format_level / LEVEL_LABELS ------------------------------
 
+
 class TestLadderLabels:
     def test_short_labels(self):
-        assert ladder.format_level(ladder.WealthLevel.STARTER, "short") == "Trồng lúa"
-        assert ladder.format_level(
-            ladder.WealthLevel.YOUNG_PROFESSIONAL, "short"
-        ) == "Kho thóc"
-        assert ladder.format_level(
-            ladder.WealthLevel.MASS_AFFLUENT, "short"
-        ) == "Phú hộ"
-        assert ladder.format_level(
-            ladder.WealthLevel.HIGH_NET_WORTH, "short"
-        ) == "Vương giả"
+        assert ladder.format_level(ladder.WealthLevel.STARTER, "short") == "Khởi Đầu"
+        assert (
+            ladder.format_level(ladder.WealthLevel.YOUNG_PROFESSIONAL, "short")
+            == "Trẻ Năng Động"
+        )
+        assert (
+            ladder.format_level(ladder.WealthLevel.MASS_AFFLUENT, "short")
+            == "Trung Lưu Vững"
+        )
+        assert (
+            ladder.format_level(ladder.WealthLevel.HIGH_NET_WORTH, "short")
+            == "Tinh Hoa"
+        )
 
     def test_full_labels(self):
-        assert ladder.format_level(
-            ladder.WealthLevel.STARTER, "full"
-        ) == "Bắt đầu tích luỹ"
-        assert ladder.format_level(
-            ladder.WealthLevel.HIGH_NET_WORTH, "full"
-        ) == "Giàu sang phú quý"
+        assert ladder.format_level(ladder.WealthLevel.STARTER, "full") == "Khởi Đầu"
+        assert (
+            ladder.format_level(ladder.WealthLevel.HIGH_NET_WORTH, "full") == "Tinh Hoa"
+        )
 
     def test_level_order_monotonic(self):
         """Sanity-check that LEVEL_ORDER matches the band thresholds —

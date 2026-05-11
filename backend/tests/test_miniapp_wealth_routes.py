@@ -7,6 +7,7 @@ Covers:
 - /trend rejects unsupported ``days`` values with 422.
 - Service errors map to a graceful 500 with friendly Vietnamese copy.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,6 +37,7 @@ def _fake_user(telegram_id: int = 12345):
 
 def _override_auth(user_id: int = 12345):
     """Bypass HMAC verification — return a fake verified payload."""
+
     async def _ok():
         return {"user_id": user_id, "first_name": "Test"}
 
@@ -87,7 +89,7 @@ SAMPLE_OVERVIEW = {
     "next_milestone": {
         "target": 30_000_000.0,
         "target_level": "young_prof",
-        "target_label": "Young Professional",
+        "target_label": "Trẻ Năng Động",
         "pct_progress": 16.67,
         "remaining": 25_000_000.0,
     },
@@ -129,12 +131,11 @@ class TestWealthOverviewHappyPath:
         async def _fake_resolve(auth, db):
             return user
 
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch.object(
-                 miniapp_routes.wealth_dashboard_service,
-                 "build_overview",
-                 build_mock,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch.object(
+            miniapp_routes.wealth_dashboard_service,
+            "build_overview",
+            build_mock,
+        ):
             resp = client.get(
                 "/miniapp/api/wealth/overview?source=briefing",
                 headers={"X-Telegram-Init-Data": "stub"},
@@ -163,12 +164,11 @@ class TestWealthOverviewHappyPath:
         async def _boom(*args, **kwargs):
             raise RuntimeError("db blew up")
 
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch.object(
-                 miniapp_routes.wealth_dashboard_service,
-                 "build_overview",
-                 _boom,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch.object(
+            miniapp_routes.wealth_dashboard_service,
+            "build_overview",
+            _boom,
+        ):
             resp = client.get(
                 "/miniapp/api/wealth/overview",
                 headers={"X-Telegram-Init-Data": "stub"},
@@ -198,20 +198,21 @@ class TestWealthTrendEndpoint:
 
     def test_happy_path_returns_trend(self):
         _override_auth()
-        trend_mock = AsyncMock(return_value=[
-            {"date": "2026-04-01", "value": 5_000_000.0},
-            {"date": "2026-04-02", "value": 5_500_000.0},
-        ])
+        trend_mock = AsyncMock(
+            return_value=[
+                {"date": "2026-04-01", "value": 5_000_000.0},
+                {"date": "2026-04-02", "value": 5_500_000.0},
+            ]
+        )
 
         async def _fake_resolve(auth, db):
             return _fake_user()
 
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch.object(
-                 miniapp_routes.wealth_dashboard_service,
-                 "get_trend",
-                 trend_mock,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch.object(
+            miniapp_routes.wealth_dashboard_service,
+            "get_trend",
+            trend_mock,
+        ):
             resp = client.get(
                 "/miniapp/api/wealth/trend?days=90",
                 headers={"X-Telegram-Init-Data": "stub"},
@@ -236,11 +237,10 @@ class TestStartAssetWizardRoute:
         wizard_mock = AsyncMock()
         # Patch the symbol where it's imported — the route does a lazy
         # import inside the handler, so we patch the source module.
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch(
-                 "backend.bot.handlers.asset_entry.start_asset_wizard",
-                 wizard_mock,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch(
+            "backend.bot.handlers.asset_entry.start_asset_wizard",
+            wizard_mock,
+        ):
             resp = client.post(
                 "/miniapp/api/wealth/start-asset-wizard",
                 headers={"X-Telegram-Init-Data": "stub"},
@@ -282,11 +282,10 @@ class TestStartAssetEditRoute:
             return user
 
         edit_mock = AsyncMock()
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch(
-                 "backend.bot.handlers.asset_entry.start_asset_edit_wizard",
-                 edit_mock,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch(
+            "backend.bot.handlers.asset_entry.start_asset_edit_wizard",
+            edit_mock,
+        ):
             resp = client.post(
                 "/miniapp/api/wealth/start-asset-edit",
                 headers={"X-Telegram-Init-Data": "stub"},
@@ -309,11 +308,10 @@ class TestStartAssetEditRoute:
             return user
 
         picker_mock = AsyncMock()
-        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), \
-             patch(
-                 "backend.bot.handlers.asset_entry.show_asset_edit_picker",
-                 picker_mock,
-             ):
+        with patch.object(miniapp_routes, "_resolve_user", _fake_resolve), patch(
+            "backend.bot.handlers.asset_entry.show_asset_edit_picker",
+            picker_mock,
+        ):
             resp = client.post(
                 "/miniapp/api/wealth/start-asset-edit",
                 headers={"X-Telegram-Init-Data": "stub"},

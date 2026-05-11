@@ -1384,9 +1384,9 @@ async def test_mark_existing_rental_does_not_expose_undo_button():
         for row in markup.get("inline_keyboard", []):
             for btn in row:
                 cb = btn.get("callback_data", "")
-                assert "undo" not in cb, (
-                    f"mark_existing flow leaked undo button: {cb!r}"
-                )
+                assert (
+                    "undo" not in cb
+                ), f"mark_existing flow leaked undo button: {cb!r}"
 
 
 @pytest.mark.asyncio
@@ -2086,9 +2086,7 @@ async def test_dashboard_edit_text_updates_value_and_refreshes_report():
         )
 
     assert consumed is True
-    update_value.assert_awaited_once_with(
-        db, user.id, asset.id, Decimal("120000000")
-    )
+    update_value.assert_awaited_once_with(db, user.id, asset.id, Decimal("120000000"))
     clear.assert_awaited_once_with(db, user.id)
     assert "Đã cập nhật" in send.await_args.kwargs["text"]
     report.assert_awaited_once_with(db, 100, user)
@@ -2120,5 +2118,5 @@ async def test_grouped_dashboard_picker_uses_one_user_scoped_asset_query():
         for row in send.await_args.kwargs["reply_markup"]["inline_keyboard"]
         for button in row
     ]
-    assert f"dashboard:edit:{first.id}" in callbacks
-    assert f"dashboard:edit:{second.id}" in callbacks
+    assert f"asset:edit:{first.id}" in callbacks
+    assert f"asset:edit:{second.id}" in callbacks

@@ -378,3 +378,33 @@
     opacity: 0.65;
     cursor: wait;
 }
+
+.asset-sort-selector {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 4px 0 12px;
+}
+
+.asset-sort-btn {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.asset-sort-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-text);
+}
+
+@media (prefers-color-scheme: dark) {
+    .asset-sort-btn {
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+}

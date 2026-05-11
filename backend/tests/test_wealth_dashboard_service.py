@@ -13,6 +13,7 @@ Covers:
 Real Postgres isn't required — we monkeypatch ``net_worth_calculator``
 and ``asset_service`` and stub ``db.execute`` for the trend SQL.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -124,14 +125,19 @@ class TestGroupAssets:
         assert out[0]["current_value"] == 8_000_000.0
         assert out[0]["count"] == 2
 
-    def test_sorts_largest_first(self):
+    def test_default_sorts_largest_first(self):
         a1 = _asset("cash", "VCB", 5_000_000, subtype="bank_savings")
         a2 = _asset("crypto", "BTC", 100_000_000)
         a3 = _asset("real_estate", "Đất", 1_500_000_000)
         out = svc._group_assets([a1, a2, a3])
-        assert [g["asset_type"] for g in out] == [
-            "real_estate", "crypto", "cash"
-        ]
+        assert [g["asset_type"] for g in out] == ["real_estate", "crypto", "cash"]
+
+    def test_value_desc_sort_keeps_largest_first(self):
+        a1 = _asset("cash", "VCB", 5_000_000, subtype="bank_savings")
+        a2 = _asset("crypto", "BTC", 100_000_000)
+        a3 = _asset("real_estate", "Đất", 1_500_000_000)
+        out = svc._group_assets([a1, a2, a3], sort=svc.SORT_VALUE_DESC)
+        assert [g["asset_type"] for g in out] == ["real_estate", "crypto", "cash"]
 
     def test_change_pct_aggregated_across_members(self):
         # Combined initial 10tr (5+5), combined current 12tr (10+2)
@@ -189,9 +195,7 @@ class TestBuildBreakdown:
         out = svc._build_breakdown({}, Decimal(0))
         assert out == []
 
-        out = svc._build_breakdown(
-            {"cash": Decimal(0)}, Decimal(0)
-        )
+        out = svc._build_breakdown({"cash": Decimal(0)}, Decimal(0))
         # The single zero-valued bucket is preserved with pct=0.
         assert len(out) == 1
         assert out[0]["pct"] == 0.0
@@ -251,7 +255,7 @@ class TestBuildOverview:
         assert result["net_worth"] == 5_000_000.0
         assert result["asset_count"] == 1
         assert result["level"] == "starter"
-        assert result["level_label"] == "Khởi đầu"
+        assert result["level_label"] == "Khởi Đầu"
         assert result["change_day"]["amount"] == 1_000_000.0
         assert result["change_month"]["amount"] == 1_000_000.0
         assert len(result["assets"]) == 1
@@ -286,7 +290,8 @@ class TestBuildOverview:
 
         monkeypatch.setattr(nwc, "calculate_change", fake_change)
         monkeypatch.setattr(
-            svc, "get_trend",
+            svc,
+            "get_trend",
             AsyncMock(return_value=[]),
         )
 
@@ -308,12 +313,14 @@ class TestBuildOverview:
         # one merged "Tiền mặt" 12tr + two distinct Techcombank cards.
         monkeypatch.setattr(
             "backend.wealth.services.asset_service.get_user_assets",
-            AsyncMock(return_value=[
-                _asset("cash", "Tiền mặt", 10_000_000, subtype="cash"),
-                _asset("cash", "Tiền mặt", 2_000_000, subtype="cash"),
-                _asset("cash", "Techcombank", 20_000_000, subtype="bank_checking"),
-                _asset("cash", "Techcombank", 15_000_000, subtype="bank_savings"),
-            ]),
+            AsyncMock(
+                return_value=[
+                    _asset("cash", "Tiền mặt", 10_000_000, subtype="cash"),
+                    _asset("cash", "Tiền mặt", 2_000_000, subtype="cash"),
+                    _asset("cash", "Techcombank", 20_000_000, subtype="bank_checking"),
+                    _asset("cash", "Techcombank", 15_000_000, subtype="bank_savings"),
+                ]
+            ),
         )
 
         async def fake_change(db, uid, period):
@@ -332,9 +339,10 @@ class TestBuildOverview:
 
         # Hero count reflects logical cards, not raw rows.
         assert result["asset_count"] == 3
+        assert result["asset_sort"] == svc.SORT_VALUE_DESC
         assert len(result["assets"]) == 3
 
-        # Cards sorted largest-first.
+        # Cards sorted largest-first by default.
         names = [(a["name"], a["subtype"]) for a in result["assets"]]
         assert names == [
             ("Techcombank", "bank_checking"),
@@ -352,11 +360,13 @@ class TestBuildOverview:
     async def test_breakdown_sorted_desc(self, monkeypatch):
         monkeypatch.setattr(
             "backend.wealth.services.asset_service.get_user_assets",
-            AsyncMock(return_value=[
-                _asset("cash", "VCB", 50_000_000),
-                _asset("stock", "VNM", 200_000_000),
-                _asset("real_estate", "Nhà MD", 1_500_000_000),
-            ]),
+            AsyncMock(
+                return_value=[
+                    _asset("cash", "VCB", 50_000_000),
+                    _asset("stock", "VNM", 200_000_000),
+                    _asset("real_estate", "Nhà MD", 1_500_000_000),
+                ]
+            ),
         )
 
         async def fake_change(db, uid, period):
