@@ -18,7 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #372 | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [issue-372.md](issue-372.md) |
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
 | #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
-| #376 | [Story] P4A-S2: Monte Carlo simulator (single asset) | [issue-376.md](issue-376.md) |
 | #377 | [Story] P4A-S3: Multi-asset portfolio simulation | [issue-377.md](issue-377.md) |
 | #378 | [Story] P4A-S4: Cone aggregator (P10/P50/P90) | [issue-378.md](issue-378.md) |
 | #379 | [Story] P4A-S5: Engine integration test | [issue-379.md](issue-379.md) |
@@ -45,4 +44,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 40
+**Total active:** 39
