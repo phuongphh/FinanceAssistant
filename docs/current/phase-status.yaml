@@ -153,10 +153,10 @@ phases:
   - id: "4A"
     name: "Financial Twin Conservative MVP"
     status: planned
-    duration: "TBD"
-    detail_doc: ""
-    issues_doc: ""
-    description: "Conservative Financial Twin MVP building on real market data from Phase 3.9"
+    duration: "~3 tuần"
+    detail_doc: "docs/current/phase-4A/phase-4A-detailed.md"
+    issues_doc: "docs/current/phase-4A/phase-4A-issues.md"
+    description: "Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation"
     completed_date: ""
     icon: "📋"
 
