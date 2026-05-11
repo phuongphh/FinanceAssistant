@@ -226,6 +226,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
+| #445 | Pre-Phase | [Feature] Dòng tiền Menu Enhancement — Consolidate Tổng quan, rename Thu vs Chi, remove duplicate | [pre-phase/issue-445.md](by-phase/pre-phase/issue-445.md) |
 
-**Total:** 222 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 205 Pre-Phase)
+**Total:** 223 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 206 Pre-Phase)
