@@ -32,13 +32,22 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_manage:cancel                   — leave manage flow
 
     asset:sort:<sort_key>                 — sort dashboard rows (default is value_desc)
+    asset:page:<page>                     — switch dashboard page (current sort kept server-side)
     asset:edit:<asset_uuid>               — edit one asset from dashboard report
     asset:delete:<asset_uuid>             — show inline delete confirmation
     asset:delete_yes:<asset_uuid>         — confirm inline soft delete
     asset:delete_no:<sort_key>            — cancel inline delete and refresh
 
+    asset_manage:edit_page:<asset_type>:<page>  — switch edit-list page
+    asset_manage:del_page:<asset_type>:<page>   — switch delete-list page
+
 Total callback bytes stay well under Telegram's 64-byte cap
 (``asset_add:undo:`` + 36-char UUID = 51 bytes).
+
+Pagination — every list keyboard that grows with user data MUST paginate.
+Telegram silently rejects ``reply_markup`` once the serialized JSON exceeds
+~10 KB (the practical client limit). At ~216 bytes per row the dashboard
+keyboard hit that ceiling around 46 assets and the user saw no response.
 """
 
 from __future__ import annotations
@@ -57,6 +66,55 @@ CB_ASSET_RENTAL = "asset_rental"
 CB_ASSET_MANAGE = "asset_manage"
 CB_DASHBOARD = "dashboard"
 CB_ASSET_ROW = "asset"
+
+# Caps each list keyboard at ~2 KB serialized JSON — well under Telegram's
+# ~10 KB practical limit and still fits within one mobile screen.
+ASSET_LIST_PAGE_SIZE = 8
+
+
+def clamp_page(page: int, total_items: int, page_size: int = ASSET_LIST_PAGE_SIZE) -> int:
+    """Return ``page`` clamped to [0, last_page]. Empty lists return 0."""
+    if total_items <= 0:
+        return 0
+    last = (total_items - 1) // page_size
+    if page < 0:
+        return 0
+    if page > last:
+        return last
+    return page
+
+
+def _page_slice(items: list, page: int, page_size: int = ASSET_LIST_PAGE_SIZE) -> tuple[list, int, int]:
+    """Return ``(slice, clamped_page, total_pages)`` for a 0-indexed page."""
+    total = len(items)
+    if total == 0:
+        return [], 0, 1
+    page = clamp_page(page, total, page_size)
+    total_pages = (total + page_size - 1) // page_size
+    start = page * page_size
+    return items[start : start + page_size], page, total_pages
+
+
+def _pagination_row(
+    page: int,
+    total_pages: int,
+    *,
+    prev_cb: str,
+    next_cb: str,
+    label_cb: str = "asset:noop",
+) -> list[dict] | None:
+    """Build a ``◀ · Trang X/Y · ▶`` row. Returns ``None`` when single-page.
+
+    ``label_cb`` is a no-op callback for the page indicator so taps don't
+    trigger Telegram's "callback expired" alert.
+    """
+    if total_pages <= 1:
+        return None
+    return [
+        {"text": "◀ Trước", "callback_data": prev_cb},
+        {"text": f"Trang {page + 1}/{total_pages}", "callback_data": label_cb},
+        {"text": "Sau ▶", "callback_data": next_cb},
+    ]
 
 
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
@@ -593,8 +651,10 @@ def asset_edit_list_keyboard(
     candidates: list[tuple[uuid.UUID | str, str]],
     *,
     asset_type: str,
+    page: int = 0,
 ) -> InlineKeyboardMarkup:
     """Render filtered edit rows plus navigation for market portfolio context."""
+    page_items, page, total_pages = _page_slice(candidates, page)
     rows = [
         [
             {
@@ -604,8 +664,16 @@ def asset_edit_list_keyboard(
                 ),
             }
         ]
-        for asset_id, label in candidates
+        for asset_id, label in page_items
     ]
+    nav = _pagination_row(
+        page,
+        total_pages,
+        prev_cb=build_callback(CB_ASSET_MANAGE, "edit_page", asset_type, page - 1),
+        next_cb=build_callback(CB_ASSET_MANAGE, "edit_page", asset_type, page + 1),
+    )
+    if nav is not None:
+        rows.append(nav)
     rows.append(
         [
             {
@@ -629,8 +697,10 @@ def asset_delete_list_keyboard(
     candidates: list[tuple[uuid.UUID | str, str]],
     *,
     asset_type: str,
+    page: int = 0,
 ) -> InlineKeyboardMarkup:
     """Render filtered delete rows plus navigation."""
+    page_items, page, total_pages = _page_slice(candidates, page)
     rows = [
         [
             {
@@ -640,8 +710,16 @@ def asset_delete_list_keyboard(
                 ),
             }
         ]
-        for asset_id, label in candidates
+        for asset_id, label in page_items
     ]
+    nav = _pagination_row(
+        page,
+        total_pages,
+        prev_cb=build_callback(CB_ASSET_MANAGE, "del_page", asset_type, page - 1),
+        next_cb=build_callback(CB_ASSET_MANAGE, "del_page", asset_type, page + 1),
+    )
+    if nav is not None:
+        rows.append(nav)
     rows.append(
         [
             {
@@ -758,10 +836,17 @@ def asset_dashboard_edit_keyboard(
     rows: list[tuple[uuid.UUID, str]],
     *,
     current_sort: str = "value_desc",
+    page: int = 0,
 ) -> InlineKeyboardMarkup | None:
-    """Sort controls plus compact edit/delete buttons per dashboard row."""
+    """Sort controls plus compact edit/delete buttons per dashboard row.
+
+    Rows are paginated at :data:`ASSET_LIST_PAGE_SIZE` per page so the
+    serialized markup stays under Telegram's ~10 KB practical limit.
+    """
     if not rows:
         return None
+
+    page_items, page, total_pages = _page_slice(rows, page)
 
     def sort_button(key: str, label: str) -> dict:
         prefix = "✅ " if key == current_sort else ""
@@ -777,7 +862,7 @@ def asset_dashboard_edit_keyboard(
             sort_button("alpha", "A-Z 🔤"),
         ],
     ]
-    for asset_id, label in rows:
+    for asset_id, label in page_items:
         clean = " ".join(str(label).split())
         if len(clean) > 34:
             clean = clean[:31].rstrip() + "…"
@@ -793,6 +878,14 @@ def asset_dashboard_edit_keyboard(
                 },
             ]
         )
+    nav = _pagination_row(
+        page,
+        total_pages,
+        prev_cb=build_callback(CB_ASSET_ROW, "page", page - 1),
+        next_cb=build_callback(CB_ASSET_ROW, "page", page + 1),
+    )
+    if nav is not None:
+        keyboard.append(nav)
     keyboard.append([{"text": "◀️ Quay về", "callback_data": "menu:assets"}])
     return {"inline_keyboard": keyboard}
 

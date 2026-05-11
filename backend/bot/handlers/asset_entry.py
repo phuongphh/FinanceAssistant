@@ -57,6 +57,7 @@ from backend.bot.formatters.wealth_formatter import (
     format_rental_marked,
 )
 from backend.bot.keyboards.asset_keyboard import (
+    clamp_page,
     add_more_keyboard,
     asset_delete_confirm_keyboard,
     asset_delete_list_keyboard,
@@ -116,6 +117,19 @@ from backend.wealth.services import asset_service, net_worth_calculator, rental_
 logger = logging.getLogger(__name__)
 
 _DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
+# Tracks the dashboard report page each user last viewed so wizard returns
+# (after edit / cancel-delete) land back on the same page instead of jumping
+# to the top. Cleared implicitly on sort change.
+_DASHBOARD_PAGE_BY_USER: dict[uuid.UUID, int] = {}
+
+
+def _safe_int(value: str | None, default: int = 0) -> int:
+    """Tolerate a malformed page number in callback_data — pagination is UX,
+    not a correctness boundary, so we fall back to page 0 rather than crash."""
+    try:
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
 
 
 class AssetEvent:
@@ -282,15 +296,22 @@ async def show_asset_dashboard_report(
     user: User,
     *,
     sort: str | None = None,
+    page: int | None = None,
     message_id: int | None = None,
 ) -> None:
-    """Render the asset dashboard report with inline row actions."""
+    """Render the asset dashboard report with inline row actions.
+
+    Rows are paginated so the keyboard markup stays under Telegram's ~10 KB
+    practical reply_markup limit (a user with ~50 assets used to hit it
+    and silently get no response — see asset_dashboard_edit_keyboard).
+    """
     sort_key = normalize_sort(sort or _dashboard_sort_for_user(user))
     _DASHBOARD_SORT_BY_USER[user.id] = sort_key
     assets = _sort_assets_for_dashboard(
         await asset_service.get_user_assets(db, user.id), sort_key
     )
     if not assets:
+        _DASHBOARD_PAGE_BY_USER.pop(user.id, None)
         text = (
             "📊 <b>Báo cáo</b>\n\n"
             "Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé."
@@ -304,6 +325,10 @@ async def show_asset_dashboard_report(
         return
 
     rows = [(asset.id, _asset_dashboard_row_label(asset)) for asset in assets]
+    if page is None:
+        page = _DASHBOARD_PAGE_BY_USER.get(user.id, 0)
+    page = clamp_page(page, len(rows))
+    _DASHBOARD_PAGE_BY_USER[user.id] = page
     text = (
         format_asset_list(assets).replace(
             "📊 <b>Tài sản của bạn</b>", "📊 <b>Báo cáo</b>", 1
@@ -311,7 +336,7 @@ async def show_asset_dashboard_report(
         + f"\n\nSắp xếp: <b>{html.escape(_dashboard_sort_label(sort_key))}</b>"
         + "\n👆 Dùng ✏️ để sửa, 🗑️ để xoá."
     )
-    markup = asset_dashboard_edit_keyboard(rows, current_sort=sort_key)
+    markup = asset_dashboard_edit_keyboard(rows, current_sort=sort_key, page=page)
     if message_id is not None:
         await edit_message_text(
             chat_id=chat_id,
@@ -519,7 +544,13 @@ def _asset_delete_row_label(asset) -> str:
 
 
 async def show_asset_edit_list(
-    db: AsyncSession, chat_id: int, user: User, asset_type: str
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    asset_type: str,
+    *,
+    page: int = 0,
+    message_id: int | None = None,
 ) -> None:
     """List only active assets of one type for quick market-context edits."""
     assets = _sort_assets_for_dashboard(
@@ -540,12 +571,23 @@ async def show_asset_edit_list(
         return
 
     candidates = [(asset.id, _asset_delete_row_label(asset)) for asset in assets]
-    await send_message(
-        chat_id=chat_id,
-        text=f"Chọn tài sản <b>{html.escape(label)}</b> muốn sửa:",
-        parse_mode="HTML",
-        reply_markup=asset_edit_list_keyboard(candidates, asset_type=asset_type),
-    )
+    text = f"Chọn tài sản <b>{html.escape(label)}</b> muốn sửa:"
+    markup = asset_edit_list_keyboard(candidates, asset_type=asset_type, page=page)
+    if message_id is not None:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+    else:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
 
 
 async def show_asset_delete_type_picker(
@@ -564,7 +606,13 @@ async def show_asset_delete_type_picker(
 
 
 async def show_asset_delete_list(
-    db: AsyncSession, chat_id: int, user: User, asset_type: str
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    asset_type: str,
+    *,
+    page: int = 0,
+    message_id: int | None = None,
 ) -> None:
     """List only active assets of one type for deletion."""
     assets = _sort_assets_for_dashboard(
@@ -582,11 +630,22 @@ async def show_asset_delete_list(
         return
 
     candidates = [(asset.id, _asset_delete_row_label(asset)) for asset in assets]
+    text = f"Chọn tài sản <b>{label}</b> muốn xoá:"
+    markup = asset_delete_list_keyboard(candidates, asset_type=asset_type, page=page)
+    if message_id is not None:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+        return
     await send_message(
         chat_id=chat_id,
-        text=f"Chọn tài sản <b>{label}</b> muốn xoá:",
+        text=text,
         parse_mode="HTML",
-        reply_markup=asset_delete_list_keyboard(candidates, asset_type=asset_type),
+        reply_markup=markup,
     )
 
 
@@ -2819,9 +2878,25 @@ async def handle_dashboard_callback(db: AsyncSession, callback_query: dict) -> b
         if action == "sort" and arg:
             sort_key = normalize_sort(arg)
             _DASHBOARD_SORT_BY_USER[user.id] = sort_key
+            # Reset to first page when sort changes — the row positions
+            # users tapped on no longer apply to the new ordering.
+            _DASHBOARD_PAGE_BY_USER[user.id] = 0
             await show_asset_dashboard_report(
-                db, chat_id, user, sort=sort_key, message_id=message_id
+                db, chat_id, user, sort=sort_key, page=0, message_id=message_id
             )
+            return
+        if action == "page" and arg is not None:
+            try:
+                page_idx = int(arg)
+            except ValueError:
+                page_idx = 0
+            await show_asset_dashboard_report(
+                db, chat_id, user, page=page_idx, message_id=message_id
+            )
+            return
+        if action == "noop":
+            # Page indicator tap — no-op so Telegram doesn't show
+            # "callback expired" after the answerCallback we already sent.
             return
         if action == "edit" and arg:
             await start_asset_edit_wizard(
@@ -2854,6 +2929,7 @@ async def handle_asset_manage_callback(db: AsyncSession, callback_query: dict) -
     callback_id = callback_query["id"]
     message = callback_query.get("message") or {}
     chat_id = (message.get("chat") or {}).get("id")
+    message_id = message.get("message_id")
     telegram_id = (callback_query.get("from") or {}).get("id")
     if chat_id is None or telegram_id is None:
         await answer_callback(callback_id)
@@ -2874,6 +2950,18 @@ async def handle_asset_manage_callback(db: AsyncSession, callback_query: dict) -
             return
         if action == "edit_type" and arg:
             await show_asset_edit_list(db, chat_id, user, arg)
+            return
+        if action == "edit_page" and arg:
+            page_idx = _safe_int(parts[2] if len(parts) > 2 else "0")
+            await show_asset_edit_list(
+                db, chat_id, user, arg, page=page_idx, message_id=message_id
+            )
+            return
+        if action == "del_page" and arg:
+            page_idx = _safe_int(parts[2] if len(parts) > 2 else "0")
+            await show_asset_delete_list(
+                db, chat_id, user, arg, page=page_idx, message_id=message_id
+            )
             return
         if action == "edit" and arg:
             return_asset_type = parts[2] if len(parts) > 2 else None

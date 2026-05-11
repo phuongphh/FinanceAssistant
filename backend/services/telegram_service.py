@@ -4,6 +4,7 @@ All Telegram API interactions go through this service.
 Routers should never call Telegram API directly.
 """
 import asyncio
+import json
 import logging
 
 import httpx
@@ -13,6 +14,42 @@ from backend.utils.markdown_sanitizer import sanitize_markdown
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Telegram silently rejects ``reply_markup`` once the serialized JSON
+# exceeds ~10 KB (the practical client limit; the API error reads
+# "Bad Request: reply markup is too long"). We guard at 8 KB so any new
+# unbounded keyboard surfaces in logs with headroom — caller still sees
+# the text body instead of a dropped message. See Issue: dashboard
+# report silently failing for users with ~50+ assets.
+_REPLY_MARKUP_SAFE_MAX_BYTES = 8 * 1024
+
+
+def _strip_oversized_markup(method: str, payload: dict) -> dict:
+    """Drop ``reply_markup`` from ``payload`` if its JSON exceeds the safe cap.
+
+    Returns a shallow copy with the field removed; logs an error so the
+    silent-drop class of bug becomes visible in production. The text body
+    is preserved so the user still sees content instead of nothing.
+    """
+    markup = payload.get("reply_markup")
+    if not markup:
+        return payload
+    serialized = (
+        markup if isinstance(markup, str)
+        else json.dumps(markup, ensure_ascii=False, separators=(",", ":"))
+    )
+    size = len(serialized.encode("utf-8"))
+    if size <= _REPLY_MARKUP_SAFE_MAX_BYTES:
+        return payload
+    logger.error(
+        "Telegram %s reply_markup is %d bytes (cap %d). Dropping markup to "
+        "avoid 'reply markup is too long' silent failure. Caller should "
+        "paginate the keyboard.",
+        method,
+        size,
+        _REPLY_MARKUP_SAFE_MAX_BYTES,
+    )
+    return {k: v for k, v in payload.items() if k != "reply_markup"}
 
 # Telegram methods whose payload carries user-facing body text we may
 # need to sanitize. ``sendMessage`` / ``editMessageText`` use ``text``;
@@ -112,6 +149,7 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
         return None
 
     payload = _sanitize_payload(method, payload)
+    payload = _strip_oversized_markup(method, payload)
 
     url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/{method}"
     client = await _get_client()
@@ -194,8 +232,16 @@ async def send_photo(
         data["caption"] = caption
         data["parse_mode"] = parse_mode
     if reply_markup:
-        import json
-        data["reply_markup"] = json.dumps(reply_markup)
+        serialized = json.dumps(reply_markup, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > _REPLY_MARKUP_SAFE_MAX_BYTES:
+            logger.error(
+                "Telegram sendPhoto reply_markup is %d bytes (cap %d). "
+                "Dropping markup to avoid silent failure.",
+                len(serialized.encode("utf-8")),
+                _REPLY_MARKUP_SAFE_MAX_BYTES,
+            )
+        else:
+            data["reply_markup"] = serialized
 
     files = {"photo": (filename, photo_bytes, "image/png")}
 

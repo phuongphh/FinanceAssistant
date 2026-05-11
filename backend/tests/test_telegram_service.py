@@ -306,6 +306,79 @@ class TestPreSendSanitization:
         assert sent_payload["text"] == "Stray *marker"
 
 
+class TestReplyMarkupSizeGuard:
+    """Guard against the silent ``Bad Request: reply markup is too long``
+    failure when a keyboard exceeds Telegram's ~10 KB practical limit.
+
+    The transport layer is the last line of defense — primary fix is
+    pagination at the keyboard layer. The guard catches regressions from
+    future menus that forget to paginate.
+    """
+
+    def _huge_markup(self, n_rows: int = 200) -> dict:
+        # ~85 bytes per row keeps the test deterministic regardless of
+        # asset_keyboard.py changes downstream.
+        return {
+            "inline_keyboard": [
+                [{"text": f"row {i:03d} padding text", "callback_data": f"row:{i:03d}"}]
+                for i in range(n_rows)
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_small_markup_is_passed_through(self, mock_settings, mock_httpx):
+        small = {"inline_keyboard": [[{"text": "OK", "callback_data": "ok"}]]}
+        await send_telegram(
+            "sendMessage", {"chat_id": 1, "text": "hi", "reply_markup": small}
+        )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert sent["reply_markup"] == small
+
+    @pytest.mark.asyncio
+    async def test_oversized_markup_is_dropped_but_text_survives(
+        self, mock_settings, mock_httpx, caplog
+    ):
+        import logging
+
+        huge = self._huge_markup(n_rows=200)
+        with caplog.at_level(logging.ERROR, logger="backend.services.telegram_service"):
+            await send_telegram(
+                "sendMessage",
+                {"chat_id": 1, "text": "body still visible", "reply_markup": huge},
+            )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert "reply_markup" not in sent, (
+            "Oversized markup must be stripped so Telegram doesn't reject "
+            "the whole message"
+        )
+        assert sent["text"] == "body still visible"
+        assert any(
+            "reply markup" in rec.message.lower() and "cap" in rec.message.lower()
+            for rec in caplog.records
+        ), "Guard must log so silent regressions surface in production"
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_also_guarded(self, mock_settings, mock_httpx):
+        huge = self._huge_markup(n_rows=200)
+        await send_telegram(
+            "editMessageText",
+            {
+                "chat_id": 1,
+                "message_id": 9,
+                "text": "edit",
+                "reply_markup": huge,
+            },
+        )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert "reply_markup" not in sent
+
+    @pytest.mark.asyncio
+    async def test_no_markup_payload_unchanged(self, mock_settings, mock_httpx):
+        await send_telegram("sendMessage", {"chat_id": 1, "text": "plain"})
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert sent == {"chat_id": 1, "text": "plain"}
+
+
 class TestAnswerCallback:
     @pytest.mark.asyncio
     async def test_calls_answer_callback_query(self, mock_settings, mock_httpx):
