@@ -4,6 +4,7 @@ This is intentionally the only module that imports matplotlib. Services and
 handlers depend on the plain ``render_cone_chart`` function returning PNG bytes,
 which keeps future renderer swaps isolated.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -59,16 +60,42 @@ def render_cone_chart(
     fig.patch.set_facecolor("#fffaf2")
     ax.set_facecolor("#fffaf2")
 
-    ax.fill_between(years, p10, p90, color="#8ecae6", alpha=0.35, label=copy["cone_label"])
+    ax.fill_between(
+        years, p10, p90, color="#8ecae6", alpha=0.35, label=copy["cone_label"]
+    )
     ax.plot(years, p50, color="#126782", linewidth=2.6, label=copy["p50_label"])
-    ax.scatter([years[0]], [p50[0]], color="#ffb703", s=45, zorder=4, label=copy["current_label"])
+    ax.scatter(
+        [years[0]],
+        [p50[0]],
+        color="#ffb703",
+        s=45,
+        zorder=4,
+        label=copy["current_label"],
+    )
 
     if optimal:
         opt_by_year = {int(point["year"]): point for point in optimal}
-        opt_p50 = [float(Decimal(str(opt_by_year[y]["p50"]))) for y in years if y in opt_by_year]
         opt_years = [y for y in years if y in opt_by_year]
         if opt_years:
-            ax.plot(opt_years, opt_p50, color="#2a9d8f", linewidth=2.1, linestyle="--", label=copy["optimal_label"])
+            opt_p10 = [float(Decimal(str(opt_by_year[y]["p10"]))) for y in opt_years]
+            opt_p50 = [float(Decimal(str(opt_by_year[y]["p50"]))) for y in opt_years]
+            opt_p90 = [float(Decimal(str(opt_by_year[y]["p90"]))) for y in opt_years]
+            ax.fill_between(
+                opt_years,
+                opt_p10,
+                opt_p90,
+                color="#2a9d8f",
+                alpha=0.16,
+                label=copy["optimal_cone_label"],
+            )
+            ax.plot(
+                opt_years,
+                opt_p50,
+                color="#2a9d8f",
+                linewidth=2.1,
+                linestyle="--",
+                label=copy["optimal_label"],
+            )
 
     ax.set_title(copy["title"], fontsize=15, fontweight="bold", color="#243b53", pad=16)
     ax.set_xlabel(copy["x_label"], fontsize=11)

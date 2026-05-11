@@ -34,7 +34,8 @@ chart:
   title: "Bé Tiền tương lai — vùng xác suất"
   current_label: "Hiện tại"
   p50_label: "P50 — đường giữa"
-  optimal_label: "Tối ưu"
+  optimal_label: "P50 — tối ưu"
+  optimal_cone_label: "Vùng tối ưu P10–P90"
   cone_label: "Vùng P10–P90"
   x_label: "Năm"
   y_label: "Giá trị tài sản"
@@ -87,3 +88,32 @@ narrative:
     Dữ liệu: năm {target_year}, P10={p10}, P50={p50}, P90={p90}, tuổi cone={cone_age_days} ngày, mã cone={cone_hash}.
     Yêu cầu: nói theo xác suất, không hứa lợi nhuận, giọng khích lệ và thận trọng.
   fallback: "Nếu giữ nhịp hiện tại, tài sản của bạn có thể đi trong vùng này. Mình sẽ theo dõi đều để bạn điều chỉnh sớm khi cần."
+
+comparison:
+  recomputing: "⏳ Mình đang dựng lộ trình tối ưu để so sánh..."
+  no_projection: |-
+    🔮 Mình chưa có đủ dữ liệu để so sánh tối ưu.
+    Bạn cập nhật tài sản rồi thử lại sau một chút nhé.
+  caption: |-
+    ⚖️ So sánh lộ trình hiện tại và tối ưu
+
+    Năm {target_year}, đường giữa P50 có thể tăng từ {current_p50} → {optimal_p50} ({delta_pct}).
+
+    {actions}
+
+    {disclaimer}
+    CTA "Bắt đầu kế hoạch" sẽ được mở ở Phase 4B; hiện tại mình chỉ dùng để tham khảo.
+  action_savings: "• Tăng tiết kiệm đều: {current_savings}/tháng → {optimal_savings}/tháng."
+  action_rebalance_add: "• Tăng tỷ trọng {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."
+  action_rebalance_trim: "• Giảm bớt {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."
+  action_hold: "• Danh mục đã khá gần mục tiêu; ưu tiên giữ nhịp và rà soát mỗi tháng."
+  disclaimer_prefix: "Đây là gợi ý chung, không phải lời khuyên đầu tư."
+
+asset_labels:
+  stocks_vn: "cổ phiếu VN"
+  stocks_global: "cổ phiếu global"
+  crypto: "crypto"
+  gold: "vàng"
+  cash_savings: "tiền gửi/tiền mặt"
+  real_estate_vn: "bất động sản"
+  bonds_vn: "trái phiếu"

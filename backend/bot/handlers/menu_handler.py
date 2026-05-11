@@ -962,9 +962,9 @@ async def _action_twin_view_current(
 async def _action_twin_compare_optimal(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    from backend.bot.handlers.twin_handler import send_twin_compare_placeholder
+    from backend.bot.handlers.twin_handler import send_twin_compare_optimal
 
-    await send_twin_compare_placeholder(chat_id=chat_id)
+    await send_twin_compare_optimal(db, chat_id=chat_id, user=user)
 
 
 async def _action_twin_open_miniapp(
