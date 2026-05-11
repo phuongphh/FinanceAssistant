@@ -61,6 +61,11 @@ class User(Base):
     # Shape: {"flow": "asset_add_cash", "step": "amount", "draft": {...}}
     wizard_state: Mapped[dict | None] = mapped_column(JSONB)
 
+    # Phase 4B Epic 3 — Cashflow Forecasting v2
+    # User-customisable cashflow alert floor. NULL → system computes the
+    # default (avg monthly expense from confirmed patterns × 1.0).
+    cashflow_alert_threshold: Mapped[float | None] = mapped_column(Numeric(20, 2))
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""

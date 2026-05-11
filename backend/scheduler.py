@@ -14,6 +14,8 @@ import signal
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from backend.jobs.cashflow_detection_job import run_cashflow_detection
+from backend.jobs.cashflow_forecast_job import run_cashflow_forecast_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
@@ -151,6 +153,23 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         day_of_week="sun", hour=23, minute=0,
         timezone="Asia/Ho_Chi_Minh",
         id="weekly_twin_update",
+    )
+
+    # Phase 4B Epic 3 — Cashflow Forecasting v2.
+    # Detection runs weekly (Monday 06:00) so users see pattern suggestions
+    # at the start of the work week. Forecast runs daily (01:00) so the
+    # morning briefing always has a fresh 3-month projection.
+    scheduler.add_job(
+        run_cashflow_detection, "cron",
+        day_of_week="mon", hour=6, minute=0,
+        timezone="Asia/Ho_Chi_Minh",
+        id="cashflow_pattern_detection",
+    )
+    scheduler.add_job(
+        run_cashflow_forecast_job, "cron",
+        hour=1, minute=0,
+        timezone="Asia/Ho_Chi_Minh",
+        id="cashflow_forecast",
     )
 
 

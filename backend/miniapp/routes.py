@@ -393,6 +393,47 @@ async def wealth_page():
     return _serve_html("wealth_dashboard.html")
 
 
+@router.get("/cashflow", include_in_schema=False)
+async def cashflow_page():
+    """Serve the Phase 4B Cashflow dashboard shell (Epic 3, S20)."""
+    analytics.track(
+        analytics.EventType.MINIAPP_OPENED,
+        properties={"page": "cashflow"},
+    )
+    return _serve_html("cashflow_dashboard.html")
+
+
+@router.get("/api/cashflow/chart")
+async def get_cashflow_chart(
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the cashflow waterfall PNG chart for the authenticated user.
+
+    Renders the chart from the latest stored forecast. Returns a 1000×600
+    PNG image directly (Content-Type: image/png) so the Mini App can embed
+    it via ``<img src=...>``.
+
+    Cache-Control is short (30s) so the chart refreshes after a forecast
+    update without stale images persisting.
+    """
+    from fastapi.responses import Response
+    from backend.cashflow.chart import render_cashflow_waterfall
+    from backend.cashflow.forecast import get_latest_forecast
+
+    user = await _resolve_user(auth, db)
+    forecast = await get_latest_forecast(db, user.id)
+
+    monthly_data = forecast.monthly_data if forecast else []
+    png_bytes = render_cashflow_waterfall(monthly_data)
+
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "max-age=30, must-revalidate"},
+    )
+
+
 @router.get("/api/wealth/overview")
 async def get_wealth_overview(
     source: str | None = Query(
