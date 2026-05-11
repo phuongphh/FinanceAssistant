@@ -25,7 +25,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
 | #426 | [Story] P4B-S9: Telegram Interface — Life Events | [issue-426.md](issue-426.md) |
 | #427 | [Story] P4B-S10: Life Event Impact Visualization | [issue-427.md](issue-427.md) |
+| #428 | [Story] P4B-S11: Mini App Life Events Panel | [issue-428.md](issue-428.md) |
 | #429 | [Story] P4B-S12: LLM Narrative for Life Events | [issue-429.md](issue-429.md) |
 | #430 | [Story] P4B-S13: Life Events Tests + Benchmarks | [issue-430.md](issue-430.md) |
 
-**Total active:** 23
+**Total active:** 24
