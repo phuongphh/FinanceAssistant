@@ -224,6 +224,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #399 | Pre-Phase | [Story] P4A-S25: Trust framing audit | [pre-phase/issue-399.md](by-phase/pre-phase/issue-399.md) |
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
+| #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
 
-**Total:** 220 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 203 Pre-Phase)
+**Total:** 221 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 204 Pre-Phase)
