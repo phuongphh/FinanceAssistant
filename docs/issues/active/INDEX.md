@@ -21,5 +21,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #421 | [Story] P4B-S4: Scenario Comparison UX Enhancement | [issue-421.md](issue-421.md) |
 | #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
 | #423 | [Story] P4B-S6: Life Event Data Model + Migration | [issue-423.md](issue-423.md) |
+| #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 
-**Total active:** 17
+**Total active:** 18
