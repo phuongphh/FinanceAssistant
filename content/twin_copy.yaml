@@ -41,6 +41,9 @@ chart:
   y_label: "Giá trị tài sản"
   watermark: "Bé Tiền — dự phóng xác suất, không phải lời hứa"
 
+recompute:
+  done: "🔮 Bé Tiền vừa cập nhật xong dự phóng tương lai cho bạn. Mở Twin để xem nhé!"
+
 trajectory:
   empty_state: |-
     🔮 Twin cần tối thiểu 10tr tài sản đã ghi nhận để mô phỏng có ý nghĩa.
@@ -67,6 +70,9 @@ briefing:
   ahead: "🚀 Twin: tài sản đang cao hơn đường giữa P50 khoảng {delta_pct}% — nhịp này ổn đó."
   on_track: "🎯 Twin: bạn đang đi khá sát đường giữa P50 — cứ đều tay nhé."
   behind: "🌱 Twin: đang thấp hơn P50 khoảng {delta_pct}%, không sao — mình đi chậm mà chắc."
+  accuracy_neutral: "📊 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} ({error_pct}%)."
+  accuracy_celebrate: "🎉 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} — bạn vượt kỳ vọng rồi!"
+  accuracy_reassure: "💪 Tuần trước dự báo P50 = {predicted}, thực tế = {actual} — chưa sao, mình điều chỉnh dần nhé."
 
 how_it_works: |-
   🔮 Twin hoạt động thế nào?
@@ -87,10 +93,29 @@ miniapp:
 
 narrative:
   prompt: |-
-    Bạn là Bé Tiền, trợ lý tài chính thân thiện. Viết 2-3 câu tiếng Việt, 50-200 ký tự, không markdown.
-    Dữ liệu: năm {target_year}, P10={p10}, P50={p50}, P90={p90}, tuổi cone={cone_age_days} ngày, mã cone={cone_hash}.
-    Yêu cầu: nói theo xác suất, không hứa lợi nhuận, giọng khích lệ và thận trọng.
-  fallback: "Nếu giữ nhịp hiện tại, tài sản của bạn có thể đi trong vùng này. Mình có thể theo dõi đều để bạn điều chỉnh sớm khi cần."
+    Bạn là Bé Tiền, trợ lý tài chính cá nhân. Viết 2-3 câu tiếng Việt, 50-200 ký tự, không markdown.
+
+    Dữ liệu của người dùng:
+    - Năm mục tiêu: {target_year}, P10={p10}, P50={p50}, P90={p90}
+    - Mức tài sản: {wealth_level}
+    - Thay đổi 30 ngày qua: {top_changes}
+    - Sự kiện gần đây: {life_events_summary}
+
+    Yêu cầu: đề cập số tiền cụ thể từ dữ liệu, nêu tên loại tài sản thực tế nếu có, không dùng câu chung chung như "tài sản của bạn", "bạn đang đi đúng hướng". Giọng ấm áp, xác suất, không hứa lợi nhuận.
+  fallback: "Nếu giữ nhịp hiện tại, P50 năm {target_year} có thể đạt {p50}. Mình theo dõi cùng bạn nhé."
+  wealth_level_labels:
+    starter: "mới bắt đầu"
+    young_prof: "đang xây dựng"
+    mass_affluent: "tích lũy tốt"
+    hnw: "tài sản lớn"
+
+scenario_comparison:
+  tooltip_optimal: "Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt."
+  delta_badge_positive: "+{delta_pct}%"
+  delta_badge_negative: "{delta_pct}%"
+  cta_savings: "Để đạt P50 tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng"
+  cta_no_change: "Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!"
+  milestone_label: "Năm {year}"
 
 comparison:
   recomputing: "⏳ Mình đang dựng lộ trình tối ưu để so sánh..."

@@ -11,10 +11,15 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 
+import yaml
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session_factory
+from backend.models.user import User
 from backend.twin.services.twin_projection_service import compute_and_store
 from backend.twin.services.twin_query_service import get_latest_projection
 from backend.wealth.services import net_worth_calculator as wealth_service
@@ -22,9 +27,17 @@ from backend.wealth.services import net_worth_calculator as wealth_service
 logger = logging.getLogger(__name__)
 
 RECOMPUTE_THRESHOLD = Decimal("0.05")
-DEBOUNCE_WINDOW = timedelta(hours=1)
+DEBOUNCE_WINDOW = timedelta(minutes=30)
 _pending_user_ids: set[uuid.UUID] = set()
 _pending_tasks: set[asyncio.Task] = set()
+
+_TWIN_COPY_PATH = Path(__file__).resolve().parents[4] / "content" / "twin_copy.yaml"
+
+
+@lru_cache(maxsize=1)
+def _load_recompute_copy() -> dict:
+    with open(_TWIN_COPY_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f).get("recompute", {})
 
 
 async def should_recompute(
@@ -73,13 +86,32 @@ async def enqueue_recompute_if_needed(
 async def _compute_in_background(user_id: uuid.UUID) -> None:
     try:
         session_factory = get_session_factory()
+        telegram_id: int | None = None
         async with session_factory() as db:
             try:
+                result = await db.execute(
+                    select(User.telegram_id).where(User.id == user_id)
+                )
+                telegram_id = result.scalar_one_or_none()
                 await compute_and_store(db, user_id, scenario="both")
                 await db.commit()
             except Exception:
                 await db.rollback()
                 logger.exception("twin-recompute: failed for user=%s", user_id)
+                return
+
+        if telegram_id is not None:
+            try:
+                from backend.ports.notifier import get_notifier
+
+                copy = _load_recompute_copy()
+                text = copy.get("done", "🔮 Dự phóng Twin vừa được cập nhật!")
+                notifier = get_notifier()
+                await notifier.send_message(chat_id=telegram_id, text=text)
+            except Exception:
+                logger.warning(
+                    "twin-recompute: notification failed for user=%s", user_id
+                )
     finally:
         _pending_user_ids.discard(user_id)
 

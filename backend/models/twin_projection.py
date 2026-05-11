@@ -57,6 +57,7 @@ class TwinProjection(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()"), nullable=False
     )
+    actual_net_worth: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
 
     __table_args__ = (
         Index("idx_twin_proj_user_latest", "user_id", "computed_at"),
