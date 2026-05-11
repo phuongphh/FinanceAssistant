@@ -39,5 +39,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #439 | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [issue-439.md](issue-439.md) |
 | #440 | [Story] P4B-S23: User Zalo Linking Flow | [issue-440.md](issue-440.md) |
 | #441 | [Story] P4B-S24: Cashflow Alert via Zalo | [issue-441.md](issue-441.md) |
+| #445 | [Feature] Dòng tiền Menu Enhancement — Consolidate Tổng quan, rename Thu vs Chi, remove duplicate | [issue-445.md](issue-445.md) |
 
-**Total active:** 35
+**Total active:** 36
