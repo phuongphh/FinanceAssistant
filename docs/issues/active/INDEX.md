@@ -40,6 +40,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #394 | [Story] P4A-S20: Deep-link from Telegram | [issue-394.md](issue-394.md) |
 | #395 | [Story] P4A-S21: Target allocation per wealth level | [issue-395.md](issue-395.md) |
 | #396 | [Story] P4A-S22: Optimal trajectory simulator | [issue-396.md](issue-396.md) |
+| #398 | [Story] P4A-S24: ContentRenderer port | [issue-398.md](issue-398.md) |
 | #400 | [Story] P4A-S26: Performance benchmarks | [issue-400.md](issue-400.md) |
 
-**Total active:** 37
+**Total active:** 38
