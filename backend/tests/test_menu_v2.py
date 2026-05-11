@@ -323,6 +323,123 @@ class TestHandleMenuCallback:
         )
 
     @pytest.mark.asyncio
+    async def test_goals_update_no_longer_in_submenu(self):
+        """Issue #450 §1 — the duplicate "Cập nhật tiến độ" button was
+        removed from the submenu, so the goals submenu no longer lists
+        a button with the ``menu:goals:update`` callback. The legacy
+        callback still routes to the list view though (backwards-compat
+        for old chat-history bubbles).
+        """
+        copy = menu_formatter._load_copy()
+        goals_buttons = copy["submenu_goals"]["buttons"]
+        callbacks = [b["callback"] for b in goals_buttons]
+        assert "menu:goals:update" not in callbacks
+
+    @pytest.mark.asyncio
+    async def test_goals_advisor_sends_placeholder_before_response(
+        self, monkeypatch,
+    ):
+        """Issue #450 §3 — clicking "Gợi ý lộ trình" must show a typing
+        indicator + placeholder message immediately, then edit it with
+        the actual advisory response. The user should see feedback in
+        <2s even when the LLM takes 5-10s.
+        """
+        from backend.bot.handlers import menu_handler
+
+        actions: list = []
+
+        async def fake_send_chat_action(chat_id, action="typing"):
+            actions.append(("chat_action", chat_id, action))
+
+        async def fake_send_message(**kwargs):
+            actions.append(("send_message", kwargs))
+            return {"ok": True, "result": {"message_id": 123}}
+
+        async def fake_edit_message_text(**kwargs):
+            actions.append(("edit_message_text", kwargs))
+            return {"ok": True}
+
+        async def fake_dispatch(result, user, db):
+            from backend.intent.dispatcher import DispatchOutcome
+            from backend.intent.intents import IntentType
+
+            return DispatchOutcome(
+                text="Đây là gợi ý lộ trình...",
+                kind="executed",
+                intent=IntentType.ADVISORY,
+            )
+
+        user = SimpleNamespace(
+            id="user-1", wealth_level="young_prof", display_name="Test",
+        )
+
+        monkeypatch.setattr(menu_handler, "send_chat_action", fake_send_chat_action)
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(
+            menu_handler._dispatcher, "dispatch", fake_dispatch,
+        )
+
+        await menu_handler._action_goals_advisor(
+            db=None, user=user, chat_id=42, message_id=None,
+        )
+
+        # Order matters — placeholder + typing must arrive before edit.
+        kinds = [step[0] for step in actions]
+        assert "chat_action" in kinds
+        assert "send_message" in kinds
+        assert "edit_message_text" in kinds
+        assert kinds.index("send_message") < kinds.index("edit_message_text")
+
+        edit_call = next(step for step in actions if step[0] == "edit_message_text")
+        assert "lộ trình" in edit_call[1]["text"].lower() or \
+               "Đây là gợi ý" in edit_call[1]["text"]
+
+    @pytest.mark.asyncio
+    async def test_goals_advisor_timeout_fallback(self, monkeypatch):
+        """Issue #450 §3 — if the LLM doesn't return in time the
+        placeholder is edited with a friendly fallback rather than
+        being left hanging."""
+        from backend.bot.handlers import menu_handler
+
+        edits: list = []
+
+        async def fake_send_chat_action(chat_id, action="typing"):
+            pass
+
+        async def fake_send_message(**kwargs):
+            return {"ok": True, "result": {"message_id": 999}}
+
+        async def fake_edit_message_text(**kwargs):
+            edits.append(kwargs)
+            return {"ok": True}
+
+        async def slow_dispatch(result, user, db):
+            await asyncio.sleep(10)  # Way over the timeout.
+
+        user = SimpleNamespace(
+            id="user-1", wealth_level="young_prof", display_name="Test",
+        )
+
+        monkeypatch.setattr(menu_handler, "send_chat_action", fake_send_chat_action)
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(
+            menu_handler, "_GOALS_ADVISOR_TIMEOUT_SECONDS", 0.05,
+        )
+        monkeypatch.setattr(
+            menu_handler._dispatcher, "dispatch", slow_dispatch,
+        )
+
+        await menu_handler._action_goals_advisor(
+            db=None, user=user, chat_id=42, message_id=None,
+        )
+
+        assert edits, "expected edit_message_text to be called with fallback"
+        body = edits[-1]["text"]
+        assert "thử lại" in body.lower() or "💚" in body
+
+    @pytest.mark.asyncio
     async def test_profile_navigation_tracks_with_snapshotted_user_id(
         self, monkeypatch
     ):

@@ -76,6 +76,7 @@ from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
+    send_chat_action,
     send_message,
 )
 
@@ -438,10 +439,10 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # ``saving_rate`` button removed (issue #445); kept for old chat-history bubbles.
     ("cashflow", "saving_rate"): (IntentType.QUERY_CASHFLOW, {"focus": "saving_rate"}),
     # Mục tiêu
-    # Phase 3.8 Epic 5 — ``goals:list`` and ``goals:update`` are now
-    # direct handlers (see _DIRECT_HANDLERS). Removed from the
-    # intent map so the dispatch order matches: direct handler
-    # first, intent map second, advisory third, coming-soon last.
+    # Phase 3.8 Epic 5 — ``goals:list`` is a direct handler (see
+    # _DIRECT_HANDLERS). Removed from the intent map so the dispatch
+    # order matches: direct handler first, intent map second, advisory
+    # third, coming-soon last.
     # Thị trường
     ("market", "vnindex"): (IntentType.QUERY_MARKET, {"ticker": "VNINDEX"}),
     ("market", "stocks"): (IntentType.QUERY_PORTFOLIO, {"asset_type": "stock"}),
@@ -805,15 +806,89 @@ async def _action_goals_list(
     await show_goals_list(db, chat_id, user)
 
 
-async def _action_goals_update(
+# Issue #450 §3 — loading indicator copy. ``PLACEHOLDER`` is what the
+# user sees within ~1s of tapping the button; ``TIMEOUT_FALLBACK`` is
+# what we substitute in when the LLM doesn't return in time. Both
+# stay personality-consistent so the wait doesn't break the Bé Tiền
+# tone-of-voice.
+_GOALS_ADVISOR_PLACEHOLDER = "⏳ Bé Tiền đang phân tích mục tiêu của bạn..."
+_GOALS_ADVISOR_TIMEOUT_FALLBACK = (
+    "⏳ Bé Tiền cần thêm thời gian — bạn thử lại sau nhé 💚"
+)
+_GOALS_ADVISOR_TIMEOUT_SECONDS = 15.0
+
+
+async def _action_goals_advisor(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Phase 3.8 Epic 5 — same surface as ``goals:list``; user picks
-    a row from the list, the per-row "Cập nhật tiến độ" button
-    opens the actual edit-progress wizard."""
-    from backend.bot.handlers.goal_entry import show_goals_list
+    """Issue #450 §3 — "Gợi ý lộ trình" with loading indicator.
 
-    await show_goals_list(db, chat_id, user)
+    Without a placeholder the user sees an idle chat for 5-10s while
+    the LLM thinks (DeepSeek round-trip + advisory context build) and
+    assumes the bot is broken. Steps:
+
+      1. Send typing chat-action — Telegram clears it after 5s but
+         the placeholder arrives well before then.
+      2. Post a placeholder message; capture its message_id.
+      3. Dispatch the advisory intent under a hard timeout so a slow
+         LLM doesn't pin a callback worker indefinitely.
+      4. Edit the placeholder with the actual response (or a friendly
+         fallback if we timed out / errored).
+    """
+    # Step 1 — typing indicator. Failure here is non-fatal; we just
+    # skip the visual cue and the placeholder still gives feedback.
+    try:
+        await send_chat_action(chat_id, "typing")
+    except Exception:
+        logger.debug("goals advisor: send_chat_action failed", exc_info=True)
+
+    # Step 2 — placeholder. Capture message_id so we can edit in place.
+    placeholder_resp = await send_message(
+        chat_id=chat_id, text=_GOALS_ADVISOR_PLACEHOLDER
+    )
+    placeholder_id: int | None = None
+    if placeholder_resp and placeholder_resp.get("ok"):
+        placeholder_id = (placeholder_resp.get("result") or {}).get("message_id")
+
+    # Step 3 — dispatch advisory with a hard timeout. ADVISORY hits
+    # the LLM in the hot path; the surrounding callback flow already
+    # has its own try/except (handle_menu_callback) so we keep the
+    # local handling tight.
+    prompt = _ADVISORY_MAP[("goals", "advisor")]
+    result = IntentResult(
+        intent=IntentType.ADVISORY,
+        confidence=1.0,
+        parameters={},
+        raw_text=prompt,
+        classifier_used=CLASSIFIER_RULE,
+    )
+    try:
+        outcome = await asyncio.wait_for(
+            _dispatcher.dispatch(result, user, db),
+            timeout=_GOALS_ADVISOR_TIMEOUT_SECONDS,
+        )
+        body = outcome.text or _GOALS_ADVISOR_TIMEOUT_FALLBACK
+    except asyncio.TimeoutError:
+        logger.warning("goals advisor LLM timed out after %ss",
+                       _GOALS_ADVISOR_TIMEOUT_SECONDS)
+        body = _GOALS_ADVISOR_TIMEOUT_FALLBACK
+    except Exception:
+        logger.exception("goals advisor dispatch crashed")
+        body = _GOALS_ADVISOR_TIMEOUT_FALLBACK
+
+    # Step 4 — replace the placeholder with the real body. If the
+    # placeholder send failed (no message_id captured), fall back to a
+    # fresh send so the user still sees the response.
+    if placeholder_id is not None:
+        edited = await edit_message_text(
+            chat_id=chat_id,
+            message_id=placeholder_id,
+            text=body,
+        )
+        if not edited:
+            await send_message(chat_id=chat_id, text=body)
+    else:
+        await send_message(chat_id=chat_id, text=body)
 
 
 def _market_portfolio_keyboard(asset_type: str, *, include_search: bool = False) -> dict:
@@ -1066,7 +1141,14 @@ _DIRECT_HANDLERS = {
     # tool + the projection service for free-form follow-ups.
     ("goals", "add"): _action_goals_add,
     ("goals", "list"): _action_goals_list,
-    ("goals", "update"): _action_goals_update,
+    # Issue #450 §3: advisor uses a direct handler so we can show the
+    # loading indicator + placeholder while the LLM works.
+    ("goals", "advisor"): _action_goals_advisor,
+    # Issue #450 §1: the "Cập nhật tiến độ" submenu button was removed
+    # because it duplicated the per-row update button in the list. Keep
+    # the legacy callback wired to the list view so old chat-history
+    # bubbles don't dead-end on the coming-soon stub.
+    ("goals", "update"): _action_goals_list,
     ("market", "stocks"): _action_market_stock_board,
     ("market", "crypto"): _action_market_crypto_prices,
     ("market", "gold"): _action_market_gold_prices,

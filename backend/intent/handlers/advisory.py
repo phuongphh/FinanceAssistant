@@ -38,7 +38,11 @@ from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.user import User
-from backend.services import conversation_context_service
+from backend.services import (
+    conversation_context_service,
+    goal_roadmap,
+    goal_templates,
+)
 from backend.services.llm_service import LLMError, call_llm
 from backend.wealth.models.income_stream import IncomeStream
 from backend.wealth.services import asset_service
@@ -48,6 +52,7 @@ logger = logging.getLogger(__name__)
 ADVISORY_RATE_LIMIT_PER_DAY = 5
 ADVISORY_EVENT_RESPONSE = "advisory_response_sent"
 ADVISORY_EVENT_RATE_LIMITED = "advisory_rate_limited"
+ADVISORY_EVENT_ROADMAP_SERVED = "advisory_roadmap_served"
 
 # Footer is appended in code (not the prompt) so a misbehaving LLM
 # can't strip it. The test suite asserts presence on every response.
@@ -84,6 +89,16 @@ Trả lời:"""
 
 class AdvisoryHandler(IntentHandler):
     async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
+        # Issue #450 §5 fast path — roadmap queries ("lộ trình mua nhà"
+        # etc.) bypass the heavy context builder and the per-user cache.
+        # We use a shared cache keyed by (template_id, wealth_level), and
+        # a rule-based fallback on timeout. Roadmap responses do NOT
+        # consume the daily advisory quota — they're cacheable and not
+        # personalized enough to count as bespoke advice.
+        template_id = goal_roadmap.match_roadmap_query(intent.raw_text or "")
+        if template_id is not None:
+            return await self._handle_roadmap(db, user, intent, template_id)
+
         # Rate-limit BEFORE building context so the expensive queries
         # don't run for capped users.
         used = await _advisory_calls_in_last_24h(db, user.id)
@@ -126,6 +141,66 @@ class AdvisoryHandler(IntentHandler):
             ADVISORY_EVENT_RESPONSE,
             user_id=user.id,
             properties={"chars": len(body)},
+        )
+        return f"{body}\n\n{DISCLAIMER}"
+
+    async def _handle_roadmap(
+        self,
+        db: AsyncSession,
+        user: User,
+        intent: IntentResult,
+        template_id: str,
+    ) -> str:
+        """Issue #450 §5 — roadmap shortcut: shared cache + LLM with
+        hard timeout + rule-based fallback.
+
+        Three sources of truth, in priority order:
+          1. ``call_roadmap_llm`` (DeepSeek with ``shared_cache=True``,
+             10s timeout) — cache hits land in <100ms.
+          2. Rule-based ``RoadmapFallback`` from
+             ``content/goal_roadmap_templates.yaml``.
+          3. The generic LLM error message (only when fallback YAML is
+             missing the entry — defensive, shouldn't happen in
+             prod).
+        """
+        from backend import analytics
+
+        template = goal_templates.get_template(template_id)
+        goal_name = template.name if template else template_id
+        # Use the persisted ``user.wealth_level`` column directly — it
+        # was set by the asset wizard via ``ladder.update_user_level``
+        # and only mutates on real life events. Avoiding ``resolve_style``
+        # saves a net-worth recompute + market-data fetch on the cache
+        # path so the P50 stays well under 200ms.
+        level = _level_to_vi(user.wealth_level or "young_prof")
+
+        source = "fallback"
+        llm_response = await goal_roadmap.call_roadmap_llm(
+            db,
+            template_id=template_id,
+            goal_name=goal_name,
+            wealth_level=level,
+        )
+        if llm_response:
+            source = "llm"
+            body = _strip_trailing_disclaimer(llm_response.strip())
+        else:
+            fallback = goal_roadmap.get_fallback(template_id)
+            if fallback is None:
+                logger.warning(
+                    "roadmap fallback missing for template_id=%s", template_id,
+                )
+                return _llm_error_message(user)
+            body = (
+                f"{fallback.render()}\n\n"
+                "_Gợi ý này dựa trên mẫu phổ biến. Bé Tiền có thể phân "
+                "tích chi tiết hơn nếu bạn thử lại sau._"
+            )
+
+        analytics.track(
+            ADVISORY_EVENT_ROADMAP_SERVED,
+            user_id=user.id,
+            properties={"template_id": template_id, "source": source},
         )
         return f"{body}\n\n{DISCLAIMER}"
 
@@ -328,6 +403,7 @@ def _strip_trailing_disclaimer(text: str) -> str:
 __all__ = [
     "ADVISORY_EVENT_RATE_LIMITED",
     "ADVISORY_EVENT_RESPONSE",
+    "ADVISORY_EVENT_ROADMAP_SERVED",
     "ADVISORY_PROMPT",
     "ADVISORY_RATE_LIMIT_PER_DAY",
     "AdvisoryHandler",

@@ -367,10 +367,6 @@ submenu_goals:
       callback: "menu:goals:add"
       description: "Đặt mục tiêu mới với mốc thời gian"
 
-    - label: "✏️ Cập nhật tiến độ"
-      callback: "menu:goals:update"
-      description: "Thêm tiền vào mục tiêu đang theo dõi"
-
     - label: "💡 Gợi ý lộ trình"
       callback: "menu:goals:advisor"
       description: "Cần tiết kiệm bao nhiêu/tháng?"
