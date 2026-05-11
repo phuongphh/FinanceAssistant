@@ -195,6 +195,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #376 | Pre-Phase | [Story] P4A-S2: Monte Carlo simulator (single asset) | [pre-phase/issue-376.md](by-phase/pre-phase/issue-376.md) |
 | #377 | Pre-Phase | [Story] P4A-S3: Multi-asset portfolio simulation | [pre-phase/issue-377.md](by-phase/pre-phase/issue-377.md) |
 | #378 | Pre-Phase | [Story] P4A-S4: Cone aggregator (P10/P50/P90) | [pre-phase/issue-378.md](by-phase/pre-phase/issue-378.md) |
+| #379 | Pre-Phase | [Story] P4A-S5: Engine integration test | [pre-phase/issue-379.md](by-phase/pre-phase/issue-379.md) |
 
-**Total:** 191 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 174 Pre-Phase)
+**Total:** 192 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 175 Pre-Phase)
