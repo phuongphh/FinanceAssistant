@@ -4,21 +4,17 @@
 
 ## Phase 4B — Epic 2: Life Event Simulator
 
-> **Type:** Epic | **Estimate:** 7 ngày | **Stories:** 8
+> **Type:** Epic | **Estimate:** 7 ngay | **Stories:** 8
 
-## Mục tiêu
-Người dùng thêm mốc đời thực (mua nhà, kết hôn, con cái) và thấy impact lên Financial Twin.
+## Muc tieu
+Nguoi dung them moc doi thuc (mua nha, ket hon, con cai) va thay impact len Twin.
 
 ## Stories in this Epic
-_(Sẽ update)_
-- [ ] [Story] P4B-S6: Life Event Data Model + Migration
-- [ ] [Story] P4B-S7: Vietnamese Life Event Presets
-- [ ] [Story] P4B-S8: Monte Carlo Integration — Life Events
-- [ ] [Story] P4B-S9: Telegram Interface — Life Events
-- [ ] [Story] P4B-S10: Life Event Impact Visualization
-- [ ] [Story] P4B-S11: Mini App Life Events Panel
-- [ ] [Story] P4B-S12: LLM Narrative for Life Events
-- [ ] [Story] P4B-S13: Life Events Tests + Benchmarks
-
-## Reference
-`docs/current/phase-4B/phase-4B-detailed.md` § Epic 2
+- [ ] #423 [Story] P4B-S6: Life Event Data Model + Migration
+- [ ] #424 [Story] P4B-S7: Vietnamese Life Event Presets
+- [ ] #425 [Story] P4B-S8: Monte Carlo Integration - Life Events
+- [ ] #426 [Story] P4B-S9: Telegram Interface - Life Events
+- [ ] #427 [Story] P4B-S10: Life Event Impact Visualization
+- [ ] #428 [Story] P4B-S11: Mini App Life Events Panel
+- [ ] #429 [Story] P4B-S12: LLM Narrative for Life Events
+- [ ] #430 [Story] P4B-S13: Life Events Tests + Benchmarks
