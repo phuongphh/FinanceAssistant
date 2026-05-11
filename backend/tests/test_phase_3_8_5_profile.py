@@ -16,9 +16,11 @@ from backend.profile.handlers.profile_menu import (
     handle_profile_view,
     notification_keyboard,
     parse_hhmm,
+    render_glossary,
     render_profile,
     sanitize_display_name,
 )
+from backend.profile.handlers import profile_menu as profile_menu_module
 from backend.profile.models.user_profile import UserProfile
 from backend.profile.services.stats_aggregator import ProfileStatsAggregator
 from backend.profile.services.wealth_level_mapper import WealthLevelMapper
@@ -197,7 +199,8 @@ async def test_handle_profile_view_degrades_when_stats_fail(monkeypatch):
 
     assert "Profile của Bé Tiền Test" in sent["text"]
     assert "chế độ an toàn" in sent["text"]
-    assert len(sent["reply_markup"]["inline_keyboard"]) == 3
+    # 4 rows: [edit_name, edit_age] + [notifications] + [glossary] + [back]
+    assert len(sent["reply_markup"]["inline_keyboard"]) == 4
 
 
 def test_sanitize_display_name_validates_and_strips_at():
@@ -293,6 +296,117 @@ async def test_preset_briefing_time_callback_accepts_colon_value(monkeypatch):
     assert user.briefing_time == time(8, 0)
     assert "08:00" in edited["text"]
     db.flush.assert_awaited_once()
+
+
+def test_render_glossary_includes_all_six_terms():
+    text = render_glossary()
+
+    # Title + intro
+    assert "Giải thích các mục" in text
+    assert "quay lại Profile" in text  # intro hints at the back button
+
+    # All six ambiguous terms must be explained
+    assert "Báo cáo sáng" in text
+    assert "Nhắc định kỳ" in text
+    assert "Hành trình tài sản" in text
+    assert "Thay đổi tài sản" in text
+    assert "Loại tài sản" in text
+    assert "Chuỗi hoạt động" in text
+
+    # Key clarifying details users would otherwise miss
+    assert "ngày đầu tiên" in text  # net-worth-change baseline
+    assert "Khởi Đầu" in text and "Tinh Hoa" in text  # wealth levels named
+
+
+def test_render_glossary_separates_entries_with_blank_lines():
+    text = render_glossary()
+
+    # Each entry should be visually separated by a blank line so the
+    # screen reads as standalone cards on mobile.
+    assert "\n\n🌅" in text or text.startswith("🌅") or "\n\n*" in text
+    # Joining via "_join_entries" inserts an empty string between entries,
+    # which becomes a blank line when joined with "\n".
+    blocks = [block for block in text.split("\n\n") if block.strip()]
+    # Title + intro + 6 entries = 8 standalone blocks
+    assert len(blocks) == 8
+
+
+def test_glossary_keyboard_has_single_back_button():
+    keyboard = profile_menu_module.glossary_keyboard()
+
+    rows = keyboard["inline_keyboard"]
+    assert len(rows) == 1
+    assert len(rows[0]) == 1
+    back = rows[0][0]
+    assert "Quay lại Profile" in back["text"]
+    # Reuses the existing profile:view callback to re-render the Profile
+    # in place; no separate "back from glossary" route needed.
+    assert back["callback_data"] == "profile:view"
+
+
+@pytest.mark.asyncio
+async def test_glossary_callback_edits_message_with_glossary_text(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    profile = UserProfile(user_id=user.id)
+    db = MagicMock()
+    db.flush = AsyncMock()
+    edited: dict = {}
+
+    async def fake_get_user(db, telegram_id):
+        return user
+
+    async def fake_get_or_create_profile(db, user_id):
+        return profile
+
+    async def fake_answer_callback(*args, **kwargs):
+        return None
+
+    async def fake_edit_message_text(**kwargs):
+        edited.update(kwargs)
+
+    async def fake_send_message(**kwargs):  # pragma: no cover — fallback path
+        edited.update(kwargs)
+
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu._get_user_by_telegram_id",
+        fake_get_user,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.get_or_create_profile",
+        fake_get_or_create_profile,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.answer_callback",
+        fake_answer_callback,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.edit_message_text",
+        fake_edit_message_text,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.send_message",
+        fake_send_message,
+    )
+
+    handled = await handle_profile_callback(
+        db,
+        {
+            "id": "cb-glossary",
+            "data": "profile:glossary",
+            "from": {"id": 12345},
+            "message": {"chat": {"id": 42}, "message_id": 99},
+        },
+    )
+
+    assert handled is True
+    assert edited["chat_id"] == 42
+    assert edited["message_id"] == 99
+    assert "Giải thích các mục" in edited["text"]
+    assert edited["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == (
+        "profile:view"
+    )
 
 
 def test_reminder_profile_settings_gate_delivery_time():

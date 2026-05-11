@@ -101,6 +101,12 @@ def profile_keyboard(
                         "callback_data": "profile:notifications",
                     }
                 ],
+                [
+                    {
+                        "text": _copy("keyboards", "profile", "glossary"),
+                        "callback_data": "profile:glossary",
+                    }
+                ],
             ]
         )
     rows.append(
@@ -377,6 +383,10 @@ async def handle_profile_callback(
         await _render_notifications(chat_id, message_id, profile)
         return True
 
+    if action == "glossary":
+        await _render_glossary(chat_id, message_id)
+        return True
+
     if action == "toggle" and len(parts) >= 3:
         kind = parts[2]
         if kind == "briefing":
@@ -523,17 +533,14 @@ def render_profile(
         pv["field_briefing"].format(
             state=briefing_state, time=_fmt_time(profile.briefing_time)
         ),
-        pv["hint_briefing"],
         pv["field_reminder"].format(
             state=reminder_state, time=_fmt_time(profile.reminder_time)
         ),
-        pv["hint_reminder"],
         "",
         pv["section_overview"],
         pv["field_account_age"].format(days=stats["account_age_days"]),
         pv["field_net_worth"].format(value=format_money_short(float(net_worth))),
         _format_wealth_journey(progress),
-        pv["hint_wealth_journey"],
     ]
 
     change = stats.get("net_worth_change_pct")
@@ -542,7 +549,6 @@ def render_profile(
         lines.append(
             pv["field_net_worth_change"].format(sign=sign, pct=f"{change:.1f}")
         )
-        lines.append(pv["hint_net_worth_change"])
 
     if notice:
         lines.extend(["", notice])
@@ -551,7 +557,6 @@ def render_profile(
         "",
         pv["section_activity"],
         pv["field_asset_types"].format(count=stats["asset_types_count"]),
-        pv["hint_asset_types"],
         pv["field_expense_this_month"].format(
             count=stats["transaction_count_this_month"]
         ),
@@ -560,7 +565,6 @@ def render_profile(
             active=stats["goals_active"], completed=stats["goals_completed"]
         ),
         pv["field_streak"].format(days=stats["current_streak"]),
-        pv["hint_streak"],
         pv["field_briefing_read"].format(count=stats["briefing_read_count"]),
         "",
         pv["footer"],
@@ -599,6 +603,56 @@ async def _get_user_by_telegram_id(
     return (
         await db.execute(select(User).where(User.telegram_id == telegram_id))
     ).scalar_one_or_none()
+
+
+def render_glossary() -> str:
+    glossary = _load_copy()["glossary"]
+    parts = [glossary["title"], "", glossary["intro"], ""]
+    parts.extend(_join_entries(glossary["entries"]))
+    return "\n".join(parts)
+
+
+def glossary_keyboard() -> dict[str, list[list[dict[str, str]]]]:
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _copy("keyboards", "glossary", "back"),
+                    "callback_data": "profile:view",
+                }
+            ]
+        ]
+    }
+
+
+def _join_entries(entries: list[str]) -> list[str]:
+    # Two blank lines between glossary entries so each term reads as a
+    # standalone card on mobile (single newline collapses on Telegram).
+    joined: list[str] = []
+    for idx, entry in enumerate(entries):
+        if idx > 0:
+            joined.append("")
+        joined.append(entry)
+    return joined
+
+
+async def _render_glossary(chat_id: int, message_id: int | None) -> None:
+    text = render_glossary()
+    if message_id is None:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_markup=glossary_keyboard(),
+        )
+        return
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup=glossary_keyboard(),
+    )
 
 
 async def _render_notifications(
@@ -756,12 +810,14 @@ __all__ = [
     "age_keyboard",
     "get_or_create_profile",
     "get_profile_or_default",
+    "glossary_keyboard",
     "handle_profile_callback",
     "handle_profile_text_input",
     "handle_profile_view",
     "notification_keyboard",
     "parse_hhmm",
     "profile_keyboard",
+    "render_glossary",
     "render_profile",
     "sanitize_display_name",
     "time_keyboard",
