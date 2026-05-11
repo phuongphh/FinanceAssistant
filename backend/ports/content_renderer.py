@@ -49,6 +49,21 @@ class TwinViewSnapshot:
 
 
 @dataclass(frozen=True)
+class TwinComparisonSnapshot:
+    """Read model needed to render Current vs Optimal Twin comparison."""
+
+    target_year: int
+    current_p50: Decimal
+    optimal_p50: Decimal
+    delta_pct: str
+    actions: str
+    disclaimer: str
+    current_cone: list[dict[str, Any]]
+    optimal_cone: list[dict[str, Any]]
+    filename: str = "be-tien-twin-optimal.png"
+
+
+@dataclass(frozen=True)
 class BriefingSnapshot:
     """Minimal briefing render model for channel renderers."""
 
@@ -68,6 +83,10 @@ class ContentRenderer(Protocol):
     """Port for rendering channel-ready content without sending it."""
 
     def render_twin_view(self, snapshot: TwinViewSnapshot) -> ChannelContent: ...
+
+    def render_twin_comparison(
+        self, snapshot: TwinComparisonSnapshot
+    ) -> ChannelContent: ...
 
     def render_briefing(self, snapshot: BriefingSnapshot) -> ChannelContent: ...
 

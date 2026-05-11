@@ -16,6 +16,7 @@ from backend.ports.content_renderer import (
     Button,
     ChannelContent,
     ContentRenderer,
+    TwinComparisonSnapshot,
     TwinViewSnapshot,
 )
 from backend.ports.notifier import Notifier, get_notifier
@@ -59,16 +60,6 @@ def _target_point(cone: list[dict[str, Any]]) -> dict[str, Any]:
     if not cone:
         raise ValueError("cone must not be empty")
     return max(cone, key=lambda point: int(point.get("year", 0)))
-
-
-def _trajectory_keyboard() -> dict:
-    return {
-        "inline_keyboard": [
-            [{"text": "⚖️ So tối ưu", "callback_data": "menu:twin:compare_optimal"}],
-            [{"text": "❓ Cách hoạt động", "callback_data": "menu:twin:how_it_works"}],
-            [{"text": "◀️ Quay về Twin", "callback_data": "menu:twin"}],
-        ]
-    }
 
 
 def _telegram_reply_markup(buttons: tuple[tuple[Button, ...], ...]) -> dict | None:
@@ -275,9 +266,13 @@ async def send_twin_compare_optimal(
     chat_id: int,
     user: User,
     notifier: Notifier | None = None,
+    renderer: ContentRenderer | None = None,
 ) -> None:
     """Send Current vs Optimal dual-cone comparison."""
     notifier = notifier or get_notifier()
+    renderer = renderer or TelegramContentRenderer(
+        chart_renderer=render_projection_chart
+    )
     copy = _copy()["comparison"]
     current = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_CURRENT
@@ -324,19 +319,17 @@ async def send_twin_compare_optimal(
     optimal_point = _target_point(optimal.cone_data)
     current_p50 = Decimal(str(current_point.get("p50", 0)))
     optimal_p50 = Decimal(str(optimal_point.get("p50", 0)))
-    caption = copy["caption"].format(
-        target_year=current_point.get("year"),
-        current_p50=format_money_short(current_p50),
-        optimal_p50=format_money_short(optimal_p50),
-        delta_pct=_delta_pct(current_p50, optimal_p50),
-        actions=_action_lines(current, optimal),
-        disclaimer=get_allocation_disclaimer(),
+    content = renderer.render_twin_comparison(
+        TwinComparisonSnapshot(
+            target_year=int(current_point.get("year", 0)),
+            current_p50=current_p50,
+            optimal_p50=optimal_p50,
+            delta_pct=_delta_pct(current_p50, optimal_p50),
+            actions=_action_lines(current, optimal),
+            disclaimer=get_allocation_disclaimer(),
+            current_cone=current.cone_data,
+            optimal_cone=optimal.cone_data,
+            filename="be-tien-twin-optimal.png",
+        )
     )
-    png = render_projection_chart(current.cone_data, optimal=optimal.cone_data)
-    await notifier.send_photo(
-        chat_id,
-        png,
-        caption=caption[:1024],
-        reply_markup=_trajectory_keyboard(),
-        filename="be-tien-twin-optimal.png",
-    )
+    await _send_channel_content(notifier, chat_id, content)

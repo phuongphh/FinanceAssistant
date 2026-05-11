@@ -7,6 +7,7 @@ from backend.ports.content_renderer import (
     ChannelContent,
     ContentRenderer,
     MilestoneSnapshot,
+    TwinComparisonSnapshot,
     TwinViewSnapshot,
 )
 
@@ -17,6 +18,14 @@ class ZaloContentRenderer(ContentRenderer):
     def render_twin_view(self, snapshot: TwinViewSnapshot) -> ChannelContent:
         # TODO(phase-5): map Twin ChannelContent to Zalo Mini Program/OA format.
         raise NotImplementedError("Zalo Twin rendering is planned for Phase 5+")
+
+    def render_twin_comparison(
+        self, snapshot: TwinComparisonSnapshot
+    ) -> ChannelContent:
+        # TODO(phase-5): map comparison charts to Zalo Mini Program/OA format.
+        raise NotImplementedError(
+            "Zalo Twin comparison rendering is planned for Phase 5+"
+        )
 
     def render_briefing(self, snapshot: BriefingSnapshot) -> ChannelContent:
         # TODO(phase-5): map briefing cards to Zalo OA messages.

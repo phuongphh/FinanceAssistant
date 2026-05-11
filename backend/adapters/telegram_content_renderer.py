@@ -15,6 +15,7 @@ from backend.ports.content_renderer import (
     ChannelContent,
     ContentRenderer,
     MilestoneSnapshot,
+    TwinComparisonSnapshot,
     TwinViewSnapshot,
 )
 from backend.twin.services.twin_chart_service import render_projection_chart
@@ -58,6 +59,26 @@ class TelegramContentRenderer(ContentRenderer):
             caption += copy["stale_note"]
         if snapshot.narrative:
             caption = f"{caption}\n\n{snapshot.narrative}"
+        return ChannelContent(
+            text=caption[:1024],
+            images=(png,),
+            buttons=twin_view_buttons(),
+            filename=snapshot.filename,
+        )
+
+    def render_twin_comparison(
+        self, snapshot: TwinComparisonSnapshot
+    ) -> ChannelContent:
+        copy = _copy()["comparison"]
+        png = self._chart_renderer(snapshot.current_cone, optimal=snapshot.optimal_cone)
+        caption = copy["caption"].format(
+            target_year=snapshot.target_year,
+            current_p50=format_money_short(snapshot.current_p50),
+            optimal_p50=format_money_short(snapshot.optimal_p50),
+            delta_pct=snapshot.delta_pct,
+            actions=snapshot.actions,
+            disclaimer=snapshot.disclaimer,
+        )
         return ChannelContent(
             text=caption[:1024],
             images=(png,),
