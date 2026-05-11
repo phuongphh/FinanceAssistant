@@ -34,6 +34,7 @@ lxml>=5.0.0
 
 # Charts
 matplotlib>=3.8.0
+numpy>=1.26.0
 
 # Utils
 python-dotenv>=1.0.0
