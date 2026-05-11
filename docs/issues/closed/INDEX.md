@@ -205,9 +205,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #384 | Pre-Phase | [Story] P4A-S10: On-demand recompute trigger | [pre-phase/issue-384.md](by-phase/pre-phase/issue-384.md) |
 | #385 | Pre-Phase | [Story] P4A-S11: Daily snapshot delta read service | [pre-phase/issue-385.md](by-phase/pre-phase/issue-385.md) |
 | #386 | Pre-Phase | [Story] P4A-S12: Menu entry "🔮 Bé Tiền tương lai" | [pre-phase/issue-386.md](by-phase/pre-phase/issue-386.md) |
+| #387 | Pre-Phase | [Story] P4A-S13: PNG cone chart renderer | [pre-phase/issue-387.md](by-phase/pre-phase/issue-387.md) |
 | #388 | Pre-Phase | [Story] P4A-S14: Twin handler — view trajectory | [pre-phase/issue-388.md](by-phase/pre-phase/issue-388.md) |
 | #389 | Pre-Phase | [Story] P4A-S15: Morning briefing Twin line | [pre-phase/issue-389.md](by-phase/pre-phase/issue-389.md) |
 | #390 | Pre-Phase | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [pre-phase/issue-390.md](by-phase/pre-phase/issue-390.md) |
 
-**Total:** 204 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 187 Pre-Phase)
+**Total:** 205 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 188 Pre-Phase)
