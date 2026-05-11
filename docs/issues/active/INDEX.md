@@ -12,5 +12,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #367 | fix(dashboard): asset name text overflow in wealth dashboard | [issue-367.md](issue-367.md) |
+| #369 | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [issue-369.md](issue-369.md) |
 
-**Total active:** 8
+**Total active:** 9
