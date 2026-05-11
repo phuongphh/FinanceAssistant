@@ -225,10 +225,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
+| #417 | Pre-Phase | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [pre-phase/issue-417.md](by-phase/pre-phase/issue-417.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
 | #439 | Pre-Phase | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [pre-phase/issue-439.md](by-phase/pre-phase/issue-439.md) |
 | #441 | Pre-Phase | [Story] P4B-S24: Cashflow Alert via Zalo | [pre-phase/issue-441.md](by-phase/pre-phase/issue-441.md) |
 | #445 | Pre-Phase | [Feature] Dòng tiền Menu Enhancement — Consolidate Tổng quan, rename Thu vs Chi, remove duplicate | [pre-phase/issue-445.md](by-phase/pre-phase/issue-445.md) |
 
-**Total:** 225 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 208 Pre-Phase)
+**Total:** 226 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 209 Pre-Phase)
