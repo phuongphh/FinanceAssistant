@@ -7,14 +7,13 @@
 > **Type:** Epic | **Estimate:** 3 ngày (Tuần 3 đầu) | **Stories:** 4
 
 ## Mục tiêu
-Telegram WebApp basic — 1 view (Twin dashboard). Channel-agnostic API.
+Telegram WebApp basic — Twin dashboard. Channel-agnostic API.
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P4A-S17: Mini App webview shell
-- [ ] [Story] P4A-S18: Twin dashboard layout
-- [ ] [Story] P4A-S19: REST API endpoint GET /api/twin
-- [ ] [Story] P4A-S20: Deep-link from Telegram
+- [ ] #391 [Story] P4A-S17: Mini App webview shell
+- [ ] #392 [Story] P4A-S18: Twin dashboard layout
+- [ ] #393 [Story] P4A-S19: REST API endpoint GET /api/twin
+- [ ] #394 [Story] P4A-S20: Deep-link from Telegram
 
 ## Reference
 `docs/current/phase-4A/phase-4A-detailed.md` § Epic 4
