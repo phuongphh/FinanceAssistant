@@ -179,7 +179,7 @@ async def unmark_as_rental(
 
     asset.is_rental = False
     asset.rental_metadata = None
-    await _pause_streams_for_asset(db, user_id, asset_id)
+    await pause_streams_for_asset(db, user_id, asset_id)
     await db.flush()
     return asset
 
@@ -329,20 +329,28 @@ async def _sync_rental_income_stream(
     return stream
 
 
-async def _pause_streams_for_asset(
+async def pause_streams_for_asset(
     db: AsyncSession,
     user_id: uuid.UUID,
     asset_id: uuid.UUID,
-) -> None:
+) -> bool:
     """Set every linked income stream to ``is_active=False``.
 
     "Pause" rather than "delete" so re-marking restores the same row
     (preserves ``created_at`` and any future Phase 2 income history
     that joins through ``source_asset_id``).
+
+    Safe to call for non-rental assets — the FK lookup is O(1) via the
+    partial ``idx_income_source_asset`` index and a no-op when no
+    stream points at this asset. Returns True if a stream was paused
+    (lets callers decide whether to mention rental income in user-
+    facing messages).
     """
     stream = await _find_stream_for_asset(db, user_id, asset_id)
     if stream is not None and stream.is_active:
         stream.is_active = False
+        return True
+    return False
 
 
 async def _find_stream_for_asset(

@@ -482,17 +482,21 @@ async def _confirm_asset_delete(
 
     asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
     if asset is None or not asset.is_active:
-        await send_message(
-            chat_id=chat_id, text="Tài sản này không còn trong danh sách."
-        )
+        await _send_asset_already_gone(db, chat_id, user, asset)
         return
 
+    rental_warning = (
+        "\n• Dòng tiền thuê hàng tháng sẽ ngừng tính." if asset.is_rental else ""
+    )
     await send_message(
         chat_id=chat_id,
         text=(
-            "Bạn chắc chắn muốn xoá tài sản này khỏi danh mục?\n\n"
+            "🗑 <b>Xác nhận xoá tài sản</b>\n\n"
             f"{_asset_delete_row_label(asset)}\n\n"
-            "Mình sẽ ẩn tài sản khỏi danh mục hiện tại, không xoá lịch sử."
+            "Sau khi xoá:\n"
+            "• Tài sản biến mất khỏi danh mục.\n"
+            "• Tổng tài sản và dòng tiền tự động tính lại."
+            f"{rental_warning}"
         ),
         parse_mode="HTML",
         reply_markup=asset_delete_confirm_keyboard(
@@ -512,23 +516,61 @@ async def _soft_delete_asset(
 
     asset = await asset_service.get_asset_by_id(db, user.id, asset_uuid)
     if asset is None or not asset.is_active:
-        await send_message(
-            chat_id=chat_id, text="Tài sản này không còn trong danh sách."
-        )
+        await _send_asset_already_gone(db, chat_id, user, asset)
         return
 
     asset_name = asset.name
+    asset_type = asset.asset_type
+    was_rental = bool(asset.is_rental)
+
     await asset_service.soft_delete(db, user.id, asset_uuid)
+    # Pause linked rental income stream (no-op for non-rental assets) so
+    # the cash-flow forecaster stops crediting rent from a deleted home.
+    rental_paused = await rental_service.pause_streams_for_asset(
+        db, user.id, asset_uuid
+    )
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user, breakdown.total)
+
+    rental_note = (
+        "\n🏠 Dòng thuê hàng tháng đã tạm dừng." if was_rental and rental_paused else ""
+    )
     await send_message(
         chat_id=chat_id,
         text=(
-            f"✅ Đã xoá <b>{asset_name}</b> khỏi danh mục hiện tại.\n"
-            f"💎 Tổng tài sản mới: <b>{format_money_full(breakdown.total)}</b>"
+            f"✅ Đã xoá <b>{html.escape(asset_name)}</b> khỏi danh mục.\n"
+            f"💎 Tổng tài sản: <b>{format_money_full(breakdown.total)}</b>\n"
+            "💰 Dòng tiền sẽ được cập nhật ở lần xem tiếp theo."
+            f"{rental_note}"
         ),
         parse_mode="HTML",
     )
+    # Re-render the (now-fresh) delete list so the user sees the
+    # updated state in-place — avoids the stale-list confusion where
+    # the previous "Chọn tài sản muốn xoá" message still shows the
+    # row they just removed.
+    await show_asset_delete_list(db, chat_id, user, asset_type)
+
+
+async def _send_asset_already_gone(
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    asset: "object | None",  # Asset | None — quoted to avoid forward-ref churn
+) -> None:
+    """Friendly recovery when the user taps a button for an already-deleted
+    or unknown asset (typically a stale list message). Re-renders a fresh
+    list when we know the asset_type, otherwise sends the type picker.
+    """
+    asset_type = getattr(asset, "asset_type", None)
+    await send_message(
+        chat_id=chat_id,
+        text="Tài sản này không còn trong danh sách. Đây là danh sách mới nhất 👇",
+    )
+    if asset_type:
+        await show_asset_delete_list(db, chat_id, user, asset_type)
+    else:
+        await show_asset_delete_type_picker(db, chat_id, user)
 
 
 # ---------- Cash flow -------------------------------------------------
