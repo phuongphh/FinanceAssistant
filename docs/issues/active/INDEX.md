@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #417 | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [issue-417.md](issue-417.md) |
 | #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
 | #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
+| #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
 
-**Total active:** 13
+**Total active:** 14
