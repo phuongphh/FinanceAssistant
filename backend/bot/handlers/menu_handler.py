@@ -666,28 +666,80 @@ async def _action_assets_net_worth(
 async def _action_assets_report(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Render the interactive asset dashboard report."""
-    from backend.bot.handlers.asset_entry import show_asset_dashboard_report
+    """Open the wealth Mini App Dashboard — Telegram WebApp button.
 
-    await show_asset_dashboard_report(db, chat_id, user)
+    Replaces the legacy inline paginated report. The Mini App is the
+    primary CRUD surface for assets (full forms, charts, validation),
+    so a single tap straight into the WebView is the lowest-friction
+    path. Callback queries can't launch a WebApp directly — we must
+    reply with an inline ``web_app`` button (Telegram API constraint).
+    """
+    url = wealth_dashboard_url(source="menu_assets_report")
+    if url is None:
+        await send_message(
+            chat_id=chat_id,
+            text=get_action_copy("action_assets_report", "not_configured"),
+            parse_mode="Markdown",
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text=get_action_copy("action_assets_report", "open_dashboard"),
+        reply_markup={
+            "inline_keyboard": [
+                [{"text": get_action_copy("action_assets_report", "miniapp_button"),
+                  "web_app": {"url": url}}],
+                [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
+            ],
+        },
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "assets", "action": "report"},
+    )
 
 
-async def _action_assets_add(
+async def _action_assets_manage(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Open the Phase 3A asset-entry wizard."""
-    from backend.bot.handlers.asset_entry import start_asset_wizard
+    """Combined Add/Edit/Delete asset entry — educates 3 alternative paths.
 
-    await start_asset_wizard(db, chat_id, user)
+    Replaces the old separate ``add`` and ``edit`` buttons. The Mini App
+    already covers full CRUD, so this surface teaches the three entry
+    points (Mini App, natural language, net-worth shortcut) rather than
+    spawning another wizard tree.
+    """
+    name = user.display_name or "bạn"
+    title = get_action_copy("action_assets_manage", "title")
+    body = get_action_copy("action_assets_manage", "body").format(name=name)
+    text = f"{title}\n\n{body}"
 
+    keyboard_rows: list[list[dict[str, Any]]] = []
+    url = wealth_dashboard_url(source="menu_assets_manage")
+    if url is not None:
+        keyboard_rows.append([
+            {"text": get_action_copy("action_assets_manage", "open_miniapp_button"),
+             "web_app": {"url": url}},
+        ])
+    keyboard_rows.append([
+        {"text": get_action_copy("action_assets_manage", "back_button"),
+         "callback_data": "menu:main"},
+    ])
 
-async def _action_assets_edit(
-    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
-) -> None:
-    """Open the type-gated asset management surface."""
-    from backend.bot.handlers.asset_entry import show_asset_manage_menu
-
-    await show_asset_manage_menu(db, chat_id, user)
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup={"inline_keyboard": keyboard_rows},
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "assets", "action": "manage"},
+    )
 
 
 async def _action_expenses_recurring(
@@ -1127,8 +1179,12 @@ async def _action_twin_life_events(
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
-    ("assets", "add"): _action_assets_add,
-    ("assets", "edit"): _action_assets_edit,
+    ("assets", "manage"): _action_assets_manage,
+    # Legacy callbacks kept so stale chat-history bubbles (before the
+    # add/edit → manage merge) don't dead-end. Both route to the new
+    # combined "Thêm/Sửa/Xoá" help surface.
+    ("assets", "add"): _action_assets_manage,
+    ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("expenses", "add"): _action_expenses_add,
     ("expenses", "ocr"): _action_expenses_ocr,

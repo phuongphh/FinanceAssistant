@@ -179,15 +179,11 @@ submenu_assets:
 
     - label: "📈 Báo cáo"
       callback: "menu:assets:report"
-      description: "Liệt kê tài sản theo loại, tap để sửa"
+      description: "Mở Mini App Dashboard tài sản"
 
-    - label: "➕ Thêm tài sản"
-      callback: "menu:assets:add"
-      description: "Tiền mặt, cổ phiếu, BĐS, tiền số, vàng…"
-
-    - label: "✏️ Sửa tài sản"
-      callback: "menu:assets:edit"
-      description: "Cập nhật giá trị, xóa, đánh dấu đã bán"
+    - label: "✏️ Thêm / Sửa / Xoá tài sản"
+      callback: "menu:assets:manage"
+      description: "Hướng dẫn 3 cách quản lý tài sản"
 
     - label: "🏠 BĐS cho thuê"
       callback: "menu:assets:mark_rental"
@@ -215,6 +211,32 @@ action_assets_net_worth:
   recalculating_wait: |-
     🔄 _Bé Tiền đang cập nhật theo giá thị trường..._
     Chờ mình một chút nhé ✨
+
+action_assets_report:
+  open_dashboard: "📊 Mở dashboard tài sản:"
+  miniapp_button: "Mở Dashboard"
+  not_configured: |-
+    📊 Dashboard chưa sẵn sàng — admin cần cấu hình `MINIAPP_BASE_URL` trước nhé.
+
+action_assets_manage:
+  title: "✏️ *THÊM / SỬA / XOÁ TÀI SẢN*"
+  body: |-
+    Mình có 3 cách để {name} quản lý tài sản — chọn cách tiện nhất nhé:
+
+    *1️⃣ Mini App Dashboard* _(khuyên dùng)_
+    • Gõ /dashboard hoặc bấm nút menu 📊 góc trái khung chat
+    • Giao diện trực quan: thêm/sửa/xoá nhanh, có biểu đồ
+
+    *2️⃣ Nói chuyện tự nhiên với Bé Tiền*
+    💡 _Mẹo — thử gõ:_
+    • "thêm 50 triệu tiền mặt"
+    • "sửa cổ phiếu FPT thành 200 cổ"
+    • "xoá tài sản vàng SJC"
+
+    *3️⃣ Xem nhanh tổng tài sản*
+    • Bấm 📊 Tổng tài sản trong menu Tài sản
+  open_miniapp_button: "📊 Mở Mini App"
+  back_button: "◀️ Quay về menu"
 
 # ============================================================
 # SUB-MENU: CHI TIÊU (Level 2)
