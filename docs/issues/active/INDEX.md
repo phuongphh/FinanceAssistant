@@ -26,5 +26,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #426 | [Story] P4B-S9: Telegram Interface — Life Events | [issue-426.md](issue-426.md) |
 | #427 | [Story] P4B-S10: Life Event Impact Visualization | [issue-427.md](issue-427.md) |
 | #429 | [Story] P4B-S12: LLM Narrative for Life Events | [issue-429.md](issue-429.md) |
+| #430 | [Story] P4B-S13: Life Events Tests + Benchmarks | [issue-430.md](issue-430.md) |
 
-**Total active:** 22
+**Total active:** 23
