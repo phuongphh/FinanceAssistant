@@ -30,5 +30,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #384 | [Story] P4A-S10: On-demand recompute trigger | [issue-384.md](issue-384.md) |
 | #385 | [Story] P4A-S11: Daily snapshot delta read service | [issue-385.md](issue-385.md) |
 | #387 | [Story] P4A-S13: PNG cone chart renderer | [issue-387.md](issue-387.md) |
+| #390 | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [issue-390.md](issue-390.md) |
 
-**Total active:** 26
+**Total active:** 27
