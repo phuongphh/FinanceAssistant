@@ -5,8 +5,11 @@ import re
 from dataclasses import dataclass
 from datetime import time
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
+import yaml
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,14 +35,31 @@ _TIME_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 logger = logging.getLogger(__name__)
 
-PROFILE_DEGRADED_NOTICE = (
-    "_Mình đang hiển thị Profile ở chế độ an toàn; vài số liệu/cài đặt "
-    "có thể tạm thời chưa cập nhật._"
+_PROFILE_COPY_PATH = (
+    Path(__file__).resolve().parents[3] / "content" / "profile_copy.yaml"
 )
-PROFILE_SCHEMA_NOTICE = (
-    "_Profile chưa sẵn sàng vì DB thiếu bảng profile; "
-    "admin chạy `alembic upgrade head` nhé._"
-)
+
+
+@lru_cache(maxsize=1)
+def _load_copy() -> dict[str, Any]:
+    """Load and cache profile_copy.yaml. File edits in production require
+    a process restart — same constraint as every other content YAML.
+    """
+    with open(_PROFILE_COPY_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _copy(*keys: str) -> str:
+    node: Any = _load_copy()
+    for key in keys:
+        node = node[key]
+    if not isinstance(node, str):
+        raise KeyError(f"profile copy lookup is not a string: {' › '.join(keys)}")
+    return node
+
+
+PROFILE_DEGRADED_NOTICE = _copy("notices", "degraded")
+PROFILE_SCHEMA_NOTICE = _copy("notices", "schema_missing")
 
 
 @dataclass(frozen=True)
@@ -66,29 +86,59 @@ def profile_keyboard(
         rows.extend(
             [
                 [
-                    {"text": "📝 Đổi tên hiển thị", "callback_data": "profile:edit_name"},
-                    {"text": "🎂 Đổi nhóm tuổi", "callback_data": "profile:edit_age"},
+                    {
+                        "text": _copy("keyboards", "profile", "edit_name"),
+                        "callback_data": "profile:edit_name",
+                    },
+                    {
+                        "text": _copy("keyboards", "profile", "edit_age"),
+                        "callback_data": "profile:edit_age",
+                    },
                 ],
-                [{"text": "🔔 Cài thông báo", "callback_data": "profile:notifications"}],
+                [
+                    {
+                        "text": _copy("keyboards", "profile", "notifications"),
+                        "callback_data": "profile:notifications",
+                    }
+                ],
             ]
         )
-    rows.append([{"text": "◀️ Quay lại", "callback_data": "menu:main"}])
+    rows.append(
+        [
+            {
+                "text": _copy("keyboards", "profile", "back"),
+                "callback_data": "menu:main",
+            }
+        ]
+    )
     return {"inline_keyboard": rows}
 
 
 def age_keyboard() -> dict[str, list[list[dict[str, str]]]]:
+    # AGE_RANGES values double as button labels and callback identifiers —
+    # they are numeric tokens, not translatable copy, so they stay in code.
     return {
         "inline_keyboard": [
             [
-                {"text": "20-29", "callback_data": "profile:age:20-29"},
-                {"text": "30-39", "callback_data": "profile:age:30-39"},
+                {"text": AGE_RANGES[0], "callback_data": f"profile:age:{AGE_RANGES[0]}"},
+                {"text": AGE_RANGES[1], "callback_data": f"profile:age:{AGE_RANGES[1]}"},
             ],
             [
-                {"text": "40-49", "callback_data": "profile:age:40-49"},
-                {"text": "50+", "callback_data": "profile:age:50+"},
+                {"text": AGE_RANGES[2], "callback_data": f"profile:age:{AGE_RANGES[2]}"},
+                {"text": AGE_RANGES[3], "callback_data": f"profile:age:{AGE_RANGES[3]}"},
             ],
-            [{"text": "🚫 Không muốn nói", "callback_data": "profile:age:none"}],
-            [{"text": "◀️ Quay lại Profile", "callback_data": "profile:view"}],
+            [
+                {
+                    "text": _copy("keyboards", "age", "none"),
+                    "callback_data": "profile:age:none",
+                }
+            ],
+            [
+                {
+                    "text": _copy("keyboards", "age", "back"),
+                    "callback_data": "profile:view",
+                }
+            ],
         ]
     }
 
@@ -96,35 +146,48 @@ def age_keyboard() -> dict[str, list[list[dict[str, str]]]]:
 def notification_keyboard(
     profile: UserProfile,
 ) -> dict[str, list[list[dict[str, str]]]]:
-    briefing_status = "✅ Bật" if profile.briefing_enabled else "🔕 Tắt"
-    reminder_status = "✅ Bật" if profile.reminder_enabled else "🔕 Tắt"
+    briefing_status = _notification_state_label(profile.briefing_enabled)
+    reminder_status = _notification_state_label(profile.reminder_enabled)
     return {
         "inline_keyboard": [
             [
                 {
-                    "text": f"🌅 Báo cáo sáng: {briefing_status}",
+                    "text": _copy("keyboards", "notifications", "toggle_briefing").format(
+                        state=briefing_status
+                    ),
                     "callback_data": "profile:toggle:briefing",
                 }
             ],
             [
                 {
-                    "text": f"🕖 Giờ báo cáo sáng: {_fmt_time(profile.briefing_time)}",
+                    "text": _copy("keyboards", "notifications", "time_briefing").format(
+                        time=_fmt_time(profile.briefing_time)
+                    ),
                     "callback_data": "profile:time_menu:briefing",
                 }
             ],
             [
                 {
-                    "text": f"⏰ Nhắc định kỳ: {reminder_status}",
+                    "text": _copy("keyboards", "notifications", "toggle_reminder").format(
+                        state=reminder_status
+                    ),
                     "callback_data": "profile:toggle:reminder",
                 }
             ],
             [
                 {
-                    "text": f"🕘 Giờ nhắc: {_fmt_time(profile.reminder_time)}",
+                    "text": _copy("keyboards", "notifications", "time_reminder").format(
+                        time=_fmt_time(profile.reminder_time)
+                    ),
                     "callback_data": "profile:time_menu:reminder",
                 }
             ],
-            [{"text": "◀️ Quay lại Profile", "callback_data": "profile:view"}],
+            [
+                {
+                    "text": _copy("keyboards", "notifications", "back"),
+                    "callback_data": "profile:view",
+                }
+            ],
         ]
     }
 
@@ -146,8 +209,18 @@ def time_keyboard(kind: str) -> dict[str, list[list[dict[str, str]]]]:
                 }
                 for preset in TIME_PRESETS[2:]
             ],
-            [{"text": "✏️ Tự nhập", "callback_data": f"profile:custom_time:{kind}"}],
-            [{"text": "◀️ Cài thông báo", "callback_data": "profile:notifications"}],
+            [
+                {
+                    "text": _copy("keyboards", "time", "custom"),
+                    "callback_data": f"profile:custom_time:{kind}",
+                }
+            ],
+            [
+                {
+                    "text": _copy("keyboards", "time", "back"),
+                    "callback_data": "profile:notifications",
+                }
+            ],
         ]
     }
 
@@ -255,7 +328,7 @@ async def handle_profile_callback(
     if user is None:
         await answer_callback(
             callback_id,
-            "Gõ /start để mình nhận ra bạn nhé 🌱",
+            _copy("messages", "unknown_user"),
             show_alert=True,
         )
         return True
@@ -274,7 +347,7 @@ async def handle_profile_callback(
         await wizard_service.start_flow(db, user.id, FLOW_PROFILE, STEP_DISPLAY_NAME)
         await send_message(
             chat_id=chat_id,
-            text="📝 Tên mới của bạn?\n\nGõ /cancel nếu muốn bỏ qua.",
+            text=_copy("prompts", "edit_name"),
         )
         return True
 
@@ -282,7 +355,7 @@ async def handle_profile_callback(
         await edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
-            text="🎂 Bạn thuộc nhóm tuổi nào?",
+            text=_copy("prompts", "edit_age"),
             reply_markup=age_keyboard(),
         )
         return True
@@ -290,7 +363,9 @@ async def handle_profile_callback(
     if action == "age" and len(parts) >= 3:
         value = None if parts[2] == "none" else parts[2]
         if value is not None and value not in AGE_RANGES:
-            await answer_callback(callback_id, "Nhóm tuổi không hợp lệ.", show_alert=True)
+            await answer_callback(
+                callback_id, _copy("messages", "age_invalid"), show_alert=True
+            )
             return True
         profile.age_range = value
         await db.flush()
@@ -334,7 +409,9 @@ async def handle_profile_callback(
         raw_time = ":".join(parts[3:])
         parsed = parse_hhmm(raw_time)
         if parsed is None:
-            await answer_callback(callback_id, "Giờ không hợp lệ.", show_alert=True)
+            await answer_callback(
+                callback_id, _copy("messages", "time_invalid"), show_alert=True
+            )
             return True
         await _set_notification_time(db, user, profile, kind, parsed)
         await _render_notifications(chat_id, message_id, profile)
@@ -351,7 +428,7 @@ async def handle_profile_callback(
         )
         await send_message(
             chat_id=chat_id,
-            text="✏️ Nhập giờ theo format HH:MM (00:00 - 23:59).\n\nGõ /cancel nếu muốn bỏ qua.",
+            text=_copy("prompts", "custom_time"),
         )
         return True
 
@@ -375,7 +452,7 @@ async def handle_profile_text_input(
 
     if text.strip().lower() in {"/cancel", "/huy"}:
         await wizard_service.clear(db, user.id)
-        await send_message(chat_id=chat_id, text="Đã hủy chỉnh sửa profile nhé.")
+        await send_message(chat_id=chat_id, text=_copy("prompts", "cancel_confirm"))
         await handle_profile_view(db, chat_id, user)
         return True
 
@@ -388,7 +465,10 @@ async def handle_profile_text_input(
         user.display_name = name
         await wizard_service.clear(db, user.id)
         await db.flush()
-        await send_message(chat_id=chat_id, text=f"✅ Đã đổi tên hiển thị thành {name}.")
+        await send_message(
+            chat_id=chat_id,
+            text=_copy("messages", "name_updated").format(name=name),
+        )
         await handle_profile_view(db, chat_id, user)
         return True
 
@@ -397,14 +477,17 @@ async def handle_profile_text_input(
         if parsed is None:
             await send_message(
                 chat_id=chat_id,
-                text="Giờ không hợp lệ. Format: HH:MM (00:00 - 23:59)",
+                text=_copy("messages", "time_invalid_format"),
             )
             return True
         kind = ((state.get("draft") or {}).get("kind") or "").strip()
         await _set_notification_time(db, user, profile, kind, parsed)
         await wizard_service.clear(db, user.id)
         await db.flush()
-        await send_message(chat_id=chat_id, text=f"✅ Đã cập nhật giờ thành {_fmt_time(parsed)}.")
+        await send_message(
+            chat_id=chat_id,
+            text=_copy("messages", "time_updated").format(time=_fmt_time(parsed)),
+        )
         await handle_profile_view(db, chat_id, user)
         return True
 
@@ -418,52 +501,69 @@ def render_profile(
     *,
     notice: str | None = None,
 ) -> str:
+    pv = _load_copy()["profile_view"]
     level = stats["wealth_level"]
     progress = stats["wealth_progress"]
     name = _display_name(profile, user)
     net_worth = Decimal(stats.get("net_worth") or 0)
 
+    age_value = profile.age_range or pv["age_range_not_set"]
+    briefing_state = pv["state_on"] if profile.briefing_enabled else pv["state_off"]
+    reminder_state = pv["state_on"] if profile.reminder_enabled else pv["state_off"]
+
     lines = [
-        f"👤 *Profile của {name}* {level['icon']} *{level['name_vn']}*",
-        f"_{level['description']}_",
+        pv["title"].format(
+            name=name, level_icon=level["icon"], level_name=level["name_vn"]
+        ),
+        pv["level_description"].format(description=level["description"]),
         "",
-        "*Thông tin cá nhân*",
-        f"• Tên hiển thị: *{name}*",
-        f"• Nhóm tuổi: *{profile.age_range or 'Chưa chia sẻ'}*",
-        f"• Báo cáo sáng: *{'Bật' if profile.briefing_enabled else 'Tắt'}* lúc *{_fmt_time(profile.briefing_time)}*",
-        f"• Nhắc định kỳ: *{'Bật' if profile.reminder_enabled else 'Tắt'}* lúc *{_fmt_time(profile.reminder_time)}*",
+        pv["section_personal"],
+        pv["field_display_name"].format(name=name),
+        pv["field_age_range"].format(value=age_value),
+        pv["field_briefing"].format(
+            state=briefing_state, time=_fmt_time(profile.briefing_time)
+        ),
+        pv["hint_briefing"],
+        pv["field_reminder"].format(
+            state=reminder_state, time=_fmt_time(profile.reminder_time)
+        ),
+        pv["hint_reminder"],
         "",
-        "*Tổng quan*",
-        f"• Tuổi tài khoản: *{stats['account_age_days']} ngày*",
-        f"• Tổng tài sản: *{format_money_short(float(net_worth))}*",
+        pv["section_overview"],
+        pv["field_account_age"].format(days=stats["account_age_days"]),
+        pv["field_net_worth"].format(value=format_money_short(float(net_worth))),
         _format_wealth_journey(progress),
+        pv["hint_wealth_journey"],
     ]
 
     change = stats.get("net_worth_change_pct")
     if change is not None:
         sign = "+" if change >= 0 else ""
-        lines.append(f"• Thay đổi tài sản: *{sign}{change:.1f}%*")
+        lines.append(
+            pv["field_net_worth_change"].format(sign=sign, pct=f"{change:.1f}")
+        )
+        lines.append(pv["hint_net_worth_change"])
 
     if notice:
         lines.extend(["", notice])
 
     lines.extend([
         "",
-        "*Hoạt động tự động ghi nhận*",
-        f"• Loại tài sản: *{stats['asset_types_count']}/6*",
-        f"• Giao dịch tháng này: *{stats['transaction_count_this_month']}*",
-        f"• Tổng giao dịch: *{stats['transaction_count_total']}*",
-        (
-            f"• Mục tiêu: *{stats['goals_active']} đang chạy* · "
-            f"*{stats['goals_completed']} hoàn tất*"
+        pv["section_activity"],
+        pv["field_asset_types"].format(count=stats["asset_types_count"]),
+        pv["hint_asset_types"],
+        pv["field_expense_this_month"].format(
+            count=stats["transaction_count_this_month"]
         ),
-        f"• Chuỗi hoạt động: *{stats['current_streak']} ngày* 🔥",
-        f"• Báo cáo sáng đã đọc: *{stats['briefing_read_count']}*",
+        pv["field_expense_total"].format(count=stats["transaction_count_total"]),
+        pv["field_goals"].format(
+            active=stats["goals_active"], completed=stats["goals_completed"]
+        ),
+        pv["field_streak"].format(days=stats["current_streak"]),
+        pv["hint_streak"],
+        pv["field_briefing_read"].format(count=stats["briefing_read_count"]),
         "",
-        (
-            "_Profile này được tự động tổng hợp từ dữ liệu bạn đã dùng "
-            "— không cần điền form._"
-        ),
+        pv["footer"],
     ])
     return "\n".join(lines)
 
@@ -473,9 +573,9 @@ def sanitize_display_name(text: str) -> tuple[str | None, str | None]:
     if name.startswith("@"):
         name = name[1:].strip()
     if not name:
-        return None, "Tên không được trống."
+        return None, _copy("messages", "name_empty")
     if len(name) > 50:
-        return None, "Tên dài quá! Tối đa 50 ký tự nhé."
+        return None, _copy("messages", "name_too_long")
     return name, None
 
 
@@ -506,12 +606,18 @@ async def _render_notifications(
     message_id: int | None,
     profile: UserProfile,
 ) -> None:
-    text = (
-        "🔔 *Cài thông báo*\n\n"
-        f"• Báo cáo sáng: *{'✅ Bật' if profile.briefing_enabled else '🔕 Tắt'}*\n"
-        f"• Giờ báo cáo sáng: *{_fmt_time(profile.briefing_time)}*\n"
-        f"• Nhắc định kỳ: *{'✅ Bật' if profile.reminder_enabled else '🔕 Tắt'}*\n"
-        f"• Giờ nhắc: *{_fmt_time(profile.reminder_time)}*"
+    panel = _load_copy()["notifications_panel"]
+    briefing_state = _notification_state_label(profile.briefing_enabled)
+    reminder_state = _notification_state_label(profile.reminder_enabled)
+    text = "\n".join(
+        [
+            panel["title"],
+            "",
+            panel["briefing"].format(state=briefing_state),
+            panel["briefing_time"].format(time=_fmt_time(profile.briefing_time)),
+            panel["reminder"].format(state=reminder_state),
+            panel["reminder_time"].format(time=_fmt_time(profile.reminder_time)),
+        ]
     )
     if message_id is None:
         await send_message(
@@ -602,19 +708,21 @@ def _display_name(profile: UserProfile, user: User | ProfileUserSnapshot) -> str
         value = (value or "").strip()
         if value:
             return value
-    return "Bạn"
+    return _copy("messages", "default_name")
 
 
 def _format_wealth_journey(progress: dict[str, Any]) -> str:
+    pv = _load_copy()["profile_view"]
     if progress.get("at_top"):
-        return "• Hành trình tài sản: *đã đạt level cao nhất* 🏆"
+        return pv["wealth_journey_at_top"]
     pct = int(progress.get("progress_pct") or 0)
     amount = Decimal(progress.get("amount_to_next") or 0)
     next_name = progress.get("next_level_name") or "level tiếp theo"
     bar = make_progress_bar(pct, 100, width=8)
-    return (
-        f"• Hành trình tài sản: `{bar}` → *{next_name}* "
-        f"(còn {format_money_short(float(amount))})"
+    return pv["wealth_journey_in_progress"].format(
+        bar=bar,
+        next_level=next_name,
+        remaining=format_money_short(float(amount)),
     )
 
 
@@ -622,15 +730,20 @@ def _fmt_time(value: time | None) -> str:
     return (value or time(7, 0)).strftime("%H:%M")
 
 
+def _notification_state_label(enabled: bool) -> str:
+    key = "notification_state_on" if enabled else "notification_state_off"
+    return _copy("keyboards", key)
+
+
 def _age_confirm_text(value: str | None) -> str:
     if value is None:
-        return "✅ Đã lưu: không chia sẻ nhóm tuổi."
-    return f"✅ Đã cập nhật nhóm tuổi: {value}."
+        return _copy("messages", "age_cleared")
+    return _copy("messages", "age_set").format(value=value)
 
 
 def _time_menu_text(kind: str) -> str:
-    label = "báo cáo sáng" if kind == "briefing" else "nhắc định kỳ"
-    return f"🕒 Chọn giờ {label}:"
+    key = "time_menu_briefing" if kind == "briefing" else "time_menu_reminder"
+    return _copy("prompts", key)
 
 
 __all__ = [

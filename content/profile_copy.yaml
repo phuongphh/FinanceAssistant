@@ -1,0 +1,127 @@
+# Profile screen copy — all user-facing Vietnamese strings.
+#
+# Loaded by backend/profile/handlers/profile_menu.py through the cached
+# loader `_load_copy()`. File edits in production require a process
+# restart (same convention as every other content/*.yaml).
+#
+# Conventions:
+# - {placeholder} is a str.format() variable; never reorder placeholders
+#   without updating the caller.
+# - Inline hints under labels use the "_↳ ..._" convention so the
+#   meaning of a term is never invisible to the user. Keep each hint
+#   short (one sentence) and avoid jargon.
+# - Internal callback identifiers stay in Python (profile:edit_name,
+#   profile:toggle:briefing, …). Only the visible text lives here.
+
+# ============================================================
+# PROFILE VIEW — main /menu → 👤 Profile screen
+# ============================================================
+
+profile_view:
+  title: "👤 *Profile của {name}* {level_icon} *{level_name}*"
+  level_description: "_{description}_"
+
+  section_personal: "*Thông tin cá nhân*"
+  field_display_name: "• Tên hiển thị: *{name}*"
+  field_age_range: "• Nhóm tuổi: *{value}*"
+  age_range_not_set: "Chưa chia sẻ"
+  field_briefing: "• Báo cáo sáng: *{state}* lúc *{time}*"
+  hint_briefing: "  _↳ Tin nhắn tóm tắt sáng mỗi ngày: thị trường, tài sản, gợi ý hành động._"
+  field_reminder: "• Nhắc định kỳ: *{state}* lúc *{time}*"
+  hint_reminder: "  _↳ Nhắc trước các khoản chi định kỳ sắp đến hạn (tiền nhà, internet, hoá đơn…)._"
+  state_on: "Bật"
+  state_off: "Tắt"
+
+  section_overview: "*Tổng quan*"
+  field_account_age: "• Tuổi tài khoản: *{days} ngày*"
+  field_net_worth: "• Tổng tài sản: *{value}*"
+  wealth_journey_at_top: "• Hành trình tài sản: *đã đạt level cao nhất* 🏆"
+  wealth_journey_in_progress: "• Hành trình tài sản: `{bar}` → *{next_level}* (còn {remaining})"
+  hint_wealth_journey: "  _↳ Level tài sản: Khởi Đầu → Trẻ Năng Động → Trung Lưu Vững → Tinh Hoa._"
+  field_net_worth_change: "• Thay đổi tài sản: *{sign}{pct}%*"
+  hint_net_worth_change: "  _↳ So với ngày đầu bạn có dữ liệu tài sản trên Bé Tiền (không phải so với tháng trước)._"
+
+  section_activity: "*Hoạt động tự động ghi nhận*"
+  field_asset_types: "• Loại tài sản: *{count}/6*"
+  hint_asset_types: "  _↳ Số loại bạn đang theo dõi trên tổng 6 loại: tiền mặt, cổ phiếu, BĐS, tiền số, vàng, khác._"
+  field_expense_this_month: "• Chi tiêu tháng này: *{count}*"
+  field_expense_total: "• Tổng chi tiêu: *{count}*"
+  field_goals: "• Mục tiêu: *{active} đang chạy* · *{completed} hoàn tất*"
+  field_streak: "• Chuỗi hoạt động: *{days} ngày* 🔥"
+  hint_streak: "  _↳ Số ngày liên tiếp bạn có hoạt động trên Bé Tiền (ghi chi tiêu, mở báo cáo, gửi phản hồi…)._"
+  field_briefing_read: "• Báo cáo sáng đã đọc: *{count}*"
+
+  footer: "_Profile này được tự động tổng hợp từ dữ liệu bạn đã dùng — không cần điền form._"
+
+# ============================================================
+# NOTICES — degraded / schema-missing fallback states
+# ============================================================
+
+notices:
+  degraded: "_Mình đang hiển thị Profile ở chế độ an toàn; vài số liệu/cài đặt có thể tạm thời chưa cập nhật._"
+  schema_missing: "_Profile chưa sẵn sàng vì DB thiếu bảng profile; admin chạy `alembic upgrade head` nhé._"
+
+# ============================================================
+# KEYBOARDS — inline button labels
+# ============================================================
+
+keyboards:
+  profile:
+    edit_name: "📝 Đổi tên hiển thị"
+    edit_age: "🎂 Đổi nhóm tuổi"
+    notifications: "🔔 Cài thông báo"
+    back: "◀️ Quay lại"
+  age:
+    none: "🚫 Không muốn nói"
+    back: "◀️ Quay lại Profile"
+  notifications:
+    toggle_briefing: "🌅 Báo cáo sáng: {state}"
+    time_briefing: "🕖 Giờ báo cáo sáng: {time}"
+    toggle_reminder: "⏰ Nhắc định kỳ: {state}"
+    time_reminder: "🕘 Giờ nhắc: {time}"
+    back: "◀️ Quay lại Profile"
+  time:
+    custom: "✏️ Tự nhập"
+    back: "◀️ Cài thông báo"
+  notification_state_on: "✅ Bật"
+  notification_state_off: "🔕 Tắt"
+
+# ============================================================
+# NOTIFICATIONS PANEL — 🔔 Cài thông báo summary text
+# ============================================================
+
+notifications_panel:
+  title: "🔔 *Cài thông báo*"
+  briefing: "• Báo cáo sáng: *{state}*"
+  briefing_time: "• Giờ báo cáo sáng: *{time}*"
+  reminder: "• Nhắc định kỳ: *{state}*"
+  reminder_time: "• Giờ nhắc: *{time}*"
+
+# ============================================================
+# PROMPTS — text shown when the bot asks for input
+# ============================================================
+
+prompts:
+  edit_name: "📝 Tên mới của bạn?\n\nGõ /cancel nếu muốn bỏ qua."
+  edit_age: "🎂 Bạn thuộc nhóm tuổi nào?"
+  time_menu_briefing: "🕒 Chọn giờ báo cáo sáng:"
+  time_menu_reminder: "🕒 Chọn giờ nhắc định kỳ:"
+  custom_time: "✏️ Nhập giờ theo format HH:MM (00:00 - 23:59).\n\nGõ /cancel nếu muốn bỏ qua."
+  cancel_confirm: "Đã hủy chỉnh sửa profile nhé."
+
+# ============================================================
+# MESSAGES — confirmations, validation errors
+# ============================================================
+
+messages:
+  unknown_user: "Gõ /start để mình nhận ra bạn nhé 🌱"
+  age_set: "✅ Đã cập nhật nhóm tuổi: {value}."
+  age_cleared: "✅ Đã lưu: không chia sẻ nhóm tuổi."
+  age_invalid: "Nhóm tuổi không hợp lệ."
+  name_empty: "Tên không được trống."
+  name_too_long: "Tên dài quá! Tối đa 50 ký tự nhé."
+  name_updated: "✅ Đã đổi tên hiển thị thành {name}."
+  time_invalid: "Giờ không hợp lệ."
+  time_invalid_format: "Giờ không hợp lệ. Format: HH:MM (00:00 - 23:59)"
+  time_updated: "✅ Đã cập nhật giờ thành {time}."
+  default_name: "Bạn"
