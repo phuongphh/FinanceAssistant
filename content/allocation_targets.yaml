@@ -1,0 +1,49 @@
+# Phase 4A — Optimal Trajectory target allocations.
+# Rule-of-thumb diversification bands for Financial Twin simulations only.
+# Keep disclaimer prominent in every surface that shows these targets.
+disclaimer: "Đây là gợi ý chung, không phải lời khuyên đầu tư. Twin bỏ qua thuế/phí giao dịch và không cam kết lợi nhuận."
+source_note: "Rule-of-thumb conservative diversification by Vietnamese wealth tier for Phase 4A MVP; tune via content without code deploy."
+asset_order:
+  - stocks_vn
+  - stocks_global
+  - crypto
+  - gold
+  - cash_savings
+  - real_estate_vn
+levels:
+  starter:
+    name_vn: "Khởi Đầu"
+    targets:
+      stocks_vn: 0.20
+      stocks_global: 0.00
+      crypto: 0.05
+      gold: 0.10
+      cash_savings: 0.65
+      real_estate_vn: 0.00
+  young_prof:
+    name_vn: "Trẻ Năng Động"
+    targets:
+      stocks_vn: 0.40
+      stocks_global: 0.10
+      crypto: 0.10
+      gold: 0.10
+      cash_savings: 0.30
+      real_estate_vn: 0.00
+  mass_affluent:
+    name_vn: "Trung Lưu Vững"
+    targets:
+      stocks_vn: 0.35
+      stocks_global: 0.15
+      crypto: 0.05
+      gold: 0.15
+      cash_savings: 0.15
+      real_estate_vn: 0.15
+  hnw:
+    name_vn: "Tinh Hoa"
+    targets:
+      stocks_vn: 0.25
+      stocks_global: 0.20
+      crypto: 0.05
+      gold: 0.15
+      cash_savings: 0.10
+      real_estate_vn: 0.25

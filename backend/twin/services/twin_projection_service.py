@@ -16,9 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.twin_projection import TwinProjection
 from backend.services import cashflow_service
+from backend.twin.allocation.target_allocation import get_target_allocation
 from backend.twin.engine import ENGINE_VERSION
 from backend.twin.engine.cone_aggregator import ConePoint, aggregate_cone
-from backend.twin.engine.monte_carlo import simulate_portfolio
+from backend.twin.engine.monte_carlo import Array2D, simulate_portfolio
+from backend.twin.engine.optimal_trajectory import simulate_optimal
+from backend.wealth.ladder import detect_level
 from backend.wealth.services import asset_service
 from backend.wealth.services import net_worth_calculator as wealth_service
 
@@ -83,11 +86,9 @@ async def compute_and_store(
     )
     projections: list[TwinProjection] = []
     for index, scenario_name in enumerate(scenarios):
-        monthly_savings, savings_split = _scenario_inputs(snapshot, scenario_name)
-        sim = simulate_portfolio(
-            snapshot.allocation_amounts,
-            monthly_savings,
-            savings_split=savings_split,
+        sim, monthly_savings, allocation_snapshot = _scenario_simulation(
+            snapshot,
+            scenario_name,
             horizon=horizon,
             paths=paths,
             seed=None if seed is None else seed + index,
@@ -99,7 +100,7 @@ async def compute_and_store(
             scenario=scenario_name,
             base_net_worth=snapshot.base_net_worth,
             monthly_savings=monthly_savings,
-            allocation_snapshot=_decimal_mapping_to_json(snapshot.allocation_weights),
+            allocation_snapshot=_decimal_mapping_to_json(allocation_snapshot),
             cone_data=_cone_to_json(cone),
             sim_paths=paths,
             seed=None if seed is None else seed + index,
@@ -150,18 +151,39 @@ def _map_asset_to_twin_class(asset_type: str, subtype: str | None) -> str:
     return _ASSET_TYPE_TO_TWIN_CLASS.get(asset_type, "cash_savings")
 
 
-def _scenario_inputs(
+def _scenario_simulation(
     snapshot: PortfolioSnapshot,
     scenario: str,
-) -> tuple[Decimal, Mapping[str, Decimal] | None]:
+    *,
+    horizon: int,
+    paths: int,
+    seed: int | None,
+) -> tuple[Array2D, Decimal, Mapping[str, Decimal | float]]:
     if scenario == SCENARIO_CURRENT:
-        return snapshot.monthly_savings, snapshot.allocation_weights or None
+        sim = simulate_portfolio(
+            snapshot.allocation_amounts,
+            snapshot.monthly_savings,
+            savings_split=snapshot.allocation_weights or None,
+            horizon=horizon,
+            paths=paths,
+            seed=seed,
+        )
+        return sim, snapshot.monthly_savings, snapshot.allocation_weights
     if scenario == SCENARIO_OPTIMAL:
-        # Conservative Phase 4A placeholder until Epic 5 introduces target allocation:
-        # keep the same allocation but model a +10% savings habit improvement.
-        return (snapshot.monthly_savings * Decimal("1.10")).quantize(
+        wealth_level = detect_level(snapshot.base_net_worth)
+        sim = simulate_optimal(
+            snapshot.allocation_amounts,
+            wealth_level,
+            horizon,
+            monthly_savings=snapshot.monthly_savings,
+            savings_boost=Decimal("1.10"),
+            paths=paths,
+            seed=seed,
+        )
+        boosted_savings = (snapshot.monthly_savings * Decimal("1.10")).quantize(
             Decimal("1")
-        ), snapshot.allocation_weights or None
+        )
+        return sim, boosted_savings, get_target_allocation(wealth_level)
     raise ValueError(f"Unsupported Twin scenario: {scenario}")
 
 
@@ -177,5 +199,5 @@ def _cone_to_json(cone: list[ConePoint]) -> list[dict[str, int | str]]:
     ]
 
 
-def _decimal_mapping_to_json(values: Mapping[str, Decimal]) -> dict[str, str]:
+def _decimal_mapping_to_json(values: Mapping[str, Decimal | float]) -> dict[str, str]:
     return {key: str(value) for key, value in values.items()}
