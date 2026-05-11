@@ -10,9 +10,16 @@ from typing import Any
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.adapters.telegram_notifier import TelegramNotifier
 from backend.bot.formatters.menu_formatter import back_to_main_keyboard
 from backend.bot.formatters.money import format_money_short
+from backend.ports.content_renderer import (
+    Button,
+    ChannelContent,
+    ContentRenderer,
+    TwinViewSnapshot,
+)
+from backend.ports.notifier import Notifier, get_notifier
+from backend.adapters.telegram_content_renderer import TelegramContentRenderer
 from backend.config import get_settings
 from backend.models.user import User
 from backend.twin.allocation.target_allocation import (
@@ -20,8 +27,8 @@ from backend.twin.allocation.target_allocation import (
     top_rebalance_deltas,
 )
 from backend.twin.services import twin_projection_service, twin_query_service
-from backend.twin.services.twin_chart_service import render_projection_chart
 from backend.twin.services.twin_narrative_service import build_twin_narrative
+from backend.twin.services.twin_chart_service import render_projection_chart
 
 _COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "twin_copy.yaml"
 _MIN_TWIN_NET_WORTH = Decimal("10000000")
@@ -64,6 +71,42 @@ def _trajectory_keyboard() -> dict:
     }
 
 
+def _telegram_reply_markup(buttons: tuple[tuple[Button, ...], ...]) -> dict | None:
+    if not buttons:
+        return None
+    inline_keyboard = []
+    for row in buttons:
+        rendered_row = []
+        for button in row:
+            payload: dict[str, Any] = {"text": button.text}
+            if button.web_app_url:
+                payload["web_app"] = {"url": button.web_app_url}
+            elif button.callback_data:
+                payload["callback_data"] = button.callback_data
+            rendered_row.append(payload)
+        if rendered_row:
+            inline_keyboard.append(rendered_row)
+    return {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+
+
+async def _send_channel_content(
+    notifier: Notifier, chat_id: int, content: ChannelContent
+) -> None:
+    reply_markup = _telegram_reply_markup(content.buttons)
+    if content.images:
+        await notifier.send_photo(
+            chat_id,
+            content.images[0],
+            caption=content.text,
+            reply_markup=reply_markup,
+            filename=content.filename or "be-tien-content.png",
+        )
+        return
+    await notifier.send_message(
+        chat_id, content.text, parse_mode=None, reply_markup=reply_markup
+    )
+
+
 def _miniapp_url() -> str | None:
     base = (get_settings().miniapp_base_url or "").rstrip("/")
     if not base:
@@ -76,10 +119,14 @@ async def send_twin_current(
     *,
     chat_id: int,
     user: User,
-    notifier: TelegramNotifier | None = None,
+    notifier: Notifier | None = None,
+    renderer: ContentRenderer | None = None,
 ) -> None:
-    """Send current Financial Twin trajectory as PNG + caption."""
-    notifier = notifier or TelegramNotifier()
+    """Send current Financial Twin trajectory as rendered channel content."""
+    notifier = notifier or get_notifier()
+    renderer = renderer or TelegramContentRenderer(
+        chart_renderer=render_projection_chart
+    )
     copy = _copy()
     snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
     if snapshot.actual_nw < _MIN_TWIN_NET_WORTH:
@@ -114,37 +161,31 @@ async def send_twin_current(
     optimal_projection = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
     )
-    png = render_projection_chart(
-        cone,
-        optimal=optimal_projection.cone_data if optimal_projection else None,
-    )
     narrative = await build_twin_narrative(
         db, user, cone, cone_age_days=snapshot.cone_age_days
     )
-    caption = copy["trajectory"]["caption"].format(
-        name=_name(user),
-        target_year=point.get("year"),
-        p10=format_money_short(Decimal(str(point.get("p10", 0)))),
-        p50=format_money_short(Decimal(str(point.get("p50", 0)))),
-        p90=format_money_short(Decimal(str(point.get("p90", 0)))),
-        age_text=_age_text(snapshot.cone_age_days),
+    content = renderer.render_twin_view(
+        TwinViewSnapshot(
+            user_name=_name(user),
+            target_year=int(point.get("year", 0)),
+            p10=Decimal(str(point.get("p10", 0))),
+            p50=Decimal(str(point.get("p50", 0))),
+            p90=Decimal(str(point.get("p90", 0))),
+            age_text=_age_text(snapshot.cone_age_days),
+            cone=cone,
+            optimal_cone=optimal_projection.cone_data if optimal_projection else None,
+            narrative=narrative,
+            is_stale=snapshot.is_stale,
+            filename="be-tien-twin.png",
+        )
     )
-    if snapshot.is_stale:
-        caption += copy["trajectory"]["stale_note"]
-    caption = f"{caption}\n\n{narrative}"
-    await notifier.send_photo(
-        chat_id,
-        png,
-        caption=caption[:1024],
-        reply_markup=_trajectory_keyboard(),
-        filename="be-tien-twin.png",
-    )
+    await _send_channel_content(notifier, chat_id, content)
 
 
 async def send_twin_how_it_works(
-    *, chat_id: int, notifier: TelegramNotifier | None = None
+    *, chat_id: int, notifier: Notifier | None = None
 ) -> None:
-    notifier = notifier or TelegramNotifier()
+    notifier = notifier or get_notifier()
     await notifier.send_message(
         chat_id,
         _copy()["how_it_works"],
@@ -154,9 +195,9 @@ async def send_twin_how_it_works(
 
 
 async def send_twin_miniapp_link(
-    *, chat_id: int, notifier: TelegramNotifier | None = None
+    *, chat_id: int, notifier: Notifier | None = None
 ) -> None:
-    notifier = notifier or TelegramNotifier()
+    notifier = notifier or get_notifier()
     copy = _copy()["miniapp"]
     url = _miniapp_url()
     if not url:
@@ -233,10 +274,10 @@ async def send_twin_compare_optimal(
     *,
     chat_id: int,
     user: User,
-    notifier: TelegramNotifier | None = None,
+    notifier: Notifier | None = None,
 ) -> None:
     """Send Current vs Optimal dual-cone comparison."""
-    notifier = notifier or TelegramNotifier()
+    notifier = notifier or get_notifier()
     copy = _copy()["comparison"]
     current = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_CURRENT
