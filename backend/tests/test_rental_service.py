@@ -359,6 +359,49 @@ class TestUnmarkAsRental:
 
 
 @pytest.mark.asyncio
+class TestPauseStreamsForAsset:
+    """Public helper used by asset_service deletion + unmark_as_rental."""
+
+    async def test_active_stream_paused_returns_true(self):
+        user_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset_id, amount=Decimal("15000000"),
+        )
+        db = _mock_session([_result_with_scalar(stream)])
+
+        paused = await rental_service.pause_streams_for_asset(db, user_id, asset_id)
+
+        assert paused is True
+        assert stream.is_active is False
+
+    async def test_no_stream_returns_false(self):
+        user_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        db = _mock_session([_result_with_scalar(None)])
+
+        paused = await rental_service.pause_streams_for_asset(db, user_id, asset_id)
+
+        assert paused is False
+
+    async def test_already_paused_returns_false(self):
+        """No-op when stream exists but is_active is already False
+        (idempotent — second delete shouldn't claim new work)."""
+        user_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        stream = _make_rental_stream(
+            user_id=user_id, asset_id=asset_id,
+            amount=Decimal("15000000"), is_active=False,
+        )
+        db = _mock_session([_result_with_scalar(stream)])
+
+        paused = await rental_service.pause_streams_for_asset(db, user_id, asset_id)
+
+        assert paused is False
+        assert stream.is_active is False
+
+
+@pytest.mark.asyncio
 class TestYieldSummary:
     async def test_empty_user_returns_none_blended(self):
         user_id = uuid.uuid4()

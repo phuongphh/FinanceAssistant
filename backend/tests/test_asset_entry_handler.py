@@ -1793,6 +1793,16 @@ async def test_asset_manage_delete_flow_filters_by_type_then_soft_deletes():
             asset_entry.asset_service, "soft_delete", AsyncMock(return_value=stock)
         ) as delete_mock,
         patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[]),
+        ),
+        patch.object(
+            asset_entry.rental_service,
+            "pause_streams_for_asset",
+            AsyncMock(return_value=False),
+        ) as pause_mock,
+        patch.object(
             asset_entry.net_worth_calculator,
             "calculate_stored_current",
             AsyncMock(return_value=MagicMock(total=Decimal("0"))),
@@ -1813,7 +1823,155 @@ async def test_asset_manage_delete_flow_filters_by_type_then_soft_deletes():
 
     assert consumed is True
     delete_mock.assert_awaited_once_with(db, user.id, stock.id)
-    assert "Đã xoá" in send.await_args.kwargs["text"]
+    pause_mock.assert_awaited_once_with(db, user.id, stock.id)
+    success_text = send.await_args_list[0].kwargs["text"]
+    assert "Đã xoá" in success_text
+    assert "Dòng tiền" in success_text
+    assert "Dòng thuê" not in success_text  # non-rental → no rental note
+
+
+@pytest.mark.asyncio
+async def test_asset_manage_delete_rental_pauses_income_stream():
+    """A rental real-estate asset deletion must also pause its linked
+    income stream — otherwise cash-flow forecaster keeps crediting rent
+    from a property the user just removed.
+    """
+    user = _user()
+    db = _db(user)
+    house = _asset(asset_type="real_estate", value=2_500_000_000)
+    house.name = "Nhà Oceanpark"
+    house.subtype = "house"
+    house.is_rental = True
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=house)
+        ),
+        patch.object(
+            asset_entry.asset_service, "soft_delete", AsyncMock(return_value=house)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[]),
+        ),
+        patch.object(
+            asset_entry.rental_service,
+            "pause_streams_for_asset",
+            AsyncMock(return_value=True),  # rental stream existed and was paused
+        ) as pause_mock,
+        patch.object(
+            asset_entry.net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=MagicMock(total=Decimal("0"))),
+        ),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        consumed = await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb_rental_delete",
+                "data": f"asset_manage:delete:{house.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    pause_mock.assert_awaited_once_with(db, user.id, house.id)
+    success_text = send.await_args_list[0].kwargs["text"]
+    assert "Đã xoá" in success_text
+    assert "Dòng thuê" in success_text  # user told rental income paused
+
+
+@pytest.mark.asyncio
+async def test_asset_manage_delete_confirm_uses_decisive_wording():
+    """The confirmation dialog must NOT use the old 'ẩn... không xoá lịch sử'
+    copy that confused users into thinking the action is fake. It must
+    state plainly that the asset will disappear and totals will recalc.
+    """
+    user = _user()
+    db = _db(user)
+    house = _asset(asset_type="real_estate", value=2_500_000_000)
+    house.name = "Nhà Oceanpark"
+    house.subtype = "house"
+    house.is_rental = True
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=house)
+        ),
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb_confirm",
+                "data": f"asset_manage:delete_confirm:{house.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    text = send.await_args.kwargs["text"]
+    # Decisive wording: tells user the asset will be removed + totals recalc.
+    assert "biến mất khỏi danh mục" in text
+    assert "tính lại" in text
+    # Rental warning surfaced for is_rental=True.
+    assert "thuê hàng tháng" in text
+    # Confusing legacy copy must be gone.
+    assert "ẩn tài sản" not in text
+    assert "không xoá lịch sử" not in text
+
+
+@pytest.mark.asyncio
+async def test_asset_manage_delete_stale_button_re_renders_list():
+    """If the user taps a delete_confirm button on a stale list message
+    (asset already gone), we should re-render a fresh list instead of
+    leaving them with a dead-end 'không còn trong danh sách' message.
+    """
+    user = _user()
+    db = _db(user)
+    gone = _asset(asset_type="stock", value=120_000_000)
+    gone.is_active = False  # already soft-deleted
+
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=gone)
+        ),
+        patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[]),
+        ) as list_mock,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        await asset_entry.handle_asset_manage_callback(
+            db,
+            {
+                "id": "cb_stale",
+                "data": f"asset_manage:delete_confirm:{gone.id}",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+
+    # Two messages: the friendly recovery + the fresh list (here: empty state).
+    assert send.await_count == 2
+    list_mock.assert_awaited_once_with(db, user.id, asset_type="stock")
 
 
 @pytest.mark.asyncio
