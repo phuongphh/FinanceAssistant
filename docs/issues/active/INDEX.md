@@ -32,5 +32,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #432 | [Story] P4B-S15: User Review Flow for Detected Patterns | [issue-432.md](issue-432.md) |
 | #433 | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [issue-433.md](issue-433.md) |
 | #434 | [Story] P4B-S17: Low-Balance Alert Engine | [issue-434.md](issue-434.md) |
+| #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 
-**Total active:** 28
+**Total active:** 29
