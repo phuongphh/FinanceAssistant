@@ -66,6 +66,12 @@ class User(Base):
     # default (avg monthly expense from confirmed patterns × 1.0).
     cashflow_alert_threshold: Mapped[float | None] = mapped_column(Numeric(20, 2))
 
+    # Phase 4B Epic 4 — Zalo channel link. NULL until the user pairs
+    # their Zalo OA follow with a /link_zalo token; populated from the
+    # Zalo webhook handler. Used by ``get_notifiers_for_user`` to fan
+    # alerts out across channels.
+    zalo_user_id: Mapped[str | None] = mapped_column(String(64))
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""
