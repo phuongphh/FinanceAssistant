@@ -12,7 +12,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #398 | [Story] P4A-S24: ContentRenderer port | [issue-398.md](issue-398.md) |
-| #399 | [Story] P4A-S25: Trust framing audit | [issue-399.md](issue-399.md) |
 | #401 | [Story] P4A-S27: Test suite + quality gates | [issue-401.md](issue-401.md) |
 
-**Total active:** 10
+**Total active:** 9
