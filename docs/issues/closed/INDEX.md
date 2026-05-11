@@ -225,6 +225,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
+| #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
 
-**Total:** 221 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 204 Pre-Phase)
+**Total:** 222 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 205 Pre-Phase)

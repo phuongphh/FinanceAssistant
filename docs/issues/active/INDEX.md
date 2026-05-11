@@ -20,7 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
 | #421 | [Story] P4B-S4: Scenario Comparison UX Enhancement | [issue-421.md](issue-421.md) |
 | #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
-| #423 | [Story] P4B-S6: Life Event Data Model + Migration | [issue-423.md](issue-423.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 | #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
 | #426 | [Story] P4B-S9: Telegram Interface — Life Events | [issue-426.md](issue-426.md) |
@@ -41,4 +40,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #441 | [Story] P4B-S24: Cashflow Alert via Zalo | [issue-441.md](issue-441.md) |
 | #445 | [Feature] Dòng tiền Menu Enhancement — Consolidate Tổng quan, rename Thu vs Chi, remove duplicate | [issue-445.md](issue-445.md) |
 
-**Total active:** 36
+**Total active:** 35
