@@ -193,7 +193,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #369 | Pre-Phase | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [pre-phase/issue-369.md](by-phase/pre-phase/issue-369.md) |
 | #375 | Pre-Phase | [Story] P4A-S1: Asset class return distributions | [pre-phase/issue-375.md](by-phase/pre-phase/issue-375.md) |
 | #376 | Pre-Phase | [Story] P4A-S2: Monte Carlo simulator (single asset) | [pre-phase/issue-376.md](by-phase/pre-phase/issue-376.md) |
+| #377 | Pre-Phase | [Story] P4A-S3: Multi-asset portfolio simulation | [pre-phase/issue-377.md](by-phase/pre-phase/issue-377.md) |
 | #378 | Pre-Phase | [Story] P4A-S4: Cone aggregator (P10/P50/P90) | [pre-phase/issue-378.md](by-phase/pre-phase/issue-378.md) |
 
-**Total:** 190 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 173 Pre-Phase)
+**Total:** 191 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 174 Pre-Phase)
