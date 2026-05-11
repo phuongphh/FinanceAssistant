@@ -23,6 +23,7 @@ from backend.models.bank_rate import BankRateSnapshot
 from backend.models.news_article import NewsArticle
 from backend.models.stock_historical_price import StockHistoricalPrice
 from backend.models.price_alert import NotificationSettings, PriceAlertLog
+from backend.models.twin_projection import TwinProjection
 from backend.models.conversation_context import (
     ROLE_ASSISTANT,
     ROLE_USER,
@@ -59,4 +60,5 @@ __all__ = [
     "StockHistoricalPrice",
     "NotificationSettings",
     "PriceAlertLog",
+    "TwinProjection",
 ]

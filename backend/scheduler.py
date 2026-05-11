@@ -31,6 +31,7 @@ from backend.market_data.jobs.gold_updater import update_all_held_gold
 from backend.market_data.jobs.historical_price_seeder import seed_year_start_stock_prices
 from backend.market_data.jobs.news_updater import update_news_articles
 from backend.market_data.jobs.stock_updater import update_all_held_stocks
+from backend.twin.schedulers.weekly_twin_updater import run_weekly_twin_update
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,15 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         seed_year_start_stock_prices, "cron",
         month=1, day=1, hour=7, minute=0, timezone="Asia/Ho_Chi_Minh",
         id="historical_price_seeder",
+    )
+
+    # Phase 4A — Financial Twin projections. Heavy Monte Carlo work runs weekly
+    # outside request paths; read surfaces consume the latest stored cone.
+    scheduler.add_job(
+        run_weekly_twin_update, "cron",
+        day_of_week="sun", hour=23, minute=0,
+        timezone="Asia/Ho_Chi_Minh",
+        id="weekly_twin_update",
     )
 
 
