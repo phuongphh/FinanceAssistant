@@ -211,7 +211,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #389 | Pre-Phase | [Story] P4A-S15: Morning briefing Twin line | [pre-phase/issue-389.md](by-phase/pre-phase/issue-389.md) |
 | #390 | Pre-Phase | [Story] P4A-S16: LLM narrative ("Bé Tiền năm 2036") | [pre-phase/issue-390.md](by-phase/pre-phase/issue-390.md) |
 | #391 | Pre-Phase | [Story] P4A-S17: Mini App webview shell | [pre-phase/issue-391.md](by-phase/pre-phase/issue-391.md) |
+| #393 | Pre-Phase | [Story] P4A-S19: REST API endpoint GET /api/twin | [pre-phase/issue-393.md](by-phase/pre-phase/issue-393.md) |
 | #394 | Pre-Phase | [Story] P4A-S20: Deep-link from Telegram | [pre-phase/issue-394.md](by-phase/pre-phase/issue-394.md) |
 
-**Total:** 208 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 191 Pre-Phase)
+**Total:** 209 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 192 Pre-Phase)
