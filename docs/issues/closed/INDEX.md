@@ -194,6 +194,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #370 | Pre-Phase | [Epic] Phase 4A — Epic 2: Persistence & Scheduler | [pre-phase/issue-370.md](by-phase/pre-phase/issue-370.md) |
 | #371 | Pre-Phase | [Epic] Phase 4A — Epic 3: Telegram Twin Surface | [pre-phase/issue-371.md](by-phase/pre-phase/issue-371.md) |
 | #372 | Pre-Phase | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [pre-phase/issue-372.md](by-phase/pre-phase/issue-372.md) |
+| #373 | Pre-Phase | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [pre-phase/issue-373.md](by-phase/pre-phase/issue-373.md) |
 | #375 | Pre-Phase | [Story] P4A-S1: Asset class return distributions | [pre-phase/issue-375.md](by-phase/pre-phase/issue-375.md) |
 | #376 | Pre-Phase | [Story] P4A-S2: Monte Carlo simulator (single asset) | [pre-phase/issue-376.md](by-phase/pre-phase/issue-376.md) |
 | #377 | Pre-Phase | [Story] P4A-S3: Multi-asset portfolio simulation | [pre-phase/issue-377.md](by-phase/pre-phase/issue-377.md) |
@@ -218,5 +219,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #396 | Pre-Phase | [Story] P4A-S22: Optimal trajectory simulator | [pre-phase/issue-396.md](by-phase/pre-phase/issue-396.md) |
 | #397 | Pre-Phase | [Story] P4A-S23: Comparison handler (Telegram) | [pre-phase/issue-397.md](by-phase/pre-phase/issue-397.md) |
 
-**Total:** 213 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 196 Pre-Phase)
+**Total:** 214 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 197 Pre-Phase)
