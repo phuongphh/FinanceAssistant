@@ -63,7 +63,7 @@ INTENTS:
 - query_expenses_by_category: Hỏi chi tiêu theo loại (ăn uống, sức khỏe...)
 - query_income: Hỏi thu nhập / lương
 - query_cashflow: Hỏi dòng tiền / dư cuối tháng
-- query_market: Hỏi giá thị trường (VNM, BTC, VN-Index)
+- query_market: Hỏi giá thị trường (cổ phiếu VNM, crypto BTC, vàng SJC, VN-Index). Bao gồm cả câu hỏi tổng quát kiểu "giá vàng", "giá crypto", "giá cổ phiếu".
 - query_goals: Hỏi mục tiêu của user
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể
 - query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
@@ -77,9 +77,11 @@ INTENTS:
 
 PARAMETERS (extract nếu có, không có thì bỏ qua):
 - time_range: "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "this_year"
-- category: "food" | "transport" | "housing" | "shopping" | "health" | "education" | "entertainment" | "utility" | "gift" | "investment"
-- asset_type: "cash" | "stock" | "real_estate" | "crypto" | "gold"
-- ticker: viết hoa, ví dụ "VNM", "BTC", "VNINDEX"
+- category (cho query_expenses_by_category): "food" | "transport" | "housing" | "shopping" | "health" | "education" | "entertainment" | "utility" | "gift" | "investment"
+- category (cho query_market — khi user hỏi cả nhóm chứ không phải 1 mã cụ thể): "gold" | "crypto" | "stock"
+  Ví dụ: "giá vàng" → category=gold; "giá crypto"/"giá tiền số" → category=crypto; "giá cổ phiếu" → category=stock
+- asset_type (cho query_assets): "cash" | "stock" | "real_estate" | "crypto" | "gold"
+- ticker (cho query_market khi user hỏi 1 mã cụ thể): viết hoa, ví dụ "VNM", "BTC", "VNINDEX"
 - amount: số nguyên VND
 - goal_name: tên mục tiêu
 

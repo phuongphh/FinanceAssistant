@@ -92,11 +92,24 @@ class RuleBasedClassifier:
             # the query_market regex and beats the genuine out_of_scope
             # match on confidence. The check lives here (not in YAML) so
             # every intent with a ticker capture benefits automatically.
+            #
+            # Category-only matches (e.g. "giá vàng" → category=gold, no
+            # ticker) bypass the whitelist: they route to the gold/crypto
+            # menu handlers which don't need a per-symbol lookup.
             if compiled.intent == IntentType.QUERY_MARKET:
                 t = params.get("ticker")
-                if not t or str(t).upper() not in ALL_TICKERS:
+                cat = params.get("category")
+                if t:
+                    if str(t).upper() not in ALL_TICKERS:
+                        # Drop the bogus capture but keep going if a
+                        # category was extracted from the same phrase.
+                        params.pop("ticker", None)
+                        if not cat:
+                            continue
+                    else:
+                        params["ticker"] = str(t).upper()
+                elif not cat:
                     continue
-                params["ticker"] = str(t).upper()
             if best is None or compiled.confidence > best[0].confidence:
                 best = (compiled, m, params)
 
