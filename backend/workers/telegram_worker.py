@@ -290,6 +290,18 @@ async def _handle_message(
         await life_event_entry_handlers.cmd_life_events(db, chat_id, resolved_user)
         return resolved_user.id if resolved_user else None
 
+    # Phase 4B Epic 4 — Zalo linking commands. Both are user-scoped so
+    # we route them by command name regardless of wizard state.
+    if command in ("/link_zalo", "/linkzalo", "/lien_ket_zalo"):
+        from backend.bot.handlers.zalo_linking import cmd_link_zalo
+        await cmd_link_zalo(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
+
+    if command in ("/unlink_zalo", "/unlinkzalo", "/huy_lien_ket_zalo"):
+        from backend.bot.handlers.zalo_linking import cmd_unlink_zalo
+        await cmd_unlink_zalo(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
+
     # /feedback — zero-friction feedback capture (Phase 3.8.5 Epic 1).
     if command == "/feedback":
         if resolved_user is not None:

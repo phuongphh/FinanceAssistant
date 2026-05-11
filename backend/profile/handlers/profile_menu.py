@@ -504,6 +504,20 @@ async def handle_profile_text_input(
     return False
 
 
+def _zalo_status_line(user: User) -> str:
+    """Render the Zalo link status line for the profile view.
+
+    Imported lazily so unit tests that don't touch Zalo never load
+    the ``content/zalo.yaml`` file. Returns an empty string if the
+    file is missing (older deploys) so the profile still renders.
+    """
+    try:
+        from backend.bot.handlers.zalo_linking import profile_status_line
+        return profile_status_line(user)
+    except Exception:  # pragma: no cover — defensive
+        return ""
+
+
 def render_profile(
     profile: UserProfile,
     user: User,
@@ -536,6 +550,10 @@ def render_profile(
         pv["field_reminder"].format(
             state=reminder_state, time=_fmt_time(profile.reminder_time)
         ),
+        # Phase 4B Epic 4 — Zalo link status (Story #440 acceptance:
+        # "/profile shows 'Zalo: đã liên kết' when linked"). Sourced
+        # from content/zalo.yaml so the string isn't hardcoded.
+        _zalo_status_line(user),
         "",
         pv["section_overview"],
         pv["field_account_age"].format(days=stats["account_age_days"]),

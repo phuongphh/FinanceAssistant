@@ -24,9 +24,11 @@ from backend.routers import (
     reports,
     telegram,
     twin,
+    zalo as zalo_router,
 )
 from backend.bot.setup_commands import setup_bot_commands
 from backend.bot.setup_menu_button import setup_chat_menu_button
+from backend.adapters.zalo_oa import close_client as close_zalo_client
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 
@@ -157,6 +159,7 @@ async def lifespan(app: FastAPI):
             )
 
     await close_telegram_client()
+    await close_zalo_client()
 
     logger.info("Finance Assistant API shutting down")
 
@@ -186,6 +189,7 @@ app.include_router(market.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(income.router, prefix="/api/v1")
 app.include_router(telegram.router, prefix="/api/v1")
+app.include_router(zalo_router.router, prefix="/api/v1")
 app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")

@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     # Optional Telegram custom emoji id for the animated sunrise in morning briefings.
     telegram_morning_custom_emoji_id: str = ""
 
+    # Zalo Official Account (Phase 4B Epic 4)
+    # Provisioned manually by ops; empty in dev/CI degrades gracefully — the
+    # adapter returns False on send and linking flows surface a friendly
+    # "not configured" message instead of raising.
+    zalo_oa_access_token: str = ""
+    zalo_oa_secret_key: str = ""  # Used to verify webhook X-ZEvent-Signature
+    zalo_app_id: str = ""
+
     # Market data
     redis_url: str = "redis://localhost:6379/0"
     market_data_timeout_seconds: float = 3.0
