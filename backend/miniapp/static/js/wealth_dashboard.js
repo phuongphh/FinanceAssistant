@@ -532,8 +532,16 @@
         const assetIds = (card.dataset.assetIds || '').split(',').filter(Boolean);
         if (!assetId && !assetIds.length) return;
 
-        const assetName = card.querySelector('.asset-name')?.textContent?.trim() || 'tài sản này';
-        const confirmed = window.confirm(`Xoá "${assetName}"?\nThao tác này không thể hoàn tác.`);
+        const assetName = card.querySelector('.asset-name')?.firstChild?.textContent?.trim() || 'tài sản này';
+        const message = `Xoá "${assetName}"?\nThao tác này không thể hoàn tác.`;
+
+        const confirmed = await new Promise((resolve) => {
+            if (tg && tg.showConfirm) {
+                tg.showConfirm(message, resolve);
+            } else {
+                resolve(window.confirm(message));
+            }
+        });
         if (!confirmed) return;
 
         const deleteBtn = card.querySelector('.asset-delete-btn');
