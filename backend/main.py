@@ -17,6 +17,7 @@ from backend.routers import (
     goals,
     income,
     ingestion,
+    life_events as life_events_router,
     market,
     portfolio,
     reports,
@@ -185,6 +186,7 @@ app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(income.router, prefix="/api/v1")
 app.include_router(telegram.router, prefix="/api/v1")
 app.include_router(twin.router, prefix="/api")
+app.include_router(life_events_router.router, prefix="/api")
 app.include_router(admin_agent_metrics.router, prefix="/api/v1")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 

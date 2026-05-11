@@ -123,6 +123,10 @@ submenu_twin:
       callback: "menu:twin:compare_optimal"
       description: "So sánh hiện tại với lộ trình tối ưu"
 
+    - label: "🌱 Kế hoạch cuộc đời"
+      callback: "menu:twin:life_events"
+      description: "Mua nhà, đám cưới, con cái — thêm vào dự phóng"
+
     - label: "📱 Mini App"
       callback: "menu:twin:open_miniapp"
       description: "Mở dashboard Twin"

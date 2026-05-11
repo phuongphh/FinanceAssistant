@@ -48,6 +48,12 @@ class TwinProjection(Base):
     allocation_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     cone_data: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    # Phase 4B Epic 2 — pristine MC cone before life-event injection. Lets the
+    # Mini App preview "what if I removed event X" without re-running MC.
+    # Nullable because rows written before Epic 2 didn't compute a base cone.
+    base_cone_data: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
     sim_paths: Mapped[int] = mapped_column(
         Integer, server_default=text("1000"), nullable=False

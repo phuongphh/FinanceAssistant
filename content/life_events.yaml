@@ -1,0 +1,191 @@
+# Phase 4B Epic 2 — Life Event Simulator copy (Vietnamese only).
+# Persona: Bé Tiền — ấm áp, không phán xét, không bao giờ gợi ý trì hoãn
+# kết hôn/sinh con vì lý do tài chính.
+
+menu:
+  intro: |-
+    🌱 Kế hoạch cuộc đời
+    Bạn đang nghĩ tới mốc lớn nào? Bé Tiền sẽ vẽ thử tương lai với mốc đó nhé.
+  empty: |-
+    Bạn chưa có mốc nào trong kế hoạch.
+    Bấm "➕ Thêm mốc" để Bé Tiền mô phỏng ảnh hưởng giúp bạn.
+  list_header: "📋 Các mốc trong kế hoạch của bạn:"
+  list_item: "{idx}. {icon} {title} · {date} · {cost}"
+  list_no_date: "chưa chốt năm"
+  list_no_cost: "chưa rõ chi phí"
+  pagination_hint: "Trang {page}/{total} — bấm ▶️ để xem tiếp."
+  buttons:
+    view: "📋 Xem danh sách"
+    add: "➕ Thêm mốc"
+    delete: "🗑 Xóa mốc"
+    back: "◀️ Quay về"
+
+presets:
+  buy_house:
+    icon: "🏠"
+    label: "Mua nhà"
+    short_label: "Mua nhà"
+    description: |-
+      Mua căn hộ/nhà ở. Ước tính trung bình thị trường VN.
+    summary: |-
+      Bé Tiền dùng giả định:
+      • Chi phí ban đầu: {one_time}
+      • Trả góp hàng tháng: {monthly}/tháng trong {duration_years} năm
+      Bạn dự định mua năm nào?
+    suggested_action: "Tăng tiết kiệm thêm để bù đắp áp lực trả góp."
+  wedding:
+    icon: "💒"
+    label: "Đám cưới"
+    short_label: "Cưới"
+    description: |-
+      Lễ cưới truyền thống VN: 200–300 khách, nhẫn, tuần trăng mật.
+    summary: |-
+      Bé Tiền dùng giả định:
+      • Chi phí một lần: {one_time}
+      Bạn dự định cưới năm nào?
+    suggested_action: "Lập quỹ chung với bạn đời từ sớm."
+  first_child:
+    icon: "👶"
+    label: "Sinh con đầu lòng"
+    short_label: "Con đầu lòng"
+    description: |-
+      Nuôi con từ 0–18 tuổi (chưa kể học phí CĐ/ĐH).
+    summary: |-
+      Bé Tiền dùng giả định:
+      • Chi phí hàng tháng: {monthly}/tháng trong {duration_years} năm
+      Bạn dự định sinh con năm nào?
+    suggested_action: "Mở quỹ trẻ em ngay khi có kế hoạch."
+  child_university:
+    icon: "🎓"
+    label: "Con vào đại học"
+    short_label: "ĐH cho con"
+    description: |-
+      Học phí + sinh hoạt 4 năm ĐH công lập.
+    summary: |-
+      Bé Tiền dùng giả định:
+      • Chi phí một lần: {one_time}
+      • Chi phí hàng tháng: {monthly}/tháng trong {duration_years} năm
+      Bạn dự định con vào ĐH năm nào?
+    suggested_action: "Gửi tiết kiệm có kỳ hạn 5–10 năm trước thời điểm."
+  early_retirement:
+    icon: "🌴"
+    label: "Nghỉ hưu sớm"
+    short_label: "Nghỉ hưu sớm"
+    description: |-
+      Dừng thu nhập từ lương — sống bằng tài sản tích lũy.
+    summary: |-
+      Bé Tiền dùng giả định:
+      • Chi phí sinh hoạt: {monthly}/tháng (kéo dài đến cuối horizon)
+      Bạn dự định nghỉ năm nào?
+    suggested_action: "Nhắm tổng tài sản đủ lớn để tạo dòng tiền thụ động."
+  custom:
+    icon: "✏️"
+    label: "Tùy chỉnh"
+    short_label: "Tùy chỉnh"
+    description: |-
+      Mốc đời riêng của bạn (chuyển nghề, du học, v.v.)
+    summary: |-
+      Bạn tự nhập chi phí cho mốc này. Bé Tiền sẽ hỏi từng bước nhé.
+    suggested_action: "Định nghĩa rõ chi phí một lần + dòng tiền hàng tháng (nếu có)."
+
+prompts:
+  ask_year: |-
+    Bạn dự định {short_label} năm nào? (Ví dụ: 2028)
+  ask_custom_title: |-
+    Bạn đặt tên cho mốc này là gì? (Ví dụ: "Du học Úc", "Khởi nghiệp")
+  ask_custom_one_time: |-
+    Mốc này có chi phí một lần không? (Ví dụ: 500 triệu, hoặc 0 nếu không)
+  ask_custom_monthly: |-
+    Có chi phí hàng tháng không? (Ví dụ: 5 triệu/tháng, hoặc 0 nếu không)
+  ask_custom_duration: |-
+    Chi phí hàng tháng kéo dài mấy tháng? (Ví dụ: 24, hoặc 0 nếu không)
+  invalid_year: |-
+    Năm phải từ {min_year} đến {max_year} nhé. Bạn nhập lại giúp mình.
+  invalid_amount: |-
+    Mình chưa hiểu số tiền đó. Bạn thử lại với ví dụ "500 triệu", "8 triệu", hoặc "0".
+  invalid_duration: |-
+    Số tháng phải từ 0 đến 600. Bạn nhập lại giúp mình.
+  past_date: |-
+    Mốc đời chỉ đặt cho tương lai thôi nhé — bạn chọn từ năm {min_year} trở đi.
+
+confirm:
+  title: |-
+    Tóm tắt kế hoạch:
+  body: |-
+    • Mốc: {icon} {title}
+    • Năm dự kiến: {year}
+    • Chi phí một lần: {one_time}
+    • Chi phí hàng tháng: {monthly}{duration_text}
+  duration_suffix: " trong {duration_years} năm"
+  no_recurring: " (không có)"
+  buttons:
+    save: "✅ Xác nhận"
+    edit: "✏️ Sửa lại"
+    cancel: "❌ Hủy"
+
+review_preset:
+  buttons:
+    use: "✅ Dùng ước tính này"
+    customize: "✏️ Tùy chỉnh chi tiết"
+
+post_save:
+  saved: |-
+    ✅ Đã lưu mốc "{title}".
+    🔮 Bé Tiền đang tính lại tương lai của bạn với mốc này...
+  recompute_done: |-
+    🔮 Tương lai đã được cập nhật! Mình gửi biểu đồ so sánh trước/sau bên dưới nhé.
+  recompute_failed: |-
+    🔮 Mình đã lưu mốc, nhưng chưa kịp dựng lại biểu đồ. Bạn mở /menu → Bé Tiền tương lai để xem nhé.
+
+delete:
+  confirm_title: "Xóa mốc {title}?"
+  confirm_body: |-
+    Bé Tiền sẽ bỏ mốc này khỏi dự phóng. Bạn có chắc không?
+  done: "🗑 Đã xóa mốc \"{title}\". Bé Tiền sẽ tính lại tương lai."
+  not_found: "Mình không tìm thấy mốc đó nữa — có thể bạn đã xóa rồi."
+  buttons:
+    confirm: "✅ Xóa"
+    cancel: "❌ Giữ lại"
+    pick: "{icon} {title}"
+
+chart:
+  title: "Trước & sau khi thêm \"{title}\""
+  cone_before_label: "Hiện tại (không có mốc)"
+  cone_after_label: "Có mốc {title}"
+  p50_before_label: "P50 hiện tại"
+  p50_after_label: "P50 có mốc"
+  x_label: "Năm"
+  y_label: "Giá trị tài sản"
+  watermark: "dự phóng, không phải dự đoán"
+  impact_label: "{delta} vào {year}"
+
+narrative:
+  prompt: |-
+    Bạn là Bé Tiền, trợ lý tài chính cá nhân ấm áp. Viết 3-4 câu tiếng Việt, 100-280 ký tự,
+    không markdown, không emoji.
+
+    Người dùng vừa thêm mốc đời: {event_label} năm {year}.
+    Tác động ước tính lên P50 năm {target_year}: {p50_delta}.
+    Mức tài sản hiện tại: {wealth_level}.
+
+    Tone rules — bắt buộc:
+    - Frame là "trade-off bình thường" hoặc "hoàn toàn có thể plan được", KHÔNG dùng từ "cảnh báo", "nguy hiểm", "thất bại", "rủi ro cao".
+    - KHÔNG bao giờ gợi ý trì hoãn hoặc bỏ kế hoạch vì lý do tài chính (đặc biệt: kết hôn, sinh con).
+    - Đề cập số tiền cụ thể từ dữ liệu, không nói chung chung.
+    - Gợi ý hành động cụ thể: {suggested_action}
+
+    Viết câu cuối là gợi ý hành động cụ thể đó.
+  fallback: |-
+    Mốc {event_label} là trade-off bình thường — hoàn toàn có thể plan được.
+    Bé Tiền theo dõi cùng bạn nhé.
+  empty_impact: "ổn định"
+  delta_positive: "+{amount}"
+  delta_negative: "-{amount}"
+
+api:
+  not_found: "Mốc đời không tồn tại hoặc đã bị xóa."
+  validation: "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại."
+
+errors:
+  generic: "Có gì đó không ổn. Bạn thử /menu lại giúp mình nhé."
+  not_in_wizard: "Bạn không trong wizard nào — gõ /life_events để bắt đầu nhé."

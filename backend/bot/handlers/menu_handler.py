@@ -982,6 +982,15 @@ async def _action_twin_how_it_works(
 
     await send_twin_how_it_works(chat_id=chat_id)
 
+
+async def _action_twin_life_events(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 4B Epic 2 — open the Life Event planner from the Twin menu."""
+    from backend.bot.handlers.life_event_entry import cmd_life_events
+
+    await cmd_life_events(db, chat_id, user)
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
@@ -1011,6 +1020,7 @@ _DIRECT_HANDLERS = {
     ("twin", "compare_optimal"): _action_twin_compare_optimal,
     ("twin", "open_miniapp"): _action_twin_open_miniapp,
     ("twin", "how_it_works"): _action_twin_how_it_works,
+    ("twin", "life_events"): _action_twin_life_events,
 }
 
 
