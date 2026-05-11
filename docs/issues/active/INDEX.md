@@ -15,5 +15,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #369 | [Epic] Phase 4A — Epic 1: Twin Engine (Monte Carlo Core) | [issue-369.md](issue-369.md) |
 | #372 | [Epic] Phase 4A — Epic 4: Mini App Basic Twin Dashboard | [issue-372.md](issue-372.md) |
 | #373 | [Epic] Phase 4A — Epic 5: Optimal Trajectory & Allocation | [issue-373.md](issue-373.md) |
+| #374 | [Epic] Phase 4A — Epic 6: Channel-Agnostic Foundation & Polish | [issue-374.md](issue-374.md) |
 
-**Total active:** 11
+**Total active:** 12
