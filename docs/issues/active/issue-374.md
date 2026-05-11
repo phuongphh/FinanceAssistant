@@ -10,11 +10,10 @@
 ContentRenderer port, trust framing, perf benchmarks, full test suite.
 
 ## Stories in this Epic
-_(Sẽ update sau khi tạo Story issues)_
-- [ ] [Story] P4A-S24: ContentRenderer port
-- [ ] [Story] P4A-S25: Trust framing audit
-- [ ] [Story] P4A-S26: Performance benchmarks
-- [ ] [Story] P4A-S27: Test suite + quality gates
+- [ ] #398 [Story] P4A-S24: ContentRenderer port
+- [ ] #399 [Story] P4A-S25: Trust framing audit
+- [ ] #400 [Story] P4A-S26: Performance benchmarks
+- [ ] #401 [Story] P4A-S27: Test suite + quality gates
 
 ## Reference
 `docs/current/phase-4A/phase-4A-detailed.md` § Epic 6
