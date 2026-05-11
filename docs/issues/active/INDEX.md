@@ -29,5 +29,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #429 | [Story] P4B-S12: LLM Narrative for Life Events | [issue-429.md](issue-429.md) |
 | #430 | [Story] P4B-S13: Life Events Tests + Benchmarks | [issue-430.md](issue-430.md) |
 | #431 | [Story] P4B-S14: Recurring Transaction Detector | [issue-431.md](issue-431.md) |
+| #433 | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [issue-433.md](issue-433.md) |
 
-**Total active:** 25
+**Total active:** 26
