@@ -12,7 +12,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #414 | [Epic] Phase 4B — Epic 1: Twin Polish | [issue-414.md](issue-414.md) |
+| #415 | [Epic] Phase 4B — Epic 2: Life Event Simulator | [issue-415.md](issue-415.md) |
 | #416 | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [issue-416.md](issue-416.md) |
 | #417 | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [issue-417.md](issue-417.md) |
 
-**Total active:** 10
+**Total active:** 11
