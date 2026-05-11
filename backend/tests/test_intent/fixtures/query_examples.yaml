@@ -91,6 +91,35 @@ canonical:
       ticker: "VNINDEX"
     notes: "Index price query."
 
+  # Regression: free-text "giá vàng" used to fall through the ticker
+  # whitelist (vang ∉ ALL_TICKERS), drop to the LLM, and surface
+  # "Bạn muốn xem giá mã nào?" instead of the gold-prices handler.
+  # Should now classify as query_market with category=gold so the
+  # handler routes to _handle_gold_prices().
+  - text: "giá vàng"
+    expected_intent: query_market
+    expected_parameters:
+      category: "gold"
+    notes: "Gold-category market query (no specific ticker)."
+
+  - text: "vàng hôm nay bao nhiêu"
+    expected_intent: query_market
+    expected_parameters:
+      category: "gold"
+    notes: "Gold-category alternative phrasing."
+
+  - text: "giá crypto"
+    expected_intent: query_market
+    expected_parameters:
+      category: "crypto"
+    notes: "Crypto-category market query (no specific coin)."
+
+  - text: "giá tiền số"
+    expected_intent: query_market
+    expected_parameters:
+      category: "crypto"
+    notes: "Vietnamese 'tiền số' = crypto category."
+
   - text: "tháng này tôi tiết kiệm được bao nhiêu?"
     expected_intent: query_cashflow
     notes: "Net cashflow / saving for the month."

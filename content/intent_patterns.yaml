@@ -172,6 +172,23 @@ query_cashflow:
 query_market:
   description: "User asks about market price."
   patterns:
+    # Category shortcuts — must beat the generic ticker patterns below
+    # because "vang" / "tien so" are NOT in the ticker whitelist and would
+    # otherwise be silently filtered out, dropping the user into the LLM
+    # fallback (and a confusing "which ticker?" reply).
+    # "giá vàng" / "vàng giá bao nhiêu" / "vàng hôm nay"
+    - pattern: 'gia\s+(?:vang|gold)\b'
+      confidence: 0.95
+    - pattern: '\bvang\s+(?:gia|hom\s+nay|bao\s*nhieu|the\s+nao|hien\s+tai)'
+      confidence: 0.93
+    # "giá tiền số" / "giá crypto" / "crypto hôm nay"
+    - pattern: 'gia\s+(?:crypto|tien\s*so)\b'
+      confidence: 0.95
+    - pattern: '(?:crypto|tien\s*so)\s+(?:gia|hom\s+nay|bao\s*nhieu|the\s+nao)'
+      confidence: 0.92
+    # "giá cổ phiếu" / "cổ phiếu hôm nay" — generic stock shortcut
+    - pattern: 'gia\s+co\s*phieu\b'
+      confidence: 0.93
     # "VNM giá bao nhiêu"
     - pattern: '(?P<ticker>[a-z]{2,8})\s*(?:gia|hom\s+nay|hien\s*tai)'
       confidence: 0.92
@@ -190,6 +207,14 @@ query_market:
   parameter_extractors:
     ticker:
       use_extractor: ticker
+    category:
+      patterns:
+        # Order matters: "vàng" first so "giá vàng" doesn't get tagged
+        # crypto via a stray substring match. Word-bound via \b in the
+        # regex compile step (ASCII-only, safe after diacritic strip).
+        - { match: '\bvang\b|\bgold\b', value: gold }
+        - { match: '\b(?:crypto|tien\s*so|bitcoin|ethereum|btc|eth)\b', value: crypto }
+        - { match: '\bco\s*phieu\b|\bstocks?\b|\bchung\s*khoan\b', value: stock }
 
 query_goal_progress:
   description: "User asks about progress toward a specific named goal."
