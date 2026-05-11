@@ -214,7 +214,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #392 | Pre-Phase | [Story] P4A-S18: Twin dashboard layout | [pre-phase/issue-392.md](by-phase/pre-phase/issue-392.md) |
 | #393 | Pre-Phase | [Story] P4A-S19: REST API endpoint GET /api/twin | [pre-phase/issue-393.md](by-phase/pre-phase/issue-393.md) |
 | #394 | Pre-Phase | [Story] P4A-S20: Deep-link from Telegram | [pre-phase/issue-394.md](by-phase/pre-phase/issue-394.md) |
+| #396 | Pre-Phase | [Story] P4A-S22: Optimal trajectory simulator | [pre-phase/issue-396.md](by-phase/pre-phase/issue-396.md) |
 | #397 | Pre-Phase | [Story] P4A-S23: Comparison handler (Telegram) | [pre-phase/issue-397.md](by-phase/pre-phase/issue-397.md) |
 
-**Total:** 211 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 194 Pre-Phase)
+**Total:** 212 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 195 Pre-Phase)
