@@ -197,7 +197,8 @@ async def test_handle_profile_view_degrades_when_stats_fail(monkeypatch):
 
     assert "Profile của Bé Tiền Test" in sent["text"]
     assert "chế độ an toàn" in sent["text"]
-    assert len(sent["reply_markup"]["inline_keyboard"]) == 3
+    # 4 rows: [edit_name, edit_age] + [notifications] + [glossary] + [back]
+    assert len(sent["reply_markup"]["inline_keyboard"]) == 4
 
 
 def test_sanitize_display_name_validates_and_strips_at():
