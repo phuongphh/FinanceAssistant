@@ -19,5 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
 | #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
 | #421 | [Story] P4B-S4: Scenario Comparison UX Enhancement | [issue-421.md](issue-421.md) |
+| #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
 
-**Total active:** 15
+**Total active:** 16
