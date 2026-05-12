@@ -43,5 +43,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #470 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-470.md](issue-470.md) |
 | #471 | [Story] P4.1-A6: Daily KPI digest cron | [issue-471.md](issue-471.md) |
 | #472 | [Story] P4.1-A7: Feedback triage UI | [issue-472.md](issue-472.md) |
+| #473 | [Story] P4.1-B1: Shareable Twin image | [issue-473.md](issue-473.md) |
 
-**Total active:** 39
+**Total active:** 40
