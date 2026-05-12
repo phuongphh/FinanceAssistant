@@ -41,6 +41,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #468 | [Story] P4.1-A3: Cost guardrail middleware | [issue-468.md](issue-468.md) |
 | #469 | [Story] P4.1-A4: Daily cost report | [issue-469.md](issue-469.md) |
 | #470 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-470.md](issue-470.md) |
+| #471 | [Story] P4.1-A6: Daily KPI digest cron | [issue-471.md](issue-471.md) |
 | #472 | [Story] P4.1-A7: Feedback triage UI | [issue-472.md](issue-472.md) |
 
-**Total active:** 38
+**Total active:** 39
