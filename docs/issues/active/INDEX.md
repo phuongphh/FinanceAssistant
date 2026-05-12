@@ -47,9 +47,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #509 | [Story] P4.1-C4: Founding member experience | [issue-509.md](issue-509.md) |
 | #510 | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [issue-510.md](issue-510.md) |
 | #512 | [Task] P4.1-M3: Migration twin_calibration_log | [issue-512.md](issue-512.md) |
-| #513 | [Task] P4.1-M4: Migration founding_member_flag | [issue-513.md](issue-513.md) |
 | #514 | [Task] P4.1-D1: Verify Zalo channel disabled | [issue-514.md](issue-514.md) |
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 
-**Total active:** 47
+**Total active:** 46

@@ -270,6 +270,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #500 | Pre-Phase | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [pre-phase/issue-500.md](by-phase/pre-phase/issue-500.md) |
 | #501 | Pre-Phase | [Story] P4.1-A6: Daily KPI digest cron | [pre-phase/issue-501.md](by-phase/pre-phase/issue-501.md) |
 | #511 | Pre-Phase | [Task] P4.1-M2: Migration feedback_sla_index | [pre-phase/issue-511.md](by-phase/pre-phase/issue-511.md) |
+| #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 
-**Total:** 266 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 249 Pre-Phase)
+**Total:** 267 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 250 Pre-Phase)
