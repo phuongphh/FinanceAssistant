@@ -233,6 +233,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #441 | Pre-Phase | [Story] P4B-S24: Cashflow Alert via Zalo | [pre-phase/issue-441.md](by-phase/pre-phase/issue-441.md) |
 | #445 | Pre-Phase | [Feature] Dòng tiền Menu Enhancement — Consolidate Tổng quan, rename Thu vs Chi, remove duplicate | [pre-phase/issue-445.md](by-phase/pre-phase/issue-445.md) |
 | #450 | Pre-Phase | [Feature] Goals UI/UX Improvements — 5 enhancements | [pre-phase/issue-450.md](by-phase/pre-phase/issue-450.md) |
+| #457 | Pre-Phase | [Feature] UI/UX Enhancements — Consolidate menus, fix labels, improve copy | [pre-phase/issue-457.md](by-phase/pre-phase/issue-457.md) |
 
-**Total:** 229 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 212 Pre-Phase)
+**Total:** 230 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 213 Pre-Phase)
