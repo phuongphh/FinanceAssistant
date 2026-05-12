@@ -697,8 +697,10 @@ async def _action_assets_net_worth(
     language. If the stored-current calculation takes at least 700ms, the
     user gets an explicit waiting sentence before the final total.
     """
+    from backend.bot.formatters.movers import format_movers_block
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
+    from backend.wealth.services import net_worth_calculator
 
     breakdown = await _calculate_stored_current_with_wait(
         db=db, user_id=user.id, chat_id=chat_id
@@ -717,12 +719,26 @@ async def _action_assets_net_worth(
 
     level = detect_level(breakdown.total)
     style = style_for_level(level, breakdown.total)
+
+    # Day-over-day total + per-asset movers — reuses asset_snapshots
+    # written by the 02:00 EOD revaluation job. ``calculate_change_from_current``
+    # is cheap (one indexed query) and ``get_daily_movers`` is one more.
+    change_day = await net_worth_calculator.calculate_change_from_current(
+        db, user.id, breakdown.total, period=net_worth_calculator.PERIOD_DAY
+    )
+    movers = await net_worth_calculator.get_daily_movers(db, user.id)
+
     lines = [
         f"💰 Tổng tài sản của {name}:",
         f"*{format_money_full(breakdown.total)}*",
-        "",
-        get_action_copy("action_assets_net_worth", "market_value_note"),
     ]
+    movers_block = format_movers_block(
+        total_pct=change_day.change_percentage if change_day.previous > 0 else None,
+        movers=movers,
+    )
+    if movers_block:
+        lines.extend(["", movers_block])
+    lines.extend(["", get_action_copy("action_assets_net_worth", "market_value_note")])
     if breakdown.asset_count and not style.is_starter:
         lines.append("")
         lines.append(f"_Theo dõi qua {breakdown.asset_count} tài sản_")

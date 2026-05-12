@@ -16,6 +16,7 @@ sections:
     📊 Danh mục:
     {allocation_lines}
     Hôm nay: {today_change}
+    {movers_line}
   news: |
     📰 Top tin liên quan:
     {news_lines}
