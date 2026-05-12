@@ -361,11 +361,11 @@ class TestCancel:
         db = _db(user)
         with patch.object(goal_entry.wizard_service, "clear",
                           AsyncMock()) as clear, \
-             patch.object(goal_entry, "show_goals_list", AsyncMock()) as show_list:
+             patch.object(goal_entry, "_send_goals_submenu", AsyncMock()) as nav:
             consumed = await goal_entry.cancel_wizard(db, 100, user)
         assert consumed is True
         clear.assert_awaited_once()
-        show_list.assert_awaited_once_with(db, 100, user)
+        nav.assert_awaited_once_with(100, user)
 
     async def test_cancel_noop_for_non_goal_flow(self):
         user = _user({"flow": "asset_add_cash", "step": "amount", "draft": {}})
@@ -478,7 +478,7 @@ class TestEditDateAutoRecalc:
 
 @pytest.mark.asyncio
 class TestCancelNavigatesToList:
-    async def test_cancel_callback_lands_on_goals_list(self):
+    async def test_cancel_callback_lands_on_goals_submenu(self):
         user = _user({
             "flow": goal_entry.FLOW_ADD, "step": "template", "draft": {},
         })
@@ -487,10 +487,9 @@ class TestCancelNavigatesToList:
                           AsyncMock(return_value=user)), \
              patch.object(goal_entry.wizard_service, "clear",
                           AsyncMock()) as clear, \
-             patch.object(goal_entry, "show_goals_list",
-                          AsyncMock()) as show, \
-             patch.object(goal_entry, "answer_callback", AsyncMock()), \
-             patch.object(goal_entry, "send_message", AsyncMock()):
+             patch.object(goal_entry, "_send_goals_submenu",
+                          AsyncMock()) as nav, \
+             patch.object(goal_entry, "answer_callback", AsyncMock()):
             await goal_entry.handle_goals_callback(
                 db,
                 {"id": "cb1", "data": "goals:cancel",
@@ -498,7 +497,7 @@ class TestCancelNavigatesToList:
                  "from": {"id": 100}},
             )
         clear.assert_awaited_once()
-        show.assert_awaited_once()
+        nav.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------

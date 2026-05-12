@@ -41,7 +41,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "start", "description": "Bắt đầu / Onboarding"},
     {"command": "menu", "description": "Menu chính"},
     {"command": "help", "description": "Hướng dẫn sử dụng"},
-    {"command": "dashboard", "description": "Mở Mini App dashboard"},
+    {"command": "dashboard", "description": "Mở Dashboard"},
     {"command": "baocaosang", "description": "Gửi lại briefing sáng"},
     {"command": "feedback", "description": "Gửi góp ý nhanh"},
     {"command": "about", "description": "Thông tin ứng dụng"},
