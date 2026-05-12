@@ -254,6 +254,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #480 | Pre-Phase | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [pre-phase/issue-480.md](by-phase/pre-phase/issue-480.md) |
 | #484 | Pre-Phase | [Story] P4.1-A4: Daily cost report | [pre-phase/issue-484.md](by-phase/pre-phase/issue-484.md) |
 | #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
+| #489 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-489.md](by-phase/pre-phase/issue-489.md) |
 
-**Total:** 250 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 233 Pre-Phase)
+**Total:** 251 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 234 Pre-Phase)
