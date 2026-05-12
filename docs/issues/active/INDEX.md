@@ -46,5 +46,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
 | #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
 | #505 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-505.md](issue-505.md) |
+| #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
 
-**Total active:** 42
+**Total active:** 43
