@@ -7,17 +7,13 @@
 > **Type:** Epic | **Estimate:** ~1.5 tuan | **Stories:** 7
 
 ## Muc tieu
-Dua onboarding, cost control, observability, va feedback triage len muc production-grade truoc soft launch thang 6/2026.
+Onboarding redesign, cost guardrail, observability, feedback triage.
 
 ## Stories in this Epic
-_(Se update sau khi tao Story issues)_
-- [ ] [Story] P4.1-A1: Onboarding redesign - 3-step guided flow
-- [ ] [Story] P4.1-A2: First-Twin shortcut
-- [ ] [Story] P4.1-A3: Cost guardrail middleware
-- [ ] [Story] P4.1-A4: Daily cost report
-- [ ] [Story] P4.1-A5: Sentry + LLM metrics dashboard
-- [ ] [Story] P4.1-A6: Daily KPI digest cron
-- [ ] [Story] P4.1-A7: Feedback triage UI
-
-## Reference
-`docs/current/phase-4.1/phase-4.1-detailed.md`
+- [ ] #481 [Story] P4.1-A1: Onboarding redesign — 3-step guided flow
+- [ ] #482 [Story] P4.1-A2: First-Twin shortcut
+- [ ] #483 [Story] P4.1-A3: Cost guardrail middleware
+- [ ] #484 [Story] P4.1-A4: Daily cost report
+- [ ] #485 [Story] P4.1-A5: Sentry + LLM metrics dashboard
+- [ ] #486 [Story] P4.1-A6: Daily KPI digest cron
+- [ ] #487 [Story] P4.1-A7: Feedback triage UI
