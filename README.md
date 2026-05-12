@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Twin Polish + Life Events + Cashflow v2 + Zalo** (current) — [detail](docs/current/phase-4B/phase-4B-detailed.md)
+🚀 **Pre-Launch Hardening** (current) — [detail](docs/current/phase-4.1/phase-4.1-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->

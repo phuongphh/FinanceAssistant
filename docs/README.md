@@ -48,10 +48,16 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 | Pre-Launch UX Polish | ✅ done | 5-7 ngày | [phase-3.9.5-detailed.md](docs/current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
 | Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
 | Financial Twin Conservative MVP | ✅ done | ~3 tuần | [phase-4A-detailed.md](docs/current/phase-4A/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
-| Twin Polish + Life Events + Cashflow v2 + Zalo | 🚀 current | ~4 tuần | [phase-4B-detailed.md](docs/current/phase-4B/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
-| Investment Intelligence | 🔮 planned | TBD | — | Investment Twin, scenario modeling, rental property tracking |
-| Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA, anomaly detection |
-| Scale & Commercialize | 🔮 planned | TBD | — | Public beta, subscriptions, multi-region, household mode |
+| Twin Polish + Life Events + Cashflow v2 + Zalo | ✅ done | ~4 tuần | [phase-4B-detailed.md](docs/current/phase-4B/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
+| Pre-Launch Hardening | 🚀 current | ~3 tuần | [phase-4.1-detailed.md](docs/current/phase-4.1/phase-4.1-detailed.md) | Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026) |
+| Zalo Spike & OA Verification | 🔮 planned | TBD | — | Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows |
+| Zalo Core Product Parity | 🔮 planned | TBD | — | Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints |
+| Zalo Mini App | 🔮 planned | TBD | — | Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK |
+| Achievement & Badges | 🔮 planned | TBD | — | Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard |
+| Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data |
+| Household Mode | 🔮 planned | TBD | — | Multi-user household: shared assets, joint goals, privacy boundaries (mỗi thành viên có view riêng), couple Twin |
+| Monetization Infrastructure | 🔮 planned | TBD | — | License management, rate limit + tier enforcement (free/pro/cfo UI), payment integration (VN gateways: VNPay/MoMo/ZaloPay), reconciliation + invoice. Pricing re-validate sau khi infra sẵn sàng. |
+| Tết Launch (Public) | 🔮 planned | TBD | — | Public launch tháng 2/2027 (Tết) — Zalo là primary channel, Telegram secondary. Marketing campaign, multi-region, public pricing live. |
 <!-- END: phase-status:roadmap-table -->
 
 ### Archive
