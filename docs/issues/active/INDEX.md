@@ -47,5 +47,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
 | #505 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-505.md](issue-505.md) |
 | #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
+| #507 | [Story] P4.1-C2: Success metrics rubric | [issue-507.md](issue-507.md) |
 
-**Total active:** 43
+**Total active:** 44
