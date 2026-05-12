@@ -7,12 +7,8 @@
 > **Type:** Epic | **Estimate:** ~1 tuan | **Stories:** 2
 
 ## Muc tieu
-2 user request tu Phase 4A dogfood: shareable moment + predictions vs actual.
+Shareable Twin image + predictions vs actual calibration.
 
 ## Stories in this Epic
-_(Se update sau khi tao Story issues)_
-- [ ] [Story] P4.1-B1: Shareable Twin image
-- [ ] [Story] P4.1-B2: Predictions vs actual calibration
-
-## Reference
-`docs/current/phase-4.1/phase-4.1-detailed.md`
+- [ ] #488 [Story] P4.1-B1: Shareable Twin image
+- [ ] #489 [Story] P4.1-B2: Predictions vs actual calibration
