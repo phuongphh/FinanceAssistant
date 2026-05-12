@@ -238,7 +238,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #464 | Pre-Phase | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [pre-phase/issue-464.md](by-phase/pre-phase/issue-464.md) |
 | #465 | Pre-Phase | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [pre-phase/issue-465.md](by-phase/pre-phase/issue-465.md) |
 | #466 | Pre-Phase | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [pre-phase/issue-466.md](by-phase/pre-phase/issue-466.md) |
+| #467 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut | [pre-phase/issue-467.md](by-phase/pre-phase/issue-467.md) |
 | #468 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-468.md](by-phase/pre-phase/issue-468.md) |
 
-**Total:** 235 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 218 Pre-Phase)
+**Total:** 236 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 219 Pre-Phase)
