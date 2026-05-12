@@ -8,10 +8,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.intent.handlers.query_cashflow import QueryCashflowHandler
+from backend.intent.extractors.time_range import TimeRange
+from backend.intent.handlers.query_cashflow import (
+    QueryCashflowHandler,
+    _strip_legacy_prefix,
+    _top_income_sources,
+)
 from backend.intent.intents import IntentResult, IntentType
 from backend.intent.wealth_adapt import style_for_level
 from backend.wealth.ladder import WealthLevel
+
+
+# 30-day window so ``amount * days / 30`` equals ``monthly_equivalent``
+# exactly — keeps the assertions in TestTopIncomeSources easy to read.
+_THIRTY_DAYS = TimeRange(
+    start=date(2026, 4, 13), end=date(2026, 5, 12), label="this_month",
+)
 
 
 def _user(name: str = "An") -> MagicMock:
@@ -210,3 +222,88 @@ async def test_cashflow_current_month_detail_report():
     assert "📈 *Nhịp chi tiêu theo ngày*" in response
     assert "🔎 *3 giao dịch lớn nhất*" in response
     assert "Tiền nhà" in response
+
+
+class TestStripLegacyPrefix:
+    """``_strip_legacy_prefix`` removes the historical type prefix that
+    ``rental_service`` baked into ``income_streams.name`` pre-PR #460."""
+
+    def test_strips_legacy_thue_bds_prefix(self):
+        assert (
+            _strip_legacy_prefix("Thuê BĐS — Nhà Mỹ Đình") == "Nhà Mỹ Đình"
+        )
+
+    def test_strips_current_bds_cho_thue_prefix(self):
+        assert (
+            _strip_legacy_prefix("BĐS cho thuê — Nhà Cầu Giấy")
+            == "Nhà Cầu Giấy"
+        )
+
+    def test_leaves_clean_name_untouched(self):
+        assert _strip_legacy_prefix("Nhà Mỹ Đình") == "Nhà Mỹ Đình"
+
+    def test_empty_string_is_safe(self):
+        assert _strip_legacy_prefix("") == ""
+
+    def test_non_matching_prefix_passes_through(self):
+        # Defensive: handler must not eat similar-looking strings.
+        assert _strip_legacy_prefix("Lương BĐS — abc") == "Lương BĐS — abc"
+
+
+def _income_stream(stream_type: str, name: str, amount: Decimal) -> MagicMock:
+    s = MagicMock()
+    s.stream_type = stream_type
+    s.name = name
+    s.monthly_equivalent = amount
+    return s
+
+
+class TestTopIncomeSources:
+    """``_top_income_sources`` composes the display string from
+    ``income_types.yaml`` for auto-linked types so YAML edits propagate
+    without touching DB rows."""
+
+    def test_rental_renders_type_label_and_asset_name_from_yaml(self):
+        stream = _income_stream("rental", "Nhà Mỹ Đình", Decimal("7_600_000"))
+        result = _top_income_sources(
+            [stream], time_range=_THIRTY_DAYS, limit=5,
+        )
+        assert len(result) == 1
+        label, amount = result[0]
+        # Auto-linked: prefix "BĐS cho thuê — " comes from YAML, not DB.
+        assert label == "🏠 BĐS cho thuê — Nhà Mỹ Đình"
+        assert amount == Decimal("7_600_000")
+
+    def test_rental_with_legacy_prefix_is_normalised(self):
+        # Pre-migration row still carries the historical prefix in DB.
+        stream = _income_stream(
+            "rental", "Thuê BĐS — Nhà Mỹ Đình", Decimal("7_600_000"),
+        )
+        result = _top_income_sources(
+            [stream], time_range=_THIRTY_DAYS, limit=5,
+        )
+        label, _ = result[0]
+        # The legacy prefix is stripped before YAML prefix is re-applied.
+        assert label == "🏠 BĐS cho thuê — Nhà Mỹ Đình"
+        assert "Thuê BĐS — " not in label
+
+    def test_salary_keeps_user_supplied_name(self):
+        stream = _income_stream(
+            "salary", "Lương công ty ABC", Decimal("30_000_000"),
+        )
+        result = _top_income_sources(
+            [stream], time_range=_THIRTY_DAYS, limit=5,
+        )
+        label, _ = result[0]
+        # Non-auto-linked: user's raw name wins, type label is implicit.
+        assert "Lương công ty ABC" in label
+        assert label.startswith("💼")
+
+    def test_rental_missing_asset_name_falls_back_to_type_label(self):
+        stream = _income_stream("rental", "", Decimal("5_000_000"))
+        result = _top_income_sources(
+            [stream], time_range=_THIRTY_DAYS, limit=5,
+        )
+        label, _ = result[0]
+        # Empty asset name: render just the type label, no trailing " — ".
+        assert label == "🏠 BĐS cho thuê"

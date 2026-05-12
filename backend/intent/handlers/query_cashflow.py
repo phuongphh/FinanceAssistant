@@ -25,12 +25,33 @@ from backend.intent.handlers.query_expenses import (
     _TIME_LABELS_VI,
     _fetch_expenses,
 )
-from backend.wealth.income_types import get_icon as _income_icon, get_label as _income_label
+from backend.wealth.income_types import (
+    get_icon as _income_icon,
+    get_label as _income_label,
+    is_auto_linked as _income_auto_linked,
+)
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.expense import Expense
 from backend.models.user import User
 from backend.wealth.models.income_stream import IncomeStream
+
+
+# Legacy prefixes ever written into ``income_streams.name`` by
+# ``rental_service``. The post-fix invariant is ``name == asset.name``; this
+# strip is belt-and-braces so old rows render correctly even before the
+# data migration has run.
+_LEGACY_NAME_PREFIXES: tuple[str, ...] = (
+    "Thuê BĐS — ",
+    "BĐS cho thuê — ",
+)
+
+
+def _strip_legacy_prefix(name: str) -> str:
+    for prefix in _LEGACY_NAME_PREFIXES:
+        if name.startswith(prefix):
+            return name[len(prefix):].strip()
+    return name
 
 
 @dataclass(frozen=True)
@@ -285,14 +306,25 @@ def _top_income_sources(
         icon = _income_icon(key)
         type_label = _income_label(key)
         raw_name = getattr(stream, "name", None)
-        name = (
-            raw_name.strip()
-            if isinstance(raw_name, str) and raw_name.strip()
-            else type_label
-        )
-        label = f"{icon} {name}"
-        totals[label] += amount
-        labels[label] = label
+        stored_name = raw_name.strip() if isinstance(raw_name, str) else ""
+        # Strip any legacy "<type prefix> — " baked into stored names so old
+        # rows display the same as freshly-synced ones until the migration
+        # has run. Both the historical "Thuê BĐS" wording and the current
+        # "BĐS cho thuê" wording are normalised away.
+        pure_name = _strip_legacy_prefix(stored_name)
+        if _income_auto_linked(key):
+            # Auto-linked streams (currently only rental) always render as
+            # "{icon} {type_label} — {asset_name}" so changes to the YAML
+            # label propagate without touching DB rows.
+            display = (
+                f"{icon} {type_label} — {pure_name}"
+                if pure_name
+                else f"{icon} {type_label}"
+            )
+        else:
+            display = f"{icon} {pure_name or type_label}"
+        totals[display] += amount
+        labels[display] = display
     ranked = sorted(totals.items(), key=lambda item: item[1], reverse=True)
     return [(labels[label], amount) for label, amount in ranked[:limit]]
 

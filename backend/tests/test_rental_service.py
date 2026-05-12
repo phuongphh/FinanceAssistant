@@ -168,6 +168,10 @@ class TestMarkAsRental:
         # ``extra`` keeps the snapshot for read-only consumers.
         assert stream.source_asset_id == asset.id
         assert stream.extra[rental_service.SOURCE_ASSET_ID_KEY] == str(asset.id)
+        # Stream name must hold the bare asset name — the type-aware prefix
+        # ("BĐS cho thuê — …") is composed at render time from
+        # ``income_types.yaml`` so YAML edits propagate without a migration.
+        assert stream.name == asset.name
         _assert_flush_only(db)
 
     async def test_non_real_estate_rejected(self):

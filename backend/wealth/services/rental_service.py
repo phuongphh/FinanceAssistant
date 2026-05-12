@@ -289,7 +289,10 @@ async def _sync_rental_income_stream(
 
     monthly_amount = metadata.net_monthly_yield
     is_active = metadata.is_income_active()
-    name = f"BĐS cho thuê — {asset.name}"
+    # Store only the asset name. The type-aware prefix ("BĐS cho thuê — …")
+    # is composed at render time from ``stream_type`` + ``income_types.yaml``
+    # so editing the YAML label propagates without a data migration.
+    name = asset.name
     # Snapshot fields stay in ``extra`` for read-only consumers; the
     # canonical pointer is now ``source_asset_id`` FK above.
     extra = {
