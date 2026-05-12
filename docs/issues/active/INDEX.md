@@ -37,5 +37,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #464 | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [issue-464.md](issue-464.md) |
 | #465 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-465.md](issue-465.md) |
 | #466 | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [issue-466.md](issue-466.md) |
+| #469 | [Story] P4.1-A4: Daily cost report | [issue-469.md](issue-469.md) |
 
-**Total active:** 33
+**Total active:** 34
