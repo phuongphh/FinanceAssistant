@@ -1,5 +1,13 @@
 # Phase 4.1 — Manual Test Cases
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Total estimate:** ~120 test cases across 13 stories + cross-cutting concerns
 > **Format:** Mỗi TC có Setup → Steps → Expected → Signoff marker
 > **Signoff:** `[unsigned]` mặc định; operator/QA đổi thành `[signed: name-date]` khi pass
