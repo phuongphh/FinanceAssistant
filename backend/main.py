@@ -206,7 +206,15 @@ app.include_router(market.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(income.router, prefix="/api/v1")
 app.include_router(telegram.router, prefix="/api/v1")
-app.include_router(zalo_router.router, prefix="/api/v1")
+# Phase 4.1 channel discipline (Task D.1): the Zalo OA webhook is only
+# mounted when ZALO_CHANNEL_ENABLED=true. Soft launch is Telegram-only
+# so the default-off setting is the safety guarantee — even if Zalo OA
+# secrets leak into the env, the webhook stays 404.
+if settings.zalo_channel_enabled:
+    app.include_router(zalo_router.router, prefix="/api/v1")
+    logger.info("Zalo channel ENABLED — webhook mounted at /api/v1/zalo/webhook")
+else:
+    logger.info("Zalo channel disabled (ZALO_CHANNEL_ENABLED=false) — webhook not mounted")
 app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")

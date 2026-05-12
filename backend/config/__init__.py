@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     zalo_oa_access_token: str = ""
     zalo_oa_secret_key: str = ""  # Used to verify webhook X-ZEvent-Signature
     zalo_app_id: str = ""
+    # Phase 4.1 channel-discipline gate. The Zalo OA adapter is fully wired
+    # (Phase 4B) but DISABLED for the 50-user Telegram-only soft launch so
+    # we measure one channel cleanly. Operator flips this to True at the
+    # start of Phase 5.1 (Zalo rollout).
+    zalo_channel_enabled: bool = False
 
     # Market data
     redis_url: str = "redis://localhost:6379/0"
