@@ -45,5 +45,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #514 | [Task] P4.1-D1: Verify Zalo channel disabled | [issue-514.md](issue-514.md) |
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
+| #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 
-**Total active:** 41
+**Total active:** 42
