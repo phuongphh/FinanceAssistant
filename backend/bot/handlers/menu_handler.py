@@ -70,7 +70,7 @@ from backend.intent.intents import (
     IntentResult,
     IntentType,
 )
-from backend.miniapp.urls import wealth_dashboard_url
+from backend.miniapp.urls import expense_dashboard_url, wealth_dashboard_url
 from backend.models.user import User
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
@@ -492,9 +492,9 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # callback is deterministic and should answer from the already-current
     # asset values without waiting for historical snapshot comparisons.
     # "Báo cáo" is a direct handler now so rows can carry edit callbacks.
-    # Chi tiêu
-    ("expenses", "report"): (IntentType.QUERY_EXPENSES, {}),
-    ("expenses", "by_category"): (IntentType.QUERY_EXPENSES_BY_CATEGORY, {}),
+    # Chi tiêu — ``report`` and ``by_category`` are now direct handlers
+    # (Mini App Dashboard). The intent map only kept them as a fallback
+    # before the dashboard shipped; the direct map now wins regardless.
     # Dòng tiền — Phase 3.8 Epic 2 promoted ``income`` to a direct
     # handler (CRUD list view); the rest still synthesise an intent
     # so personality wrap + follow-up keyboards stay consistent.
@@ -833,6 +833,83 @@ async def _action_assets_manage(
     )
 
 
+async def _action_expenses_report(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Open the Expense Dashboard Mini App — mirrors ``_action_assets_report``.
+
+    The dashboard is the primary CRUD surface for expenses (full forms,
+    pie chart, inline edit/delete), so a single tap straight into the
+    WebView is the lowest-friction path. Callback queries can't launch
+    a WebApp directly — we reply with an inline ``web_app`` button.
+    """
+    url = expense_dashboard_url(source="menu_expenses_report")
+    if url is None:
+        await send_message(
+            chat_id=chat_id,
+            text=get_action_copy("action_expenses_report", "not_configured"),
+            parse_mode="Markdown",
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text=get_action_copy("action_expenses_report", "open_dashboard"),
+        reply_markup={
+            "inline_keyboard": [
+                [{"text": get_action_copy("action_expenses_report", "miniapp_button"),
+                  "web_app": {"url": url}}],
+                [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
+            ],
+        },
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "expenses", "action": "report"},
+    )
+
+
+async def _action_expenses_manage(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Educate the user on the 3 ways to manage expenses.
+
+    Mirrors :func:`_action_assets_manage` so the visual + UX pattern is
+    identical across menus: Mini App link + natural-language tips +
+    receipt-photo path.
+    """
+    name = user.display_name or "bạn"
+    title = get_action_copy("action_expenses_manage", "title")
+    body = get_action_copy("action_expenses_manage", "body").format(name=name)
+    text = f"{title}\n\n{body}"
+
+    keyboard_rows: list[list[dict[str, Any]]] = []
+    url = expense_dashboard_url(source="menu_expenses_manage")
+    if url is not None:
+        keyboard_rows.append([
+            {"text": get_action_copy("action_expenses_manage", "open_miniapp_button"),
+             "web_app": {"url": url}},
+        ])
+    keyboard_rows.append([
+        {"text": get_action_copy("action_expenses_manage", "back_button"),
+         "callback_data": "menu:main"},
+    ])
+
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup={"inline_keyboard": keyboard_rows},
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "expenses", "action": "manage"},
+    )
+
+
 async def _action_expenses_recurring(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -885,48 +962,6 @@ async def _action_assets_mark_rental(
     from backend.bot.handlers.asset_entry import start_mark_rental_wizard
 
     await start_mark_rental_wizard(db, chat_id, user)
-
-
-async def _action_expenses_add(
-    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
-) -> None:
-    """Prompt the user to send a free-text or voice transaction.
-
-    The message they send next falls through the worker's normal
-    routes — voice → voice_query, text → handle_text_message which
-    runs the NL expense parser.
-    """
-    await send_message(
-        chat_id=chat_id,
-        text=(
-            "✏️ *Thêm chi tiêu nhanh*\n\n"
-            "Gõ hoặc nói cho mình biết, ví dụ:\n"
-            '• _"vừa chi 200k cafe"_\n'
-            '• _"mua xe máy 35tr"_\n'
-            '• _"trả tiền điện 1.2tr"_\n\n'
-            "Mình sẽ tự ghi lại và phân loại."
-        ),
-        parse_mode="Markdown",
-        reply_markup=back_to_main_keyboard(),
-    )
-
-
-async def _action_expenses_ocr(
-    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
-) -> None:
-    """Prompt the user to send a receipt photo. Existing photo
-    handler in the worker takes over from there (Phase 3A OCR flow).
-    """
-    await send_message(
-        chat_id=chat_id,
-        text=(
-            "📷 *OCR hóa đơn*\n\n"
-            "Gửi cho mình ảnh hóa đơn — mình sẽ tự đọc số tiền,"
-            " merchant và phân loại giúp bạn."
-        ),
-        parse_mode="Markdown",
-        reply_markup=back_to_main_keyboard(),
-    )
 
 
 async def _action_goals_add(
@@ -1520,8 +1555,15 @@ _DIRECT_HANDLERS = {
     ("assets", "add"): _action_assets_manage,
     ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
-    ("expenses", "add"): _action_expenses_add,
-    ("expenses", "ocr"): _action_expenses_ocr,
+    ("expenses", "report"): _action_expenses_report,
+    ("expenses", "manage"): _action_expenses_manage,
+    # Legacy callbacks kept so stale chat-history bubbles (before the
+    # 4-button menu restructure) don't dead-end. ``add`` / ``ocr`` /
+    # ``by_category`` now all route to the combined manage guide which
+    # teaches the natural-language + photo entry points.
+    ("expenses", "add"): _action_expenses_manage,
+    ("expenses", "ocr"): _action_expenses_manage,
+    ("expenses", "by_category"): _action_expenses_manage,
     ("expenses", "recurring"): _action_expenses_recurring,
     ("cashflow", "income"): _action_cashflow_income,
     ("cashflow", "goals"): _action_cashflow_goals,

@@ -1,0 +1,182 @@
+/* Expense dashboard — additions on top of wealth.css base.
+ *
+ * Reuses .wealth-page hero/breakdown/section styles. Only the
+ * expense-row card layout and modal styles are unique here.
+ */
+
+.expense-page .hero-amount {
+    color: var(--text-color);
+}
+
+.expense-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    background: var(--card-bg, #ffffff);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.expense-row .expense-icon {
+    font-size: 22px;
+    width: 32px;
+    text-align: center;
+}
+
+.expense-row .expense-info {
+    min-width: 0;
+}
+
+.expense-row .expense-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.expense-row .expense-meta {
+    font-size: 12px;
+    color: var(--text-muted, #888);
+    margin-top: 2px;
+}
+
+.expense-row .expense-amount {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-color);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.expense-row .expense-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.expense-row .expense-action-btn {
+    background: transparent;
+    border: none;
+    padding: 6px 8px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.expense-row .expense-action-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.expense-row .expense-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.expense-page .add-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--primary, #4ECDC4);
+    color: var(--primary-text, #ffffff);
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.expense-page .add-btn:active {
+    opacity: 0.85;
+}
+
+/* Modal — reused pattern from legacy dashboard */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+
+.modal[hidden] { display: none; }
+
+.modal-content {
+    background: var(--bg-color, #fff);
+    color: var(--text-color, #111);
+    border-radius: 16px;
+    padding: 18px;
+    width: 100%;
+    max-width: 380px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+    margin: 0 0 12px;
+    font-size: 17px;
+}
+
+.modal-content label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted, #888);
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+.modal-content input,
+.modal-content select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+    font-size: 15px;
+    background: var(--card-bg, #fff);
+    color: var(--text-color, #111);
+    box-sizing: border-box;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.modal-actions button {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.modal-actions .primary-btn {
+    background: var(--primary, #4ECDC4);
+    color: var(--primary-text, #fff);
+}
+
+.modal-actions .secondary-btn {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-color, #111);
+}
+
+.modal-actions .danger-btn {
+    background: #EF4444;
+    color: #fff;
+}
+
+.modal-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
