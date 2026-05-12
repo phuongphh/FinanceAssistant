@@ -21,6 +21,7 @@ from backend.jobs.feedback_sla_job import run_feedback_sla_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
+from backend.jobs.eod_revaluation_job import revalue_and_snapshot
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
 from backend.jobs.morning_briefing_job import run_morning_briefing_job
@@ -99,6 +100,17 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         create_daily_snapshots, "cron",
         hour=23, minute=59, timezone="Asia/Ho_Chi_Minh",
         id="daily_asset_snapshot",
+    )
+    # End-of-day revaluation: at 02:00 ICT (~11h after HOSE close) we
+    # re-price every stock/crypto/gold holding against the latest market
+    # quote, write the fresh ``current_value`` back to ``assets``, and
+    # overwrite yesterday's ``asset_snapshots`` row so day-over-day
+    # comparisons reflect real market movement. The 23:59 job above is
+    # kept as a defense-in-depth carry-forward; the upsert here wins.
+    scheduler.add_job(
+        revalue_and_snapshot, "cron",
+        hour=2, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="eod_asset_revaluation",
     )
     # Phase 3.8 Epic 3 — recurring-pattern auto-detection. Runs at
     # 02:00 (low-activity window so the Telegram delivery doesn't
