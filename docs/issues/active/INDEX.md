@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #514 | [Task] P4.1-D1: Verify Zalo channel disabled | [issue-514.md](issue-514.md) |
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 | #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
 | #520 | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [issue-520.md](issue-520.md) |
@@ -44,4 +43,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #525 | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [issue-525.md](issue-525.md) |
 | #526 | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [issue-526.md](issue-526.md) |
 
-**Total active:** 39
+**Total active:** 38
