@@ -35,7 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #494 | [Epic] Phase 4.1 — EPIC 2: Twin Polish Thuc Chien | [issue-494.md](issue-494.md) |
 | #495 | [Epic] Phase 4.1 — EPIC 3: Soft Launch Playbook & Founding Cohort | [issue-495.md](issue-495.md) |
-| #496 | [Story] P4.1-A1: Onboarding redesign — 3-step goal-based flow | [issue-496.md](issue-496.md) |
 | #498 | [Story] P4.1-A3: Cost guardrail middleware | [issue-498.md](issue-498.md) |
 | #502 | [Story] P4.1-A7: Feedback triage UI | [issue-502.md](issue-502.md) |
 | #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
@@ -50,4 +49,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 
-**Total active:** 45
+**Total active:** 44
