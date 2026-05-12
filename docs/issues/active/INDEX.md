@@ -46,6 +46,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
+| #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
 | #520 | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [issue-520.md](issue-520.md) |
 
-**Total active:** 43
+**Total active:** 44
