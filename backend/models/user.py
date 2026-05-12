@@ -72,6 +72,14 @@ class User(Base):
     # alerts out across channels.
     zalo_user_id: Mapped[str | None] = mapped_column(String(64))
 
+    # Phase 4.1 — Founding member cohort + acquisition tracking.
+    is_founding_member: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    founding_member_sequence: Mapped[int | None] = mapped_column(Integer)
+    founding_member_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acquisition_source: Mapped[str | None] = mapped_column(String(64))
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""

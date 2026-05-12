@@ -81,6 +81,17 @@ async def lifespan(app: FastAPI):
     # more than one uvicorn worker is running.
     logger.info("Finance Assistant API starting up")
 
+    # Phase 4.1 Story A.5 — Sentry init runs BEFORE anything that could
+    # raise so the very first exception of a deploy is captured. Init
+    # is idempotent and no-ops if SENTRY_DSN is unset (dev/test envs).
+    try:
+        from backend.adapters.observability import sentry_adapter
+
+        sentry_adapter.init()
+    except Exception:
+        # Sentry init failure must never block boot — log and proceed.
+        logger.exception("Sentry init failed; continuing without telemetry")
+
     # Block until PostgreSQL is reachable. This prevents the race where
     # launchd boots the backend before Docker containers finish starting.
     await _wait_for_db()

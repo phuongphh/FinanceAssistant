@@ -1,0 +1,23 @@
+# Founding-member welcome banner (Phase 4.1, Story C.4).
+# Shown ONCE, right after invite redemption, before the goal question.
+
+banner: |
+  🌱 <b>Bạn là Founding Member #{sequence} của Bé Tiền</b> — 1 trong 50 người đầu tiên.
+
+  Trong giai đoạn này toàn bộ tính năng <b>miễn phí</b>.
+
+  Khi Bé Tiền Pro ra mắt chính thức (dự kiến cuối 2026), bạn được <b>giảm 50% trọn đời</b> — 44.000đ/tháng thay vì 88.000đ — để cảm ơn sự đồng hành.
+
+cap_reached: |
+  💚 Cảm ơn bạn đã đến với Bé Tiền! Cohort Founding Member 50 chỗ đã đầy, nhưng bạn vẫn được dùng tất cả tính năng miễn phí trong giai đoạn soft launch.
+
+whoami_template: |
+  <b>Hồ sơ Bé Tiền của bạn</b>
+
+  • Tên: {display_name}
+  • Wealth segment: {segment}
+  • Onboarding: {onboarded_at}
+  • Days active: {days_active}
+  {founding_line}
+
+founding_line_template: "• 🌱 <b>Founding Member #{sequence}</b> — kể từ {founding_date}"

@@ -51,6 +51,15 @@ class Feedback(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Phase 4.1 Story A.7 — SLA tracking + in-onboarding emoji link.
+    # first_responded_at: when operator first sent a reply via /feedback_reply.
+    # sla_breach_alerted_at: set by feedback_sla_worker so we only alert once.
+    # onboarding_emoji_signal: 'love'|'confused'|'dislike' captured when the
+    #   feedback row was the in-Twin onboarding feedback (Story A.2).
+    first_responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sla_breach_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    onboarding_emoji_signal: Mapped[str | None] = mapped_column(String(16))
+
     __table_args__ = (
         Index("idx_feedbacks_user_created_at", "user_id", "created_at"),
         Index(

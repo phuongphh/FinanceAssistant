@@ -16,12 +16,15 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.jobs.cashflow_detection_job import run_cashflow_detection
 from backend.jobs.cashflow_forecast_job import run_cashflow_forecast_job
+from backend.jobs.daily_kpi_digest_job import run_daily_kpi_digest_job
+from backend.jobs.feedback_sla_job import run_feedback_sla_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
 from backend.jobs.morning_briefing_job import run_morning_briefing_job
+from backend.jobs.onboarding_resume_job import run_onboarding_resume_job
 from backend.jobs.recurring_detection_job import run_recurring_detection
 from backend.jobs.reminder_scheduler_job import run_reminder_scheduler
 from backend.jobs.seasonal_notifier import run_seasonal_check
@@ -155,6 +158,31 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         id="weekly_twin_update",
     )
 
+    # Phase 4.1 Story A.6 — Daily KPI digest. 08:00 ICT every morning;
+    # operator gets ONE message gathering cost + engagement + quality +
+    # churn + feedback queue (Story A.4 cost report merges in here).
+    scheduler.add_job(
+        run_daily_kpi_digest_job, "cron",
+        hour=8, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="daily_kpi_digest",
+    )
+    # Phase 4.1 Story A.7 — Feedback SLA alert. Every hour, alert
+    # operator about feedback open > 24h (once per feedback).
+    scheduler.add_job(
+        run_feedback_sla_job, "interval",
+        minutes=60, timezone="Asia/Ho_Chi_Minh",
+        id="feedback_sla_alert",
+    )
+
+    # Phase 4.1 Story A.2 — Onboarding resume nudge. Every 5 minutes:
+    # finds users stuck >10 minutes mid-onboarding (per-user nudge cap
+    # is enforced in the service, NOT here).
+    scheduler.add_job(
+        run_onboarding_resume_job, "interval",
+        minutes=5, timezone="Asia/Ho_Chi_Minh",
+        id="onboarding_resume_nudge",
+    )
+
     # Phase 4B Epic 3 — Cashflow Forecasting v2.
     # Detection runs weekly (Monday 06:00) so users see pattern suggestions
     # at the start of the work week. Forecast runs daily (01:00) so the
@@ -174,6 +202,15 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
 
 async def _run() -> None:
+    # Phase 4.1 Story A.5 — Sentry covers scheduler process too so
+    # cron-only failures land in the same dashboard as web errors.
+    try:
+        from backend.adapters.observability import sentry_adapter
+
+        sentry_adapter.init()
+    except Exception:
+        logger.exception("Sentry init failed in scheduler; continuing")
+
     scheduler = AsyncIOScheduler()
     register_jobs(scheduler)
     scheduler.start()

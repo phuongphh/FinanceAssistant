@@ -1,0 +1,32 @@
+# Operator quick-reply templates for /feedback_reply (Phase 4.1, A.7).
+# Used as ``/feedback_reply <id> --template <key>``.
+# All copy must be vetted by the vi-localization-checker — never edit
+# without a tone read-through.
+
+templates:
+  thanks_logged: |
+    Cảm ơn bạn — Bé Tiền đã ghi nhận và đang xem qua 💚
+  clarify_request: |
+    Bạn cho Bé Tiền biết thêm về điều này được không? Bé Tiền cần hiểu rõ hơn để hỗ trợ chính xác.
+  feature_acknowledged: |
+    Ý tưởng hay! Bé Tiền lưu vào roadmap để cân nhắc trong các bản cập nhật tới.
+  bug_apology: |
+    Xin lỗi bạn vì trải nghiệm chưa tốt — đây là bug đang fix, kết quả sẽ có trong 24h. Cảm ơn bạn báo Bé Tiền!
+  not_supported_yet: |
+    Tính năng này chưa có nhưng đang trong kế hoạch. Bé Tiền sẽ báo khi sẵn sàng!
+
+operator:
+  reply_sent_ack: "✅ Đã gửi phản hồi cho user {user_id_short}."
+  reply_failed: "⚠️ Gửi phản hồi thất bại — thử lại hoặc check log."
+  feedback_not_found: "Không tìm thấy feedback với id {feedback_id_short}."
+  unknown_template: "Template '{template}' không có. Templates: {available}."
+  unauthorized: "Lệnh /feedback_* chỉ dành cho operator (OPERATOR_TELEGRAM_ID)."
+  inbox_empty: "📬 Inbox trống — không có feedback open nào."
+  inbox_header: "<b>📬 Feedback inbox ({count} open)</b>"
+  inbox_row: "<code>{id_short}</code> | {segment}{founding} | {age} | {emoji}{snippet}"
+  sla_alert: |
+    🚨 <b>Feedback quá SLA 24h</b>
+    <code>{id_short}</code> ({age_h}h) | user {user_id_short}
+    "{snippet}"
+
+    Trả lời: <code>/feedback_reply {id_short} ...</code>
