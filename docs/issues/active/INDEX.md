@@ -36,7 +36,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
 | #508 | [Story] P4.1-C3: Kill criteria documentation | [issue-508.md](issue-508.md) |
 | #514 | [Task] P4.1-D1: Verify Zalo channel disabled | [issue-514.md](issue-514.md) |
-| #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 | #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
@@ -48,4 +47,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #525 | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [issue-525.md](issue-525.md) |
 | #526 | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [issue-526.md](issue-526.md) |
 
-**Total active:** 43
+**Total active:** 42
