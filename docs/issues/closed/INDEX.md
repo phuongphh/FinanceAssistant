@@ -256,6 +256,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #482 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut | [pre-phase/issue-482.md](by-phase/pre-phase/issue-482.md) |
 | #483 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-483.md](by-phase/pre-phase/issue-483.md) |
 | #484 | Pre-Phase | [Story] P4.1-A4: Daily cost report | [pre-phase/issue-484.md](by-phase/pre-phase/issue-484.md) |
+| #485 | Pre-Phase | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [pre-phase/issue-485.md](by-phase/pre-phase/issue-485.md) |
 | #486 | Pre-Phase | [Story] P4.1-A6: Daily KPI digest cron | [pre-phase/issue-486.md](by-phase/pre-phase/issue-486.md) |
 | #487 | Pre-Phase | [Story] P4.1-A7: Feedback triage UI | [pre-phase/issue-487.md](by-phase/pre-phase/issue-487.md) |
 | #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
@@ -263,5 +264,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #491 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-491.md](by-phase/pre-phase/issue-491.md) |
 | #492 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-492.md](by-phase/pre-phase/issue-492.md) |
 
-**Total:** 258 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 241 Pre-Phase)
+**Total:** 259 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 242 Pre-Phase)
