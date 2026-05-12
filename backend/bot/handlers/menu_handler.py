@@ -1052,10 +1052,29 @@ def _market_back_keyboard() -> dict:
 async def _action_market_vnindex(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """VNIndex market screen with compact VN30 leaders and clean footer."""
+    """VNIndex market screen with compact VN30 leaders and clean footer.
+
+    Data sources, in order of preference:
+      1. ``market_snapshots`` table — populated daily by ``market_service``
+         using vnstock (VCI source). This is the proven-working path also
+         used by the morning briefing and the ``get_market_data`` agent
+         tool. Always available for VNINDEX and (after issue #530) VN30
+         constituents.
+      2. Live SSI/VNDIRECT dispatcher — used for any VN30 symbol missing
+         from snapshot (e.g., new listing, cron just rebooted) and to
+         refresh today's reading intraday when snapshot is from yesterday.
+
+    Previously the handler called only the live dispatcher; SSI's dchart
+    endpoint does not serve quote payloads and VNDIRECT's ``stock_prices``
+    does not carry indices, so VNINDEX and the VN30 board both came back
+    empty for the user.
+    """
     from decimal import Decimal
 
+    from sqlalchemy import desc, select
+
     from backend.market_data.client import get_stock_quote, get_stock_quotes
+    from backend.models.market_snapshot import MarketSnapshot
 
     def dec(value) -> Decimal:
         try:
@@ -1070,7 +1089,16 @@ async def _action_market_vnindex(
             return f"{value / Decimal('1000000'):.0f} tr"
         return f"{value:,.0f}đ"
 
-    def row(q) -> dict:
+    async def latest_snapshot(code: str) -> MarketSnapshot | None:
+        stmt = (
+            select(MarketSnapshot)
+            .where(MarketSnapshot.asset_code == code)
+            .order_by(desc(MarketSnapshot.snapshot_date))
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
+    def row_from_quote(q) -> dict:
         pct = dec(q.metadata.get("change_pct"))
         trading_value = dec(q.metadata.get("trading_value"))
         if trading_value <= 0:
@@ -1084,32 +1112,77 @@ async def _action_market_vnindex(
             "stale": q.is_stale,
         }
 
-    try:
-        index_quote = await get_stock_quote("VNINDEX")
-    except Exception:
-        logger.warning("Unable to fetch VNINDEX overview", exc_info=True)
-        index_quote = None
+    def row_from_snapshot(s: MarketSnapshot) -> dict:
+        extra = s.extra_data or {}
+        price = dec(s.price)
+        volume = dec(extra.get("volume"))
+        trading_value = dec(extra.get("trading_value"))
+        if trading_value <= 0:
+            trading_value = price * volume
+        return {
+            "symbol": s.asset_code,
+            "price": price,
+            "change": dec(extra.get("change")),
+            "pct": dec(s.change_1d_pct),
+            "trading_value": trading_value,
+            "stale": False,
+        }
 
-    try:
-        quote_map = await get_stock_quotes(VN30_SYMBOLS)
-    except Exception:
-        logger.warning("Unable to fetch VN30 board", exc_info=True)
-        quote_map = {}
+    # ── VNINDEX overview ────────────────────────────────────────────────
+    snap = await latest_snapshot("VNINDEX")
+    index_data: dict | None = None
+    if snap is not None and snap.price:
+        index_data = {
+            "price": dec(snap.price),
+            "change": dec((snap.extra_data or {}).get("change")),
+            "pct": dec(snap.change_1d_pct),
+            "updated": snap.snapshot_date.strftime("%d/%m"),
+            "stale_note": " · dữ liệu cuối phiên",
+        }
+    if index_data is None:
+        try:
+            iq = await get_stock_quote("VNINDEX")
+            index_data = {
+                "price": iq.price,
+                "change": dec(iq.metadata.get("change")),
+                "pct": dec(iq.metadata.get("change_pct")),
+                "updated": iq.fetched_at.astimezone().strftime("%H:%M %d/%m"),
+                "stale_note": " · dữ liệu cũ/ngoài giờ" if iq.is_stale else "",
+            }
+        except Exception:
+            logger.warning("Unable to fetch VNINDEX overview", exc_info=True)
 
-    rows = [row(q) for q in quote_map.values()]
+    # ── VN30 board: snapshot first, live fallback for missing symbols ──
+    snap_stmt = (
+        select(MarketSnapshot)
+        .where(MarketSnapshot.asset_code.in_(VN30_SYMBOLS))
+        .order_by(MarketSnapshot.asset_code, desc(MarketSnapshot.snapshot_date))
+    )
+    snap_rows = (await db.execute(snap_stmt)).scalars().all()
+    snap_by_code: dict[str, MarketSnapshot] = {}
+    for s in snap_rows:
+        snap_by_code.setdefault(s.asset_code, s)
+
+    rows: list[dict] = [row_from_snapshot(s) for s in snap_by_code.values() if s.price]
+    missing = [sym for sym in VN30_SYMBOLS if sym not in snap_by_code]
+    if missing:
+        try:
+            quote_map = await get_stock_quotes(missing)
+            rows.extend(row_from_quote(q) for q in quote_map.values())
+        except Exception:
+            logger.warning("Unable to fetch VN30 board live", exc_info=True)
+
     lines = ["📊 *VNIndex*", ""]
-    if index_quote is None:
+    if index_data is None:
         lines.append("Không tải được điểm VNIndex lúc này. Bạn thử lại sau nhé.")
     else:
-        pct = dec(index_quote.metadata.get("change_pct"))
-        change = dec(index_quote.metadata.get("change"))
+        pct = index_data["pct"]
+        change = index_data["change"]
         sign = "+" if pct >= 0 else ""
-        updated = index_quote.fetched_at.astimezone().strftime("%H:%M %d/%m")
-        stale = " · dữ liệu cũ/ngoài giờ" if index_quote.is_stale else ""
         lines.extend([
-            f"Điểm: *{index_quote.price:,.2f}*",
-            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){stale}",
-            f"Cập nhật: {updated}",
+            f"Điểm: *{index_data['price']:,.2f}*",
+            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){index_data['stale_note']}",
+            f"Cập nhật: {index_data['updated']}",
         ])
     lines.append("")
     if not rows:

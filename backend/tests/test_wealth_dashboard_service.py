@@ -230,7 +230,7 @@ class TestBuildOverview:
             AsyncMock(return_value=[_asset("cash", "VCB", 5_000_000)]),
         )
 
-        async def fake_change(db, uid, period):
+        async def fake_change(db, uid, current, period=None):
             return nwc.NetWorthChange(
                 current=Decimal("5_000_000"),
                 previous=Decimal("4_000_000"),
@@ -239,7 +239,7 @@ class TestBuildOverview:
                 period_label=nwc._PERIOD_LABELS[period],
             )
 
-        monkeypatch.setattr(nwc, "calculate_change", fake_change)
+        monkeypatch.setattr(nwc, "calculate_change_from_current", fake_change)
 
         async def fake_trend(db, uid, *, days, end=None):
             return [{"date": "2026-04-01", "value": 5_000_000.0}]
@@ -279,7 +279,7 @@ class TestBuildOverview:
             AsyncMock(return_value=[]),
         )
 
-        async def fake_change(db, uid, period):
+        async def fake_change(db, uid, current, period=None):
             return nwc.NetWorthChange(
                 current=Decimal(0),
                 previous=Decimal(0),
@@ -288,7 +288,7 @@ class TestBuildOverview:
                 period_label="",
             )
 
-        monkeypatch.setattr(nwc, "calculate_change", fake_change)
+        monkeypatch.setattr(nwc, "calculate_change_from_current", fake_change)
         monkeypatch.setattr(
             svc,
             "get_trend",
@@ -323,7 +323,7 @@ class TestBuildOverview:
             ),
         )
 
-        async def fake_change(db, uid, period):
+        async def fake_change(db, uid, current, period=None):
             return nwc.NetWorthChange(
                 current=Decimal("47_000_000"),
                 previous=Decimal("47_000_000"),
@@ -332,7 +332,7 @@ class TestBuildOverview:
                 period_label="",
             )
 
-        monkeypatch.setattr(nwc, "calculate_change", fake_change)
+        monkeypatch.setattr(nwc, "calculate_change_from_current", fake_change)
         monkeypatch.setattr(svc, "get_trend", AsyncMock(return_value=[]))
 
         result = await svc.build_overview(MagicMock(), uuid.uuid4())
@@ -369,7 +369,7 @@ class TestBuildOverview:
             ),
         )
 
-        async def fake_change(db, uid, period):
+        async def fake_change(db, uid, current, period=None):
             return nwc.NetWorthChange(
                 current=Decimal("1_750_000_000"),
                 previous=Decimal("1_750_000_000"),
@@ -378,7 +378,7 @@ class TestBuildOverview:
                 period_label="",
             )
 
-        monkeypatch.setattr(nwc, "calculate_change", fake_change)
+        monkeypatch.setattr(nwc, "calculate_change_from_current", fake_change)
         monkeypatch.setattr(svc, "get_trend", AsyncMock(return_value=[]))
 
         result = await svc.build_overview(MagicMock(), uuid.uuid4())

@@ -25,6 +25,121 @@ settings = get_settings()
 # Target fund codes to scrape from cafef.vn
 TARGET_FUNDS = ["DCDS", "VESAF", "VFMVF1", "VCBF-BCF", "SSIBF"]
 
+# VN30 constituents — populated daily so the VNIndex menu screen (issue
+# #530) can rank Top-5 by trading value without a live HTTP fetch. Kept
+# in sync with the same list in ``backend/bot/handlers/menu_handler.py``.
+VN30_CONSTITUENTS = [
+    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+    "LPB", "MBB", "MSN", "MWG", "PLX", "SAB", "SHB", "SSB", "SSI", "STB",
+    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+]
+
+
+async def _fetch_vn30_snapshots(today: date) -> list[dict]:
+    """Fetch VN30 constituents via vnstock ``price_board`` in one batch.
+
+    vnstock is synchronous + pandas-backed, so we offload to a thread.
+    Column names differ across vnstock versions (``match_price`` vs
+    ``Giá khớp``, etc.), so we probe candidates rather than assume a
+    schema. A missing column falls through to ``None`` and is filtered
+    out by the caller's row construction.
+    """
+    import asyncio
+
+    def _sync() -> list[dict]:
+        from vnstock import Vnstock
+
+        vs = Vnstock().stock(symbol=VN30_CONSTITUENTS[0], source="VCI")
+        df = vs.trading.price_board(VN30_CONSTITUENTS)
+        if df is None or len(df) == 0:
+            return []
+
+        # vnstock returns either flat columns or a MultiIndex; flatten if
+        # needed so ``record[k]`` lookup works uniformly.
+        if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
+            df.columns = ["_".join(str(c) for c in col if c).strip("_") for col in df.columns]
+
+        rows: list[dict] = []
+        for _, r in df.iterrows():
+            record = {k: r[k] for k in df.columns}
+
+            def pick(*names: str):
+                for n in names:
+                    for key in (n, n.lower(), n.upper()):
+                        if key in record and record[key] not in (None, ""):
+                            try:
+                                if isinstance(record[key], float) and (record[key] != record[key]):  # NaN
+                                    continue
+                            except Exception:
+                                pass
+                            return record[key]
+                return None
+
+            sym = pick("symbol", "Mã CP", "ticker", "code", "listing_symbol")
+            if not sym:
+                continue
+            sym = str(sym).upper().strip()
+            price = pick("match_price", "Giá khớp", "matchPrice", "close", "match_match_price")
+            if price is None:
+                continue
+            try:
+                price = float(price)
+                # vnstock VCI returns prices in thousands of VND (matches SSI iBoard).
+                if price < 1000:
+                    price *= 1000.0
+            except (TypeError, ValueError):
+                continue
+            volume = pick("accumulated_volume", "Tổng KL", "total_volume", "match_accumulated_volume")
+            trading_value = pick("accumulated_value", "Tổng GT", "total_value", "match_accumulated_value")
+            change_pct = pick("change_pct", "%", "pct_change", "match_change_pct")
+            change_abs = pick("change", "Thay đổi", "price_change")
+            try:
+                vol_f = float(volume) if volume is not None else 0.0
+            except (TypeError, ValueError):
+                vol_f = 0.0
+            try:
+                tv_f = float(trading_value) if trading_value is not None else 0.0
+                # ``accumulated_value`` from VCI is in VND already; some sources return
+                # value in thousands — heuristic: if tv looks too small to be VND, scale up.
+                if tv_f and tv_f < vol_f * (price / 1000):
+                    tv_f *= 1000.0
+            except (TypeError, ValueError):
+                tv_f = 0.0
+            try:
+                pct_f = float(change_pct) if change_pct is not None else None
+            except (TypeError, ValueError):
+                pct_f = None
+            try:
+                chg_f = float(change_abs) if change_abs is not None else None
+            except (TypeError, ValueError):
+                chg_f = None
+
+            rows.append(
+                {
+                    "snapshot_date": today,
+                    "asset_code": sym,
+                    "asset_type": "stock",
+                    "asset_name": sym,
+                    "price": price,
+                    "change_1d_pct": pct_f,
+                    "change_1w_pct": None,
+                    "change_1m_pct": None,
+                    "extra_data": {
+                        "volume": vol_f,
+                        "trading_value": tv_f,
+                        "change": chg_f,
+                        "group": "VN30",
+                    },
+                }
+            )
+        return rows
+
+    try:
+        return await asyncio.to_thread(_sync)
+    except ImportError:
+        logger.warning("vnstock not installed, skipping VN30 board snapshot")
+        return []
+
 
 async def fetch_daily_snapshot() -> list[dict]:
     """Fetch market data from vnstock and cafef.vn."""
@@ -101,6 +216,14 @@ async def fetch_daily_snapshot() -> list[dict]:
         logger.warning("vnstock not installed, skipping index data")
     except Exception as e:
         logger.error("vnstock error: %s", e)
+
+    # 1b. VN30 individual stocks via vnstock ``price_board`` — used by
+    # the VNIndex menu screen to rank Top-5 by trading value and to show
+    # gainers/losers without a per-request HTTP roundtrip.
+    try:
+        snapshots.extend(await _fetch_vn30_snapshots(today))
+    except Exception as e:
+        logger.error("vnstock VN30 error: %s", e)
 
     # 2. Fund NAV from cafef.vn
     try:
