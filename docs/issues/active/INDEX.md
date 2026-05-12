@@ -33,12 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #478 | [Epic] Phase 4.1 — Epic A: Pre-Launch Hardening | [issue-478.md](issue-478.md) |
-| #479 | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [issue-479.md](issue-479.md) |
-| #480 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-480.md](issue-480.md) |
-| #481 | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [issue-481.md](issue-481.md) |
-| #482 | [Story] P4.1-A2: First-Twin shortcut | [issue-482.md](issue-482.md) |
-| #483 | [Story] P4.1-A3: Cost guardrail middleware | [issue-483.md](issue-483.md) |
 | #484 | [Story] P4.1-A4: Daily cost report | [issue-484.md](issue-484.md) |
 | #485 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-485.md](issue-485.md) |
 | #486 | [Story] P4.1-A6: Daily KPI digest cron | [issue-486.md](issue-486.md) |
@@ -49,4 +43,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #491 | [Story] P4.1-C2: Success metrics rubric | [issue-491.md](issue-491.md) |
 | #492 | [Story] P4.1-C3: Kill criteria documentation | [issue-492.md](issue-492.md) |
 
-**Total active:** 44
+**Total active:** 38
