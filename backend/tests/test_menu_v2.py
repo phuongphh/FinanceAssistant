@@ -811,6 +811,162 @@ class TestNavigateCashflow:
 
 
 # ============================================================
+# _navigate_assets — Issue #457 inline net_worth
+# ============================================================
+
+
+def _fake_breakdown(total: int = 150_000_000, asset_count: int = 3):
+    from decimal import Decimal
+    from types import SimpleNamespace
+    return SimpleNamespace(total=Decimal(total), asset_count=asset_count)
+
+
+def _fake_style(is_starter: bool = False):
+    from types import SimpleNamespace
+    return SimpleNamespace(is_starter=is_starter)
+
+
+class TestNavigateAssets:
+    """Unit tests for _navigate_assets (issue #457).
+
+    Mirrors TestNavigateCashflow patterns: net_worth_calculator is mocked
+    so no DB is needed; send_message vs edit_message_text branching is
+    covered; zero-asset fallback path is verified.
+    """
+
+    @pytest.mark.asyncio
+    async def test_send_message_called_when_no_message_id(self, monkeypatch):
+        """When message_id is None, send_message is used (no existing bubble)."""
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        sent: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_assets(
+            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+        )
+
+        assert sent["chat_id"] == 42
+        assert "Tổng tài sản" in sent["text"]
+        assert "inline_keyboard" in sent["reply_markup"]
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_called_when_message_id_set(self, monkeypatch):
+        """When message_id is provided, edit_message_text is used (edit in-place)."""
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        edited: dict = {}
+
+        async def fake_edit_message_text(**kwargs):
+            edited.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_assets(
+            db=None, user=_fake_user(), chat_id=42, message_id=99, level="young_prof",
+        )
+
+        assert edited["chat_id"] == 42
+        assert edited["message_id"] == 99
+        assert "Tổng tài sản" in edited["text"]
+
+    @pytest.mark.asyncio
+    async def test_zero_assets_shows_empty_state_message(self, monkeypatch):
+        """When breakdown.total == 0, show 'chưa có tài sản' prompt instead."""
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        sent: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown(total=0, asset_count=0)),
+        )
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_assets(
+            db=None, user=_fake_user(), chat_id=42, message_id=None, level="starter",
+        )
+
+        assert "chưa có tài sản" in sent["text"]
+        assert "/themtaisan" in sent["text"]
+
+    @pytest.mark.asyncio
+    async def test_hint_appended_to_text(self, monkeypatch):
+        """The assets submenu hint from YAML is appended to the body text."""
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        captured: list[str] = []
+
+        async def fake_send_message(**kwargs):
+            captured.append(kwargs["text"])
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_assets(
+            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+        )
+
+        assert len(captured) == 1
+        assert "💡" in captured[0]  # hint block starts with 💡
+
+    @pytest.mark.asyncio
+    async def test_assets_submenu_keyboard_excludes_net_worth_button(self, monkeypatch):
+        """Assets submenu keyboard must NOT contain menu:assets:net_worth (removed #457)."""
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        captured_kb: list[dict] = []
+
+        async def fake_send_message(**kwargs):
+            captured_kb.append(kwargs.get("reply_markup", {}))
+
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            net_worth_calculator, "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+
+        await menu_handler._navigate_assets(
+            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+        )
+
+        all_callbacks = [
+            row[0]["callback_data"] for row in captured_kb[0]["inline_keyboard"]
+        ]
+        assert "menu:assets:net_worth" not in all_callbacks
+        assert "menu:assets:report" in all_callbacks
+        assert "menu:main" in all_callbacks
+
+
+# ============================================================
 # Coexistence — Story S9
 # ============================================================
 
