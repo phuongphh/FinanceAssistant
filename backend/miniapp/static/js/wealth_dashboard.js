@@ -184,12 +184,12 @@
     function renderHero(data) {
         els.netWorth.textContent = formatMoneyFull(data.net_worth || 0);
 
-        // User asked for "chỉ cần tổng tăng giảm %" vs hôm qua, with
-        // color + icon. We render just the percent (no absolute amount)
-        // and tag the hero-change element with .up / .down / .flat so
-        // CSS can paint it green/red/neutral.
+        // Show both absolute amount and % vs hôm qua, e.g. "+217 tỷ (3%)".
+        // Color + icon tag the .hero-change element via .up / .down / .flat
+        // so CSS paints it green / red / neutral.
         const change = data.change_day || { amount: 0, pct: 0 };
         const pct = Number(change.pct || 0);
+        const amount = Number(change.amount || 0);
         const tolerance = 0.05;  // < 0.05% reads as "flat" — UI sugar
         let direction = 'flat';
         let icon = '➖';
@@ -200,7 +200,12 @@
             direction = 'down'; icon = '📉'; sign = '−';
         }
         els.changeIcon.textContent = icon;
-        els.changeAmount.textContent = `${sign}${Math.abs(pct).toFixed(1)}%`;
+        const absAmount = formatMoneyShort(Math.abs(amount));
+        const absPct = Math.abs(pct).toFixed(1);
+        els.changeAmount.textContent =
+            direction === 'flat'
+                ? '0₫ (0.0%)'
+                : `${sign}${absAmount} (${sign}${absPct}%)`;
         els.changePeriod.textContent = 'so với hôm qua';
         const heroChange = els.changeIcon.parentElement;
         if (heroChange) {

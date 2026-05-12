@@ -66,26 +66,44 @@ def format_movers_line(
     return " · ".join(parts)
 
 
+def _signed_amount(amount, formatter) -> str:
+    """Render a Decimal/int amount with explicit sign and short money fmt."""
+    from decimal import Decimal
+
+    value = Decimal(amount or 0)
+    sign = "+" if value >= 0 else "−"
+    return f"{sign}{formatter(abs(value))}"
+
+
 def format_movers_block(
     total_pct: float | None,
     movers: Iterable[AssetMover],
     *,
     limit: int = 6,
+    total_amount=None,
+    amount_formatter=None,
 ) -> str:
     """Format the headline + per-asset breakdown across two lines.
 
-    Example::
+    With ``total_amount`` + ``amount_formatter`` (e.g. ``format_money_short``)
+    the headline includes the absolute change too::
 
-        📊 +4.0% so với hôm qua
+        📈 +217 tỷ (+3.0%) so với hôm qua
         VIC +15.0% · MSB +2.0% · BTC −1.2%
 
-    When ``total_pct`` is ``None`` (e.g. no baseline) the headline is
-    omitted; when there are no movers the breakdown line is omitted.
+    Without them the headline shows just the percent (kept for surfaces
+    that haven't wired up the amount yet). When ``total_pct`` is ``None``
+    the headline is omitted; when there are no movers the breakdown line
+    is omitted.
     """
     lines: list[str] = []
     if total_pct is not None and abs(total_pct) >= 0.05:
         icon = "📈" if total_pct > 0 else "📉"
-        lines.append(f"{icon} {_signed_pct(total_pct)} so với hôm qua")
+        if total_amount is not None and amount_formatter is not None:
+            amt = _signed_amount(total_amount, amount_formatter)
+            lines.append(f"{icon} {amt} ({_signed_pct(total_pct)}) so với hôm qua")
+        else:
+            lines.append(f"{icon} {_signed_pct(total_pct)} so với hôm qua")
     elif total_pct is not None:
         lines.append("➖ Đi ngang so với hôm qua")
     detail = format_movers_line(movers, limit=limit)
