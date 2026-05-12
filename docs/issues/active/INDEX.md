@@ -34,5 +34,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #494 | [Epic] Phase 4.1 — EPIC 2: Twin Polish Thuc Chien | [issue-494.md](issue-494.md) |
+| #495 | [Epic] Phase 4.1 — EPIC 3: Soft Launch Playbook & Founding Cohort | [issue-495.md](issue-495.md) |
 
-**Total active:** 30
+**Total active:** 31
