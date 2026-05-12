@@ -48,6 +48,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #505 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-505.md](issue-505.md) |
 | #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
 | #507 | [Story] P4.1-C2: Success metrics rubric | [issue-507.md](issue-507.md) |
+| #508 | [Story] P4.1-C3: Kill criteria documentation | [issue-508.md](issue-508.md) |
 | #509 | [Story] P4.1-C4: Founding member experience | [issue-509.md](issue-509.md) |
 | #510 | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [issue-510.md](issue-510.md) |
 | #511 | [Task] P4.1-M2: Migration feedback_sla_index | [issue-511.md](issue-511.md) |
@@ -57,4 +58,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 
-**Total active:** 52
+**Total active:** 53
