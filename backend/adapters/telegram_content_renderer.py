@@ -30,12 +30,26 @@ def _copy() -> dict[str, Any]:
 
 
 def twin_view_buttons() -> tuple[tuple[Button, ...], ...]:
-    """Default Telegram Twin action rows as channel-neutral buttons."""
-    return (
-        (Button("⚖️ So tối ưu", callback_data="menu:twin:compare_optimal"),),
-        (Button("❓ Cách hoạt động", callback_data="menu:twin:how_it_works"),),
-        (Button("◀️ Quay về Twin", callback_data="menu:twin"),),
+    """Default Telegram Twin action rows as channel-neutral buttons.
+
+    The "📸 Lưu thành ảnh" row (Phase 4.1 Story B.1) is gated by the
+    ``TWIN_SHARE_ENABLED`` env flag. When off, the row disappears so
+    users never see a button that would error.
+    """
+    from backend.services.twin.twin_share_service import is_share_enabled
+
+    rows: list[tuple[Button, ...]] = []
+    if is_share_enabled():
+        share_label = _copy().get("share", {}).get("button", "📸 Lưu thành ảnh")
+        rows.append((Button(share_label, callback_data="menu:twin:share"),))
+    rows.extend(
+        [
+            (Button("⚖️ So tối ưu", callback_data="menu:twin:compare_optimal"),),
+            (Button("❓ Cách hoạt động", callback_data="menu:twin:how_it_works"),),
+            (Button("◀️ Quay về Twin", callback_data="menu:twin"),),
+        ]
     )
+    return tuple(rows)
 
 
 class TelegramContentRenderer(ContentRenderer):

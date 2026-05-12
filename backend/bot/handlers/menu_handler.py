@@ -1241,6 +1241,15 @@ async def _action_twin_how_it_works(
     await send_twin_how_it_works(chat_id=chat_id)
 
 
+async def _action_twin_share(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 4.1 Story B.1 — render shareable Twin image on demand."""
+    from backend.bot.handlers.twin_handler import send_twin_share
+
+    await send_twin_share(db, chat_id=chat_id, user=user)
+
+
 async def _action_twin_life_events(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -1289,6 +1298,7 @@ _DIRECT_HANDLERS = {
     ("twin", "compare_optimal"): _action_twin_compare_optimal,
     ("twin", "open_miniapp"): _action_twin_open_miniapp,
     ("twin", "how_it_works"): _action_twin_how_it_works,
+    ("twin", "share"): _action_twin_share,
     ("twin", "life_events"): _action_twin_life_events,
 }
 

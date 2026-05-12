@@ -36,6 +36,7 @@ from backend.market_data.jobs.gold_updater import update_all_held_gold
 from backend.market_data.jobs.historical_price_seeder import seed_year_start_stock_prices
 from backend.market_data.jobs.news_updater import update_news_articles
 from backend.market_data.jobs.stock_updater import update_all_held_stocks
+from backend.jobs.twin_calibration_job import run_twin_calibration_job
 from backend.twin.schedulers.weekly_twin_updater import run_weekly_twin_update
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,15 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         run_onboarding_resume_job, "interval",
         minutes=5, timezone="Asia/Ho_Chi_Minh",
         id="onboarding_resume_nudge",
+    )
+
+    # Phase 4.1 Story B.2 — Twin calibration fill. Daily 02:00 ICT —
+    # off-peak so backfilling a large queue never competes with the
+    # morning briefing burst. Idempotent (only NULL actuals scanned).
+    scheduler.add_job(
+        run_twin_calibration_job, "cron",
+        hour=2, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="twin_calibration_fill",
     )
 
     # Phase 4B Epic 3 — Cashflow Forecasting v2.

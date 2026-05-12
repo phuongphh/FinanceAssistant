@@ -137,6 +137,34 @@ comparison:
   action_hold: "• Danh mục đã khá gần mục tiêu; ưu tiên giữ nhịp và rà soát mỗi tháng."
   disclaimer_prefix: "Đây là gợi ý chung, không phải lời khuyên đầu tư."
 
+share:
+  # Phase 4.1 Story B.1 — Shareable Twin image copy.
+  # Image MUST NOT contain absolute money amounts; only % and horizon.
+  button: "📸 Lưu thành ảnh"
+  headline: "Bé Tiền tương lai"
+  subline: "Dự phóng xác suất, không phải lời hứa"
+  growth_pct: "{sign}{value}%"
+  horizon: "Sau {years} năm"
+  watermark: "Bé Tiền — Personal CFO"
+  founding_badge: "🌱 Founding Member"
+  caption: |-
+    📸 Đây là Twin của bạn — ảnh đã ẩn số tiền tuyệt đối để bạn yên tâm chia sẻ.
+
+    Lưu về máy hoặc gửi cho bạn bè nếu thấy thú vị nhé. Bé Tiền không tự đăng đâu — quyết định là của bạn.
+  unavailable: |-
+    🔮 Mình chưa có Twin để tạo ảnh chia sẻ.
+    Bạn cập nhật tài sản rồi quay lại nhé.
+  disabled: |-
+    📸 Tính năng lưu ảnh đang tạm tắt để Bé Tiền tối ưu lại. Quay lại sau bạn nhé.
+
+calibration:
+  # Phase 4.1 Story B.2 — Predictions vs actual section.
+  # Only render when user has >=3 completed snapshots. Honest framing:
+  # never inflate; if hit-rate <50%, acknowledge openly.
+  section_title: "🎯 Bé Tiền đoán đúng bao nhiêu?"
+  hit_line: "Bé Tiền đoán đúng {correct}/{total} lần ({pct}%)."
+  learning_note: "Dự phóng chưa chuẩn, Bé Tiền đang học thêm."
+
 asset_labels:
   stocks_vn: "cổ phiếu VN"
   stocks_global: "cổ phiếu global"
