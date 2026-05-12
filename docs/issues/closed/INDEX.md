@@ -256,9 +256,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #482 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut | [pre-phase/issue-482.md](by-phase/pre-phase/issue-482.md) |
 | #483 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-483.md](by-phase/pre-phase/issue-483.md) |
 | #484 | Pre-Phase | [Story] P4.1-A4: Daily cost report | [pre-phase/issue-484.md](by-phase/pre-phase/issue-484.md) |
+| #486 | Pre-Phase | [Story] P4.1-A6: Daily KPI digest cron | [pre-phase/issue-486.md](by-phase/pre-phase/issue-486.md) |
 | #487 | Pre-Phase | [Story] P4.1-A7: Feedback triage UI | [pre-phase/issue-487.md](by-phase/pre-phase/issue-487.md) |
 | #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
 | #489 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-489.md](by-phase/pre-phase/issue-489.md) |
 
-**Total:** 255 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 238 Pre-Phase)
+**Total:** 256 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 239 Pre-Phase)
