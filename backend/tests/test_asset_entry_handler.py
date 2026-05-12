@@ -1431,6 +1431,47 @@ async def test_mark_rental_pick_already_rental_rejected():
 # -----------------------------------------------------------------
 
 
+def test_rental_wizard_footers_return_to_assets_menu():
+    """Rental sub-wizard footers should go back to Tài sản, not cancel text."""
+    for keyboard_fn in (
+        asset_entry.rental_ask_keyboard,
+        asset_entry.rental_status_keyboard,
+        asset_entry.rental_extra_keyboard,
+    ):
+        footer = keyboard_fn()["inline_keyboard"][-1][0]
+        assert footer["text"] == "◀️ Quay về"
+        assert footer["callback_data"] == "asset_add:back_assets"
+
+
+@pytest.mark.asyncio
+async def test_callback_back_assets_clears_state_and_opens_assets_menu():
+    user = _user({"flow": "asset_add_real_estate", "step": "rental_ask", "draft": {}})
+    db = _db(user)
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+        patch("backend.bot.handlers.menu_handler._navigate", AsyncMock()) as navigate,
+    ):
+        consumed = await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:back_assets",
+                "message": {"chat": {"id": 100}, "message_id": 7},
+                "from": {"id": 100},
+            },
+        )
+
+    assert consumed is True
+    clear.assert_awaited_once_with(db, user.id)
+    navigate.assert_awaited_once_with(
+        db=db, user=user, chat_id=100, message_id=7, target="assets"
+    )
+
+
 @pytest.mark.asyncio
 async def test_callback_cancel_clears_state():
     user = _user({"flow": "asset_add_cash", "step": "amount", "draft": {}})
