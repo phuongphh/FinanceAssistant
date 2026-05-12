@@ -286,6 +286,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #512 | Pre-Phase | [Task] P4.1-M3: Migration twin_calibration_log | [pre-phase/issue-512.md](by-phase/pre-phase/issue-512.md) |
 | #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 | #515 | Pre-Phase | [Task] P4.1-D2: Operator briefing & dogfood | [pre-phase/issue-515.md](by-phase/pre-phase/issue-515.md) |
+| #516 | Pre-Phase | [Task] P4.1-D3: 50 invite link distribution package | [pre-phase/issue-516.md](by-phase/pre-phase/issue-516.md) |
 
-**Total:** 282 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 265 Pre-Phase)
+**Total:** 283 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 266 Pre-Phase)
