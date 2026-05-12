@@ -242,11 +242,12 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #468 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-468.md](by-phase/pre-phase/issue-468.md) |
 | #469 | Pre-Phase | [Story] P4.1-A4: Daily cost report | [pre-phase/issue-469.md](by-phase/pre-phase/issue-469.md) |
 | #470 | Pre-Phase | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [pre-phase/issue-470.md](by-phase/pre-phase/issue-470.md) |
+| #471 | Pre-Phase | [Story] P4.1-A6: Daily KPI digest cron | [pre-phase/issue-471.md](by-phase/pre-phase/issue-471.md) |
 | #473 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-473.md](by-phase/pre-phase/issue-473.md) |
 | #474 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-474.md](by-phase/pre-phase/issue-474.md) |
 | #475 | Pre-Phase | [Story] P4.1-C1: Acquisition source + invite tracking | [pre-phase/issue-475.md](by-phase/pre-phase/issue-475.md) |
 | #476 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-476.md](by-phase/pre-phase/issue-476.md) |
 | #477 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-477.md](by-phase/pre-phase/issue-477.md) |
 
-**Total:** 243 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 226 Pre-Phase)
+**Total:** 244 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 227 Pre-Phase)
