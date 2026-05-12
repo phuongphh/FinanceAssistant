@@ -235,7 +235,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #450 | Pre-Phase | [Feature] Goals UI/UX Improvements — 5 enhancements | [pre-phase/issue-450.md](by-phase/pre-phase/issue-450.md) |
 | #457 | Pre-Phase | [Feature] UI/UX Enhancements — Consolidate menus, fix labels, improve copy | [pre-phase/issue-457.md](by-phase/pre-phase/issue-457.md) |
 | #463 | Pre-Phase | [Epic] Phase 4.1 — Epic A: Pre-Launch Hardening | [pre-phase/issue-463.md](by-phase/pre-phase/issue-463.md) |
+| #464 | Pre-Phase | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [pre-phase/issue-464.md](by-phase/pre-phase/issue-464.md) |
 | #465 | Pre-Phase | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [pre-phase/issue-465.md](by-phase/pre-phase/issue-465.md) |
 
-**Total:** 232 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 215 Pre-Phase)
+**Total:** 233 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 216 Pre-Phase)
