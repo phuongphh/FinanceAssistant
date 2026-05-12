@@ -288,6 +288,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #514 | Pre-Phase | [Task] P4.1-D1: Verify Zalo channel disabled | [pre-phase/issue-514.md](by-phase/pre-phase/issue-514.md) |
 | #515 | Pre-Phase | [Task] P4.1-D2: Operator briefing & dogfood | [pre-phase/issue-515.md](by-phase/pre-phase/issue-515.md) |
 | #516 | Pre-Phase | [Task] P4.1-D3: 50 invite link distribution package | [pre-phase/issue-516.md](by-phase/pre-phase/issue-516.md) |
+| #518 | Pre-Phase | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [pre-phase/issue-518.md](by-phase/pre-phase/issue-518.md) |
 | #519 | Pre-Phase | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [pre-phase/issue-519.md](by-phase/pre-phase/issue-519.md) |
 | #520 | Pre-Phase | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [pre-phase/issue-520.md](by-phase/pre-phase/issue-520.md) |
 | #521 | Pre-Phase | [UI/UX] US3: Cashflow Main Menu — Income/Expense Summary Only | [pre-phase/issue-521.md](by-phase/pre-phase/issue-521.md) |
@@ -297,5 +298,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #525 | Pre-Phase | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [pre-phase/issue-525.md](by-phase/pre-phase/issue-525.md) |
 | #526 | Pre-Phase | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [pre-phase/issue-526.md](by-phase/pre-phase/issue-526.md) |
 
-**Total:** 292 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 275 Pre-Phase)
+**Total:** 293 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 276 Pre-Phase)
