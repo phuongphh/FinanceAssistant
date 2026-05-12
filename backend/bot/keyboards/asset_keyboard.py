@@ -15,13 +15,14 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:more                        — add another asset
     asset_add:done                        — finish wizard
     asset_add:cancel                      — abort wizard
+    asset_add:back_assets                 — abort wizard and return to Tài sản menu
     asset_add:undo:<asset_uuid>           — undo last save (hard delete)
     asset_add:rental_ask:<yes|no>         — Phase 3.8: BĐS cho thuê?
     asset_add:rental_status:<rented|vacant>  — current occupancy
     asset_add:rental_extra:<skip|add>     — collect tenant info or skip
 
     asset_rental:pick:<asset_uuid>        — Phase 3.8: pick existing RE asset
-    asset_rental:cancel                   — abort mark-as-rental flow
+    asset_rental:back_assets              — return to Tài sản menu
 
     asset_manage:edit_type:<asset_type>   — list active assets filtered by type for edit
     asset_manage:edit:<uuid>:<asset_type> — edit one asset, then return to market portfolio
@@ -454,8 +455,8 @@ def rental_ask_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
-                    "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+                    "text": "◀️ Quay về",
+                    "callback_data": build_callback(CB_ASSET_ADD, "back_assets"),
                 }
             ],
         ]
@@ -484,8 +485,8 @@ def rental_status_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
-                    "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+                    "text": "◀️ Quay về",
+                    "callback_data": build_callback(CB_ASSET_ADD, "back_assets"),
                 }
             ],
         ]
@@ -530,8 +531,8 @@ def rental_extra_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
-                    "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+                    "text": "◀️ Quay về",
+                    "callback_data": build_callback(CB_ASSET_ADD, "back_assets"),
                 }
             ],
         ]
@@ -789,7 +790,7 @@ def rental_pick_existing_keyboard(
         [
             {
                 "text": "◀️ Quay về",
-                "callback_data": build_callback(CB_ASSET_RENTAL, "cancel"),
+                "callback_data": build_callback(CB_ASSET_RENTAL, "back_assets"),
             }
         ]
     )
