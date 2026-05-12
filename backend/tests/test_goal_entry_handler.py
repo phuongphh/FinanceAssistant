@@ -361,7 +361,7 @@ class TestCancel:
         db = _db(user)
         with patch.object(goal_entry.wizard_service, "clear",
                           AsyncMock()) as clear, \
-             patch.object(goal_entry, "send_message", AsyncMock()):
+             patch.object(goal_entry, "show_goals_list", AsyncMock()):
             consumed = await goal_entry.cancel_wizard(db, 100, user)
         assert consumed is True
         clear.assert_awaited_once()
