@@ -279,6 +279,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #505 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-505.md](by-phase/pre-phase/issue-505.md) |
 | #506 | Pre-Phase | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [pre-phase/issue-506.md](by-phase/pre-phase/issue-506.md) |
 | #507 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-507.md](by-phase/pre-phase/issue-507.md) |
+| #508 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-508.md](by-phase/pre-phase/issue-508.md) |
 | #509 | Pre-Phase | [Story] P4.1-C4: Founding member experience | [pre-phase/issue-509.md](by-phase/pre-phase/issue-509.md) |
 | #510 | Pre-Phase | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [pre-phase/issue-510.md](by-phase/pre-phase/issue-510.md) |
 | #511 | Pre-Phase | [Task] P4.1-M2: Migration feedback_sla_index | [pre-phase/issue-511.md](by-phase/pre-phase/issue-511.md) |
@@ -286,5 +287,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 | #515 | Pre-Phase | [Task] P4.1-D2: Operator briefing & dogfood | [pre-phase/issue-515.md](by-phase/pre-phase/issue-515.md) |
 
-**Total:** 281 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 264 Pre-Phase)
+**Total:** 282 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 265 Pre-Phase)
