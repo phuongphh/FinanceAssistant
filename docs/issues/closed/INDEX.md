@@ -253,9 +253,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #479 | Pre-Phase | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [pre-phase/issue-479.md](by-phase/pre-phase/issue-479.md) |
 | #480 | Pre-Phase | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [pre-phase/issue-480.md](by-phase/pre-phase/issue-480.md) |
 | #482 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut | [pre-phase/issue-482.md](by-phase/pre-phase/issue-482.md) |
+| #483 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-483.md](by-phase/pre-phase/issue-483.md) |
 | #484 | Pre-Phase | [Story] P4.1-A4: Daily cost report | [pre-phase/issue-484.md](by-phase/pre-phase/issue-484.md) |
 | #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
 | #489 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-489.md](by-phase/pre-phase/issue-489.md) |
 
-**Total:** 252 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 235 Pre-Phase)
+**Total:** 253 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 236 Pre-Phase)
