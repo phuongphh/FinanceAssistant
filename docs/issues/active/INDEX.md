@@ -40,6 +40,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #482 | [Story] P4.1-A2: First-Twin shortcut | [issue-482.md](issue-482.md) |
 | #483 | [Story] P4.1-A3: Cost guardrail middleware | [issue-483.md](issue-483.md) |
 | #485 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-485.md](issue-485.md) |
+| #486 | [Story] P4.1-A6: Daily KPI digest cron | [issue-486.md](issue-486.md) |
 | #487 | [Story] P4.1-A7: Feedback triage UI | [issue-487.md](issue-487.md) |
 
-**Total active:** 37
+**Total active:** 38
