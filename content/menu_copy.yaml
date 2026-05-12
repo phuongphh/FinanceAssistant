@@ -216,7 +216,7 @@ action_assets_manage:
 
     *3️⃣ Xem nhanh tổng tài sản*
     • Vào menu 💎 Tài sản — tổng tài sản hiển thị ngay phía trên
-  open_miniapp_button: "📊 Mở Mini App"
+  open_miniapp_button: "Mở Dashboard"
   back_button: "◀️ Quay về menu"
 
 # ============================================================

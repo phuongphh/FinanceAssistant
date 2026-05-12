@@ -196,6 +196,17 @@ async def start_goals_wizard(
     analytics.track(GoalEvent.WIZARD_OPENED, user_id=user.id)
 
 
+async def _send_goals_submenu(chat_id: int, user: User) -> None:
+    """Navigate back to the goals submenu (4-button screen)."""
+    from backend.bot.formatters.menu_formatter import format_submenu, get_submenu_hint
+    level = user.wealth_level if user else None
+    text, keyboard = format_submenu(user, "goals", level=level)
+    hint = get_submenu_hint("goals")
+    if hint:
+        text = f"{text}\n\n{hint}"
+    await send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+
+
 async def cancel_wizard(
     db: AsyncSession, chat_id: int, user: User
 ) -> bool:
@@ -204,7 +215,7 @@ async def cancel_wizard(
         return False
     await wizard_service.clear(db, user.id)
     analytics.track(GoalEvent.WIZARD_CANCELED, user_id=user.id)
-    await show_goals_list(db, chat_id, user)
+    await _send_goals_submenu(chat_id, user)
     return True
 
 
@@ -942,13 +953,9 @@ async def _dispatch(
         await show_goals_list(db, chat_id, user)
         return
     if action == "cancel":
-        # Issue #450 §4 — the button label is now "◀️ Quay về", so the
-        # right behaviour is to land the user on the goals list instead
-        # of a dead-end "Đã huỷ" message. We still clear wizard state
-        # so any in-progress draft is dropped before showing the list.
         await wizard_service.clear(db, user.id)
         analytics.track(GoalEvent.WIZARD_CANCELED, user_id=user.id)
-        await show_goals_list(db, chat_id, user)
+        await _send_goals_submenu(chat_id, user)
         return
     if action == "custom":
         await _handle_custom_pick(db, chat_id, user)

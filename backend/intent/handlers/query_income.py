@@ -10,25 +10,8 @@ from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.models.user import User
+from backend.wealth.income_types import get_icon, get_label
 from backend.wealth.models.income_stream import IncomeStream
-
-# Source type → user-facing Vietnamese label (mirrors income_streams
-# CHECK constraint values from the Phase 3A spec).
-_SOURCE_LABELS = {
-    "salary": "Lương",
-    "dividend": "Cổ tức",
-    "interest": "Lãi tiết kiệm",
-    "rental": "Cho thuê",
-    "other": "Thu nhập khác",
-}
-
-_SOURCE_ICONS = {
-    "salary": "💼",
-    "dividend": "📊",
-    "interest": "🏦",
-    "rental": "🏠",
-    "other": "💰",
-}
 
 
 class QueryIncomeHandler(IntentHandler):
@@ -83,8 +66,8 @@ class QueryIncomeHandler(IntentHandler):
             "",
         ]
         for s in streams:
-            icon = _SOURCE_ICONS.get(s.stream_type, "💰")
-            label = _SOURCE_LABELS.get(s.stream_type, s.stream_type)
+            icon = get_icon(s.stream_type)
+            label = get_label(s.stream_type)
             lines.append(
                 f"{icon} *{label}* — {s.name}: "
                 f"{format_money_short(s.monthly_equivalent)}/tháng"
