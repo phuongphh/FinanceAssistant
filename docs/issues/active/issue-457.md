@@ -74,20 +74,25 @@
 
 **Vấn đề:** Lời giới thiệu hiện tại "Tổng quan tài chính cá nhân của [name]" không rõ nghĩa và không ấn tượng — không cho user biết Bé Tiền là gì và làm được gì.
 
-**Yêu cầu:** Cải thiện intro ngắn gọn nhưng ấn tượng, phản ánh đúng positioning product: Personal CFO.
+**Yêu cầu:** Cải thiện intro ngắn gọn nhưng ấm áp, thân thiện. Product position là Personal CFO nhưng **KHÔNG dùng từ "CFO" trong user-facing text** — từ này khô khan, nặng nề.
 
-**Gợi ý (cần chọn 1 hoặc A/B test):**
-- Option A: "💎 *Bé Tiền* — Trợ lý CFO cá nhân của [name]"
-- Option B: "💎 [name] ơi, Bé Tiền đây — CFO cá nhân của bạn!"
-- Option C: "💎 *Bé Tiền* — Quản lý tài sản thông minh cho [name]"
-- Option D: *Tự đề xuất*
+**Nguyên tắc:**
+- ❌ Không dùng: CFO, tài chính cá nhân, quản lý tài sản
+- ✅ Dùng từ gần gũi: đồng hành, cùng bạn, giúp bạn
+- ✅ Bé Tiền tone: warm, "mình" - "bạn"
+- ✅ ≤ 2 dòng, mention tên user
+
+**Gợi ý (tham khảo, chọn 1 hoặc đề xuất khác):**
+- Option A: "💎 [name] ơi, Bé Tiền đây — mình cùng nhau xây dựng tương lai nhé!"
+- Option B: "💎 Chào [name]! Bé Tiền luôn ở đây, đồng hành cùng bạn."
+- Option C: "💎 *Bé Tiền* — Người bạn đồng hành của [name]"
 
 **Acceptance Criteria:**
 - [ ] Intro ≤ 2 dòng
-- [ ] Mention được tên user + giá trị sản phẩm (Personal CFO)
-- [ ] Bé Tiền tone consistent (warm, thân thiện)
-- [ ] Cập nhật trong `content/menu_copy.yaml` (main_menu greeting)
-- [ ] Wealth-level adaptive intro (nếu đã có) giữ nguyên tone mới
+- [ ] KHÔNG chứa từ "CFO" trong bất kỳ user-facing string nào
+- [ ] Bé Tiền tone consistent (warm, "mình"/"bạn")
+- [ ] Cập nhật trong content/menu_copy.yaml (main_menu greeting)
+- [ ] Wealth-level adaptive intro giữ nguyên tone mới
 - [ ] vi-localization-checker pass
 
 ---
