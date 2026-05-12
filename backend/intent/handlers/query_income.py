@@ -10,6 +10,7 @@ from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.models.user import User
+from backend.intent.handlers.query_cashflow import _strip_legacy_prefix
 from backend.wealth.income_types import get_icon, get_label
 from backend.wealth.models.income_stream import IncomeStream
 
@@ -68,8 +69,9 @@ class QueryIncomeHandler(IntentHandler):
         for s in streams:
             icon = get_icon(s.stream_type)
             label = get_label(s.stream_type)
+            display_name = _strip_legacy_prefix((s.name or "").strip())
             lines.append(
-                f"{icon} *{label}* — {s.name}: "
+                f"{icon} *{label}* — {display_name}: "
                 f"{format_money_short(s.monthly_equivalent)}/tháng"
             )
 
