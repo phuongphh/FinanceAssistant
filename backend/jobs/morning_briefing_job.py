@@ -177,11 +177,29 @@ async def run_morning_briefing_job(
 
                 result = await render_enriched_morning_briefing(db, user)
 
+                # Phase 4.1 Story A.8 — first-ever briefing for this
+                # user gets an explainer wrap + "what is this?" button.
+                # The detection MUST run before the post-send event
+                # write below, otherwise the count is always 1.
+                from backend.services.briefing import first_briefing_service
+
+                is_first = await first_briefing_service.is_first_briefing(
+                    db, user.id
+                )
+
+            if is_first:
+                text_to_send, reply_markup = first_briefing_service.decorate(
+                    result.text
+                )
+            else:
+                text_to_send = result.text
+                reply_markup = briefing_actions_keyboard()
+
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,
-                text=result.text,
+                text=text_to_send,
                 parse_mode=None,
-                reply_markup=briefing_actions_keyboard(),
+                reply_markup=reply_markup,
                 **message_kwargs_for_animation(result.text, "briefing"),
             )
             # Notifier returns ``None`` on adapter error (it logs but
@@ -202,6 +220,7 @@ async def run_morning_briefing_job(
                     "level": result.level.value,
                     "is_empty_state": result.is_empty_state,
                     "char_count": result.char_count,
+                    "is_first_briefing": is_first,
                     "is_stale": result.is_stale,
                     "render_ms": result.render_ms,
                 },

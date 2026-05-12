@@ -1,0 +1,36 @@
+# First-Twin narrative (Phase 4.1, Story A.2).
+# Mascot intro shown BEFORE the cone chart image so user has a frame
+# for the chart they're about to see. Composer-only — no LLM call.
+
+narrative: |
+  ✨ Đây là <b>Twin tài chính</b> của bạn — Bé Tiền vẽ ra 3 con đường tương lai dựa trên tình hình hiện tại.
+
+  • Đường <b>giữa</b> là điều kiện thường (kịch bản P50).
+  • Đường <b>trên</b> là nếu bạn tiết kiệm chăm hơn (P90).
+  • Đường <b>dưới</b> là nếu có biến cố (P10).
+
+  Bạn không cần đoán tương lai — Bé Tiền đoán giúp, bạn chỉ cần quyết định.
+
+caption: |
+  📈 Twin của {name} — kịch bản {horizon} năm tới.
+
+# In-moment feedback prompt — sent 5–10s after the chart image.
+feedback_prompt:
+  body: "💬 Bạn cảm thấy thế nào về Twin đầu tiên?"
+  buttons:
+    love: "😍 Rất thích"
+    confused: "🤔 Hơi khó hiểu"
+    dislike: "😕 Chưa thích"
+  callback_prefix: "onboarding_v2:fb:"
+  ack: |
+    Cảm ơn bạn — Bé Tiền ghi nhận để cải thiện 💚
+
+# Fallback if Twin compute fails. Keep short — user already on edge.
+compute_failed: |
+  Bé Tiền đang tính Twin cho bạn, mất khoảng 1 phút. Bạn quay lại sau nhé — Bé Tiền sẽ nhắn ngay khi xong.
+
+# Completion message after feedback (or auto after 30s).
+completion: |
+  🎉 Xong! Bé Tiền và bạn chính thức đồng hành.
+
+  Mỗi sáng 8h Bé Tiền sẽ gửi briefing ngắn về tài sản của bạn. Trong ngày, gõ <code>/menu</code> để xem tất cả tính năng, hoặc nhắn tự nhiên — Bé Tiền hiểu.

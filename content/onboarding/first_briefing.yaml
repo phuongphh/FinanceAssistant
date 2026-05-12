@@ -1,0 +1,25 @@
+# First morning briefing copy (Phase 4.1, Story A.8).
+# Wraps the normal briefing text with an explainer + "what is this?"
+# button so the user has context for the daily-8h rhythm.
+
+explainer: |
+  🌟 <b>Đây là briefing đầu tiên của bạn!</b>
+
+  Mỗi sáng 8h Bé Tiền sẽ tổng hợp <b>3 thứ quan trọng nhất</b> về tài sản của bạn trong 30 giây đọc.
+
+  Hôm nay Bé Tiền nói về:
+
+# Button shown below the briefing — explains each metric in detail.
+explain_button:
+  label: "💡 Bé Tiền đang nói gì?"
+  callback: "first_briefing:explain"
+
+# Detail panel shown when the user taps the button above.
+explanation: |
+  <b>Bé Tiền đang theo dõi gì cho bạn?</b>
+
+  • <b>Tổng tài sản</b>: tổng tiền trong NH + đầu tư + BĐS + vàng (bạn nhập).
+  • <b>Biến động</b>: so với ngày hôm qua / tuần trước.
+  • <b>Cảnh báo</b>: nếu có gì cần chú ý (cashflow âm, giá cổ phiếu lao dốc…).
+
+  Bé Tiền sẽ học theo thói quen của bạn — gõ <code>/profile</code> để chỉnh giờ briefing, hoặc <code>/feedback</code> để góp ý.

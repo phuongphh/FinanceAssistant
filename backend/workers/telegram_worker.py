@@ -211,7 +211,26 @@ async def _handle_message(
                 "has_display_name": bool(user.display_name),
             },
         )
-        await onboarding_handlers.resume_or_start(db, chat_id, user)
+
+        # Phase 4.1 — V2 goal-based onboarding for new users. Existing
+        # users (already past welcome step) stay on the legacy flow so
+        # their state isn't reset mid-onboarding.
+        from backend.bot.handlers import onboarding_v2
+
+        # Deep-link payload follows "/start " (Telegram convention).
+        payload: str | None = None
+        if " " in text.strip():
+            payload = text.strip().split(maxsplit=1)[1]
+
+        use_v2 = onboarding_v2.is_v2_enabled() and (
+            created or user.onboarding_step <= int(OnboardingStep.NOT_STARTED)
+        )
+        if use_v2:
+            await onboarding_v2.handle_start(
+                db, chat_id, user, payload=payload
+            )
+        else:
+            await onboarding_handlers.resume_or_start(db, chat_id, user)
         return user.id
 
     if command == "/about":
@@ -309,6 +328,40 @@ async def _handle_message(
             return resolved_user.id
         return None
 
+    # Phase 4.1 Story A.7 — operator triage commands. Auth (operator
+    # telegram_id check) happens inside the handler so the unauthorized
+    # message is rendered consistently.
+    if command == "/feedback_inbox":
+        from backend.feedback.handlers import triage_command
+
+        await triage_command.cmd_feedback_inbox(db, chat_id, telegram_id)
+        return resolved_user.id if resolved_user else None
+
+    if command == "/feedback_reply":
+        from backend.feedback.handlers import triage_command
+
+        await triage_command.cmd_feedback_reply(db, chat_id, telegram_id, text)
+        return resolved_user.id if resolved_user else None
+
+    # Phase 4.1 Story C.4 — founding-member commands.
+    if command == "/whoami":
+        from backend.bot.handlers import founding_handler
+
+        await founding_handler.cmd_whoami(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
+
+    if command == "/founding_status":
+        from backend.bot.handlers import founding_handler
+
+        await founding_handler.cmd_founding_status(db, chat_id, telegram_id)
+        return resolved_user.id if resolved_user else None
+
+    if command == "/cohort_stats":
+        from backend.bot.handlers import founding_handler
+
+        await founding_handler.cmd_cohort_stats(db, chat_id, telegram_id)
+        return resolved_user.id if resolved_user else None
+
     # /story or /kechuyen — open storytelling mode (Phase 3A Epic 3).
     if command in ("/story", "/kechuyen", "/kể_chuyện"):
         if resolved_user is not None:
@@ -378,6 +431,22 @@ async def _handle_message(
         and resolved_user.onboarding_step == int(OnboardingStep.ASKING_NAME)
     ):
         consumed = await onboarding_handlers.handle_name_input(
+            db, chat_id, resolved_user, text
+        )
+        if consumed:
+            return resolved_user.id
+
+    # Phase 4.1 — V2 onboarding first-asset text input. Same defensive
+    # pattern as the legacy name step: catch the amount before the NL
+    # expense parser interprets "200tr" as a transaction.
+    if (
+        text
+        and resolved_user is not None
+        and not command.startswith("/")
+    ):
+        from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+
+        consumed = await onboarding_v2_handlers.handle_asset_text_input(
             db, chat_id, resolved_user, text
         )
         if consumed:
@@ -622,6 +691,14 @@ async def _handle_callback(
     if await about_handlers.handle_about_callback(callback_query):
         return await _resolved_user_id()
 
+    # Phase 4.1 — V2 onboarding callbacks own the ``onboarding_v2:*``
+    # namespace. Must run before the legacy ``onboarding:*`` router so
+    # the prefixes don't collide for users straddling versions.
+    from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+
+    if await onboarding_v2_handlers.handle_callback(db, callback_query):
+        return await _resolved_user_id()
+
     # Onboarding callbacks first — otherwise the menu-callback handler
     # would swallow them.
     if await onboarding_handlers.handle_onboarding_callback(db, callback_query):
@@ -659,6 +736,16 @@ async def _handle_callback(
     # Phase 4B Epic 2 — life-event wizard + menu (life_event:*).
     if await life_event_entry_handlers.handle_life_event_callback(db, callback_query):
         return await _resolved_user_id()
+
+    # Phase 4.1 Story A.8 — first-briefing "what is this?" button.
+    callback_data_raw = callback_query.get("data") or ""
+    if callback_data_raw.startswith("first_briefing:"):
+        from backend.bot.handlers.briefing_first_briefing import (
+            handle_first_briefing_callback,
+        )
+
+        if await handle_first_briefing_callback(db, callback_query):
+            return await _resolved_user_id()
 
     # Morning-briefing button taps (briefing:*). Handled before the
     # transaction router because the briefing keyboard sits on its own

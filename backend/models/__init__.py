@@ -30,6 +30,33 @@ from backend.models.conversation_context import (
     ROLE_USER,
     ConversationContext,
 )
+from backend.models.cost_budget import (
+    DEFAULT_BUDGET_VND,
+    TIER_FREE,
+    TIER_PRO,
+    LLMCostLog,
+    UserCostBudget,
+)
+from backend.models.invite_code import InviteCode
+from backend.models.onboarding_session import (
+    ALL_GOALS,
+    GOAL_PLAN_GOAL,
+    GOAL_TRACK_SPENDING,
+    GOAL_UNDERSTAND_WEALTH,
+    SEGMENT_HNW,
+    SEGMENT_MASS_AFFLUENT,
+    SEGMENT_STARTER,
+    SEGMENT_YOUNG_PRO,
+    SIGNAL_CONFUSED,
+    SIGNAL_DISLIKE,
+    SIGNAL_LOVE,
+    STEP_COMPLETED,
+    STEP_FIRST_ASSET,
+    STEP_GOAL_QUESTION,
+    STEP_TWIN_SHOWN,
+    OnboardingSession,
+)
+from backend.models.twin_calibration import HORIZONS_DAYS, TwinCalibrationSnapshot
 
 __all__ = [
     "User",
@@ -64,4 +91,29 @@ __all__ = [
     "TwinProjection",
     "LifeEvent",
     "LifeEventType",
+    # Phase 4.1
+    "UserCostBudget",
+    "LLMCostLog",
+    "TIER_FREE",
+    "TIER_PRO",
+    "DEFAULT_BUDGET_VND",
+    "InviteCode",
+    "OnboardingSession",
+    "STEP_GOAL_QUESTION",
+    "STEP_FIRST_ASSET",
+    "STEP_TWIN_SHOWN",
+    "STEP_COMPLETED",
+    "GOAL_UNDERSTAND_WEALTH",
+    "GOAL_PLAN_GOAL",
+    "GOAL_TRACK_SPENDING",
+    "ALL_GOALS",
+    "SEGMENT_STARTER",
+    "SEGMENT_YOUNG_PRO",
+    "SEGMENT_MASS_AFFLUENT",
+    "SEGMENT_HNW",
+    "SIGNAL_LOVE",
+    "SIGNAL_CONFUSED",
+    "SIGNAL_DISLIKE",
+    "TwinCalibrationSnapshot",
+    "HORIZONS_DAYS",
 ]

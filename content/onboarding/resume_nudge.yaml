@@ -1,0 +1,17 @@
+# Resume nudge — 1-time, sent if user stuck > 10 min mid-onboarding.
+# Tone: warm, never pushy. Cap is enforced via onboarding_sessions.nudge_sent_at.
+
+step_labels:
+  goal_question: "câu hỏi mục tiêu"
+  first_asset: "nhập tài sản đầu tiên"
+  twin_shown: "xem Twin"
+
+nudge: |
+  💚 Bé Tiền đang chờ bạn ở bước <b>{step_label}</b> — chỉ cần thêm 1 thông tin là Twin sẵn sàng. Tiếp tục nhé?
+
+buttons:
+  continue: "▶️ Tiếp tục"
+  demo: "🎭 Để Bé Tiền dùng demo trước"
+
+continue_callback: "onboarding_v2:resume"
+demo_callback: "onboarding_v2:demo"

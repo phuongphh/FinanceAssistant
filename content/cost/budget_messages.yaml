@@ -1,0 +1,19 @@
+# Budget-cap user messages (Phase 4.1, Story A.3).
+# Warm, never accusatory — soft cap is a safety net for the user, not
+# a punishment. Used by adapters/llm/cost_tracking_adapter.py +
+# services/cost/budget_service.py.
+
+warning_80_percent: |
+  💚 Tháng này Bé Tiền đã dùng khá nhiều "công suất AI" để giúp bạn (~80% hạn mức). Bé Tiền vẫn tiếp tục bình thường — chỉ thông báo để bạn biết. Nếu dùng nhiều hơn nữa, có thể có lúc Bé Tiền phải nghỉ tay AI một chút, mọi tính năng cơ bản (ghi chép, dashboard, Twin) vẫn hoạt động đầy đủ.
+
+blocked_100_percent: |
+  💚 Tháng này Bé Tiền tạm dừng một số tính năng AI (phân loại tự động, OCR, voice) cho tài khoản của bạn — sang tháng sẽ tự mở lại.
+
+  • Tính năng cơ bản (ghi chép, dashboard, Twin, briefing) vẫn hoạt động bình thường.
+  • Nếu bạn cần dùng gấp, gõ /feedback — Bé Tiền sẽ xem qua.
+
+operator_warning_sent: |
+  ⚠️ User {user_id_short} đã chạm 80% budget cap ({spend_vnd}/{cap_vnd} VND).
+
+operator_blocked: |
+  🚨 User {user_id_short} chạm 100% budget cap ({spend_vnd}/{cap_vnd} VND) — LLM call bị chặn.

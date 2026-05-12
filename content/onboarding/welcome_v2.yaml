@@ -1,0 +1,84 @@
+# Onboarding v2 — 3-step goal-based flow (Phase 4.1, Story A.1).
+# All user-facing strings live here so changes do not require a code
+# deploy and the vi-localization-checker can audit a single surface.
+
+intro:
+  default: |
+    👋 Chào bạn, Bé Tiền đây!
+
+    Bé Tiền là Personal CFO cho người Việt — giúp bạn nhìn rõ tài sản, theo dõi chi tiêu, và lên kế hoạch cho mục tiêu lớn.
+
+    Bấm bên dưới để bắt đầu — chỉ mất 3 phút.
+  cta_label: "🌱 Bắt đầu hành trình"
+  cta_callback: "onboarding_v2:start"
+
+# Source-aware variants — appended above the default intro when an
+# invite code carries the matching source. Keep them short, max 1 line.
+source_variants:
+  friends:
+    prefix: "Cảm ơn bạn đã thử Bé Tiền theo lời mời của bạn bè 💚"
+  personal_fb:
+    prefix: "Cảm ơn bạn đã ghé Bé Tiền từ trang Facebook cá nhân 💚"
+  vn_finance_community:
+    prefix: "Cảm ơn bạn đến từ cộng đồng tài chính. Bé Tiền là Personal CFO cho người Việt mass affluent."
+  tg_finance_groups:
+    prefix: "Cảm ơn bạn đến từ cộng đồng Telegram tài chính 💚"
+  direct_msg:
+    prefix: "Cảm ơn bạn đã trả lời tin nhắn của Bé Tiền — bắt đầu khám phá nhé!"
+
+# Step 1 — goal question. Three button labels keyed by goal code.
+step_1_goal:
+  header: "(1/3) Câu hỏi đầu tiên"
+  body: |
+    Bạn muốn Bé Tiền giúp gì trước nhất?
+  buttons:
+    understand_wealth: "🌱 Hiểu rõ tổng tài sản của tôi"
+    plan_goal: "🎯 Lên kế hoạch cho mục tiêu lớn"
+    track_spending: "📊 Theo dõi chi tiêu thông minh"
+  callback_prefix: "onboarding_v2:goal:"
+  goal_acks:
+    understand_wealth: |
+      Tuyệt! Bé Tiền sẽ giúp bạn vẽ bức tranh đầy đủ về tài sản.
+    plan_goal: |
+      Mục tiêu rõ ràng là bước đầu quan trọng nhất — Bé Tiền sẽ đồng hành.
+    track_spending: |
+      Bé Tiền sẽ giúp bạn thấy tiền đi đâu, không còn mơ hồ.
+
+# Step 2 — first asset prompt.
+step_2_asset:
+  header: "(2/3) Tài sản hiện tại"
+  body: |
+    Để vẽ Twin tài chính chính xác, Bé Tiền cần 1 con số khởi đầu — tổng tiền tiết kiệm/đầu tư hiện tại của bạn.
+
+    Bạn có thể gõ số tiền (ví dụ: <code>200tr</code>, <code>1.5 tỷ</code>, <code>500000000</code>), hoặc dùng số liệu demo để xem trước.
+  demo_button: "🎭 Để Bé Tiền dùng demo trước"
+  demo_callback: "onboarding_v2:demo"
+  invalid: |
+    Bé Tiền chưa hiểu con số đó. Bạn thử lại với định dạng như <code>200tr</code>, <code>1.5 tỷ</code>, hoặc nhập số nguyên (<code>200000000</code>) nhé.
+  too_small: |
+    Số tiền hơi nhỏ — bạn có thể nhập tài sản (tiết kiệm, đầu tư, vàng…) tối thiểu từ 1 triệu trở lên, hoặc bấm nút demo bên dưới.
+  too_large: |
+    Số tiền có vẻ chưa hợp lý. Bạn kiểm tra lại giúp Bé Tiền nhé.
+
+# Demo mode banner — explicit framing so user does not mistake the
+# 50tr placeholder for their own Twin (loss-of-trust risk).
+demo_banner:
+  body: |
+    📌 <b>Demo Mode</b>
+
+    Đây là Twin của một người giả định với <b>50 triệu</b> tiết kiệm. Twin của bạn sẽ khác — nhập tài sản thật để xem Twin riêng của bạn.
+  cta_label: "💎 Xem Twin của tôi"
+  cta_callback: "onboarding_v2:exit_demo"
+
+# Step 3 — Twin shown ack.
+step_3_twin:
+  header: "(3/3) Twin của bạn"
+
+# Resume helpers.
+resume:
+  prompt: |
+    Bé Tiền đang chờ bạn ở bước <b>{step}</b> — chỉ cần thêm 1 thông tin là Twin sẵn sàng. Tiếp tục nhé?
+  continue_label: "▶️ Tiếp tục"
+  demo_label: "🎭 Để Bé Tiền dùng demo trước"
+  continue_callback: "onboarding_v2:resume"
+  demo_callback: "onboarding_v2:demo"

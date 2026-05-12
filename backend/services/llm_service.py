@@ -126,18 +126,32 @@ async def call_llm(
     if not deepseek_client:
         raise LLMError("DEEPSEEK_API_KEY not configured")
 
-    try:
-        response = await deepseek_client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=500,
-        )
-        result = response.choices[0].message.content.strip()
-        tokens_used = response.usage.total_tokens if response.usage else None
-    except Exception as e:
-        logger.error("DeepSeek API error: %s", e)
-        raise LLMError(f"DeepSeek API call failed: {e}") from e
+    # Phase 4.1 Story A.3 — wrap every API call in the cost-tracking
+    # context manager. Preflight raises BudgetExceededError BEFORE the
+    # upstream HTTP call when the user hit 100% cap; we let it bubble
+    # so callers can convert it to the user-facing "tạm dừng" message
+    # via content/cost/budget_messages.yaml.
+    from backend.adapters.llm.cost_tracking_adapter import tracked_call
+
+    async with tracked_call(
+        db, user_id, provider="deepseek", operation=task_type
+    ) as recorder:
+        try:
+            response = await deepseek_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=500,
+            )
+            result = response.choices[0].message.content.strip()
+            tokens_used = response.usage.total_tokens if response.usage else None
+            if response.usage:
+                recorder.tokens_in = response.usage.prompt_tokens or 0
+                recorder.tokens_out = response.usage.completion_tokens or 0
+            recorder.model_version = getattr(response, "model", "deepseek-chat")
+        except Exception as e:
+            logger.error("DeepSeek API error: %s", e)
+            raise LLMError(f"DeepSeek API call failed: {e}") from e
 
     # Save to cache
     if use_cache and db:
