@@ -51,7 +51,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #509 | [Story] P4.1-C4: Founding member experience | [issue-509.md](issue-509.md) |
 | #510 | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [issue-510.md](issue-510.md) |
 | #511 | [Task] P4.1-M2: Migration feedback_sla_index | [issue-511.md](issue-511.md) |
+| #512 | [Task] P4.1-M3: Migration twin_calibration_log | [issue-512.md](issue-512.md) |
 | #513 | [Task] P4.1-M4: Migration founding_member_flag | [issue-513.md](issue-513.md) |
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 
-**Total active:** 49
+**Total active:** 50
