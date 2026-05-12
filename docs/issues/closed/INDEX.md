@@ -291,6 +291,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #519 | Pre-Phase | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [pre-phase/issue-519.md](by-phase/pre-phase/issue-519.md) |
 | #520 | Pre-Phase | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [pre-phase/issue-520.md](by-phase/pre-phase/issue-520.md) |
 | #524 | Pre-Phase | [Feature/UI] US6: Expense Mini App — Add/Edit/Delete Expenses | [pre-phase/issue-524.md](by-phase/pre-phase/issue-524.md) |
+| #526 | Pre-Phase | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [pre-phase/issue-526.md](by-phase/pre-phase/issue-526.md) |
 
-**Total:** 287 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 270 Pre-Phase)
+**Total:** 288 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 271 Pre-Phase)
