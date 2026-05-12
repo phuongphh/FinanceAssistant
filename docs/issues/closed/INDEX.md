@@ -278,7 +278,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #505 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-505.md](by-phase/pre-phase/issue-505.md) |
 | #510 | Pre-Phase | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [pre-phase/issue-510.md](by-phase/pre-phase/issue-510.md) |
 | #511 | Pre-Phase | [Task] P4.1-M2: Migration feedback_sla_index | [pre-phase/issue-511.md](by-phase/pre-phase/issue-511.md) |
+| #512 | Pre-Phase | [Task] P4.1-M3: Migration twin_calibration_log | [pre-phase/issue-512.md](by-phase/pre-phase/issue-512.md) |
 | #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 
-**Total:** 275 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 258 Pre-Phase)
+**Total:** 276 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 259 Pre-Phase)
