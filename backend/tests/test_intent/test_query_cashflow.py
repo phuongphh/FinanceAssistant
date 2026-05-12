@@ -216,7 +216,8 @@ async def test_cashflow_current_month_detail_report():
         response = await QueryCashflowHandler().handle(intent, user, db)
 
     assert "📅 *Dòng tiền tháng này*" in response
-    assert "Net flow" in response
+    assert "Dư / thiếu" in response
+    assert "Net flow" not in response
     assert "💼 *Top nguồn thu*" in response
     assert "💸 *Top nhóm chi*" in response
     assert "📈 *Nhịp chi tiêu theo ngày*" in response

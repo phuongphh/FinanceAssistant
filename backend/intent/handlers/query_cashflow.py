@@ -164,7 +164,7 @@ class QueryCashflowHandler(IntentHandler):
             f"📅 *Dòng tiền {label_vi}*",
             f"Thu: *{format_money_full(period.income)}*",
             f"Chi: *{format_money_full(period.spend)}*",
-            f"Net flow: *{sign}{format_money_full(abs(period.net))}*",
+            f"Dư / thiếu: *{sign}{format_money_full(abs(period.net))}*",
             "",
             "💼 *Top nguồn thu*",
         ]
