@@ -155,6 +155,31 @@ async def send_twin_current(
     narrative = await build_twin_narrative(
         db, user, cone, cone_age_days=snapshot.cone_age_days
     )
+
+    # Phase 4.1 Story B.2 — log snapshot per Twin open and (if enabled
+    # + enough completed) append the honest hit-rate section to the
+    # narrative. log_open_snapshot is best-effort; failures never
+    # block the chart.
+    from backend.services.twin import twin_calibration_service
+
+    if snapshot.projection is not None:
+        await twin_calibration_service.log_open_snapshot(
+            db, user_id=user.id, projection=snapshot.projection
+        )
+    if twin_calibration_service.is_display_enabled():
+        hit = await twin_calibration_service.get_hit_rate(db, user.id)
+        if hit is not None:
+            calib_copy = _copy().get("calibration", {})
+            extra = (
+                f"\n\n{calib_copy.get('section_title', '')}\n"
+                + calib_copy.get("hit_line", "").format(
+                    correct=hit.correct, total=hit.total, pct=hit.pct
+                )
+            )
+            if hit.is_low_confidence:
+                extra += "\n" + calib_copy.get("learning_note", "")
+            narrative = (narrative or "") + extra
+
     content = renderer.render_twin_view(
         TwinViewSnapshot(
             user_name=_name(user),
@@ -171,6 +196,66 @@ async def send_twin_current(
         )
     )
     await _send_channel_content(notifier, chat_id, content)
+
+
+async def send_twin_share(
+    db: AsyncSession,
+    *,
+    chat_id: int,
+    user: User,
+    notifier: Notifier | None = None,
+) -> None:
+    """Phase 4.1 Story B.1 — render and send the shareable Twin PNG.
+
+    Privacy contract: the image contains NO absolute money amounts;
+    only % growth + horizon. The caption nudges the user to share but
+    Bé Tiền does NOT auto-post anywhere — user controls the share.
+    """
+    import logging
+
+    from backend.services.twin import twin_share_service
+
+    notifier = notifier or get_notifier()
+    if not twin_share_service.is_share_enabled():
+        await notifier.send_message(
+            chat_id,
+            _copy().get("share", {}).get(
+                "disabled",
+                "📸 Tính năng tạm tắt — quay lại sau bạn nhé.",
+            ),
+            parse_mode=None,
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+    try:
+        png = await twin_share_service.build_share_image_bytes(db, user=user)
+    except twin_share_service.TwinShareUnavailable:
+        await notifier.send_message(
+            chat_id,
+            twin_share_service.get_unavailable_message(),
+            parse_mode=None,
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "twin_share: render failed user=%s", user.id
+        )
+        await notifier.send_message(
+            chat_id,
+            twin_share_service.get_unavailable_message(),
+            parse_mode=None,
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+
+    await notifier.send_photo(
+        chat_id,
+        png,
+        caption=twin_share_service.get_caption(),
+        reply_markup=back_to_main_keyboard(),
+        filename="be-tien-twin-share.png",
+    )
 
 
 async def send_twin_how_it_works(
