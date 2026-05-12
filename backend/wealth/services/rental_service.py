@@ -289,7 +289,7 @@ async def _sync_rental_income_stream(
 
     monthly_amount = metadata.net_monthly_yield
     is_active = metadata.is_income_active()
-    name = f"Thuê BĐS — {asset.name}"
+    name = f"BĐS cho thuê — {asset.name}"
     # Snapshot fields stay in ``extra`` for read-only consumers; the
     # canonical pointer is now ``source_asset_id`` FK above.
     extra = {

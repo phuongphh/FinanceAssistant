@@ -35,28 +35,13 @@ main_menu:
     hnw: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
 
   intro:
-    starter: |-
-      Mình giúp {name} theo dõi tài sản, chi tiêu, và xây kế hoạch
-      tài chính từng bước.
+    starter: "Chào {name}! Mình ở đây cùng bạn — từng bước nhỏ nhé 🌱\nHôm nay muốn bắt đầu từ đâu?"
 
-      Bạn muốn xem gì hôm nay?
+    young_prof: "Chào {name}! Mình đang theo sát danh mục và kế hoạch của bạn.\nHôm nay muốn xem gì?"
 
-    young_prof: |-
-      Mình giúp {name} quản lý tài sản và xây danh mục đầu tư
-      vững mạnh.
+    mass_affluent: "Chào {name}! Mình sẵn sàng cùng bạn phân tích và tối ưu nhé.\nHôm nay muốn làm gì?"
 
-      Bạn muốn xem gì hôm nay?
-
-    mass_affluent: |-
-      Mình giúp {name} tối ưu hóa tài sản và đưa ra quyết định
-      tài chính thông minh.
-
-      Bạn muốn làm gì hôm nay?
-
-    hnw: |-
-      Tổng quan tài chính cá nhân của {name}.
-
-      {name} muốn xem mục nào?
+    hnw: "Chào {name}! Mình luôn ở đây — đồng hành từng bước cùng bạn.\nHôm nay muốn xem mục nào?"
 
   buttons:
     - label: "💎 Tài sản"
@@ -173,10 +158,6 @@ submenu_assets:
       Bao gồm tư vấn tối ưu hóa phân bổ.
 
   buttons:
-    - label: "📊 Tổng tài sản"
-      callback: "menu:assets:net_worth"
-      description: "Tóm tắt tổng giá trị + thay đổi tháng này"
-
     - label: "📈 Báo cáo"
       callback: "menu:assets:report"
       description: "Mở Mini App Dashboard tài sản"

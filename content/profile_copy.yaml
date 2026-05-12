@@ -45,7 +45,7 @@ profile_view:
   field_streak: "• Chuỗi hoạt động: *{days} ngày* 🔥"
   field_briefing_read: "• Báo cáo sáng đã đọc: *{count}*"
 
-  footer: "_Profile này được tự động tổng hợp từ dữ liệu bạn đã dùng — không cần điền form._"
+  footer: "_Profile này được tự động tổng hợp từ dữ liệu bạn đã dùng._"
 
 # ============================================================
 # GLOSSARY — opens when user taps "❓ Giải thích các mục"

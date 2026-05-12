@@ -45,7 +45,7 @@ income_types:
       - "Cổ tức cổ phiếu VNM"
 
   rental:
-    label: "Thuê BĐS"
+    label: "BĐS cho thuê"
     icon: "🏠"
     is_passive: true
     typical_schedule: "monthly"
