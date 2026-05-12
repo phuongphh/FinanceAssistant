@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "4B"
+current_phase: "4.1"
 
 phases:
   - id: "1"
@@ -162,40 +162,100 @@ phases:
 
   - id: "4B"
     name: "Twin Polish + Life Events + Cashflow v2 + Zalo"
-    status: current
+    status: done
     duration: "~4 tuần"
     detail_doc: "docs/current/phase-4B/phase-4B-detailed.md"
     issues_doc: "docs/current/phase-4B/phase-4B-issues.md"
     description: "Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation"
+    completed_date: "2026-05-12"
+    icon: "✅"
+
+  - id: "4.1"
+    name: "Pre-Launch Hardening"
+    status: current
+    duration: "~3 tuần"
+    detail_doc: "docs/current/phase-4.1/phase-4.1-detailed.md"
+    issues_doc: "docs/current/phase-4.1/phase-4.1-issues.md"
+    description: "Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026)"
     completed_date: ""
     icon: "🛠"
 
-  - id: "4"
-    name: "Investment Intelligence"
+  - id: "5.1"
+    name: "Zalo Spike & OA Verification"
     status: planned
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Investment Twin, scenario modeling, rental property tracking"
+    description: "Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows"
     completed_date: ""
     icon: "🔮"
 
-  - id: "5"
+  - id: "5.2"
+    name: "Zalo Core Product Parity"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.3"
+    name: "Zalo Mini App"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.4"
+    name: "Achievement & Badges"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.5"
     name: "Behavioral Engine"
     status: planned
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Wealth-aware nudges, Financial DNA, anomaly detection"
+    description: "Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data"
     completed_date: ""
     icon: "🔮"
 
-  - id: "6"
-    name: "Scale & Commercialize"
+  - id: "5.6"
+    name: "Household Mode"
     status: planned
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Public beta, subscriptions, multi-region, household mode"
+    description: "Multi-user household: shared assets, joint goals, privacy boundaries (mỗi thành viên có view riêng), couple Twin"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.7"
+    name: "Monetization Infrastructure"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "License management, rate limit + tier enforcement (free/pro/cfo UI), payment integration (VN gateways: VNPay/MoMo/ZaloPay), reconciliation + invoice. Pricing re-validate sau khi infra sẵn sàng."
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "6.0"
+    name: "Tết Launch (Public)"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Public launch tháng 2/2027 (Tết) — Zalo là primary channel, Telegram secondary. Marketing campaign, multi-region, public pricing live."
     completed_date: ""
     icon: "🔮"
