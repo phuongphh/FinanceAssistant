@@ -25,7 +25,7 @@ from backend.intent.handlers.query_expenses import (
     _TIME_LABELS_VI,
     _fetch_expenses,
 )
-from backend.intent.handlers.query_income import _SOURCE_ICONS, _SOURCE_LABELS
+from backend.wealth.income_types import get_icon as _income_icon, get_label as _income_label
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.expense import Expense
@@ -282,8 +282,8 @@ def _top_income_sources(
         key = getattr(stream, "stream_type", None)
         if not isinstance(key, str) or not key:
             key = "other"
-        icon = _SOURCE_ICONS.get(key, "💰")
-        type_label = _SOURCE_LABELS.get(key, key)
+        icon = _income_icon(key)
+        type_label = _income_label(key)
         raw_name = getattr(stream, "name", None)
         name = (
             raw_name.strip()
