@@ -260,7 +260,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #487 | Pre-Phase | [Story] P4.1-A7: Feedback triage UI | [pre-phase/issue-487.md](by-phase/pre-phase/issue-487.md) |
 | #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
 | #489 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-489.md](by-phase/pre-phase/issue-489.md) |
+| #491 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-491.md](by-phase/pre-phase/issue-491.md) |
 | #492 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-492.md](by-phase/pre-phase/issue-492.md) |
 
-**Total:** 257 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 240 Pre-Phase)
+**Total:** 258 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 241 Pre-Phase)
