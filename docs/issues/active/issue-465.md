@@ -7,10 +7,9 @@
 > **Type:** Epic | **Estimate:** ~3-5 ngay | **Stories:** 3
 
 ## Muc tieu
-Operator co cong cu + tieu chi ro rang de chay 50-user soft launch thang 6/2026.
+Invite tracking, success metrics, kill criteria — operator co tools de chay 50-user soft launch.
 
 ## Stories in this Epic
-_(Se update sau)_
-- [ ] [Story] P4.1-C1: Acquisition source + invite tracking
-- [ ] [Story] P4.1-C2: Success metrics rubric
-- [ ] [Story] P4.1-C3: Kill criteria documentation
+- [ ] #475 [Story] P4.1-C1: Acquisition source + invite tracking
+- [ ] #476 [Story] P4.1-C2: Success metrics rubric
+- [ ] #477 [Story] P4.1-C3: Kill criteria documentation
