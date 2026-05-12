@@ -37,5 +37,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #479 | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [issue-479.md](issue-479.md) |
 | #480 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-480.md](issue-480.md) |
 | #482 | [Story] P4.1-A2: First-Twin shortcut | [issue-482.md](issue-482.md) |
+| #483 | [Story] P4.1-A3: Cost guardrail middleware | [issue-483.md](issue-483.md) |
 
-**Total active:** 33
+**Total active:** 34
