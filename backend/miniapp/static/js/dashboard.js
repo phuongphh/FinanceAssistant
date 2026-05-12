@@ -21,14 +21,41 @@
         categoryList: document.getElementById('category-list'),
         categoryChart: document.getElementById('category-chart'),
         trendChart: document.getElementById('trend-chart'),
+        addExpenseBtn: document.getElementById('add-expense-btn'),
+        expenseMonth: document.getElementById('expense-month'),
+        expenseList: document.getElementById('expense-list'),
+        expenseEmpty: document.getElementById('expense-empty'),
+        expenseModal: document.getElementById('expense-modal'),
+        expenseModalTitle: document.getElementById('expense-modal-title'),
+        expenseAmount: document.getElementById('expense-amount'),
+        expenseCategory: document.getElementById('expense-category'),
+        expenseDate: document.getElementById('expense-date'),
+        expenseNote: document.getElementById('expense-note'),
+        expensePayment: document.getElementById('expense-payment'),
+        expenseDelete: document.getElementById('expense-delete'),
+        expenseCancel: document.getElementById('expense-cancel'),
+        expenseSave: document.getElementById('expense-save'),
     };
 
     let categoryChart = null;
     let trendChart = null;
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
+    let editingExpenseId = null;
+    const CATEGORIES = [
+        ['food', '🍜 Ăn uống'], ['transport', '🚗 Di chuyển'], ['housing', '🏠 Nhà cửa'],
+        ['shopping', '👕 Mua sắm'], ['health', '💊 Sức khỏe'], ['education', '📚 Giáo dục'],
+        ['entertainment', '🎮 Giải trí'], ['utility', '⚡ Tiện ích'], ['investment', '📊 Đầu tư'],
+        ['saving', '💰 Tiết kiệm'], ['gift', '🎁 Quà tặng'], ['other', '📌 Chưa phân loại'],
+    ];
 
     els.retryBtn.addEventListener('click', renderDashboard);
+    els.addExpenseBtn?.addEventListener('click', () => showExpenseModal());
+    els.expenseCancel?.addEventListener('click', hideExpenseModal);
+    els.expenseSave?.addEventListener('click', saveExpense);
+    els.expenseDelete?.addEventListener('click', deleteExpense);
+    els.expenseMonth?.addEventListener('change', renderDashboard);
+    initExpenseForm();
 
     renderDashboard();
 
@@ -59,7 +86,7 @@
         return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
     }
 
-    async function fetchAPI(endpoint) {
+    async function fetchAPI(endpoint, options = {}) {
         const controller = new AbortController();
         const tid = setTimeout(() => controller.abort(), 12000);
         const headers = { 'Content-Type': 'application/json' };
@@ -67,7 +94,7 @@
             headers['X-Telegram-Init-Data'] = tg.initData;
         }
         try {
-            const response = await fetch('/miniapp/api' + endpoint, { headers, signal: controller.signal });
+            const response = await fetch('/miniapp/api' + endpoint, { ...options, headers: { ...headers, ...(options.headers || {}) }, signal: controller.signal });
             if (!response.ok) {
                 throw new Error('API ' + response.status);
             }
@@ -82,14 +109,17 @@
     async function renderDashboard() {
         showState('loading');
         try {
-            const data = await fetchAPI('/overview');
+            const monthQs = els.expenseMonth?.value ? '?month=' + encodeURIComponent(els.expenseMonth.value) : '';
+            const data = await fetchAPI('/overview' + monthQs);
             els.totalSpent.textContent = formatMoneyFull(data.total_spent || 0);
             els.transactionCount.textContent = data.transaction_count || 0;
             els.monthLabel.textContent = formatMonthLabel(data.month);
+            if (els.expenseMonth && !els.expenseMonth.value && data.month) els.expenseMonth.value = data.month;
 
             renderCategoryChart(data.top_categories || []);
             renderCategoryList(data.top_categories || []);
             renderTrendChart(data.daily_trend || []);
+            renderExpenseList(data.expenses || []);
             showState('content');
             reportLoaded();
         } catch (err) {
@@ -230,6 +260,88 @@
                 },
             },
         });
+    }
+
+
+    function initExpenseForm() {
+        if (els.expenseCategory) {
+            els.expenseCategory.innerHTML = CATEGORIES.map(([code, label]) =>
+                `<option value="${code}">${escapeHtml(label)}</option>`
+            ).join('');
+        }
+        if (els.expenseDate) els.expenseDate.valueAsDate = new Date();
+    }
+
+    function renderExpenseList(items) {
+        if (!els.expenseList) return;
+        els.expenseEmpty.hidden = items.length > 0;
+        els.expenseList.innerHTML = items.map(item => `
+            <button class="expense-item" type="button" data-id="${escapeHtml(item.id)}">
+                <span class="expense-emoji">${escapeHtml(item.category_emoji || '📌')}</span>
+                <span class="expense-info">
+                    <strong>${escapeHtml(item.merchant || item.note || item.category_label || 'Chi tiêu')}</strong>
+                    <small>${formatDate(item.expense_date)} · ${escapeHtml(item.category_label || 'Chưa phân loại')}</small>
+                </span>
+                <span class="expense-amount">${formatMoneyShort(item.amount || 0)}</span>
+            </button>
+        `).join('');
+        els.expenseList.querySelectorAll('.expense-item').forEach((row) => {
+            const item = items.find(x => x.id === row.dataset.id);
+            row.addEventListener('click', () => showExpenseModal(item));
+        });
+    }
+
+    function showExpenseModal(item) {
+        editingExpenseId = item?.id || null;
+        els.expenseModalTitle.textContent = editingExpenseId ? 'Sửa chi tiêu' : 'Thêm chi tiêu';
+        els.expenseAmount.value = item ? Math.round(item.amount || 0) : '';
+        els.expenseCategory.value = item?.category || 'other';
+        els.expenseDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
+        els.expenseNote.value = item?.merchant || item?.note || '';
+        els.expensePayment.value = item?.payment_method || '';
+        els.expenseDelete.hidden = !editingExpenseId;
+        els.expenseModal.hidden = false;
+    }
+
+    function hideExpenseModal() {
+        els.expenseModal.hidden = true;
+        editingExpenseId = null;
+    }
+
+    async function saveExpense() {
+        const amount = parseFloat(els.expenseAmount.value);
+        if (!amount || amount < 1000) {
+            tg?.showAlert?.('Số tiền phải từ 1.000đ.');
+            return;
+        }
+        const body = {
+            amount,
+            category: els.expenseCategory.value || 'other',
+            expense_date: els.expenseDate.value,
+            note: els.expenseNote.value.trim(),
+            merchant: els.expenseNote.value.trim(),
+            payment_method: els.expensePayment.value.trim(),
+        };
+        const url = editingExpenseId ? `/expenses/${editingExpenseId}` : '/expenses';
+        const method = editingExpenseId ? 'PATCH' : 'POST';
+        await fetchAPI(url, { method, body: JSON.stringify(body) });
+        hideExpenseModal();
+        await renderDashboard();
+    }
+
+    async function deleteExpense() {
+        if (!editingExpenseId) return;
+        const ok = window.confirm('Xoá chi tiêu này?');
+        if (!ok) return;
+        await fetchAPI(`/expenses/${editingExpenseId}`, { method: 'DELETE' });
+        hideExpenseModal();
+        await renderDashboard();
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '--/--';
+        const d = new Date(iso + 'T00:00:00');
+        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     }
 
     function escapeHtml(value) {

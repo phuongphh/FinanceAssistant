@@ -189,3 +189,112 @@ body {
         background: rgba(255, 255, 255, 0.08);
     }
 }
+
+.section-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.section-heading-row h2 { margin-bottom: 0; }
+
+.small-primary-btn, .primary-btn, .secondary-btn, .danger-btn {
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.small-primary-btn {
+    background: var(--primary);
+    color: var(--primary-text);
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+.filter-label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.month-input {
+    width: 100%;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 15px;
+    margin-bottom: 14px;
+    background: var(--card-bg);
+    color: var(--text-color);
+}
+
+.expense-list { display: flex; flex-direction: column; gap: 8px; }
+
+.expense-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(128, 128, 128, 0.12);
+    border-radius: 14px;
+    padding: 12px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    text-align: left;
+}
+
+.expense-emoji { font-size: 22px; }
+.expense-info { flex: 1; min-width: 0; }
+.expense-info strong, .expense-info small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.expense-info small { color: var(--text-muted); margin-top: 2px; }
+.expense-amount { font-weight: 800; color: #D32F2F; }
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+    display: flex;
+    align-items: flex-end;
+    z-index: 200;
+}
+.modal[hidden] { display: none; }
+.modal-content {
+    width: 100%;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 22px 20px 30px;
+}
+.modal-content h3 { margin-bottom: 16px; }
+.modal-content label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    margin: 12px 0 5px;
+}
+.modal-content input, .modal-content select {
+    width: 100%;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 16px;
+    background: var(--card-bg);
+    color: var(--text-color);
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.primary-btn, .secondary-btn, .danger-btn { flex: 1; padding: 13px; font-size: 15px; }
+.primary-btn { background: var(--primary); color: var(--primary-text); }
+.secondary-btn { background: rgba(128, 128, 128, 0.14); color: var(--text-color); }
+.danger-btn { background: #FEE2E2; color: #B91C1C; }

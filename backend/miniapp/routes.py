@@ -464,6 +464,8 @@ async def get_overview(
         db, user.id, month_key
     )
     daily_trend = await dashboard_service.get_daily_trend(db, user.id, days=trend_days)
+    expenses = await dashboard_service.get_recent_transactions(db, user.id, limit=100)
+    expenses = [item for item in expenses if item.get("date", "")[:7] == month_key]
 
     return {
         "data": {
@@ -472,8 +474,143 @@ async def get_overview(
             "transaction_count": transaction_count,
             "top_categories": top_categories,
             "daily_trend": daily_trend,
+            "expenses": [
+                {
+                    "id": item["id"],
+                    "amount": item["amount"],
+                    "merchant": item.get("merchant"),
+                    "category": item["category"]["code"],
+                    "category_label": item["category"]["name"],
+                    "category_emoji": item["category"]["emoji"],
+                    "expense_date": item["date"],
+                    "note": item.get("merchant"),
+                } for item in expenses
+            ],
         },
         "error": None,
+    }
+
+
+
+
+@router.get("/api/expenses")
+async def miniapp_list_expenses(
+    month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    limit: int = Query(100, ge=1, le=200),
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Authenticated expense list for the Mini App management screen."""
+    from backend.services import expense_service
+
+    user = await _resolve_user(auth, db)
+    month_key = month or dashboard_service.current_month_key()
+    items = await expense_service.list_expenses(
+        db, user.id, month=month_key, limit=limit, offset=0
+    )
+    return {
+        "data": [_serialize_expense_item(item) for item in items],
+        "error": None,
+    }
+
+
+@router.post("/api/expenses", status_code=201)
+async def miniapp_create_expense(
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create one expense scoped to the Telegram-authenticated user."""
+    from backend.schemas.expense import ExpenseCreate
+    from backend.services import expense_service
+
+    user = await _resolve_user(auth, db)
+    data = ExpenseCreate(**_clean_expense_payload(payload or {}))
+    expense = await expense_service.create_expense(db, user.id, data)
+    await db.commit()
+    invalidate_wealth_cache_for_user(user.id)
+    return {"data": _serialize_expense_item(expense), "error": None}
+
+
+@router.patch("/api/expenses/{expense_id}")
+async def miniapp_update_expense(
+    expense_id: str,
+    payload: dict,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an expense; ownership is enforced by expense_service."""
+    import uuid as _uuid
+
+    from backend.schemas.expense import ExpenseUpdate
+    from backend.services import expense_service
+
+    user = await _resolve_user(auth, db)
+    try:
+        parsed_id = _uuid.UUID(str(expense_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="expense_id không hợp lệ") from exc
+    data = ExpenseUpdate(**_clean_expense_payload(payload or {}, partial=True))
+    expense = await expense_service.update_expense(db, user.id, parsed_id, data)
+    if expense is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy chi tiêu.")
+    await db.commit()
+    invalidate_wealth_cache_for_user(user.id)
+    return {"data": _serialize_expense_item(expense), "error": None}
+
+
+@router.delete("/api/expenses/{expense_id}")
+async def miniapp_delete_expense(
+    expense_id: str,
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft-delete an expense after client-side confirmation."""
+    import uuid as _uuid
+
+    from backend.services import expense_service
+
+    user = await _resolve_user(auth, db)
+    try:
+        parsed_id = _uuid.UUID(str(expense_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="expense_id không hợp lệ") from exc
+    deleted = await expense_service.delete_expense(db, user.id, parsed_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Không tìm thấy chi tiêu.")
+    await db.commit()
+    invalidate_wealth_cache_for_user(user.id)
+    return {"data": {"ok": True}, "error": None}
+
+
+def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
+    allowed = {"amount", "currency", "merchant", "category", "expense_date", "note", "needs_review"}
+    clean = {k: v for k, v in payload.items() if k in allowed and v not in (None, "")}
+    payment_method = str(payload.get("payment_method") or "").strip()[:64]
+    if payment_method:
+        clean["raw_data"] = {"payment_method": payment_method}
+    if not partial:
+        clean.setdefault("source", "manual")
+    return clean
+
+
+def _serialize_expense_item(expense) -> dict:
+    from backend.config.categories import get_category
+
+    category = dashboard_service._normalize_category(expense.category)
+    cat = get_category(category)
+    return {
+        "id": str(expense.id),
+        "amount": float(expense.amount or 0),
+        "currency": expense.currency or "VND",
+        "merchant": expense.merchant,
+        "category": category,
+        "category_label": cat.name_vi,
+        "category_emoji": cat.emoji,
+        "expense_date": expense.expense_date.isoformat(),
+        "month_key": expense.month_key,
+        "note": expense.note,
+        "payment_method": (expense.raw_data or {}).get("payment_method") if expense.raw_data else None,
     }
 
 

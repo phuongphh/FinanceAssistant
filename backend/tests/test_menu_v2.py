@@ -215,7 +215,7 @@ class TestFormatSubmenu:
         labels = [row[0]["text"] for row in kb["inline_keyboard"]]
         callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
 
-        assert "📅 Dòng tiền tháng này" in labels
+        assert "📅 Chi tiết" in labels
         assert "🎯 Mục tiêu" in labels
         assert "menu:cashflow:monthly_report" in callbacks
         assert "menu:cashflow:goals" in callbacks

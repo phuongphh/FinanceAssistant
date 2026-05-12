@@ -788,7 +788,7 @@ def rental_pick_existing_keyboard(
     rows.append(
         [
             {
-                "text": "❌ Hủy",
+                "text": "◀️ Quay về",
                 "callback_data": build_callback(CB_ASSET_RENTAL, "cancel"),
             }
         ]

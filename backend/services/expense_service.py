@@ -123,6 +123,8 @@ async def update_expense(
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(expense, field, value)
+    if "expense_date" in update_data and expense.expense_date is not None:
+        expense.month_key = expense.expense_date.strftime("%Y-%m")
     await db.flush()
     await db.refresh(expense)
     return expense
