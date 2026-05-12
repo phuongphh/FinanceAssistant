@@ -250,6 +250,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #476 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-476.md](by-phase/pre-phase/issue-476.md) |
 | #477 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-477.md](by-phase/pre-phase/issue-477.md) |
 | #479 | Pre-Phase | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [pre-phase/issue-479.md](by-phase/pre-phase/issue-479.md) |
+| #488 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-488.md](by-phase/pre-phase/issue-488.md) |
 
-**Total:** 246 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 229 Pre-Phase)
+**Total:** 247 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 230 Pre-Phase)
