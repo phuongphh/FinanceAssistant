@@ -40,7 +40,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #498 | [Story] P4.1-A3: Cost guardrail middleware | [issue-498.md](issue-498.md) |
 | #499 | [Story] P4.1-A4: Daily cost report | [issue-499.md](issue-499.md) |
 | #500 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-500.md](issue-500.md) |
-| #501 | [Story] P4.1-A6: Daily KPI digest cron | [issue-501.md](issue-501.md) |
 | #502 | [Story] P4.1-A7: Feedback triage UI | [issue-502.md](issue-502.md) |
 | #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
 | #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
@@ -57,4 +56,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
 | #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 
-**Total active:** 52
+**Total active:** 51
