@@ -33,20 +33,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #463 | [Epic] Phase 4.1 — Epic A: Pre-Launch Hardening | [issue-463.md](issue-463.md) |
-| #464 | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [issue-464.md](issue-464.md) |
-| #465 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-465.md](issue-465.md) |
-| #466 | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [issue-466.md](issue-466.md) |
-| #467 | [Story] P4.1-A2: First-Twin shortcut | [issue-467.md](issue-467.md) |
-| #468 | [Story] P4.1-A3: Cost guardrail middleware | [issue-468.md](issue-468.md) |
-| #469 | [Story] P4.1-A4: Daily cost report | [issue-469.md](issue-469.md) |
-| #470 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-470.md](issue-470.md) |
-| #471 | [Story] P4.1-A6: Daily KPI digest cron | [issue-471.md](issue-471.md) |
-| #472 | [Story] P4.1-A7: Feedback triage UI | [issue-472.md](issue-472.md) |
-| #473 | [Story] P4.1-B1: Shareable Twin image | [issue-473.md](issue-473.md) |
-| #474 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-474.md](issue-474.md) |
-| #475 | [Story] P4.1-C1: Acquisition source + invite tracking | [issue-475.md](issue-475.md) |
-| #476 | [Story] P4.1-C2: Success metrics rubric | [issue-476.md](issue-476.md) |
-| #477 | [Story] P4.1-C3: Kill criteria documentation | [issue-477.md](issue-477.md) |
 
-**Total active:** 44
+**Total active:** 29
