@@ -44,5 +44,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #501 | [Story] P4.1-A6: Daily KPI digest cron | [issue-501.md](issue-501.md) |
 | #502 | [Story] P4.1-A7: Feedback triage UI | [issue-502.md](issue-502.md) |
 | #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
+| #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
 
-**Total active:** 40
+**Total active:** 41
