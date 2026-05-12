@@ -264,6 +264,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #490 | Pre-Phase | [Story] P4.1-C1: Acquisition source + invite tracking | [pre-phase/issue-490.md](by-phase/pre-phase/issue-490.md) |
 | #491 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-491.md](by-phase/pre-phase/issue-491.md) |
 | #492 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-492.md](by-phase/pre-phase/issue-492.md) |
+| #497 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut + narrative + in-moment feedback | [pre-phase/issue-497.md](by-phase/pre-phase/issue-497.md) |
 
-**Total:** 260 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 243 Pre-Phase)
+**Total:** 261 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 244 Pre-Phase)
