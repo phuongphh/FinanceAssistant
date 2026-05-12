@@ -49,7 +49,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
 | #520 | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [issue-520.md](issue-520.md) |
 | #521 | [UI/UX] US3: Cashflow Main Menu — Income/Expense Summary Only | [issue-521.md](issue-521.md) |
+| #522 | [UI/UX] US4: Cashflow — Rename Button to "Chi tiết" | [issue-522.md](issue-522.md) |
 | #523 | [UI/UX] US5: Monthly Expense — Category List Sorted by Amount DESC | [issue-523.md](issue-523.md) |
 | #524 | [Feature/UI] US6: Expense Mini App — Add/Edit/Delete Expenses | [issue-524.md](issue-524.md) |
 
-**Total active:** 47
+**Total active:** 48
