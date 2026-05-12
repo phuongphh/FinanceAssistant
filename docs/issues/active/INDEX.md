@@ -42,5 +42,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #500 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-500.md](issue-500.md) |
 | #501 | [Story] P4.1-A6: Daily KPI digest cron | [issue-501.md](issue-501.md) |
 | #502 | [Story] P4.1-A7: Feedback triage UI | [issue-502.md](issue-502.md) |
+| #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
 
-**Total active:** 38
+**Total active:** 39
