@@ -52,5 +52,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #522 | [UI/UX] US4: Cashflow — Rename Button to "Chi tiết" | [issue-522.md](issue-522.md) |
 | #523 | [UI/UX] US5: Monthly Expense — Category List Sorted by Amount DESC | [issue-523.md](issue-523.md) |
 | #524 | [Feature/UI] US6: Expense Mini App — Add/Edit/Delete Expenses | [issue-524.md](issue-524.md) |
+| #525 | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [issue-525.md](issue-525.md) |
 
-**Total active:** 48
+**Total active:** 49
