@@ -48,5 +48,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 | #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
 | #520 | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [issue-520.md](issue-520.md) |
+| #521 | [UI/UX] US3: Cashflow Main Menu — Income/Expense Summary Only | [issue-521.md](issue-521.md) |
 
-**Total active:** 44
+**Total active:** 45
