@@ -290,6 +290,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #516 | Pre-Phase | [Task] P4.1-D3: 50 invite link distribution package | [pre-phase/issue-516.md](by-phase/pre-phase/issue-516.md) |
 | #519 | Pre-Phase | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [pre-phase/issue-519.md](by-phase/pre-phase/issue-519.md) |
 | #520 | Pre-Phase | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [pre-phase/issue-520.md](by-phase/pre-phase/issue-520.md) |
+| #524 | Pre-Phase | [Feature/UI] US6: Expense Mini App — Add/Edit/Delete Expenses | [pre-phase/issue-524.md](by-phase/pre-phase/issue-524.md) |
 
-**Total:** 286 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 269 Pre-Phase)
+**Total:** 287 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 270 Pre-Phase)
