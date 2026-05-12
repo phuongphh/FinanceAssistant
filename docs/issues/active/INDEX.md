@@ -36,7 +36,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #494 | [Epic] Phase 4.1 — EPIC 2: Twin Polish Thuc Chien | [issue-494.md](issue-494.md) |
 | #495 | [Epic] Phase 4.1 — EPIC 3: Soft Launch Playbook & Founding Cohort | [issue-495.md](issue-495.md) |
 | #496 | [Story] P4.1-A1: Onboarding redesign — 3-step goal-based flow | [issue-496.md](issue-496.md) |
+| #498 | [Story] P4.1-A3: Cost guardrail middleware | [issue-498.md](issue-498.md) |
 | #499 | [Story] P4.1-A4: Daily cost report | [issue-499.md](issue-499.md) |
 | #501 | [Story] P4.1-A6: Daily KPI digest cron | [issue-501.md](issue-501.md) |
 
-**Total active:** 34
+**Total active:** 35
