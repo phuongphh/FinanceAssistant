@@ -35,7 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 | #519 | [UI/UX] US1: Dashboard — Rename "Giá trị ròng" to "Tổng tài sản" | [issue-519.md](issue-519.md) |
-| #520 | [UI/UX] US2: Rental Asset — Change "Huỷ" to "Quay về" | [issue-520.md](issue-520.md) |
 | #521 | [UI/UX] US3: Cashflow Main Menu — Income/Expense Summary Only | [issue-521.md](issue-521.md) |
 | #522 | [UI/UX] US4: Cashflow — Rename Button to "Chi tiết" | [issue-522.md](issue-522.md) |
 | #523 | [UI/UX] US5: Monthly Expense — Category List Sorted by Amount DESC | [issue-523.md](issue-523.md) |
@@ -43,4 +42,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #525 | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [issue-525.md](issue-525.md) |
 | #526 | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [issue-526.md](issue-526.md) |
 
-**Total active:** 38
+**Total active:** 37
