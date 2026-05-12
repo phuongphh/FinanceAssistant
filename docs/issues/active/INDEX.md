@@ -49,5 +49,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
 | #507 | [Story] P4.1-C2: Success metrics rubric | [issue-507.md](issue-507.md) |
 | #509 | [Story] P4.1-C4: Founding member experience | [issue-509.md](issue-509.md) |
+| #511 | [Task] P4.1-M2: Migration feedback_sla_index | [issue-511.md](issue-511.md) |
 
-**Total active:** 45
+**Total active:** 46
