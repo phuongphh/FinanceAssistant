@@ -4,12 +4,11 @@
 
 ## Phase 4.1 — EPIC 2: Twin Polish Thuc Chien
 
-> **Type:** Epic | **Estimate:** ~1 tuan | **Stories:** 2 | **Priority:** P1
+> **Type:** Epic | **Priority:** P1 | **Stories:** 2 | **Tasks:** 1 (M.3)
 
-## Muc tieu
-Shareable Twin image + predictions vs actual calibration.
+### Stories
+- [ ] #504 [Story] P4.1-B1: Shareable Twin image
+- [ ] #505 [Story] P4.1-B2: Predictions vs actual calibration
 
-## Stories in this Epic
-_(Se update)_
-- [ ] [Story] P4.1-B1: Shareable Twin image
-- [ ] [Story] P4.1-B2: Predictions vs actual calibration
+### Tasks
+- [ ] #512 [Task] M.3: Migration twin_calibration_log
