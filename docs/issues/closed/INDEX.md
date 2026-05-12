@@ -274,10 +274,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #501 | Pre-Phase | [Story] P4.1-A6: Daily KPI digest cron | [pre-phase/issue-501.md](by-phase/pre-phase/issue-501.md) |
 | #502 | Pre-Phase | [Story] P4.1-A7: Feedback triage UI | [pre-phase/issue-502.md](by-phase/pre-phase/issue-502.md) |
 | #503 | Pre-Phase | [Story] P4.1-A8: First morning briefing onboarding | [pre-phase/issue-503.md](by-phase/pre-phase/issue-503.md) |
+| #504 | Pre-Phase | [Story] P4.1-B1: Shareable Twin image | [pre-phase/issue-504.md](by-phase/pre-phase/issue-504.md) |
 | #505 | Pre-Phase | [Story] P4.1-B2: Predictions vs actual calibration | [pre-phase/issue-505.md](by-phase/pre-phase/issue-505.md) |
 | #510 | Pre-Phase | [Task] P4.1-M1: Migration user_cost_budgets + llm_cost_log | [pre-phase/issue-510.md](by-phase/pre-phase/issue-510.md) |
 | #511 | Pre-Phase | [Task] P4.1-M2: Migration feedback_sla_index | [pre-phase/issue-511.md](by-phase/pre-phase/issue-511.md) |
 | #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 
-**Total:** 274 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 257 Pre-Phase)
+**Total:** 275 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 258 Pre-Phase)
