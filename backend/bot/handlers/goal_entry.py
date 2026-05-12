@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,9 +204,7 @@ async def cancel_wizard(
         return False
     await wizard_service.clear(db, user.id)
     analytics.track(GoalEvent.WIZARD_CANCELED, user_id=user.id)
-    await send_message(
-        chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋",
-    )
+    await show_goals_list(db, chat_id, user)
     return True
 
 

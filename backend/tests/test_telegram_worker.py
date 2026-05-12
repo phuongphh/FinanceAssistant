@@ -10,8 +10,6 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -214,6 +212,46 @@ class TestRouteUpdate:
 
         fake_session.rollback.assert_awaited_once()
         fake_session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_huy_command_routes_to_goal_entry_cancel(self):
+        """/huy with an active goal_add wizard calls goal_entry_handlers.cancel_wizard."""
+        from backend.bot.handlers import goal_entry as goal_entry_handlers
+
+        fake_user = MagicMock()
+        fake_user.id = "user-goal-1"
+        fake_user.telegram_id = 42
+        fake_user.wizard_state = {"flow": goal_entry_handlers.FLOW_ADD, "step": "amount", "draft": {}}
+
+        fake_session = _make_fake_session()
+        factory = MagicMock(return_value=fake_session)
+
+        with patch.object(
+            telegram_worker, "get_session_factory", return_value=factory
+        ), patch(
+            "backend.services.dashboard_service.get_or_create_user",
+            new_callable=AsyncMock,
+            return_value=(fake_user, False),
+        ), patch(
+            "backend.bot.handlers.goal_entry.cancel_wizard",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_cancel:
+            await telegram_worker.route_update(
+                {
+                    "update_id": 50,
+                    "message": {
+                        "text": "/huy",
+                        "chat": {"id": 42},
+                        "from": {"id": 42},
+                    },
+                }
+            )
+
+        mock_cancel.assert_awaited_once()
+        args, _ = mock_cancel.await_args
+        assert args[1] == 42  # chat_id
+        assert args[2] is fake_user
 
 
 # ---------------------------------------------------------------------------

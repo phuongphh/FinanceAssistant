@@ -333,6 +333,8 @@ async def _handle_message(
                 await life_event_entry_handlers.cancel_wizard(
                     db, chat_id, resolved_user
                 )
+            elif await goal_entry_handlers.cancel_wizard(db, chat_id, resolved_user):
+                pass
             elif not await asset_entry_handlers.cancel_wizard(
                 db, chat_id, resolved_user
             ):

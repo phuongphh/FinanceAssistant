@@ -118,7 +118,7 @@ def format_rental_marked(
     lines.append(f"   • Trạng thái: {status_label}")
     lines.append("")
     lines.append(
-        "🔁 Mình tự động tạo nguồn thu nhập <b>'Thuê BĐS'</b> để theo dõi nhé."
+        "🔁 Mình tự động tạo nguồn thu nhập <b>'BĐS cho thuê'</b> để theo dõi nhé."
     )
     return "\n".join(lines)
 

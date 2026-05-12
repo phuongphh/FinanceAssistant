@@ -332,6 +332,14 @@ async def _navigate(
         )
         analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
         return
+    elif target == "assets":
+        # Issue #457: show net_worth inline so the user sees total immediately
+        # without an extra "Tổng tài sản" tap — same pattern as cashflow.
+        await _navigate_assets(
+            db=db, user=user, chat_id=chat_id, message_id=message_id, level=level
+        )
+        analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
+        return
     else:
         text, keyboard = format_submenu(user, target, level=level)
 
@@ -400,6 +408,71 @@ async def _navigate_cashflow(
         chat_id=chat_id,
         message_id=message_id,
         text=text,
+        reply_markup=keyboard,
+        **anim_kwargs,
+    )
+
+
+async def _navigate_assets(
+    *,
+    db: AsyncSession,
+    user: User,
+    chat_id: int,
+    message_id: int | None,
+    level: str | None,
+) -> None:
+    """Issue #457: render net_worth inline when entering the Tài sản submenu.
+
+    Shows the stored net-worth total immediately alongside the submenu
+    keyboard so the user sees meaningful data without an extra tap —
+    same pattern as _navigate_cashflow (issue #445).
+    """
+    from backend.intent.wealth_adapt import decorate, style_for_level
+    from backend.wealth.ladder import detect_level
+    from backend.wealth.services import net_worth_calculator
+
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    _, keyboard = format_submenu(user, "assets", level=level)
+    hint = get_submenu_hint("assets")
+    name = user.display_name or "bạn"
+
+    if breakdown.total <= 0:
+        text = (
+            f"💎 {name} chưa có tài sản nào trong hệ thống.\n\n"
+            "Tap /themtaisan để mình tính tổng tài sản giúp nhé 🚀"
+        )
+    else:
+        asset_level = detect_level(breakdown.total)
+        style = style_for_level(asset_level, breakdown.total)
+        lines = [
+            f"💰 Tổng tài sản của {name}:",
+            f"*{format_money_full(breakdown.total)}*",
+            "",
+            get_action_copy("action_assets_net_worth", "market_value_note"),
+        ]
+        if breakdown.asset_count and not style.is_starter:
+            lines.append("")
+            lines.append(f"_Theo dõi qua {breakdown.asset_count} tài sản_")
+        text = decorate("\n".join(lines), style)
+
+    if hint:
+        text = text + f"\n\n{hint}"
+
+    anim_kwargs = message_kwargs_for_animation(text, "submenu")
+    if message_id is None:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_markup=keyboard,
+            **anim_kwargs,
+        )
+        return
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=text,
+        parse_mode="Markdown",
         reply_markup=keyboard,
         **anim_kwargs,
     )
