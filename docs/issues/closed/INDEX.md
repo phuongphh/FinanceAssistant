@@ -240,6 +240,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #466 | Pre-Phase | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [pre-phase/issue-466.md](by-phase/pre-phase/issue-466.md) |
 | #467 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut | [pre-phase/issue-467.md](by-phase/pre-phase/issue-467.md) |
 | #468 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-468.md](by-phase/pre-phase/issue-468.md) |
+| #477 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-477.md](by-phase/pre-phase/issue-477.md) |
 
-**Total:** 236 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 219 Pre-Phase)
+**Total:** 237 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 220 Pre-Phase)
