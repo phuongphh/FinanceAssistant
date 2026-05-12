@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #480 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-480.md](issue-480.md) |
 | #482 | [Story] P4.1-A2: First-Twin shortcut | [issue-482.md](issue-482.md) |
 | #483 | [Story] P4.1-A3: Cost guardrail middleware | [issue-483.md](issue-483.md) |
+| #485 | [Story] P4.1-A5: Sentry + LLM metrics dashboard | [issue-485.md](issue-485.md) |
 
-**Total active:** 34
+**Total active:** 35
