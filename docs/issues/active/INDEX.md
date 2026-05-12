@@ -55,5 +55,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #513 | [Task] P4.1-M4: Migration founding_member_flag | [issue-513.md](issue-513.md) |
 | #514 | [Task] P4.1-D1: Verify Zalo channel disabled | [issue-514.md](issue-514.md) |
 | #515 | [Task] P4.1-D2: Operator briefing & dogfood | [issue-515.md](issue-515.md) |
+| #516 | [Task] P4.1-D3: 50 invite link distribution package | [issue-516.md](issue-516.md) |
 
-**Total active:** 51
+**Total active:** 52
