@@ -237,6 +237,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #463 | Pre-Phase | [Epic] Phase 4.1 — Epic A: Pre-Launch Hardening | [pre-phase/issue-463.md](by-phase/pre-phase/issue-463.md) |
 | #464 | Pre-Phase | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [pre-phase/issue-464.md](by-phase/pre-phase/issue-464.md) |
 | #465 | Pre-Phase | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [pre-phase/issue-465.md](by-phase/pre-phase/issue-465.md) |
+| #466 | Pre-Phase | [Story] P4.1-A1: Onboarding redesign — 3-step guided flow | [pre-phase/issue-466.md](by-phase/pre-phase/issue-466.md) |
 
-**Total:** 233 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 216 Pre-Phase)
+**Total:** 234 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 217 Pre-Phase)
