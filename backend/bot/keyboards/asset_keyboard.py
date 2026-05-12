@@ -22,7 +22,7 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
     asset_add:rental_extra:<skip|add>     — collect tenant info or skip
 
     asset_rental:pick:<asset_uuid>        — Phase 3.8: pick existing RE asset
-    asset_rental:cancel                   — abort mark-as-rental flow
+    asset_rental:back_assets              — return to Tài sản menu
 
     asset_manage:edit_type:<asset_type>   — list active assets filtered by type for edit
     asset_manage:edit:<uuid>:<asset_type> — edit one asset, then return to market portfolio
@@ -790,7 +790,7 @@ def rental_pick_existing_keyboard(
         [
             {
                 "text": "◀️ Quay về",
-                "callback_data": build_callback(CB_ASSET_RENTAL, "cancel"),
+                "callback_data": build_callback(CB_ASSET_RENTAL, "back_assets"),
             }
         ]
     )

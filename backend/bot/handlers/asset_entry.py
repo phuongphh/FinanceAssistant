@@ -2851,10 +2851,22 @@ async def handle_asset_rental_callback(db: AsyncSession, callback_query: dict) -
     arg = parts[1] if len(parts) > 1 else None
 
     async def _act() -> None:
-        if action == "cancel":
+        if action in ("back_assets", "cancel"):
             await wizard_service.clear(db, user.id)
-            analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
-            await send_message(chat_id=chat_id, text="Đã huỷ. 👋")
+            analytics.track(
+                AssetEvent.WIZARD_CANCELED,
+                user_id=user.id,
+                properties={"destination": "menu_assets"},
+            )
+            from backend.bot.handlers.menu_handler import _navigate
+
+            await _navigate(
+                db=db,
+                user=user,
+                chat_id=chat_id,
+                message_id=message.get("message_id"),
+                target="assets",
+            )
             return
         if action == "pick" and arg:
             await _handle_rental_pick(db, chat_id, user, arg)
