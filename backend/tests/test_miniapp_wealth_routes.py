@@ -341,7 +341,7 @@ class TestWealthDashboardPage:
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
         body = resp.text
-        assert "Giá trị ròng" in body
+        assert "Tổng tài sản" in body
         # Must reference the wealth-specific JS + CSS bundles.
         assert "wealth_dashboard.js" in body
         assert "wealth.css" in body

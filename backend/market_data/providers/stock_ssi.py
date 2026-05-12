@@ -115,6 +115,8 @@ class SSIStockProvider(BaseProvider):
             price *= Decimal("1000")
         metadata = {
             "volume": decimal_or_none(first_present(record, ("nmVolume", "volume", "matchedVolume"))),
+            "trading_value": decimal_or_none(first_present(record, ("nmValue", "tradingValue", "matchedValue", "value"))),
+            "change": decimal_or_none(first_present(record, ("change", "priceChange", "changePrice"))),
             "change_pct": decimal_or_none(first_present(record, ("changePercent", "change_pct", "percentPriceChange"))),
             "high": decimal_or_none(first_present(record, ("highest", "high", "ceilingPrice"))),
             "low": decimal_or_none(first_present(record, ("lowest", "low", "floorPrice"))),

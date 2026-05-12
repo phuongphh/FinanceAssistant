@@ -517,7 +517,6 @@ _INTENT_MAP: dict[tuple[str, str], tuple[IntentType, dict]] = {
     # order matches: direct handler first, intent map second, advisory
     # third, coming-soon last.
     # Thị trường
-    ("market", "vnindex"): (IntentType.QUERY_MARKET, {"ticker": "VNINDEX"}),
     ("market", "stocks"): (IntentType.QUERY_PORTFOLIO, {"asset_type": "stock"}),
     ("market", "crypto"): (IntentType.QUERY_MARKET, {"category": "crypto"}),
     ("market", "gold"): (IntentType.QUERY_MARKET, {"category": "gold"}),
@@ -1038,6 +1037,107 @@ def _market_portfolio_keyboard(asset_type: str, *, include_search: bool = False)
     return {"inline_keyboard": rows}
 
 
+
+VN30_SYMBOLS = [
+    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+    "LPB", "MBB", "MSN", "MWG", "PLX", "SAB", "SHB", "SSB", "SSI", "STB",
+    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+]
+
+
+def _market_back_keyboard() -> dict:
+    return {"inline_keyboard": [[{"text": "◀️ Quay về", "callback_data": "menu:market"}]]}
+
+
+async def _action_market_vnindex(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """VNIndex market screen with compact VN30 leaders and clean footer."""
+    from decimal import Decimal
+
+    from backend.market_data.client import get_stock_quote, get_stock_quotes
+
+    def dec(value) -> Decimal:
+        try:
+            return Decimal(str(value or 0))
+        except Exception:
+            return Decimal(0)
+
+    def money(value: Decimal) -> str:
+        if value >= Decimal("1000000000"):
+            return f"{value / Decimal('1000000000'):.1f} tỷ"
+        if value >= Decimal("1000000"):
+            return f"{value / Decimal('1000000'):.0f} tr"
+        return f"{value:,.0f}đ"
+
+    def row(q) -> dict:
+        pct = dec(q.metadata.get("change_pct"))
+        trading_value = dec(q.metadata.get("trading_value"))
+        if trading_value <= 0:
+            trading_value = q.price * dec(q.metadata.get("volume"))
+        return {
+            "symbol": q.symbol,
+            "price": q.price,
+            "change": dec(q.metadata.get("change")),
+            "pct": pct,
+            "trading_value": trading_value,
+            "stale": q.is_stale,
+        }
+
+    try:
+        index_quote = await get_stock_quote("VNINDEX")
+    except Exception:
+        logger.warning("Unable to fetch VNINDEX overview", exc_info=True)
+        index_quote = None
+
+    try:
+        quote_map = await get_stock_quotes(VN30_SYMBOLS)
+    except Exception:
+        logger.warning("Unable to fetch VN30 board", exc_info=True)
+        quote_map = {}
+
+    rows = [row(q) for q in quote_map.values()]
+    lines = ["📊 *VNIndex*", ""]
+    if index_quote is None:
+        lines.append("Không tải được điểm VNIndex lúc này. Bạn thử lại sau nhé.")
+    else:
+        pct = dec(index_quote.metadata.get("change_pct"))
+        change = dec(index_quote.metadata.get("change"))
+        sign = "+" if pct >= 0 else ""
+        updated = index_quote.fetched_at.astimezone().strftime("%H:%M %d/%m")
+        stale = " · dữ liệu cũ/ngoài giờ" if index_quote.is_stale else ""
+        lines.extend([
+            f"Điểm: *{index_quote.price:,.2f}*",
+            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){stale}",
+            f"Cập nhật: {updated}",
+        ])
+    lines.append("")
+    if not rows:
+        lines.append("VN30 chưa có dữ liệu để xếp hạng.")
+    else:
+        top_value = sorted(rows, key=lambda x: x["trading_value"], reverse=True)[:5]
+        gainers = sorted(rows, key=lambda x: x["pct"], reverse=True)[:5]
+        losers = sorted(rows, key=lambda x: x["pct"])[:5]
+        lines.append("🏦 *Top 5 VN30 theo GTGD*")
+        for item in top_value:
+            sign = "+" if item["pct"] >= 0 else ""
+            lines.append(f"• {item['symbol']}: {item['price']:,.0f}đ · {sign}{item['pct']:.2f}% · GTGD {money(item['trading_value'])}")
+        lines.extend(["", "📈 *Tăng mạnh nhất*"])
+        for item in gainers:
+            sign = "+" if item["pct"] >= 0 else ""
+            lines.append(f"• {item['symbol']}: {sign}{item['pct']:.2f}%")
+        lines.extend(["", "📉 *Giảm mạnh nhất*"])
+        for item in losers:
+            sign = "+" if item["pct"] >= 0 else ""
+            lines.append(f"• {item['symbol']}: {sign}{item['pct']:.2f}%")
+
+    await send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=_market_back_keyboard(),
+    )
+
 async def _action_market_stock_board(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -1287,6 +1387,7 @@ _DIRECT_HANDLERS = {
     # the legacy callback wired to the list view so old chat-history
     # bubbles don't dead-end on the coming-soon stub.
     ("goals", "update"): _action_goals_list,
+    ("market", "vnindex"): _action_market_vnindex,
     ("market", "stocks"): _action_market_stock_board,
     ("market", "crypto"): _action_market_crypto_prices,
     ("market", "gold"): _action_market_gold_prices,

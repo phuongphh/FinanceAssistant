@@ -31,7 +31,9 @@ class ExpenseUpdate(BaseModel):
     currency: str | None = None
     merchant: str | None = None
     category: str | None = None
+    expense_date: date | None = None
     note: str | None = None
+    raw_data: dict | None = None
     needs_review: bool | None = None
 
 

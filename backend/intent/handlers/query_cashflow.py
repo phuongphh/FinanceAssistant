@@ -105,22 +105,12 @@ class QueryCashflowHandler(IntentHandler):
                 "Mình cần ít nhất một nguồn thu và vài giao dịch để tính dòng tiền."
             )
 
-        if style.is_starter:
-            if current.net >= 0:
-                return (
-                    f"💰 Dòng tiền {label_vi}:\n"
-                    f"Bạn dư *{format_money_short(current.net)}* {label_vi} 💚"
-                )
-            return (
-                f"💰 Dòng tiền {label_vi}:\n"
-                f"Tháng này hơi căng — đang vượt thu {format_money_short(abs(current.net))} 🟥"
-            )
-
         saving_rate = _safe_rate(current.net, current.income)
         arrow = "💚" if current.net >= 0 else "🟥"
         sign = "+" if current.net >= 0 else "−"
+        net_word = "dư" if current.net >= 0 else "vượt thu"
         lines = [
-            f"💰 Dòng tiền {label_vi}:",
+            f"💰 Dòng tiền {label_vi}: {net_word} {format_money_short(abs(current.net))}",
             "",
             self._income_card(current, previous, streams, time_range),
             "",
@@ -130,6 +120,8 @@ class QueryCashflowHandler(IntentHandler):
             f"{_format_percent(saving_rate) if saving_rate is not None else '—'}",
             "",
             f"{arrow} *Dư / thiếu*: {sign}{format_money_full(abs(current.net))}",
+            "",
+            _cashflow_tip(current, saving_rate),
         ]
         return "\n".join(lines)
 
@@ -146,14 +138,6 @@ class QueryCashflowHandler(IntentHandler):
             f"Tổng: *{format_money_full(current.income)}* "
             f"({income_delta} vs tháng trước)",
         ]
-        top_sources = _top_income_sources(streams, time_range=time_range, limit=3)
-        if not top_sources:
-            lines.append(
-                "Chưa có nguồn thu nào. Thêm thu nhập để mình theo dõi đều hơn nhé 🌱"
-            )
-            return "\n".join(lines)
-        for label, amount in top_sources:
-            lines.append(f"• {label}: {format_money_short(amount)}")
         return "\n".join(lines)
 
     def _expense_card(
@@ -165,12 +149,6 @@ class QueryCashflowHandler(IntentHandler):
             f"Tổng: *{format_money_full(current.spend)}* "
             f"({spend_delta} vs tháng trước)",
         ]
-        top_categories = _top_expense_categories(current.expenses, limit=3)
-        if not top_categories:
-            lines.append("Tháng này chưa có khoản chi nào được ghi nhận 🌱")
-            return "\n".join(lines)
-        for category, amount in top_categories:
-            lines.append(f"• {category}: {format_money_short(amount)}")
         return "\n".join(lines)
 
     def _format_monthly_detail(
@@ -369,8 +347,20 @@ def _format_percent(value: float | None) -> str:
     return f"{value:+.1f}%"
 
 
+def _cashflow_tip(period: CashflowPeriod, saving_rate: float | None) -> str:
+    if period.income <= 0:
+        return "💡 Mẹo: thêm nguồn thu để Bé Tiền tính tỷ lệ tiết kiệm chính xác hơn."
+    if period.net < 0:
+        return "💡 Mẹo: xem lại 1–2 nhóm chi lớn nhất trước khi thêm khoản mới."
+    if saving_rate is not None and saving_rate >= 20:
+        return "💡 Mẹo: dòng tiền đang ổn — cân nhắc chuyển phần dư vào mục tiêu ưu tiên."
+    return "💡 Mẹo: thử đặt mục tiêu tiết kiệm 20% thu nhập để có vùng đệm an toàn."
+
+
 def _delta_text(current: Decimal, previous: Decimal) -> str:
     if previous <= 0:
-        return "—"
+        return "Chưa có dữ liệu tháng trước"
     delta = (current - previous) / previous * Decimal(100)
+    if delta == 0:
+        return "Không đổi"
     return f"{float(delta):+.1f}%"
