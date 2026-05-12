@@ -45,7 +45,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #487 | [Story] P4.1-A7: Feedback triage UI | [issue-487.md](issue-487.md) |
 | #488 | [Story] P4.1-B1: Shareable Twin image | [issue-488.md](issue-488.md) |
 | #489 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-489.md](issue-489.md) |
+| #490 | [Story] P4.1-C1: Acquisition source + invite tracking | [issue-490.md](issue-490.md) |
 | #491 | [Story] P4.1-C2: Success metrics rubric | [issue-491.md](issue-491.md) |
 | #492 | [Story] P4.1-C3: Kill criteria documentation | [issue-492.md](issue-492.md) |
 
-**Total active:** 43
+**Total active:** 44
