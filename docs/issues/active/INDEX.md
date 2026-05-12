@@ -36,6 +36,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #518 | [Epic] UI/UX Enhancement 3 — Dashboard, Cashflow, Expense Mini App & VNIndex Market Screen | [issue-518.md](issue-518.md) |
 | #521 | [UI/UX] US3: Cashflow Main Menu — Income/Expense Summary Only | [issue-521.md](issue-521.md) |
 | #522 | [UI/UX] US4: Cashflow — Rename Button to "Chi tiết" | [issue-522.md](issue-522.md) |
-| #523 | [UI/UX] US5: Monthly Expense — Category List Sorted by Amount DESC | [issue-523.md](issue-523.md) |
 
-**Total active:** 33
+**Total active:** 32
