@@ -265,6 +265,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #491 | Pre-Phase | [Story] P4.1-C2: Success metrics rubric | [pre-phase/issue-491.md](by-phase/pre-phase/issue-491.md) |
 | #492 | Pre-Phase | [Story] P4.1-C3: Kill criteria documentation | [pre-phase/issue-492.md](by-phase/pre-phase/issue-492.md) |
 | #493 | Pre-Phase | [Epic] Phase 4.1 — EPIC 1: Pre-Launch Hardening | [pre-phase/issue-493.md](by-phase/pre-phase/issue-493.md) |
+| #494 | Pre-Phase | [Epic] Phase 4.1 — EPIC 2: Twin Polish Thuc Chien | [pre-phase/issue-494.md](by-phase/pre-phase/issue-494.md) |
 | #496 | Pre-Phase | [Story] P4.1-A1: Onboarding redesign — 3-step goal-based flow | [pre-phase/issue-496.md](by-phase/pre-phase/issue-496.md) |
 | #497 | Pre-Phase | [Story] P4.1-A2: First-Twin shortcut + narrative + in-moment feedback | [pre-phase/issue-497.md](by-phase/pre-phase/issue-497.md) |
 | #498 | Pre-Phase | [Story] P4.1-A3: Cost guardrail middleware | [pre-phase/issue-498.md](by-phase/pre-phase/issue-498.md) |
@@ -278,5 +279,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #511 | Pre-Phase | [Task] P4.1-M2: Migration feedback_sla_index | [pre-phase/issue-511.md](by-phase/pre-phase/issue-511.md) |
 | #513 | Pre-Phase | [Task] P4.1-M4: Migration founding_member_flag | [pre-phase/issue-513.md](by-phase/pre-phase/issue-513.md) |
 
-**Total:** 273 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 256 Pre-Phase)
+**Total:** 274 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 257 Pre-Phase)

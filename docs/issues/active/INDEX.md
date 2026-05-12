@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #494 | [Epic] Phase 4.1 — EPIC 2: Twin Polish Thuc Chien | [issue-494.md](issue-494.md) |
 | #495 | [Epic] Phase 4.1 — EPIC 3: Soft Launch Playbook & Founding Cohort | [issue-495.md](issue-495.md) |
 | #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
 | #506 | [Story] P4.1-C1: Acquisition source + invite tracking + source-aware copy | [issue-506.md](issue-506.md) |
@@ -54,4 +53,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #525 | [UI/UX] US7: VNIndex — Keep Only "Quay về" Footer | [issue-525.md](issue-525.md) |
 | #526 | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [issue-526.md](issue-526.md) |
 
-**Total active:** 49
+**Total active:** 48
