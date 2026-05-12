@@ -45,5 +45,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #502 | [Story] P4.1-A7: Feedback triage UI | [issue-502.md](issue-502.md) |
 | #503 | [Story] P4.1-A8: First morning briefing onboarding | [issue-503.md](issue-503.md) |
 | #504 | [Story] P4.1-B1: Shareable Twin image | [issue-504.md](issue-504.md) |
+| #505 | [Story] P4.1-B2: Predictions vs actual calibration | [issue-505.md](issue-505.md) |
 
-**Total active:** 41
+**Total active:** 42
