@@ -60,6 +60,34 @@ def test_format_movers_block_with_positive_total():
     assert "VIC +15.0%" in block
 
 
+def test_format_movers_block_with_amount_includes_both():
+    """When caller passes total_amount + formatter, headline shows both."""
+    from decimal import Decimal
+
+    block = format_movers_block(
+        total_pct=3.0,
+        movers=[_mover("VIC", "stock", 15.0)],
+        total_amount=Decimal("217_000_000_000"),
+        amount_formatter=lambda v: f"{v / Decimal('1000000000'):.0f} tỷ",
+    )
+    assert "+217 tỷ" in block
+    assert "+3.0%" in block
+    assert "so với hôm qua" in block
+
+
+def test_format_movers_block_with_negative_amount_uses_real_minus():
+    from decimal import Decimal
+
+    block = format_movers_block(
+        total_pct=-2.5,
+        movers=[_mover("BTC", "crypto", -10.0)],
+        total_amount=Decimal("-50_000_000"),
+        amount_formatter=lambda v: f"{v / Decimal('1000000'):.0f}tr",
+    )
+    assert "−50tr" in block  # real minus sign
+    assert "−2.5%" in block
+
+
 def test_format_movers_block_with_negative_total():
     block = format_movers_block(total_pct=-2.5, movers=[_mover("BTC", "crypto", -10.0)])
     assert block.startswith("📉 −2.5% so với hôm qua")

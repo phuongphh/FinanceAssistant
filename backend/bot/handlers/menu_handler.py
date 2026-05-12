@@ -697,6 +697,7 @@ async def _action_assets_net_worth(
     language. If the stored-current calculation takes at least 700ms, the
     user gets an explicit waiting sentence before the final total.
     """
+    from backend.bot.formatters.money import format_money_short
     from backend.bot.formatters.movers import format_movers_block
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
@@ -735,6 +736,8 @@ async def _action_assets_net_worth(
     movers_block = format_movers_block(
         total_pct=change_day.change_percentage if change_day.previous > 0 else None,
         movers=movers,
+        total_amount=change_day.change_absolute if change_day.previous > 0 else None,
+        amount_formatter=format_money_short,
     )
     if movers_block:
         lines.extend(["", movers_block])
