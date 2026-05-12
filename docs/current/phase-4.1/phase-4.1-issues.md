@@ -1,445 +1,739 @@
 # Phase 4.1 — GitHub Issues
 
-> **Phase:** 4.1 — Pre-Launch Hardening
-> **Reference:** [`phase-4.1-detailed.md`](./phase-4.1-detailed.md)
-> **Total:** 3 Epics, 12 Stories, ~3 tuần.
-
-## Phase Overview
-
-Phase 4.1 đưa Bé Tiền sang trạng thái production-ready cho soft launch tháng 6/2026. Không thêm wow-feature; siết 3 trục: first-session UX, cost guardrail, observability + feedback triage. Thêm 2 Twin polish lấy từ dogfood Phase 4A và 1 playbook cho operator.
-
-### Scope decisions locked
-
-- 50-user soft launch tháng 6/2026, không scale rộng hơn.
-- Budget cap default rộng tay (free = 30k VND/tháng) — phase này chỉ stop the bleeding, không monetize.
-- Sentry + KPI digest wire ngay tuần 1, không defer.
-- Shareable Twin image **không** chứa số tuyệt đối + **không** auto-prompt share.
-- Calibration framing honest (kể cả khi hit-rate thấp), không inflate.
-- Tier multi-user (free/pro/cfo) ở DB schema, nhưng UI/flow defer sang Phase 5.7.
+> File này là source-of-truth để OpenClaw PM Agent generate GitHub Issues qua Actions sync.
+> Format: Epic-as-parent / Story-as-child. Mỗi Story có parent epic reference.
+> Labels chuẩn: `phase-4.1`, `epic-{a|b|c}`, `story`, `epic`, plus area labels (`area-onboarding`, `area-cost`, `area-observability`, etc.)
 
 ---
 
-# Epic A: Pre-Launch Hardening
+## EPIC #1: Pre-Launch Hardening
 
-**Labels:** `phase-4.1`, `epic`, `hardening`
-**Estimate:** ~1.5 tuần (7 stories)
-**Goal:** Đưa onboarding, cost control, observability, và feedback triage lên mức production-grade trước soft launch.
-**Stories:** A.1, A.2, A.3, A.4, A.5, A.6, A.7
+**Type:** Epic
+**Labels:** `phase-4.1`, `epic-a`, `epic`, `priority-p0`
+**Estimate:** ~1.5 tuần (8 stories)
+**Owner:** TBD
+
+### Description
+
+Đưa onboarding, cost control, observability, feedback triage, và first-briefing experience lên mức production-grade trước soft launch 50-user. Đây là core của Phase 4.1.
+
+### Goals
+
+- First 5 phút từ `/start` → user thấy Twin của chính mình
+- Không có cost runaway: budget cap per user enforce trước mọi LLM call
+- Sentry + KPI digest chạy daily từ ngày 1
+- Feedback SLA < 24h, có công cụ triage cho operator
+- First morning briefing có frame riêng, không assume user biết đọc
+
+### Child Stories
+
+- #A.1 Onboarding redesign (3-step goal-based flow)
+- #A.2 First-Twin shortcut + narrative + in-moment feedback
+- #A.3 Cost guardrail middleware
+- #A.4 Daily cost report
+- #A.5 Sentry + LLM metrics dashboard
+- #A.6 Daily KPI digest cron
+- #A.7 Feedback triage UI
+- #A.8 First morning briefing onboarding
+
+### Definition of Done
+
+- All 8 child stories acceptance criteria pass
+- E2E test: clean account → `/start` → < 5 phút thấy Twin (đo trên staging)
+- Sentry capture test exception verified với PII scrub
+- KPI digest đã chạy 3 ngày liên tiếp trên staging
 
 ---
 
-## [Story] P4.1-A1: Onboarding redesign — 3-step guided flow
+## STORY #A.1: Onboarding redesign (3-step goal-based flow)
 
-**Labels:** `phase-4.1`, `story`, `onboarding`, `frontend`
-**Parent:** Epic A
+**Type:** Story
+**Parent:** EPIC #1 (Pre-Launch Hardening)
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-onboarding`, `priority-p0`
 **Estimate:** 2 ngày
 
 ### Description
 
-Rewrite `/start` thành flow 3 bước dẫn dắt, đảm bảo user thấy giá trị Bé Tiền (Twin) ngay session đầu thay vì lạc trong menu.
+Rewrite `/start` flow thành 3-step guided onboarding. Step 1 hỏi mục tiêu (không phải wealth level — culture-risk với VN mass affluent). Step 2 nhập asset đầu hoặc dùng demo (với framing rõ ràng). Step 3 auto-trigger Twin (xem A.2).
+
+### Layer
+
+- `bot/handlers/start_handler.py` (rewrite)
+- `content/onboarding/welcome_v2.yaml` (new)
+- `content/onboarding/demo_mode_framing.yaml` (new)
+- `services/onboarding/onboarding_service.py` (new)
+- `services/onboarding/wealth_inference_service.py` (new)
 
 ### Acceptance Criteria
 
-- [ ] `/start` lần đầu hiển thị welcome message < 200 chars + inline button "🌱 Bắt đầu hành trình".
-- [ ] Sau khi bấm, 3 bước hiện rõ với progress `(1/3)`, `(2/3)`, `(3/3)` ở đầu message:
-  - [ ] Bước 1: chọn wealth level (4 button — Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa).
-  - [ ] Bước 2: thêm asset đầu tiên — có nút "Để Bé Tiền dùng demo trước" để skip + tạo placeholder asset (cash 50tr).
-  - [ ] Bước 3: trigger first-Twin compute (handoff cho Story A.2).
-- [ ] User cũ (`created_at < deploy_date`) không bị qua flow mới.
-- [ ] Toàn bộ string nằm trong `content/onboarding/welcome_v2.yaml`, pass `vi-localization-checker`.
-- [ ] Feature flag `ONBOARDING_V2_ENABLED` env var, default true.
+- [ ] `/start` lần đầu hiển thị message < 200 chars + inline button "🌱 Bắt đầu hành trình"
+- [ ] Mỗi step có thanh tiến trình `(1/3)` `(2/3)` `(3/3)` ở đầu message
+- [ ] **Step 1 — Goal question** với 3 inline button: 🌱 Hiểu rõ tổng tài sản / 🎯 Lên kế hoạch mục tiêu lớn / 📊 Theo dõi chi tiêu thông minh → lưu vào `onboarding_sessions.goal_choice`
+- [ ] **Step 2 — First asset:** prompt nhập số tiền VND (free text) hoặc skip qua "Để Bé Tiền dùng demo trước"
+- [ ] **Demo mode banner** khi skip: *"📌 Demo Mode — đây là Twin của một người giả định với 50tr tiết kiệm. Twin của bạn sẽ khác — nhập tài sản thật để xem Twin riêng của bạn."* + CTA "💎 Xem Twin của tôi" để quay lại Step 2
+- [ ] **Wealth segment inference** từ asset value:
+  - < 100tr → `starter`
+  - 100tr–500tr → `young_pro`
+  - 500tr–5 tỷ → `mass_affluent`
+  - > 5 tỷ → `hnw`
+  - Lưu vào `onboarding_sessions.inferred_wealth_segment`
+- [ ] **Source-aware welcome copy** từ `users.acquisition_source` (mapping `friends`/`personal_fb`/`vn_finance_community`/`tg_finance_groups`/`direct_msg` trong yaml)
+- [ ] Toàn bộ Vietnamese strings trong `welcome_v2.yaml`, không hardcode
+- [ ] `vi-localization-checker` agent pass
 
 ### Technical Notes
 
-- Reuse `intent_logs` để track step completion: action `(onboarding, step_1_done)` etc.
-- Wealth level selection nên reuse existing `user_profile_service.set_wealth_level()`.
-- Placeholder asset = `Asset(type='cash', value=50_000_000, label='Tiền mặt demo', user_id=...)`.
+- `wealth_inference_service` là pure function (no DB write) — called by `onboarding_service`
+- State machine có 4 state: `goal_question` → `first_asset` → `twin_shown` → `completed`
+- User có thể quay lại sửa: nếu user gõ `/start` lại khi `current_step != 'completed'`, hỏi resume hay restart
 
 ### Dependencies
 
-- None (foundation story).
+- Blocks: #A.2 (depends on session state from A.1)
+- Depends on: Migration `4.1.04` (onboarding_sessions table)
 
 ---
 
-## [Story] P4.1-A2: First-Twin shortcut
+## STORY #A.2: First-Twin shortcut + narrative + in-moment feedback
 
-**Labels:** `phase-4.1`, `story`, `onboarding`, `twin`
-**Parent:** Epic A
-**Estimate:** 1.5 ngày
-
-### Description
-
-Sau khi user xong onboarding step 2, auto-trigger Twin computation và push kết quả message thứ 3 — KHÔNG bắt user đi tìm menu.
-
-### Acceptance Criteria
-
-- [ ] `OnboardingService.complete_step_2()` async-trigger `TwinEngineService.compute_for_user(user_id)`.
-- [ ] Khi result ready, push qua Notifier với message intro từ `content/onboarding/first_twin_intro.yaml`.
-- [ ] Time-to-first-Twin (từ `/start` đến message hiển thị cone) ≤ 5 phút — đo qua `users.created_at` vs `intent_logs (twin, first_view)`.
-- [ ] Twin compute fail → fallback message "đang tính, quay lại sau 1 phút nhé" + auto-retry sau 60s 1 lần.
-- [ ] Onboarding completion log `(onboarding, completed)` vào `intent_logs`.
-
-### Technical Notes
-
-- Twin compute hiện ~10-30s với 1000 Monte Carlo paths. Async background task, không block.
-- Fallback message phải có timestamp để debug nếu user phản hồi.
-
-### Dependencies
-
-- P4.1-A1 (onboarding flow).
-
----
-
-## [Story] P4.1-A3: Cost guardrail middleware
-
-**Labels:** `phase-4.1`, `story`, `cost`, `infrastructure`
-**Parent:** Epic A
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-onboarding`, `area-twin`, `priority-p0`
 **Estimate:** 2 ngày
 
 ### Description
 
-Mọi LLM call (DeepSeek/Claude/Whisper) đi qua `cost_tracking_adapter` để enforce per-user monthly budget cap.
+Sau Step 2, auto-trigger Twin computation và push 3 message liên tiếp: (1) mascot narrative, (2) cone chart, (3) in-moment feedback prompt. Implement resume worker cho user dừng giữa onboarding.
+
+### Layer
+
+- `services/onboarding/onboarding_service.py` (extend)
+- `services/twin/twin_narrative_service.py` (new)
+- `bot/handlers/onboarding_handler.py` (new)
+- `workers/onboarding_resume_worker.py` (new)
+- `content/onboarding/first_twin_intro.yaml` (new)
+- `content/onboarding/resume_nudge.yaml` (new)
 
 ### Acceptance Criteria
 
-- [ ] Migration `4.1.01_user_cost_budgets.py` applied — tables `user_cost_budgets` + `llm_cost_log`.
-- [ ] `cost_tracking_adapter` wrap DeepSeek/Claude/Whisper adapter hiện có; mọi call qua adapter này.
-- [ ] Trước mỗi call, `BudgetService.check_and_reserve(user_id, estimated_cost)`:
-  - [ ] Nếu spend < 80% cap → cho qua silent.
-  - [ ] Nếu vừa qua 80% → cho qua + push warning ấm áp (1 lần/tháng).
-  - [ ] Nếu chạm 100% → raise `BudgetExceededError`, service catch và trả message "tháng này Bé Tiền tạm dừng tính năng X".
-- [ ] Sau mỗi call, log vào `llm_cost_log` với provider/operation/tokens_in/tokens_out/cost_vnd/latency_ms.
-- [ ] Default cap: free = 30,000 VND, pro = 150,000 VND, cfo = 400,000 VND. Tier hiện tại all = `free`.
-- [ ] Operator command `/budget_set <user_id_or_telegram_id> <amount_vnd>` để override 1-1.
-- [ ] Integration test cover: under-budget pass, 80% warning trigger, 100% block.
+- [ ] Sau Step 2, service auto-trigger `twin_engine_service.compute()` cho user
+- [ ] Push 3 message liên tiếp:
+  - [ ] (1) **Mascot narrative** từ `first_twin_intro.yaml`: *"Đây là Twin tài chính của bạn — Bé Tiền vẽ ra 3 con đường tương lai..."*
+  - [ ] (2) **Cone chart image** (gọi existing twin engine render)
+  - [ ] (3) Sau delay 5–10s, **feedback prompt**: *"💬 Bạn cảm thấy thế nào về Twin đầu tiên?"* với 3 inline button 😍 / 🤔 / 😕
+- [ ] Feedback bấm vào:
+  - [ ] Lưu signal vào `onboarding_sessions.onboarding_feedback_signal`
+  - [ ] Tạo record trong `feedbacks` với `onboarding_emoji_signal` = giá trị emoji
+  - [ ] Acknowledge: *"Cảm ơn bạn — Bé Tiền ghi nhận để cải thiện"*
+- [ ] **TTFT đo được**: `first_twin_shown_at - started_at` < 5 phút trong staging E2E test
+- [ ] **Fallback nếu Twin compute fail**: message *"Bé Tiền đang tính, bạn quay lại sau 1 phút nhé"* — KHÔNG `...` 30s
+- [ ] **Resume worker `onboarding_resume_worker`**:
+  - [ ] Chạy mỗi 5 phút
+  - [ ] Query `onboarding_sessions` WHERE `current_step != 'completed'` AND `nudge_sent_at IS NULL` AND `updated_at < NOW() - 10 minutes`
+  - [ ] Gửi **1 message duy nhất** với 2 button "Tiếp tục" / "Để Bé Tiền dùng demo trước"
+  - [ ] Set `nudge_sent_at = NOW()` để không gửi lần 2 (cap vĩnh viễn)
+- [ ] Onboarding completion log vào `intent_logs` với action `(onboarding, completed)` và metadata `{goal, segment}`
 
 ### Technical Notes
 
-- Pricing reference: DeepSeek $0.14/1M input + $0.28/1M output ≈ 6 VND/1k token. Claude Sonnet $3/1M input ≈ 75 VND/1k token (OCR only).
-- Estimate cost trước call bằng `tokens_in_estimated = len(prompt) // 4`, `tokens_out_estimated = max_tokens param`.
-- `BudgetService.check_and_reserve` chỉ flush, worker commit.
+- `twin_narrative_service` là composer pattern — không gọi LLM, chỉ format yaml + inject user values
+- Feedback prompt timing dùng `asyncio.sleep(7)` — không block handler
+- Worker contract: chỉ flush trong service, commit trong worker boundary
 
 ### Dependencies
 
-- None.
+- Blocks: #A.8 (first briefing depends on onboarding completed)
+- Depends on: #A.1
 
 ---
 
-## [Story] P4.1-A4: Daily cost report
+## STORY #A.3: Cost guardrail middleware
 
-**Labels:** `phase-4.1`, `story`, `cost`, `observability`
-**Parent:** Epic A
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-cost`, `priority-p0`
+**Estimate:** 2 ngày
+
+### Description
+
+Wrap tất cả LLM call (DeepSeek/Claude/Whisper) qua cost-tracking adapter. Enforce per-user monthly budget cap. Warning ở 80%, block ở 100%.
+
+### Layer
+
+- `services/cost/budget_service.py` (new)
+- `adapters/llm/cost_tracking_adapter.py` (new)
+- `workers/cost_budget_worker.py` (new)
+- `content/cost/budget_messages.yaml` (new)
+
+### Acceptance Criteria
+
+- [ ] Mọi LLM call đi qua `cost_tracking_adapter` wrap quanh DeepSeek/Claude/Whisper
+- [ ] Trước mỗi call:
+  - [ ] Check `current_month_spend_vnd < monthly_cap_vnd`
+  - [ ] Nếu đã chạm 80%: gửi warning ấm áp (1 lần/tháng, lưu `last_warning_sent_at`), tiếp tục cho qua
+  - [ ] Nếu chạm 100%: raise `BudgetExceededError`, không gọi LLM
+- [ ] Sau mỗi call success: insert vào `llm_cost_log` (provider/operation/tokens/cost/latency)
+- [ ] **Budget cap default**: free = 30,000 VND/tháng, pro = 100,000 VND/tháng (chưa active v1)
+- [ ] **Constraint check** `chk_tier_v1` từ migration `4.1.01` enforce `tier IN ('free', 'pro')`
+- [ ] Operator command `/budget_set <user_id> <amount>` để override per-user
+- [ ] Service raise domain exception `BudgetExceededError` — adapter KHÔNG gọi Telegram trực tiếp
+- [ ] `budget_service` chỉ flush, không commit; worker commit tại boundary
+- [ ] Integration test với mock DeepSeek + mock budget pass
+
+### Technical Notes
+
+- Cost computation: tokens_in × in_price + tokens_out × out_price (per provider), exchange rate VND/USD lấy từ ENV (`USD_VND_RATE`, default 25000)
+- Whisper cost = duration_seconds × rate
+- Claude OCR cost = page count × rate
+
+### Dependencies
+
+- Blocks: #A.4, #A.5 (cost data feeds dashboard)
+- Depends on: Migration `4.1.01`
+
+---
+
+## STORY #A.4: Daily cost report
+
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-cost`, `area-observability`, `priority-p1`
 **Estimate:** 0.5 ngày
 
 ### Description
 
-Cron 8:00 ICT mỗi sáng gửi operator báo cáo cost 24h trước.
+Mỗi sáng 8h, operator nhận message tổng hợp cost 24h. Merge vào KPI digest (#A.6) để chỉ có 1 message/sáng.
+
+### Layer
+
+- `services/cost/cost_report_service.py` (new)
+- `scripts/kpi_digest.py` (shared with A.6)
 
 ### Acceptance Criteria
 
-- [ ] `cost_report_service.generate_daily_report(date)` trả Markdown ngắn (< 500 chars):
-  - Tổng cost theo provider (DeepSeek/Claude/Whisper).
-  - Top 5 user theo cost.
-  - User mới chạm 80% cap trong 24h.
-- [ ] Số tròn về 1k VND.
-- [ ] Nếu tổng cost ngày > 200% trung bình 7 ngày → flag 🚨 đầu message.
-- [ ] Sent qua Notifier đến `OPERATOR_TELEGRAM_ID`.
-- [ ] Tích hợp vào KPI digest (Story A.6) — 1 message duy nhất buổi sáng.
-
-### Technical Notes
-
-- Reuse `llm_cost_log` từ A.3, không cần bảng mới.
-- Báo cáo + KPI digest share cùng cron worker.
+- [ ] Function `cost_report_service.daily_summary(date)` trả về object với:
+  - [ ] Tổng cost theo provider (DeepSeek / Claude / Whisper)
+  - [ ] Top 5 user theo cost với user_id snippet
+  - [ ] User mới chạm 80% cap trong ngày
+- [ ] Format < 500 chars, số liệu round về 1k VND
+- [ ] Flag 🚨 đầu message nếu tổng cost > 200% trung bình 7 ngày trước
+- [ ] Output được consume bởi `daily_kpi_digest_worker` (#A.6), KHÔNG gửi message riêng
 
 ### Dependencies
 
-- P4.1-A3 (cost log).
-- P4.1-A6 (digest infrastructure).
+- Depends on: #A.3 (cost data)
+- Merged into: #A.6
 
 ---
 
-## [Story] P4.1-A5: Sentry + LLM metrics dashboard
+## STORY #A.5: Sentry + LLM metrics dashboard
 
-**Labels:** `phase-4.1`, `story`, `observability`, `infrastructure`
-**Parent:** Epic A
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-observability`, `priority-p0`
 **Estimate:** 1 ngày
 
 ### Description
 
-Wire Sentry vào FastAPI + workers, expose LLM metrics đủ để build dashboard Grafana/Metabase.
+Wire Sentry vào FastAPI + workers. Build Metabase dashboard cho LLM metrics. PII scrub strict trước khi send Sentry.
+
+### Layer
+
+- `adapters/observability/sentry_adapter.py` (new)
+- `adapters/observability/llm_metrics_adapter.py` (new)
+- `main.py` (init Sentry trong lifecycle hook)
 
 ### Acceptance Criteria
 
-- [ ] Sentry SDK init trong `main.py` lifecycle + mỗi worker entrypoint.
-- [ ] Unhandled exception capture với `user_id` + `intent_name` tag.
-- [ ] PII scrub: `before_send` hook strip regex số > 6 digit, email, phone; whitelist field thay vì blacklist.
-- [ ] ENV `SENTRY_DSN` documented trong `.env.example`; empty string = disabled.
-- [ ] LLM metrics adapter ghi mỗi call: provider/operation/latency_ms/success/model_version vào `llm_cost_log`.
-- [ ] Operator có dashboard query-ready (SQL examples committed trong `docs/operations/sentry-queries.md` hoặc Metabase saved questions):
-  - Error rate per intent (last 24h).
-  - p50/p95 LLM latency per provider.
-  - Daily active users.
-- [ ] Test exception trong staging capture được trên Sentry web UI.
-
-### Technical Notes
-
-- Sentry SDK version pinned trong `pyproject.toml`.
-- Sample rate 100% cho phase soft launch (50 user, traffic thấp).
+- [ ] Sentry SDK wire vào FastAPI app + tất cả worker process
+- [ ] Mọi unhandled exception capture với user_id (hash, không plain) + intent context
+- [ ] **PII scrub trong beforesend hook**:
+  - [ ] Strip số > 6 digits (tiền)
+  - [ ] Strip email regex
+  - [ ] Strip phone regex (+84..., 0...)
+  - [ ] **Whitelist** field thay vì blacklist: chỉ pass `intent_type`, `step`, `error_message_template_id`, `user_id_hash`
+- [ ] Test exception trong staging → verify Sentry nhận với PII đã scrub
+- [ ] LLM metrics adapter ghi mỗi call vào `llm_cost_log`: provider, operation, latency_ms, success/error, model_version
+- [ ] Metabase dashboard với connection trực tiếp PostgreSQL hiển thị:
+  - [ ] Error rate per intent (24h, 7d)
+  - [ ] p50/p95 LLM latency per provider
+  - [ ] Daily active users
+- [ ] ENV `SENTRY_DSN` documented trong `.env.example`, không hardcode
+- [ ] Sentry init phải trước router/worker dispatch
 
 ### Dependencies
 
-- P4.1-A3 (cost log table reused for metrics).
+- Blocks: nothing (foundational)
+- Recommendation: ship tuần 1 để stack trace tốt cho mọi bug fix sau
 
 ---
 
-## [Story] P4.1-A6: Daily KPI digest cron
+## STORY #A.6: Daily KPI digest cron
 
-**Labels:** `phase-4.1`, `story`, `observability`, `worker`
-**Parent:** Epic A
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-observability`, `priority-p0`
 **Estimate:** 1 ngày
 
 ### Description
 
-Cron 8:00 ICT mỗi sáng gửi operator KPI tổng hợp (gộp với cost report A.4).
+Cron 8h sáng gửi **1 message duy nhất** Telegram đến operator gộp cost report + engagement KPI + feedback queue.
+
+### Layer
+
+- `workers/daily_kpi_digest_worker.py` (new)
+- `scripts/kpi_digest.py` (new, standalone runnable)
 
 ### Acceptance Criteria
 
-- [ ] `daily_kpi_digest_worker` chạy 8:00 ICT mỗi ngày qua scheduler.
-- [ ] Gửi 1 message Telegram đến `OPERATOR_TELEGRAM_ID` với:
-  - DAU / WAU / MAU.
-  - Số Twin view 24h.
-  - Intent classification accuracy (% confirm vs % clarify, từ `intent_logs`).
-  - Churn signals: user không active 7+ ngày, đếm số.
-  - Top 3 feedback chưa trả lời (snippet 100 chars + age).
-  - Cost report (từ A.4).
-- [ ] Length < 2000 chars, Markdown formatted.
-- [ ] Cron fail → Sentry alert, không silent.
-- [ ] Script `scripts/kpi_digest.py` runnable standalone với arg `--date YYYY-MM-DD` để backfill.
-
-### Technical Notes
-
-- Scheduler: APScheduler hoặc cron OS-level — chọn cái codebase đang dùng.
-- Query intent accuracy: `SELECT COUNT(*) FILTER (WHERE action='confirm') / COUNT(*) FROM intent_logs WHERE date = ...`.
+- [ ] Cron schedule 8:00 ICT mỗi sáng
+- [ ] Gửi đến `OPERATOR_TELEGRAM_ID` từ ENV
+- [ ] Nội dung gộp:
+  - [ ] **Cost section** (từ #A.4): tổng cost 24h, top 5 user, user chạm 80%
+  - [ ] **Engagement section**: DAU/WAU/MAU, số Twin view 24h, số onboarding completed
+  - [ ] **Quality section**: Intent classification accuracy (% confirm vs % clarify), in-onboarding emoji breakdown (😍/🤔/😕)
+  - [ ] **Churn signals**: User không active 7+ ngày (gồm founding members nếu có)
+  - [ ] **Feedback queue**: Top 3 feedback chưa trả lời với age
+- [ ] Format Telegram message < 4000 chars (giới hạn Telegram)
+- [ ] Nếu cron fail → Sentry alert
+- [ ] Standalone script `python scripts/kpi_digest.py --date 2026-05-15` chạy được không qua cron
 
 ### Dependencies
 
-- P4.1-A3 (cost log).
-- P4.1-A7 (feedback inbox query).
+- Depends on: #A.3, #A.4, #A.5
 
 ---
 
-## [Story] P4.1-A7: Feedback triage UI
+## STORY #A.7: Feedback triage UI
 
-**Labels:** `phase-4.1`, `story`, `feedback`, `operator-tools`
-**Parent:** Epic A
-**Estimate:** 1.5 ngày
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-feedback`, `priority-p0`
+**Estimate:** 1 ngày
 
 ### Description
 
-Operator có command để xem feedback pending, reply qua bot, và worker alert nếu SLA breach.
+Operator commands để đọc inbox, reply nhanh với templates, SLA alert nếu feedback > 24h chưa trả lời.
+
+### Layer
+
+- `bot/handlers/feedback_handler.py` (extend)
+- `services/feedback/feedback_triage_service.py` (new)
+- `workers/feedback_sla_worker.py` (new)
+- `content/feedback/triage_responses.yaml` (new)
 
 ### Acceptance Criteria
 
-- [ ] Migration `4.1.02_feedback_sla_index.py` applied — partial index + `first_responded_at`, `sla_breach_alerted_at`.
-- [ ] `/feedback_inbox` cho operator: list feedback `status=open` cũ nhất trước, mỗi entry hiện ID/wealth level/snippet/age.
-- [ ] `/feedback_reply <id> <message>` gửi message đó cho user via Notifier, set `first_responded_at = NOW()`, `status = answered`.
-- [ ] `/feedback_reply <id> --template <name>` dùng template từ `content/feedback/triage_responses.yaml` (5 template: thanks_logged, will_fix_next_phase, need_more_info, wont_fix_with_reason, escalate_owner).
-- [ ] `feedback_sla_worker` chạy mỗi giờ, alert operator nếu feedback `status=open` quá 24h (chỉ alert 1 lần per feedback).
-- [ ] Permission check: chỉ `OPERATOR_TELEGRAM_ID` được dùng `/feedback_*`.
-
-### Technical Notes
-
-- Reply qua Notifier port, KHÔNG import telegram_service trực tiếp.
-- Template format dùng `{{user_name}}`, `{{wealth_level_vn}}` placeholder.
+- [ ] **`/feedback_inbox`** liệt kê tất cả `status=open` sắp theo `created_at` cũ nhất trước
+- [ ] Mỗi feedback hiển thị: ID ngắn (8 chars), user wealth_segment, **founding flag (🌱)** nếu có, snippet 100 chars, age ("2h trước"), **in-onboarding emoji signal** nếu có
+- [ ] **`/feedback_reply <id> <message>`**:
+  - [ ] Gửi message cho user via Notifier
+  - [ ] Đánh dấu `first_responded_at = NOW()`
+  - [ ] Set `status = answered`
+- [ ] **5 templates** trong `triage_responses.yaml`:
+  - [ ] `thanks_logged` — *"Cảm ơn bạn — Bé Tiền đã ghi nhận và đang xem qua."*
+  - [ ] `clarify_request` — *"Bạn cho Bé Tiền biết thêm về [X] được không?"*
+  - [ ] `feature_acknowledged` — *"Ý tưởng hay — Bé Tiền lưu vào roadmap."*
+  - [ ] `bug_apology` — *"Xin lỗi bạn, đây là bug đang fix — kết quả sẽ có trong 24h."*
+  - [ ] `not_supported_yet` — *"Tính năng này chưa có nhưng đang trong kế hoạch — Bé Tiền sẽ báo khi sẵn sàng."*
+- [ ] **`/feedback_reply <id> --template thanks_logged`** dùng template
+- [ ] **`feedback_sla_worker`** chạy mỗi giờ:
+  - [ ] Query feedback `status=open` AND `created_at < NOW() - 24h` AND `sla_breach_alerted_at IS NULL`
+  - [ ] Alert operator (1 lần per feedback), set `sla_breach_alerted_at`
 
 ### Dependencies
 
-- None (existing `/feedback` từ Phase 3.8.5).
+- Depends on: Migration `4.1.02` (feedback_sla_index + columns)
 
 ---
 
-# Epic B: Twin Polish Thực Chiến
+## STORY #A.8: First morning briefing onboarding
 
-**Labels:** `phase-4.1`, `epic`, `twin`
+**Type:** Story
+**Parent:** EPIC #1
+**Labels:** `phase-4.1`, `epic-a`, `story`, `area-briefing`, `area-onboarding`, `priority-p1`
+**Estimate:** 1 ngày
+
+### Description
+
+First briefing có format khác briefing thường — có explainer ngắn và button "Bé Tiền đang nói gì?". Logic đơn giản: gửi 8h sáng ngày sau onboarding bất kể.
+
+### Layer
+
+- `services/briefing/first_briefing_service.py` (new)
+- `content/onboarding/first_briefing.yaml` (new)
+- Existing briefing worker (extend với branch on `is_first_briefing`)
+
+### Acceptance Criteria
+
+- [ ] Service detect first briefing bằng query `briefing_logs` đếm count cho user_id — nếu = 0 trước briefing này thì áp first-briefing format
+- [ ] First briefing format:
+  - [ ] Mở đầu: *"Đây là briefing đầu tiên của bạn! Mỗi sáng 8h Bé Tiền sẽ tổng hợp 3 thứ quan trọng nhất về tài sản của bạn trong 30 giây đọc. Hôm nay Bé Tiền nói về:"*
+  - [ ] 3 mục briefing thường
+  - [ ] Inline button "💡 Bé Tiền đang nói gì?" → hiện explanation chi tiết từng metric (text trong yaml)
+- [ ] **Timing đơn giản**: gửi 8h sáng **ngày sau onboarding**, không apply smart logic. Nếu user mute notification, briefing vẫn nằm trong chat khi mở lại.
+- [ ] Log event vào `intent_logs` với action `(briefing, first_shown)`
+- [ ] Toàn bộ string trong `first_briefing.yaml`
+
+### Dependencies
+
+- Depends on: #A.1, #A.2 (onboarding completed event)
+
+---
+
+## EPIC #2: Twin Polish Thực Chiến
+
+**Type:** Epic
+**Labels:** `phase-4.1`, `epic-b`, `epic`, `priority-p1`
 **Estimate:** ~1 tuần (2 stories)
-**Goal:** Lấy 2 user request lớn nhất từ Phase 4A dogfood — shareable moment + predictions vs actual — để build trust trước launch.
-**Stories:** B.1, B.2
+
+### Description
+
+Lấy 2 user request lớn nhất từ Phase 4A dogfood — *"muốn share Twin"* và *"Twin đoán có đúng không?"* — để build trust trước launch.
+
+### Child Stories
+
+- #B.1 Shareable Twin image
+- #B.2 Predictions vs actual
 
 ---
 
-## [Story] P4.1-B1: Shareable Twin image
+## STORY #B.1: Shareable Twin image
 
-**Labels:** `phase-4.1`, `story`, `twin`, `image`
-**Parent:** Epic B
+**Type:** Story
+**Parent:** EPIC #2
+**Labels:** `phase-4.1`, `epic-b`, `story`, `area-twin`, `priority-p1`
 **Estimate:** 2 ngày
 
 ### Description
 
-Trong Twin view, thêm nút "📸 Lưu thành ảnh" trả về PNG render của cone chart + summary text, KHÔNG chứa số tuyệt đối.
+Nút "📸 Lưu thành ảnh" trên Twin view → render PNG với cone chart + summary. KHÔNG hiển thị số tiền tuyệt đối (privacy). Có founding badge nếu user là founding member.
+
+### Layer
+
+- `services/twin/twin_share_service.py` (new)
+- `adapters/image/twin_image_renderer.py` (new, dùng PIL/Pillow)
 
 ### Acceptance Criteria
 
-- [ ] Nút "📸 Lưu thành ảnh" trong Twin Telegram view.
-- [ ] Bấm → service gen PNG (target < 1s) qua PIL/Pillow.
-- [ ] Content image:
-  - Cone chart (P10/P50/P90 lines).
-  - % tăng trưởng compounded (vd "+86% trong 10 năm").
-  - Time horizon ("Bé Tiền 2036").
-  - Bé Tiền mascot góc dưới phải.
-  - Watermark "Bé Tiền — Personal CFO" mờ ở bottom.
-- [ ] **KHÔNG** hiển thị số tiền tuyệt đối (kể cả P50).
-- [ ] **KHÔNG** auto-prompt share lên FB/Zalo — user tự save.
-- [ ] Render headless, không depend Chrome/Puppeteer.
-- [ ] Feature flag `TWIN_SHARE_IMAGE_ENABLED`, default true.
-
-### Technical Notes
-
-- PIL/Pillow + matplotlib for chart, rasterize to PNG 1080x1080.
-- Font Vietnamese-safe (Inter hoặc Be Vietnam Pro), embed trong repo.
+- [ ] Trong Twin view (Telegram), thêm nút "📸 Lưu thành ảnh"
+- [ ] Bấm → trả về PNG render
+- [ ] Image chứa: % tăng trưởng, time horizon, watermark "Bé Tiền — Personal CFO". **KHÔNG** chứa số tiền tuyệt đối.
+- [ ] Render < 1s (PIL/Pillow, không headless browser)
+- [ ] Background gradient + Bé Tiền mascot góc dưới phải
+- [ ] **Founding badge** "🌱 Founding Member" góc trên trái nếu `users.is_founding_member = TRUE`
+- [ ] User save về máy hoặc share — Bé Tiền KHÔNG chủ động prompt share FB/Zalo
+- [ ] Feature flag `TWIN_SHARE_ENABLED` (default ON, rollback nếu cần)
 
 ### Dependencies
 
-- None (Twin view đã có từ 4A).
+- Depends on: existing Twin view from Phase 4A
 
 ---
 
-## [Story] P4.1-B2: Predictions vs actual calibration
+## STORY #B.2: Predictions vs actual
 
-**Labels:** `phase-4.1`, `story`, `twin`, `trust`
-**Parent:** Epic B
-**Estimate:** 2.5 ngày
+**Type:** Story
+**Parent:** EPIC #2
+**Labels:** `phase-4.1`, `epic-b`, `story`, `area-twin`, `priority-p1`
+**Estimate:** 2 ngày
 
 ### Description
 
-Mỗi Twin view log snapshot, worker check sau 7d/30d/90d so với actual net worth. Hiện hit-rate trong Twin view khi đủ data.
+Log Twin snapshot mỗi lần user mở, fill actual sau 7/30/90 ngày, hiển thị hit-rate honest framing.
+
+### Layer
+
+- `services/twin/twin_calibration_service.py` (new)
+- `workers/twin_calibration_worker.py` (new)
+- `scripts/twin_calibration_backfill.py` (new)
 
 ### Acceptance Criteria
 
-- [ ] Migration `4.1.03_twin_calibration_log.py` applied.
-- [ ] Mỗi lần Twin compute, service log snapshot vào `twin_calibration_snapshots` với horizon 7/30/90 ngày.
-- [ ] `twin_calibration_worker` daily: với mỗi snapshot due, fill `actual_vnd` từ current net worth, compute `within_band` (P10 ≤ actual ≤ P90).
-- [ ] Twin view thêm section "🎯 Bé Tiền đoán đúng bao nhiêu?" — chỉ hiển thị khi user có ≥ 3 snapshot completed.
-- [ ] Framing honest: "Bé Tiền đoán đúng 7/9 lần (78%)". Nếu hit-rate < 50% → hiện disclaimer "dự phóng chưa chuẩn, Bé Tiền đang học thêm".
-- [ ] Backfill script `twin_calibration_backfill.py` replay Twin runs từ 30 ngày trước để bootstrap data.
-
-### Technical Notes
-
-- Within-band định nghĩa scope rộng: P10 ≤ actual ≤ P90 (80% confidence interval).
-- Snapshot lưu cả 3 horizon, worker query bằng `WHERE predicted_at + horizon_days <= NOW()`.
+- [ ] Mỗi lần user mở Twin → log snapshot vào `twin_calibration_snapshots` với 3 horizon: 7d, 30d, 90d
+- [ ] Worker daily: query snapshot due (predicted_at + horizon_days < NOW), fill `actual_vnd` từ current net worth, compute `within_band` (P10 ≤ actual ≤ P90)
+- [ ] Trong Twin view, thêm section "🎯 Bé Tiền đoán đúng bao nhiêu?":
+  - [ ] Chỉ hiện khi user có ≥ 3 snapshot completed
+  - [ ] Honest framing: *"Bé Tiền đoán đúng 7/9 lần (78%)"* — KHÔNG inflate
+  - [ ] Nếu hit-rate < 50%: hiển thị *"Dự phóng chưa chuẩn, Bé Tiền đang học thêm"*
+- [ ] Backfill script `twin_calibration_backfill.py` cho dogfood data từ Phase 4A
+- [ ] Feature flag `TWIN_CALIBRATION_DISPLAY_ENABLED` (mặc định ON, rollback ẩn section nhưng vẫn log snapshot)
 
 ### Dependencies
 
-- None.
+- Depends on: Migration `4.1.03`
 
 ---
 
-# Epic C: Soft Launch Playbook
+## EPIC #3: Soft Launch Playbook & Founding Cohort
 
-**Labels:** `phase-4.1`, `epic`, `launch`, `documentation`
-**Estimate:** ~3-5 ngày (3 stories)
-**Goal:** Operator có công cụ + tiêu chí rõ ràng để chạy 50-user soft launch.
-**Stories:** C.1, C.2, C.3
+**Type:** Epic
+**Labels:** `phase-4.1`, `epic-c`, `epic`, `priority-p0`
+**Estimate:** ~5 ngày (4 stories)
+
+### Description
+
+Operator có công cụ + tiêu chí rõ ràng để chạy 50-user soft launch trên Telegram. Founding member scaffolding cho promise 50% lifetime discount.
+
+### Child Stories
+
+- #C.1 Acquisition source + invite tracking + source-aware copy
+- #C.2 Success metrics rubric (doc only)
+- #C.3 Kill criteria (doc only)
+- #C.4 Founding member experience
 
 ---
 
-## [Story] P4.1-C1: Acquisition source + invite tracking
+## STORY #C.1: Acquisition source + invite tracking + source-aware copy
 
-**Labels:** `phase-4.1`, `story`, `launch`, `analytics`
-**Parent:** Epic C
+**Type:** Story
+**Parent:** EPIC #3
+**Labels:** `phase-4.1`, `epic-c`, `story`, `area-acquisition`, `priority-p0`
 **Estimate:** 1 ngày
 
 ### Description
 
-Generate 50 unique invite link với metadata source, track user acquisition để biết kênh nào hiệu quả.
+Generate 50 invite link, track source, source-aware welcome copy.
+
+### Layer
+
+- `scripts/soft_launch_acquisition.py` (new)
+- `bot/handlers/start_handler.py` (extend)
+- `content/onboarding/welcome_v2.yaml` (source variant)
 
 ### Acceptance Criteria
 
-- [ ] Table `invite_codes (token PK, source, batch_name, used_by_user_id, created_at, used_at)`.
-- [ ] Script `soft_launch_acquisition.py generate --source <name> --count <n>` tạo invite codes, in ra CSV.
-- [ ] `start_handler` parse `?start=invite_<token>`, lookup, fill `users.acquisition_source` + mark token used.
-- [ ] Operator command `/cohort_stats` hiển thị breakdown user theo source + signup count.
-- [ ] Source ban đầu: `friends`, `personal_fb`, `vn_finance_community`, `direct_msg`.
-
-### Technical Notes
-
-- Token = 8 char URL-safe random.
-- 1 token = 1 user; nếu user dùng token đã used → ignore, dùng default `acquisition_source = 'organic'`.
+- [ ] Script generate **exactly 50** invite link `t.me/BeTienBot?start=invite_<token>` với:
+  - [ ] Metadata: `source`, `batch_name`, `grants_founding_status=TRUE`
+  - [ ] Lưu vào `invite_codes` table
+- [ ] Khi user redeem invite:
+  - [ ] Log `source` vào `users.acquisition_source`
+  - [ ] Nếu `grants_founding_status=TRUE` → mark user là founding (#C.4 logic)
+- [ ] **`/cohort_stats`** operator command: breakdown user theo source
+- [ ] 5 source values: `friends`, `personal_fb`, `vn_finance_community`, `direct_msg`, `tg_finance_groups`
+- [ ] **Source-aware copy** trong `welcome_v2.yaml`:
+  - [ ] `friends` / `personal_fb` → warm tone với placeholder `{referrer_name}`
+  - [ ] `vn_finance_community` / `tg_finance_groups` → professional tone
+  - [ ] `direct_msg` → personal tone
+- [ ] CSV output: 50 dòng với `invite_url`, `source`, `batch_name`
 
 ### Dependencies
 
-- None.
+- Depends on: Migration `4.1.04`
 
 ---
 
-## [Story] P4.1-C2: Success metrics rubric
+## STORY #C.2: Success metrics rubric (doc only)
 
-**Labels:** `phase-4.1`, `story`, `documentation`, `launch`
-**Parent:** Epic C
+**Type:** Story
+**Parent:** EPIC #3
+**Labels:** `phase-4.1`, `epic-c`, `story`, `area-metrics`, `docs-only`, `priority-p0`
 **Estimate:** 0.5 ngày
 
 ### Description
 
-Document 6 success metric với target + SQL query để compute.
+Document 8 metric với target + measurement method + SQL query.
+
+### Output
+
+`docs/current/phase-4.1/success-metrics.md`
 
 ### Acceptance Criteria
 
-- [ ] File `docs/current/phase-4.1/success-metrics.md` committed.
-- [ ] 6 metric documented:
-  - D1 retention ≥ 70%
-  - D7 retention ≥ 40%
-  - % user mở Twin trong session đầu ≥ 70%
-  - % user log ≥ 1 asset thật trong 7 ngày đầu ≥ 60%
-  - Intent classification accuracy ≥ 85%
-  - Feedback SLA (response < 24h) ≥ 95%
-- [ ] Mỗi metric có: định nghĩa rõ ràng, target, SQL query để compute từ existing tables, cron tích hợp (hoặc on-demand).
+- [ ] Document 8 metric:
+  - [ ] **D1 retention ≥ 70%** — % founding member quay lại ngày 2
+  - [ ] **D7 retention ≥ 40%** — % founding member active tuần 2
+  - [ ] **% user mở Twin trong session đầu ≥ 70%** — `onboarding_sessions.first_twin_shown_at IS NOT NULL`
+  - [ ] **% user log ≥ 1 asset thật trong 7 ngày đầu ≥ 60%** — `assets` table, exclude placeholder
+  - [ ] **Intent classification accuracy ≥ 85%** — `intent_logs` (% confirmed vs clarified vs misexecuted)
+  - [ ] **Feedback SLA < 24h ≥ 95%** — `feedbacks.first_responded_at - created_at`
+  - [ ] **In-onboarding emoji signal**: % 😍 ≥ 50%
+  - [ ] **Twin satisfaction sau D7**: qualitative interview với 10 founding member ngẫu nhiên
+- [ ] Mỗi metric có SQL query để compute từ existing tables
+- [ ] Mỗi metric có cron schedule để monitor
 
 ### Dependencies
 
-- P4.1-A6 (KPI digest có thể reuse query).
+- Depends on: schema từ A.1–A.8
 
 ---
 
-## [Story] P4.1-C3: Kill criteria documentation
+## STORY #C.3: Kill criteria (doc only)
 
-**Labels:** `phase-4.1`, `story`, `documentation`, `launch`
-**Parent:** Epic C
+**Type:** Story
+**Parent:** EPIC #3
+**Labels:** `phase-4.1`, `epic-c`, `story`, `area-metrics`, `docs-only`, `priority-p0`
 **Estimate:** 0.5 ngày
 
 ### Description
 
-Document tiêu chí dừng/pivot rõ ràng cho 4-week post-launch checkpoint.
+Document tiêu chí dừng/pivot.
+
+### Output
+
+`docs/current/phase-4.1/kill-criteria.md`
 
 ### Acceptance Criteria
 
-- [ ] File `docs/current/phase-4.1/kill-criteria.md` committed.
-- [ ] Mỗi tiêu chí có: threshold rõ ràng, owner, action plan, measurement method:
-  - 4-week retention < 20% → pivot positioning hoặc kill product.
-  - Cost per active user > 50k VND/tháng sau 1 tháng → re-evaluate LLM budget.
-  - Critical bug rate (Sentry P1) > 1/day với cohort 50 user → freeze feature, fix sprint.
-  - Bé Tiền persona violation reported > 5 lần/tuần → prompt audit toàn bộ.
-- [ ] Document có timeline: T+7, T+14, T+28 checkpoint.
+- [ ] Document 6 tiêu chí với owner + threshold + action plan:
+  - [ ] **4-week retention < 20%** → pivot positioning hoặc kill product
+  - [ ] **Cost per active user > 50k VND/tháng** sau 1 tháng → re-evaluate LLM budget hoặc model choice
+  - [ ] **Critical bug rate (Sentry P1) > 1/day** với cohort 50 user → freeze feature, fix sprint
+  - [ ] **Bé Tiền persona violation reported > 5 lần/tuần** → prompt audit toàn bộ
+  - [ ] **In-onboarding emoji signal 😕 > 30%** → first-impression broken, redesign A.1+A.2
+  - [ ] **Twin within-band hit rate < 40%** sau 90 ngày → calibration model rework
 
 ### Dependencies
 
-- P4.1-C2 (metric definition).
+- None
 
 ---
 
-## Summary Table
+## STORY #C.4: Founding member experience
 
-| Story ID | Title | Epic | Estimate | Critical Path |
-|---|---|---|---|---|
-| P4.1-A1 | Onboarding redesign — 3-step guided flow | A | 2d | ✅ |
-| P4.1-A2 | First-Twin shortcut | A | 1.5d | ✅ |
-| P4.1-A3 | Cost guardrail middleware | A | 2d | ✅ |
-| P4.1-A4 | Daily cost report | A | 0.5d | — |
-| P4.1-A5 | Sentry + LLM metrics dashboard | A | 1d | ✅ |
-| P4.1-A6 | Daily KPI digest cron | A | 1d | ✅ |
-| P4.1-A7 | Feedback triage UI | A | 1.5d | — |
-| P4.1-B1 | Shareable Twin image | B | 2d | — |
-| P4.1-B2 | Predictions vs actual calibration | B | 2.5d | — |
-| P4.1-C1 | Acquisition source + invite tracking | C | 1d | — |
-| P4.1-C2 | Success metrics rubric | C | 0.5d | ✅ |
-| P4.1-C3 | Kill criteria documentation | C | 0.5d | — |
+**Type:** Story
+**Parent:** EPIC #3
+**Labels:** `phase-4.1`, `epic-c`, `story`, `area-acquisition`, `area-monetization`, `priority-p0`
+**Estimate:** 1 ngày
 
-**Total estimate:** ~16 ngày làm việc (3 tuần với buffer).
+### Description
+
+DB scaffolding + welcome copy + operator view cho 50 founding member với 50% lifetime discount promise.
+
+### Layer
+
+- `services/founding/founding_member_service.py` (new)
+- `bot/handlers/founding_handler.py` (new)
+- `bot/handlers/start_handler.py` (extend)
+- `content/onboarding/founding_welcome.yaml` (new)
+- `docs/current/founding-promise.md` (new — promise document)
+
+### Acceptance Criteria
+
+- [ ] **Sequence assignment atomic**: dùng `SELECT ... FOR UPDATE` hoặc advisory lock — race-safe khi 2 user redeem cùng giây
+- [ ] **Founding welcome banner** (trong `founding_welcome.yaml`):
+  > *"🌱 Bạn là Founding Member #[N] của Bé Tiền — 1 trong 50 người đầu tiên.*
+  > *Trong giai đoạn này toàn bộ tính năng miễn phí.*
+  > *Khi Bé Tiền Pro ra mắt chính thức (dự kiến cuối 2026), bạn được giảm 50% trọn đời — 44.000đ/tháng thay vì 88.000đ — để cảm ơn sự đồng hành."*
+- [ ] **`/whoami`** command: trả về user info (wealth_segment, onboarding date, founding sequence nếu có, days active)
+- [ ] **`/founding_status`** operator command: liệt kê 50 founding member với sequence, ngày onboard, days active, last seen
+- [ ] **`compute_discount(user_id)`** service method ready cho Phase 5.7 (return 0.5 nếu founding, 0 nếu không)
+- [ ] **Founding badge** xuất hiện trong:
+  - [ ] Welcome message (1 lần khi onboard)
+  - [ ] `/whoami` output
+  - [ ] Shareable Twin image (#B.1)
+  - [ ] Operator feedback inbox (#A.7)
+- [ ] **`docs/current/founding-promise.md`** document:
+  - [ ] Promise statement
+  - [ ] Expiry: none (lifetime)
+  - [ ] Exception cases (vd: nếu user delete account và tạo lại)
+  - [ ] Owner: Founder/PM
+  - [ ] Reference link từ Phase 5.7 detailed (TBD khi viết 5.7)
+
+### Dependencies
+
+- Depends on: Migration `4.1.04` (is_founding_member, founding_member_sequence, grants_founding_status)
+
+---
+
+## INFRA / MIGRATION TASKS
+
+### TASK #M.1: Migration `4.1.01_user_cost_budgets`
+
+**Type:** Task
+**Labels:** `phase-4.1`, `infra`, `migration`, `priority-p0`
+**Estimate:** 0.25 ngày
+
+- [ ] Create table `user_cost_budgets` với `CHECK CONSTRAINT chk_tier_v1` (tier IN 'free', 'pro')
+- [ ] Create table `llm_cost_log` với indexes
+- [ ] Apply dev + staging
+- [ ] Verify rollback script
+
+### TASK #M.2: Migration `4.1.02_feedback_sla_index`
+
+**Type:** Task
+**Labels:** `phase-4.1`, `infra`, `migration`, `priority-p0`
+**Estimate:** 0.1 ngày
+
+- [ ] Create partial index `idx_feedback_unanswered_age`
+- [ ] Add columns `first_responded_at`, `sla_breach_alerted_at`, `onboarding_emoji_signal`
+- [ ] Apply dev + staging
+
+### TASK #M.3: Migration `4.1.03_twin_calibration_log`
+
+**Type:** Task
+**Labels:** `phase-4.1`, `infra`, `migration`, `priority-p1`
+**Estimate:** 0.1 ngày
+
+- [ ] Create table `twin_calibration_snapshots`
+- [ ] Create index `idx_twin_calibration_due` (partial)
+- [ ] Apply dev + staging
+
+### TASK #M.4: Migration `4.1.04_founding_member_flag`
+
+**Type:** Task
+**Labels:** `phase-4.1`, `infra`, `migration`, `priority-p0`
+**Estimate:** 0.25 ngày
+
+- [ ] Alter `users` table: add `is_founding_member`, `founding_member_sequence`, `founding_member_at`
+- [ ] Alter `invite_codes`: add `grants_founding_status`
+- [ ] Create index `idx_users_founding` (partial)
+- [ ] Create table `onboarding_sessions` với index `idx_onboarding_stuck`
+- [ ] Apply dev + staging
+
+---
+
+## DEPLOY READINESS TASKS
+
+### TASK #D.1: Verify `ZALO_CHANNEL_ENABLED=false`
+
+**Type:** Task
+**Labels:** `phase-4.1`, `deploy`, `priority-p0`
+**Estimate:** 0.1 ngày
+
+- [ ] Grep codebase: tất cả Zalo router init phải gate qua flag
+- [ ] Deploy config (env var) check 2 lần trước launch
+- [ ] Document trong `docs/current/phase-4.1/deploy-checklist.md`
+
+### TASK #D.2: Operator briefing & dogfood
+
+**Type:** Task
+**Labels:** `phase-4.1`, `deploy`, `priority-p0`
+**Estimate:** 0.5 ngày
+
+- [ ] Operator (= founder) tự onboard từ 3 invite test code với 3 source khác nhau
+- [ ] Verify E2E flow đầy đủ: onboarding → Twin → feedback → next morning briefing
+- [ ] Verify KPI digest đến hộp tin sáng hôm sau
+- [ ] Verify feedback SLA alert hoạt động (tạo feedback test, đợi 24h, hoặc set fake `created_at`)
+
+### TASK #D.3: 50 invite link distribution package
+
+**Type:** Task
+**Labels:** `phase-4.1`, `deploy`, `priority-p0`
+**Estimate:** 0.5 ngày
+
+- [ ] Generate 50 invite via `scripts/soft_launch_acquisition.py`
+- [ ] Verify mỗi link unique, `grants_founding_status=TRUE`
+- [ ] Export CSV với assignment plan (link nào gửi cho ai)
+- [ ] Operator review distribution list trước khi gửi
+
+---
+
+## SUMMARY
+
+| Type | Count | Total Estimate |
+|---|---|---|
+| Epics | 3 | — |
+| Stories | 13 | ~13 ngày |
+| Migration tasks | 4 | ~0.7 ngày |
+| Deploy tasks | 3 | ~1.1 ngày |
+| **Total** | **23 issues** | **~15 ngày work (3 tuần với buffer)** |
+
+### Critical path
+
+`#M.1 → #A.3 → #A.5 → #A.6 → ready for ops`
+`#M.4 → #A.1 → #A.2 → #A.8 → ready for users`
+`#M.4 → #C.1 → #C.4 → ready for launch`
+`#C.2 + #C.3 → ready for measurement`
+
+All must converge before 50-user soft launch start.
