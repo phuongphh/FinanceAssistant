@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #478 | [Epic] Phase 4.1 — Epic A: Pre-Launch Hardening | [issue-478.md](issue-478.md) |
 | #479 | [Epic] Phase 4.1 — Epic B: Twin Polish Thuc Chien | [issue-479.md](issue-479.md) |
+| #480 | [Epic] Phase 4.1 — Epic C: Soft Launch Playbook | [issue-480.md](issue-480.md) |
 
-**Total active:** 31
+**Total active:** 32
