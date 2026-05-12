@@ -14,6 +14,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
+from backend.bot.formatters.movers import format_movers_line
 from backend.market_data.analytics.news_relevance import get_relevant_news
 from backend.market_data.analytics.portfolio_metrics import (
     compute_diversification_score,
@@ -305,6 +306,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     # concurrent DB use), while external provider/RSS calls run in parallel.
     breakdown = await net_worth_calculator.calculate(db, user.id)
     change = await net_worth_calculator.calculate_change(db, user.id, net_worth_calculator.PERIOD_DAY)
+    movers = await net_worth_calculator.get_daily_movers(db, user.id)
     vnindex = await _latest_market_snapshot(db, "VNINDEX")
     assets = await _portfolio_assets(db, user.id)
     vcb_rate = await _latest_vcb_rate(db)
@@ -346,6 +348,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         "portfolio": template["sections"]["portfolio"].format(
             allocation_lines=_allocation_lines(breakdown),
             today_change=f"{format_money_short(change.change_absolute)} ({_signed_pct(change.change_percentage)}%)",
+            movers_line=format_movers_line(movers) or "—",
         ),
         "news": template["sections"]["news"].format(news_lines=_news_lines(news)),
         "insights": template["sections"]["insights"].format(insight_lines="\n".join(f"• {line}" for line in insight_lines[:4])),

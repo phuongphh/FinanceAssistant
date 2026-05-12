@@ -285,3 +285,99 @@ async def calculate_change(
     return await calculate_change_from_current(
         db, user_id, current_breakdown.total, period=period
     )
+
+
+@dataclass
+class AssetMover:
+    """One asset's day-over-day movement.
+
+    ``previous_value`` is yesterday's ``asset_snapshots.value``; for
+    new assets without yesterday data we omit the row rather than
+    misrepresent a 100% gain.
+    """
+    asset_id: uuid.UUID
+    name: str
+    asset_type: str
+    current_value: Decimal
+    previous_value: Decimal
+    change_absolute: Decimal
+    change_percentage: float
+
+
+async def get_daily_movers(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    today: date | None = None,
+    min_abs_pct: float = 0.1,
+) -> list[AssetMover]:
+    """Return active assets whose value moved since yesterday.
+
+    Each row joins the asset to its latest ``asset_snapshots`` value on
+    or before ``today - 1``. Assets with no prior snapshot (just
+    added) or whose absolute % change is below ``min_abs_pct`` are
+    filtered out — neither is interesting on a "what moved today"
+    list, and the new-asset case would otherwise read as "+100% so
+    với hôm qua" which is misleading.
+
+    Sorted by absolute % movement descending so the biggest swing
+    leads, regardless of direction.
+    """
+    today = today or date.today()
+    yesterday = today - timedelta(days=1)
+
+    stmt = text(
+        """
+        SELECT
+            a.id          AS asset_id,
+            a.name        AS name,
+            a.asset_type  AS asset_type,
+            a.current_value AS current_value,
+            (
+                SELECT s.value
+                FROM asset_snapshots s
+                WHERE s.asset_id = a.id
+                  AND s.snapshot_date <= :yesterday
+                ORDER BY s.snapshot_date DESC
+                LIMIT 1
+            ) AS previous_value
+        FROM assets a
+        WHERE a.user_id = :user_id
+          AND a.is_active = TRUE
+        """
+    ).bindparams(
+        bindparam("user_id"),
+        bindparam("yesterday"),
+    )
+    rows = (
+        await db.execute(stmt, {"user_id": user_id, "yesterday": yesterday})
+    ).mappings().all()
+
+    movers: list[AssetMover] = []
+    for row in rows:
+        prev = row["previous_value"]
+        curr = row["current_value"]
+        if prev is None or curr is None:
+            continue
+        prev_d = Decimal(prev)
+        curr_d = Decimal(curr)
+        if prev_d <= 0:
+            continue
+        change_abs = curr_d - prev_d
+        change_pct = float(change_abs / prev_d * Decimal(100))
+        if abs(change_pct) < min_abs_pct:
+            continue
+        movers.append(
+            AssetMover(
+                asset_id=row["asset_id"],
+                name=row["name"] or "",
+                asset_type=row["asset_type"],
+                current_value=curr_d,
+                previous_value=prev_d,
+                change_absolute=change_abs,
+                change_percentage=change_pct,
+            )
+        )
+
+    movers.sort(key=lambda m: abs(m.change_percentage), reverse=True)
+    return movers

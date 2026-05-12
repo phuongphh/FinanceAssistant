@@ -697,8 +697,10 @@ async def _action_assets_net_worth(
     language. If the stored-current calculation takes at least 700ms, the
     user gets an explicit waiting sentence before the final total.
     """
+    from backend.bot.formatters.movers import format_movers_block
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
+    from backend.wealth.services import net_worth_calculator
 
     breakdown = await _calculate_stored_current_with_wait(
         db=db, user_id=user.id, chat_id=chat_id
@@ -717,12 +719,26 @@ async def _action_assets_net_worth(
 
     level = detect_level(breakdown.total)
     style = style_for_level(level, breakdown.total)
+
+    # Day-over-day total + per-asset movers — reuses asset_snapshots
+    # written by the 02:00 EOD revaluation job. ``calculate_change_from_current``
+    # is cheap (one indexed query) and ``get_daily_movers`` is one more.
+    change_day = await net_worth_calculator.calculate_change_from_current(
+        db, user.id, breakdown.total, period=net_worth_calculator.PERIOD_DAY
+    )
+    movers = await net_worth_calculator.get_daily_movers(db, user.id)
+
     lines = [
         f"💰 Tổng tài sản của {name}:",
         f"*{format_money_full(breakdown.total)}*",
-        "",
-        get_action_copy("action_assets_net_worth", "market_value_note"),
     ]
+    movers_block = format_movers_block(
+        total_pct=change_day.change_percentage if change_day.previous > 0 else None,
+        movers=movers,
+    )
+    if movers_block:
+        lines.extend(["", movers_block])
+    lines.extend(["", get_action_copy("action_assets_net_worth", "market_value_note")])
     if breakdown.asset_count and not style.is_starter:
         lines.append("")
         lines.append(f"_Theo dõi qua {breakdown.asset_count} tài sản_")
@@ -1049,13 +1065,74 @@ def _market_back_keyboard() -> dict:
     return {"inline_keyboard": [[{"text": "◀️ Quay về", "callback_data": "menu:market"}]]}
 
 
+VNINDEX_SCREEN_CACHE_KEY = "menu:vnindex:v1"
+VNINDEX_SCREEN_CACHE_TTL_MARKET_OPEN = 60  # 1 min during trading hours
+VNINDEX_SCREEN_CACHE_TTL_CLOSED = 300  # 5 min outside trading hours
+
+
+def _is_vn_market_open(now=None) -> bool:
+    """Return True during HOSE trading hours (Mon-Fri 09:00-15:00 ICT).
+
+    A coarse window — we use it only to pick a cache TTL, not for order
+    routing — so we don't bother with the lunch break (11:30-13:00) or
+    ATC nuances. Off-by-15-minutes here just trades cache freshness for
+    a slightly stricter ``if`` and is not worth the complexity.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    if now is None:
+        now = datetime.now(timezone(timedelta(hours=7)))
+    if now.weekday() >= 5:  # Saturday/Sunday
+        return False
+    return 9 <= now.hour < 15
+
+
 async def _action_market_vnindex(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """VNIndex market screen with compact VN30 leaders and clean footer."""
+    """VNIndex market screen with compact VN30 leaders and clean footer.
+
+    Data sources (consulted in parallel, snapshot is the primary):
+      1. ``market_snapshots`` table — populated daily by ``market_service``
+         using vnstock (VCI source). Same path used by the morning
+         briefing and ``get_market_data`` agent tool, so the three
+         surfaces always agree.
+      2. Live SSI/VNDIRECT dispatcher — only consulted for VN30 symbols
+         missing from snapshot (e.g., the cron just rebooted or a new
+         listing was added). The dispatcher has its own Redis cache.
+
+    Caching: the fully rendered Markdown payload is cached under
+    ``menu:vnindex:v1`` because the data is market-wide (no PII) and a
+    burst of users tapping the menu in the same minute should not all
+    fan out to Postgres + live providers. TTL is 60s during market
+    hours and 300s otherwise — short enough that the freshness label
+    ("Cập nhật: HH:MM") never lies by more than the TTL.
+    """
     from decimal import Decimal
 
-    from backend.market_data.client import get_stock_quote, get_stock_quotes
+    from sqlalchemy import desc, select
+
+    from backend.market_data.client import (
+        get_redis_client,
+        get_stock_quote,
+        get_stock_quotes,
+    )
+    from backend.models.market_snapshot import MarketSnapshot
+
+    redis = get_redis_client()
+    try:
+        cached = await redis.get(VNINDEX_SCREEN_CACHE_KEY)
+    except Exception:
+        cached = None
+    if cached:
+        text = cached.decode("utf-8") if isinstance(cached, (bytes, bytearray)) else cached
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_markup=_market_back_keyboard(),
+        )
+        return
 
     def dec(value) -> Decimal:
         try:
@@ -1070,7 +1147,28 @@ async def _action_market_vnindex(
             return f"{value / Decimal('1000000'):.0f} tr"
         return f"{value:,.0f}đ"
 
-    def row(q) -> dict:
+    async def latest_vnindex_snapshot() -> MarketSnapshot | None:
+        stmt = (
+            select(MarketSnapshot)
+            .where(MarketSnapshot.asset_code == "VNINDEX")
+            .order_by(desc(MarketSnapshot.snapshot_date))
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
+    async def latest_vn30_snapshots() -> dict[str, MarketSnapshot]:
+        stmt = (
+            select(MarketSnapshot)
+            .where(MarketSnapshot.asset_code.in_(VN30_SYMBOLS))
+            .order_by(MarketSnapshot.asset_code, desc(MarketSnapshot.snapshot_date))
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        out: dict[str, MarketSnapshot] = {}
+        for s in rows:
+            out.setdefault(s.asset_code, s)
+        return out
+
+    def row_from_quote(q) -> dict:
         pct = dec(q.metadata.get("change_pct"))
         trading_value = dec(q.metadata.get("trading_value"))
         if trading_value <= 0:
@@ -1084,32 +1182,72 @@ async def _action_market_vnindex(
             "stale": q.is_stale,
         }
 
-    try:
-        index_quote = await get_stock_quote("VNINDEX")
-    except Exception:
-        logger.warning("Unable to fetch VNINDEX overview", exc_info=True)
-        index_quote = None
+    def row_from_snapshot(s: MarketSnapshot) -> dict:
+        extra = s.extra_data or {}
+        price = dec(s.price)
+        volume = dec(extra.get("volume"))
+        trading_value = dec(extra.get("trading_value"))
+        if trading_value <= 0:
+            trading_value = price * volume
+        return {
+            "symbol": s.asset_code,
+            "price": price,
+            "change": dec(extra.get("change")),
+            "pct": dec(s.change_1d_pct),
+            "trading_value": trading_value,
+            "stale": False,
+        }
 
-    try:
-        quote_map = await get_stock_quotes(VN30_SYMBOLS)
-    except Exception:
-        logger.warning("Unable to fetch VN30 board", exc_info=True)
-        quote_map = {}
+    # Both snapshot reads are independent — fan them out so the DB does
+    # the two queries concurrently and the user waits for the slower one
+    # only, not their sum.
+    snap, snap_by_code = await asyncio.gather(
+        latest_vnindex_snapshot(),
+        latest_vn30_snapshots(),
+    )
 
-    rows = [row(q) for q in quote_map.values()]
+    index_data: dict | None = None
+    if snap is not None and snap.price:
+        index_data = {
+            "price": dec(snap.price),
+            "change": dec((snap.extra_data or {}).get("change")),
+            "pct": dec(snap.change_1d_pct),
+            "updated": snap.snapshot_date.strftime("%d/%m"),
+            "stale_note": " · dữ liệu cuối phiên",
+        }
+    if index_data is None:
+        try:
+            iq = await get_stock_quote("VNINDEX")
+            index_data = {
+                "price": iq.price,
+                "change": dec(iq.metadata.get("change")),
+                "pct": dec(iq.metadata.get("change_pct")),
+                "updated": iq.fetched_at.astimezone().strftime("%H:%M %d/%m"),
+                "stale_note": " · dữ liệu cũ/ngoài giờ" if iq.is_stale else "",
+            }
+        except Exception:
+            logger.warning("Unable to fetch VNINDEX overview", exc_info=True)
+
+    rows: list[dict] = [row_from_snapshot(s) for s in snap_by_code.values() if s.price]
+    missing = [sym for sym in VN30_SYMBOLS if sym not in snap_by_code]
+    if missing:
+        try:
+            quote_map = await get_stock_quotes(missing)
+            rows.extend(row_from_quote(q) for q in quote_map.values())
+        except Exception:
+            logger.warning("Unable to fetch VN30 board live", exc_info=True)
+
     lines = ["📊 *VNIndex*", ""]
-    if index_quote is None:
+    if index_data is None:
         lines.append("Không tải được điểm VNIndex lúc này. Bạn thử lại sau nhé.")
     else:
-        pct = dec(index_quote.metadata.get("change_pct"))
-        change = dec(index_quote.metadata.get("change"))
+        pct = index_data["pct"]
+        change = index_data["change"]
         sign = "+" if pct >= 0 else ""
-        updated = index_quote.fetched_at.astimezone().strftime("%H:%M %d/%m")
-        stale = " · dữ liệu cũ/ngoài giờ" if index_quote.is_stale else ""
         lines.extend([
-            f"Điểm: *{index_quote.price:,.2f}*",
-            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){stale}",
-            f"Cập nhật: {updated}",
+            f"Điểm: *{index_data['price']:,.2f}*",
+            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){index_data['stale_note']}",
+            f"Cập nhật: {index_data['updated']}",
         ])
     lines.append("")
     if not rows:
@@ -1131,9 +1269,20 @@ async def _action_market_vnindex(
             sign = "+" if item["pct"] >= 0 else ""
             lines.append(f"• {item['symbol']}: {sign}{item['pct']:.2f}%")
 
+    text = "\n".join(lines)
+    ttl = (
+        VNINDEX_SCREEN_CACHE_TTL_MARKET_OPEN
+        if _is_vn_market_open()
+        else VNINDEX_SCREEN_CACHE_TTL_CLOSED
+    )
+    try:
+        await redis.setex(VNINDEX_SCREEN_CACHE_KEY, ttl, text)
+    except Exception:
+        logger.debug("Skipping VNIndex screen cache write", exc_info=True)
+
     await send_message(
         chat_id=chat_id,
-        text="\n".join(lines),
+        text=text,
         parse_mode="Markdown",
         reply_markup=_market_back_keyboard(),
     )

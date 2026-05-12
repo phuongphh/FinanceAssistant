@@ -42,10 +42,24 @@
     gap: 6px;
     font-size: 14px;
     opacity: 0.95;
+    font-weight: 600;
+}
+
+.hero-change.up {
+    color: #34D399;  /* emerald-400 — readable on the dark hero bg */
+}
+
+.hero-change.down {
+    color: #FCA5A5;  /* red-300 */
+}
+
+.hero-change.flat {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .hero-change .change-period {
     opacity: 0.8;
+    font-weight: 400;
 }
 
 .hero-meta {

@@ -264,13 +264,24 @@ async def build_overview(
     trend_days: int = 90,
     sort: str | None = None,
 ) -> dict:
-    """One-shot dashboard payload — net worth + change + breakdown + trend + assets."""
-    breakdown_now = await net_worth_calculator.calculate(db, user_id)
-    change_day = await net_worth_calculator.calculate_change(
-        db, user_id, net_worth_calculator.PERIOD_DAY
+    """One-shot dashboard payload — total assets + change + breakdown + trend + assets.
+
+    Uses ``calculate_stored_current`` so the Mini App hero card matches
+    the Telegram ``Tài sản → Tổng tài sản`` screen byte-for-byte. Both
+    surfaces sum each asset's stored ``current_value`` rather than
+    re-pricing stock/crypto holdings via live quotes — the live path
+    drifted whenever SSI/VNDIRECT were unreachable (returning 0 or a
+    stale value) and produced a different number from the Telegram menu.
+    Change-over-period uses ``calculate_change_from_current`` against the
+    same stored total to avoid duplicate live valuation and keep the
+    "+x% so với hôm qua/tháng trước" deltas consistent with the headline.
+    """
+    breakdown_now = await net_worth_calculator.calculate_stored_current(db, user_id)
+    change_day = await net_worth_calculator.calculate_change_from_current(
+        db, user_id, breakdown_now.total, period=net_worth_calculator.PERIOD_DAY
     )
-    change_month = await net_worth_calculator.calculate_change(
-        db, user_id, net_worth_calculator.PERIOD_MONTH
+    change_month = await net_worth_calculator.calculate_change_from_current(
+        db, user_id, breakdown_now.total, period=net_worth_calculator.PERIOD_MONTH
     )
 
     level = detect_level(breakdown_now.total)

@@ -184,14 +184,29 @@
     function renderHero(data) {
         els.netWorth.textContent = formatMoneyFull(data.net_worth || 0);
 
-        const change = data.change_month || { amount: 0, pct: 0 };
-        const positive = change.amount >= 0;
-        els.changeIcon.textContent = positive ? '📈' : '📉';
-        const sign = positive ? '+' : '−';
-        const pct = Math.abs(change.pct || 0).toFixed(1);
-        els.changeAmount.textContent =
-            `${sign}${formatMoneyShort(Math.abs(change.amount || 0))} (${sign}${pct}%)`;
-        els.changePeriod.textContent = 'so với tháng trước';
+        // User asked for "chỉ cần tổng tăng giảm %" vs hôm qua, with
+        // color + icon. We render just the percent (no absolute amount)
+        // and tag the hero-change element with .up / .down / .flat so
+        // CSS can paint it green/red/neutral.
+        const change = data.change_day || { amount: 0, pct: 0 };
+        const pct = Number(change.pct || 0);
+        const tolerance = 0.05;  // < 0.05% reads as "flat" — UI sugar
+        let direction = 'flat';
+        let icon = '➖';
+        let sign = '';
+        if (pct > tolerance) {
+            direction = 'up'; icon = '📈'; sign = '+';
+        } else if (pct < -tolerance) {
+            direction = 'down'; icon = '📉'; sign = '−';
+        }
+        els.changeIcon.textContent = icon;
+        els.changeAmount.textContent = `${sign}${Math.abs(pct).toFixed(1)}%`;
+        els.changePeriod.textContent = 'so với hôm qua';
+        const heroChange = els.changeIcon.parentElement;
+        if (heroChange) {
+            heroChange.classList.remove('up', 'down', 'flat');
+            heroChange.classList.add(direction);
+        }
 
         els.levelPill.textContent = data.level_label || LEVEL_LABELS[data.level] || data.level || '—';
         els.assetCount.textContent = `${data.asset_count || 0} tài sản`;
