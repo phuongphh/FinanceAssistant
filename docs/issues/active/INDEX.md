@@ -37,6 +37,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #547 | [Story] P4.2-3.1: Day 7 Positioning Micro-Survey | [issue-547.md](issue-547.md) |
 | #548 | [Story] P4.2-3.2: Positioning Misalignment Kill Criterion | [issue-548.md](issue-548.md) |
 | #551 | [Task] P4.2-M3: Migration positioning_survey | [issue-551.md](issue-551.md) |
-| #553 | [Task] P4.2-D2: Content Quality Playbook | [issue-553.md](issue-553.md) |
 
-**Total active:** 34
+**Total active:** 33
