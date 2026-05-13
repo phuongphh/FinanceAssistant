@@ -306,9 +306,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #546 | Pre-Phase | [Story] P4.2-2.3: Query-First Soft Prompts | [pre-phase/issue-546.md](by-phase/pre-phase/issue-546.md) |
 | #549 | Pre-Phase | [Task] P4.2-M1: Migration asset_quality_flags | [pre-phase/issue-549.md](by-phase/pre-phase/issue-549.md) |
 | #550 | Pre-Phase | [Task] P4.2-M2: Migration onboarding_trust_state | [pre-phase/issue-550.md](by-phase/pre-phase/issue-550.md) |
+| #551 | Pre-Phase | [Task] P4.2-M3: Migration positioning_survey | [pre-phase/issue-551.md](by-phase/pre-phase/issue-551.md) |
 | #552 | Pre-Phase | [Task] P4.2-D1: Editorial Discipline Doc cho Operator | [pre-phase/issue-552.md](by-phase/pre-phase/issue-552.md) |
 | #553 | Pre-Phase | [Task] P4.2-D2: Content Quality Playbook | [pre-phase/issue-553.md](by-phase/pre-phase/issue-553.md) |
 | #554 | Pre-Phase | [Task] P4.2-D3: Manual Review Briefing #1 (Soft Launch Cohort) | [pre-phase/issue-554.md](by-phase/pre-phase/issue-554.md) |
 
-**Total:** 305 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 288 Pre-Phase)
+**Total:** 306 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 289 Pre-Phase)

@@ -36,6 +36,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 | #547 | [Story] P4.2-3.1: Day 7 Positioning Micro-Survey | [issue-547.md](issue-547.md) |
 | #548 | [Story] P4.2-3.2: Positioning Misalignment Kill Criterion | [issue-548.md](issue-548.md) |
-| #551 | [Task] P4.2-M3: Migration positioning_survey | [issue-551.md](issue-551.md) |
 
-**Total active:** 33
+**Total active:** 32
