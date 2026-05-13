@@ -41,5 +41,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
 | #580 | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [issue-580.md](issue-580.md) |
 | #581 | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [issue-581.md](issue-581.md) |
+| #582 | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [issue-582.md](issue-582.md) |
 
-**Total active:** 37
+**Total active:** 38
