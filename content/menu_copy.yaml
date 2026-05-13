@@ -296,6 +296,7 @@ action_expenses_manage:
     *3️⃣ Gửi ảnh hoá đơn*
     • Chụp/forward ảnh hoá đơn — mình tự đọc số tiền, merchant và phân loại giúp.
   open_miniapp_button: "Mở Dashboard"
+  ocr_button: "📷 Đọc hoá đơn"
   back_button: "◀️ Quay về menu"
 
 # ============================================================

@@ -2,8 +2,9 @@
 // consistency. One bundled `/api/expense-dashboard/overview` round-trip
 // loads hero total, category breakdown (pie + list), 30-day trend, and
 // the month's expense rows. Add/edit/delete happens inline via a modal
-// (no chat round-trip) because expense edits are simple compared to the
-// type-specific asset wizard.
+// (no chat round-trip). After a mutation the UI patches local state +
+// recomputes totals so the user sees the change instantly; a background
+// reload reconciles with the server.
 (function () {
     'use strict';
 
@@ -34,6 +35,7 @@
         pieChart: document.getElementById('pie-chart'),
         trendChart: document.getElementById('trend-chart'),
         trendHeading: document.getElementById('trend-heading'),
+        categoryFilter: document.getElementById('category-filter'),
         expensesList: document.getElementById('expenses-list'),
         addExpenseBtn: document.getElementById('add-expense-btn'),
         addFirstExpenseBtn: document.getElementById('add-first-expense-btn'),
@@ -51,7 +53,8 @@
 
     // Keep in sync with backend/config/categories.py. Inlined to avoid
     // an extra round-trip on first paint — the canonical labels arrive
-    // from the API for each row, so this list only feeds the form select.
+    // from the API for each row, so this list only feeds the form select
+    // and the category filter dropdown.
     const CATEGORIES = [
         ['food', '🍜 Ăn uống'],
         ['transport', '🚗 Di chuyển'],
@@ -72,12 +75,16 @@
     let trendChart = null;
     let lastOverview = null;
     let editingExpenseId = null;
+    let currentTrendDays = 30;
+    let currentSort = window.sessionStorage.getItem('expense.sort') || 'date_desc';
+    let currentCategoryFilter = '';
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
     const SOURCE = new URLSearchParams(window.location.search).get('source');
 
     initModalForm();
-    els.retryBtn.addEventListener('click', renderDashboard);
+    initCategoryFilter();
+    els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
     els.addExpenseBtn.addEventListener('click', () => openModal());
     els.addFirstExpenseBtn.addEventListener('click', () => openModal());
     els.expensesList.addEventListener('click', onExpenseRowClick);
@@ -87,8 +94,19 @@
     els.modal.addEventListener('click', (e) => {
         if (e.target === els.modal) closeModal();
     });
+    els.categoryFilter.addEventListener('change', () => {
+        currentCategoryFilter = els.categoryFilter.value || '';
+        renderExpensesSection();
+    });
+    document.querySelectorAll('.period-btn').forEach((btn) => {
+        btn.addEventListener('click', () => onPeriodChange(btn));
+    });
+    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+        btn.addEventListener('click', () => onSortChange(btn));
+    });
+    updateSortButtons();
 
-    renderDashboard();
+    renderDashboard({ showSpinner: true });
 
     // -- Theme + utils ----------------------------------------------------
 
@@ -165,8 +183,8 @@
 
     // -- Top-level render -------------------------------------------------
 
-    async function renderDashboard() {
-        showState('loading');
+    async function renderDashboard({ showSpinner = false } = {}) {
+        if (showSpinner) showState('loading');
         try {
             const params = new URLSearchParams();
             if (SOURCE) params.set('source', SOURCE);
@@ -174,24 +192,35 @@
             const data = await fetchAPI('/expense-dashboard/overview' + qs);
             lastOverview = data;
 
-            renderHero(data);
-            const isEmpty = (data.transaction_count || 0) === 0;
-            toggleSections(isEmpty);
-
-            if (!isEmpty) {
-                renderPie(data.breakdown || []);
-                renderBreakdownList(data.breakdown || []);
-                renderTrend(data.daily_trend || []);
-                renderExpenses(data.expenses || []);
-            }
-
+            renderAll();
             showState('content');
             reportLoaded();
         } catch (err) {
             console.error(err);
+            // If we already have a snapshot, keep it on screen and just
+            // alert silently — refreshes from optimistic mutations
+            // shouldn't blow away the user's view on a transient blip.
+            if (lastOverview) {
+                if (tg && tg.showAlert) tg.showAlert('Đồng bộ thất bại, mình sẽ thử lại sau.');
+                return;
+            }
             els.errorMessage.textContent = buildErrorMessage(err);
             showState('error');
             if (tg && tg.showAlert) tg.showAlert('Không tải được dữ liệu, thử lại nhé.');
+        }
+    }
+
+    function renderAll() {
+        if (!lastOverview) return;
+        renderHero(lastOverview);
+        const isEmpty = (lastOverview.transaction_count || 0) === 0;
+        toggleSections(isEmpty);
+        if (!isEmpty) {
+            renderPie(lastOverview.breakdown || []);
+            renderBreakdownList(lastOverview.breakdown || []);
+            renderTrend(lastOverview.daily_trend || []);
+            populateCategoryFilter(lastOverview.breakdown || []);
+            renderExpensesSection();
         }
     }
 
@@ -334,11 +363,92 @@
         });
     }
 
-    // -- Expenses list ----------------------------------------------------
+    async function onPeriodChange(btn) {
+        document.querySelectorAll('.period-btn').forEach((b) => {
+            b.classList.remove('active');
+            b.removeAttribute('aria-selected');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        currentTrendDays = parseInt(btn.dataset.days, 10);
+        const labelMap = { 30: '30 ngày', 90: '90 ngày', 365: '1 năm' };
+        els.trendHeading.textContent = `Xu hướng ${labelMap[currentTrendDays] || ''}`.trim();
+
+        try {
+            const trend = await fetchAPI(`/expense-dashboard/trend?days=${currentTrendDays}`);
+            renderTrend(trend);
+        } catch (err) {
+            console.error(err);
+            if (tg && tg.showAlert) tg.showAlert('Không tải được dữ liệu xu hướng.');
+        }
+    }
+
+    // -- Expenses list (sort + filter) -----------------------------------
+
+    function populateCategoryFilter(breakdown) {
+        const previous = currentCategoryFilter;
+        // Keep "Tất cả" + one option per category present in the current month.
+        const opts = ['<option value="">Tất cả</option>'].concat(
+            breakdown.map(
+                (b) => `<option value="${escapeHtml(b.code)}">${escapeHtml(b.emoji)} ${escapeHtml(b.name)}</option>`
+            )
+        );
+        els.categoryFilter.innerHTML = opts.join('');
+        // Preserve user's filter selection across re-renders if still valid.
+        if (previous && breakdown.some((b) => b.code === previous)) {
+            els.categoryFilter.value = previous;
+            currentCategoryFilter = previous;
+        } else {
+            els.categoryFilter.value = '';
+            currentCategoryFilter = '';
+        }
+    }
+
+    function onSortChange(btn) {
+        const nextSort = btn.dataset.sort || 'date_desc';
+        if (nextSort === currentSort) return;
+        currentSort = nextSort;
+        try {
+            window.sessionStorage.setItem('expense.sort', currentSort);
+        } catch (_e) { /* private mode */ }
+        updateSortButtons();
+        renderExpensesSection();
+    }
+
+    function updateSortButtons() {
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            const active = btn.dataset.sort === currentSort;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+    }
+
+    function renderExpensesSection() {
+        const items = filteredSortedExpenses();
+        renderExpenses(items);
+    }
+
+    function filteredSortedExpenses() {
+        const all = (lastOverview && lastOverview.expenses) || [];
+        let items = all;
+        if (currentCategoryFilter) {
+            items = items.filter((it) => it.category === currentCategoryFilter);
+        }
+        const sorters = {
+            date_desc: (a, b) => (b.expense_date || '').localeCompare(a.expense_date || '') || (b.id || '').localeCompare(a.id || ''),
+            date_asc: (a, b) => (a.expense_date || '').localeCompare(b.expense_date || '') || (a.id || '').localeCompare(b.id || ''),
+            amount_desc: (a, b) => (b.amount || 0) - (a.amount || 0),
+            amount_asc: (a, b) => (a.amount || 0) - (b.amount || 0),
+        };
+        return items.slice().sort(sorters[currentSort] || sorters.date_desc);
+    }
 
     function renderExpenses(items) {
         if (!items.length) {
-            els.expensesList.innerHTML = '<p class="empty-state">Chưa có giao dịch nào tháng này 🌱</p>';
+            const emptyMsg = currentCategoryFilter
+                ? 'Không có giao dịch nào ở loại này.'
+                : 'Chưa có giao dịch nào tháng này 🌱';
+            els.expensesList.innerHTML = `<p class="empty-state">${escapeHtml(emptyMsg)}</p>`;
             return;
         }
         els.expensesList.innerHTML = items.map((it) => {
@@ -384,13 +494,73 @@
             else resolve(window.confirm(message));
         });
         if (!confirmed) return;
+        applyDeleteOptimistic(item.id);
         try {
             await fetchAPI(`/expenses/${item.id}`, { method: 'DELETE' });
         } catch (_err) {
             if (tg && tg.showAlert) tg.showAlert('Không xoá được chi tiêu, thử lại nhé.');
+            await renderDashboard();
             return;
         }
         await renderDashboard();
+    }
+
+    // -- Optimistic UI helpers --------------------------------------------
+    //
+    // Mutations patch ``lastOverview`` in place (remove/replace/append row,
+    // adjust totals + breakdown) and re-render immediately. A background
+    // reload then reconciles with the server — if the server disagrees the
+    // user sees the corrected state, otherwise the screen never flickers.
+
+    function recomputeOverview() {
+        const expenses = lastOverview.expenses || [];
+        let total = 0;
+        const byCat = new Map();
+        for (const e of expenses) {
+            total += e.amount || 0;
+            const code = e.category || 'other';
+            const prev = byCat.get(code) || {
+                code,
+                name: e.category_label || code,
+                emoji: e.category_emoji || '📌',
+                color: '#808080',
+                amount: 0,
+            };
+            // Preserve canonical color from previous breakdown if present.
+            const known = (lastOverview.breakdown || []).find((b) => b.code === code);
+            if (known) prev.color = known.color;
+            prev.amount += e.amount || 0;
+            byCat.set(code, prev);
+        }
+        lastOverview.total_spent = total;
+        lastOverview.transaction_count = expenses.length;
+        lastOverview.breakdown = Array.from(byCat.values()).sort(
+            (a, b) => b.amount - a.amount
+        );
+        const prev = lastOverview.change_month?.previous || 0;
+        const change_amount = total - prev;
+        const change_pct = prev > 0 ? (change_amount / prev) * 100.0 : 0;
+        lastOverview.change_month = { amount: change_amount, pct: change_pct, previous: prev };
+    }
+
+    function applyDeleteOptimistic(id) {
+        if (!lastOverview) return;
+        lastOverview.expenses = (lastOverview.expenses || []).filter(
+            (x) => x.id !== id
+        );
+        recomputeOverview();
+        renderAll();
+    }
+
+    function applyUpsertOptimistic(item) {
+        if (!lastOverview) return;
+        const list = lastOverview.expenses || [];
+        const idx = list.findIndex((x) => x.id === item.id);
+        if (idx >= 0) list[idx] = item;
+        else list.unshift(item);
+        lastOverview.expenses = list;
+        recomputeOverview();
+        renderAll();
     }
 
     // -- Modal: add / edit / delete ---------------------------------------
@@ -399,6 +569,11 @@
         els.modalCategory.innerHTML = CATEGORIES.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
+    }
+
+    function initCategoryFilter() {
+        // Seed with only "Tất cả" until first overview lands.
+        els.categoryFilter.innerHTML = '<option value="">Tất cả</option>';
     }
 
     function openModal(item) {
@@ -438,14 +613,15 @@
             payment_method: els.modalPayment.value.trim() || null,
         };
         els.modalSave.disabled = true;
+        let saved;
         try {
             if (editingExpenseId) {
-                await fetchAPI(`/expenses/${editingExpenseId}`, {
+                saved = await fetchAPI(`/expenses/${editingExpenseId}`, {
                     method: 'PATCH',
                     body: JSON.stringify(body),
                 });
             } else {
-                await fetchAPI('/expenses', {
+                saved = await fetchAPI('/expenses', {
                     method: 'POST',
                     body: JSON.stringify(body),
                 });
@@ -456,7 +632,10 @@
             return;
         }
         closeModal();
-        await renderDashboard();
+        // POST/PATCH return the canonical row — patch UI without waiting
+        // for the round-trip refresh, then reconcile in the background.
+        if (saved && saved.id) applyUpsertOptimistic(saved);
+        renderDashboard();
     }
 
     async function onDelete() {
@@ -468,15 +647,17 @@
         });
         if (!confirmed) return;
         els.modalDelete.disabled = true;
+        const idToDelete = editingExpenseId;
         try {
-            await fetchAPI(`/expenses/${editingExpenseId}`, { method: 'DELETE' });
+            await fetchAPI(`/expenses/${idToDelete}`, { method: 'DELETE' });
         } catch (_err) {
             els.modalDelete.disabled = false;
             if (tg && tg.showAlert) tg.showAlert('Không xoá được, thử lại nhé.');
             return;
         }
         closeModal();
-        await renderDashboard();
+        applyDeleteOptimistic(idToDelete);
+        renderDashboard();
     }
 
     // -- Misc -------------------------------------------------------------

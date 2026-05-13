@@ -775,10 +775,38 @@ def invalidate_expense_cache_for_user(user_id) -> None:
     stale_keys = [
         key
         for key in _wealth_cache
-        if key and key[0] == user_id and len(key) > 1 and key[1] == "expense_overview"
+        if key
+        and key[0] == user_id
+        and len(key) > 1
+        and key[1] in ("expense_overview", "expense_trend")
     ]
     for key in stale_keys:
         _wealth_cache.pop(key, None)
+
+
+_EXPENSE_TREND_DAYS_ALLOWED = (30, 90, 365)
+
+
+@router.get("/api/expense-dashboard/trend")
+async def get_expense_dashboard_trend(
+    days: int = Query(30, description="Trend window in days; one of 30, 90, 365"),
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily expense totals for the trend selector. 30s per-user cache."""
+    if days not in _EXPENSE_TREND_DAYS_ALLOWED:
+        raise HTTPException(
+            status_code=422,
+            detail=f"days must be one of {list(_EXPENSE_TREND_DAYS_ALLOWED)}",
+        )
+    user = await _resolve_user(auth, db)
+    cache_key = (user.id, "expense_trend", days)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return {"data": cached, "error": None}
+    trend = await dashboard_service.get_daily_trend(db, user.id, days=days)
+    _cache_set(cache_key, trend)
+    return {"data": trend, "error": None}
 
 
 @router.get("/wealth", include_in_schema=False)

@@ -893,6 +893,10 @@ async def _action_expenses_manage(
              "web_app": {"url": url}},
         ])
     keyboard_rows.append([
+        {"text": get_action_copy("action_expenses_manage", "ocr_button"),
+         "callback_data": "menu:expenses:ocr_prompt"},
+    ])
+    keyboard_rows.append([
         {"text": get_action_copy("action_expenses_manage", "back_button"),
          "callback_data": "menu:main"},
     ])
@@ -907,6 +911,32 @@ async def _action_expenses_manage(
         "menu_action",
         user_id=user.id,
         properties={"category": "expenses", "action": "manage"},
+    )
+
+
+async def _action_expenses_ocr_prompt(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Prompt the user to send a receipt photo from the manage guide shortcut.
+
+    The worker's existing photo handler takes over once the user uploads
+    an image (Phase 3A OCR flow). Kept tiny because the shortcut just
+    nudges into the existing entry point.
+    """
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            "📷 *Đọc hoá đơn*\n\n"
+            "Gửi cho mình ảnh hoá đơn — mình sẽ tự đọc số tiền,"
+            " merchant và phân loại giúp bạn."
+        ),
+        parse_mode="Markdown",
+        reply_markup=back_to_main_keyboard(),
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "expenses", "action": "ocr_prompt"},
     )
 
 
@@ -1557,6 +1587,7 @@ _DIRECT_HANDLERS = {
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("expenses", "report"): _action_expenses_report,
     ("expenses", "manage"): _action_expenses_manage,
+    ("expenses", "ocr_prompt"): _action_expenses_ocr_prompt,
     # Legacy callbacks kept so stale chat-history bubbles (before the
     # 4-button menu restructure) don't dead-end. ``add`` / ``ocr`` /
     # ``by_category`` now all route to the combined manage guide which

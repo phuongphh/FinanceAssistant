@@ -58,10 +58,27 @@
                 <div class="chart-container">
                     <canvas id="trend-chart" role="img" aria-label="Biểu đồ chi tiêu theo ngày"></canvas>
                 </div>
+                <div class="period-selector" role="tablist" aria-label="Chọn khoảng thời gian">
+                    <button class="period-btn active" data-days="30" type="button" role="tab" aria-selected="true">30 ngày</button>
+                    <button class="period-btn" data-days="90" type="button" role="tab">90 ngày</button>
+                    <button class="period-btn" data-days="365" type="button" role="tab">1 năm</button>
+                </div>
             </section>
 
             <section class="section" id="expenses-section">
                 <h2>📦 Giao dịch tháng này</h2>
+                <div class="asset-sort-selector" role="tablist" aria-label="Sắp xếp giao dịch">
+                    <button class="asset-sort-btn active" data-sort="date_desc" type="button" role="tab" aria-selected="true">📅 Mới nhất</button>
+                    <button class="asset-sort-btn" data-sort="date_asc" type="button" role="tab">📅 Cũ nhất</button>
+                    <button class="asset-sort-btn" data-sort="amount_desc" type="button" role="tab">📈 Lớn → Nhỏ</button>
+                    <button class="asset-sort-btn" data-sort="amount_asc" type="button" role="tab">📉 Nhỏ → Lớn</button>
+                </div>
+                <div class="category-filter-row">
+                    <label class="filter-label" for="category-filter">Lọc theo loại</label>
+                    <select id="category-filter" class="category-filter-select">
+                        <option value="">Tất cả</option>
+                    </select>
+                </div>
                 <p class="section-hint">✏️ Sửa · 🗑️ Xoá chi tiêu</p>
                 <div id="expenses-list"></div>
                 <button class="add-btn" id="add-expense-btn" type="button">+ Thêm chi tiêu</button>
