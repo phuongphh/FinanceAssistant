@@ -1,10 +1,11 @@
-# Phase 3.6: Admin Observability Layer — Implementation Guide
+# Phase 4.2.5: Admin Observability Layer — Implementation Guide
 
-> **Status**: Design complete · Ready for implementation
+> **Status**: Design complete · Ready for implementation (next phase sau Phase 4.2)
 > **Owner**: Phuong
-> **Target start**: Soft launch tuần 5
+> **Target start**: Cuối tháng 5 / đầu tháng 6 2026 — trước soft launch 50 founding member (June 2026)
 > **Estimated effort**: 3 sprints (~3 tuần)
-> **Dependencies**: Phase 3A (Wealth Foundation) đã ship, Phase 3.5 (Intent Layer) đã design
+> **Dependencies**: Phase 3A (Wealth Foundation) ✅, Phase 3.5 (Intent Layer) ✅, Phase 4.1 (Pre-Launch Hardening) ✅, Phase 4.2 (Customer Experience Hardening) ✅
+> **Position in roadmap**: Inserted giữa Phase 4.2 và Phase 5.0 (Encryption End-to-End). Soft launch tháng 6 mở 50 founding member → Admin Observability cần ready để Phuong monitor sức khỏe sản phẩm hằng ngày, phát hiện sớm retention drop / cost spike / activation gap.
 
 ---
 
@@ -31,13 +32,18 @@
 
 ## 1. Executive Summary
 
-Phase 3.6 xây dựng **Admin Observability Layer** — một dashboard web nội bộ giúp Phuong và team monitor sức khỏe sản phẩm Bé Tiền trong giai đoạn soft launch. Dashboard trả lời 3 câu hỏi cốt lõi:
+Phase 4.2.5 xây dựng **Admin Observability Layer** — một dashboard web nội bộ giúp Phuong và team monitor sức khỏe sản phẩm Bé Tiền trong giai đoạn soft launch 50 founding member (June 2026). Dashboard trả lời 3 câu hỏi cốt lõi:
 
 1. **Có ai dùng không, và họ có quay lại không?** — Acquisition + Retention
 2. **Họ dùng cái gì, có bí ở đâu không?** — Engagement + Friction
 3. **Bé Tiền đang đốt bao nhiêu chi phí mỗi user?** — Unit economics
 
-Dashboard cũng đặt nền móng cho **License Management** (Phase 5), với placeholder UI và data model sẵn sàng để activate khi launch paid tier.
+Dashboard cũng đặt nền móng cho **License Management** (Phase 5.7 Monetization Infrastructure), với placeholder UI và data model sẵn sàng để activate khi Pro tier (68k/tháng) ra mắt sau Tết 2027.
+
+**Tại sao chèn vào 4.2.5 thay vì sau Phase 5?**
+- Soft launch 50 user (June 2026) yêu cầu operator nhìn được data thực tế thay vì query DB thủ công.
+- Phase 4.2 đã ship Day 7 micro-survey, briefing content quality, NBA matrix — cần dashboard để đọc kết quả của các signals này.
+- License placeholder ship sớm tránh migration đau đầu khi tới Phase 5.7.
 
 **Key deliverables:**
 - 1 React SPA (Vite + Tailwind + Recharts) deploy tại `admin.betien.vn`
@@ -60,12 +66,12 @@ Dashboard cũng đặt nền móng cho **License Management** (Phase 5), với p
 ### Vision
 
 Trong 12 tháng tới, dashboard này phát triển thành **Bé Tiền Operations Console** — không chỉ monitor mà còn cho phép admin:
-- Quản lý license, refund, upgrade
-- A/B test các thay đổi UX
+- Quản lý license, refund, upgrade (kích hoạt cùng Phase 5.7 Monetization)
+- A/B test các thay đổi UX (defer, không phải priority với cohort <200)
 - Customer support (xem lịch sử conversation, trợ giúp user)
-- Tài chính (MRR, ARR, churn, LTV/CAC)
+- Tài chính (MRR, ARR, churn, LTV/CAC) — gated by Phase 5.7
 
-Phase 3.6 chỉ scope phần monitoring & user list — các phần khác là phase sau.
+Phase 4.2.5 chỉ scope phần monitoring & user list — các phần khác là phase sau.
 
 ---
 
@@ -164,7 +170,7 @@ Phase 3.6 chỉ scope phần monitoring & user list — các phần khác là ph
 be_tien_backend/
 ├── app/
 │   ├── api/
-│   │   ├── admin/                    ← NEW (toàn bộ Phase 3.6)
+│   │   ├── admin/                    ← NEW (toàn bộ Phase 4.2.5)
 │   │   │   ├── __init__.py
 │   │   │   ├── deps.py               ← Auth dependency
 │   │   │   ├── auth.py               ← Login/logout/me
@@ -278,14 +284,16 @@ Theo principle "Multi-tenancy from day one" của Bé Tiền:
 | Storytelling expense rate | % expense 200k-2M VND được capture qua storytelling | Đo UX flow Phase 3A |
 | Tier distribution | Phân bố theo Ladder (Starter/Young Pro/Mass Affluent/HNW) | Xác định fit thị trường |
 
-**Tier classification thresholds** (xác nhận với Phuong 2026-05-13, dựa vào tổng giá trị asset của user):
+**Tier classification thresholds** (xác nhận với Phuong 2026-05-13, dựa vào tổng giá trị asset của user). Tier name nội bộ giữ tiếng Anh để code rõ ràng; UI hiển thị tên Vietnamese theo wealth-level map của Phase 3.8.5:
 
-| Tier | Total asset value (VND) |
-|------|------------------------|
-| Starter | < 100M |
-| Young Pro | 100M – 500M |
-| Mass Affluent | 500M – 5B |
-| HNW | ≥ 5B |
+| Tier (internal) | UI label (Vietnamese, Phase 3.8.5) | Total asset value (VND) |
+|------|------|------------------------|
+| `starter` | Khởi Đầu | < 100M |
+| `young_pro` | Trẻ Năng Động | 100M – 500M |
+| `mass_affluent` | Trung Lưu Vững | 500M – 5B |
+| `hnw` | Tinh Hoa | ≥ 5B |
+
+> ⚠ **Strategy alignment note:** Strategy V3 (docs/current/strategy.md) định nghĩa wealth ladder lưu lượng hơi khác (0-30tr / 30-200tr / 200tr-1tỷ / 1tỷ+). Phase 4.2.5 dùng thresholds operator-friendly (100M / 500M / 5B) đã được Phuong xác nhận 2026-05-13. UI label vẫn tái dùng Phase 3.8.5 wealth-level naming để giữ persona consistent.
 
 ### 6.6. Cost & Unit Economics
 
@@ -530,7 +538,7 @@ Response: DB connection, Redis connection, last data sync time.
 
 ### 8.1. New tables
 
-> **⚠ Schema dependency**: Story 1.5 trong issues.md sẽ thêm cột `resolved_by VARCHAR(50)` vào bảng `messages` hiện có. Cột này (`rule` / `llm_classifier` / `clarification`) là output của Phase 3.5 Intent Layer dispatcher. Phase 3.6 query depends on column này.
+> **✅ Schema dependency resolved**: Cột `messages.resolved_by VARCHAR(50)` đã được ship ở Phase 3.5 (Intent Understanding Layer, completed 2026-05-02). Phase 4.2.5 query chỉ cần `SELECT … FROM messages` — không cần bridge migration. Allowed values từ dispatcher: `rule` / `llm_classifier` / `clarification`. Phase 4.2.5 chỉ đọc, không sửa schema này.
 
 #### `admin_users`
 
@@ -1089,36 +1097,38 @@ Khi cần scale lên cloud-native Kubernetes:
 
 ## 14. Roadmap & Future
 
-### v1.0 (current — Phase 3.6)
+### v1.0 (current — Phase 4.2.5)
 
-Scope đã liệt kê trong Section 3. Target launch: cuối tuần 8 soft launch.
+Scope đã liệt kê trong Section 3. Target launch: trước soft launch tháng 6/2026.
 
-### v1.1 (Phase 3.6.1)
+### v1.1 (Phase 4.2.5.1 — post-soft-launch polish)
 
 - Export users/metrics ra CSV/Excel.
 - Customizable date range picker.
 - Dark mode.
 - Saved filter presets.
 
-### v1.2 (Phase 3.6.2)
+### v1.2 (Phase 4.2.5.2 — alerting)
 
 - Alert system: Slack/email notification khi metric vượt threshold.
 - Daily digest email cho admin.
 - Funnel analysis (signup → first asset → first briefing → retained).
+- Day 7 micro-survey results visualization (Phase 4.2 Epic 3 output).
 
-### v2.0 (Phase 5 — License Management)
+### v2.0 (Phase 5.7 — Monetization Infrastructure)
 
-Activate placeholder sang full implementation:
+Activate placeholder sang full implementation cùng nhịp với Pro launch (Tết 2027):
 
 - **License lifecycle**: Free → Trial → Paid → Cancelled.
-- **Plan management**: Free / Pro / HNW tiers với feature gates.
-- **Billing**: Tích hợp VNPay/MoMo, MoMo, hoặc Stripe.
+- **Plan management**: Free / Pro (68k) / CFO (168k) tiers với feature gates.
+- **Founding 50 discount**: Honor 50% lifetime discount (Phase 4.1 commitment).
+- **Billing**: Tích hợp VNPay/MoMo/ZaloPay (VN-first).
 - **Revenue metrics**: MRR, ARR, churn, LTV, ARPU, CAC.
 - **Trial conversion funnel**: D0 → D7 → D14 → paid.
 - **Churn risk scoring**: ML model dựa trên engagement signals.
 - **Customer support tools**: View conversation, refund, plan change.
 
-### v3.0 (Phase 6 — Multi-tenant SaaS)
+### v3.0 (Phase 6+ — Multi-tenant SaaS)
 
 - Multi-admin với RBAC.
 - Tenant isolation enforcement.
@@ -1183,7 +1193,7 @@ Activate placeholder sang full implementation:
 
 ### ADR-006: License model tạo từ v1.0 dù chưa dùng
 
-**Decision**: Tạo bảng `licenses` ngay trong Phase 3.6, default plan="free" cho tất cả user.
+**Decision**: Tạo bảng `licenses` ngay trong Phase 4.2.5, default plan="free" cho tất cả user.
 
 **Rationale**:
 - Tránh migration đau đầu sau.
@@ -1194,26 +1204,28 @@ Activate placeholder sang full implementation:
 
 ## 16. Open Questions
 
-> **Update 2026-05-13**: Q1, Q2, Q5 (partial) đã được trả lời bởi Phuong.
+> **Update 2026-05-13 (post-Phase-4.2 close)**: Q1, Q2, Q5 (partial), Q6 đã resolve. Q2 originally about Phase 3.5 dependency — now obsolete since Phase 3.5 đã ship 2026-05-02.
 
 1. ~~**Admin user count v1.0**~~ → **RESOLVED**: Chỉ Phuong trong v1.0. Initial seed: `phuongphh@nuitruc.ai`. Password mặc định là dev placeholder, phải đổi ngay sau lần login đầu qua endpoint change-password.
 
-2. ~~**Phase 3.5 `resolved_by` column**~~ → **RESOLVED**: Column chưa tồn tại trong bảng `messages` (Phase 3.5 mới design, chưa implement). Phase 3.6 phải tự handle migration này như pre-requisite của Story 2.4 (xem `AdminDashboard-issues.md` Epic 0).
+2. ~~**Phase 3.5 `resolved_by` column dependency**~~ → **RESOLVED 2026-05-02**: Phase 3.5 đã ship trước Phase 4.2.5. Column `messages.resolved_by` đã tồn tại với các giá trị `rule` / `llm_classifier` / `clarification`. Phase 4.2.5 không cần bridge migration nữa — chỉ đọc trực tiếp.
 
-3. **Date range cho cohort retention**: Mặc định 8 tuần hay 12 tuần? → Soft launch mới 5 tuần, có thể 8 tuần là đủ.
+3. **Date range cho cohort retention**: Mặc định 8 tuần hay 12 tuần? → Soft launch mới có ~4 tuần data tại thời điểm dashboard ship, 8 tuần là đủ.
 
-4. **Notification channel v1.0**: Có cần Telegram/email alert cho admin ngay từ v1.0 không? → Đã đặt vào v1.2 nhưng có thể sớm hơn nếu thấy cần.
+4. **Notification channel v1.0**: Có cần Telegram/email alert cho admin ngay từ v1.0 không? → Đã đặt vào v1.2; với cohort 50 user thì manual refresh hằng sáng (đọc cùng nhịp morning briefing của user) là đủ.
 
-5. **PDPA compliance**: Việt Nam có quy định PDPA mới — cần review xem dashboard hiển thị bao nhiêu PII là an toàn về mặt pháp lý.
+5. **PDPA compliance**: Việt Nam có quy định PDPA mới — cần review xem dashboard hiển thị bao nhiêu PII là an toàn về mặt pháp lý. → Phase 4.2 Story D.1 (operator editorial discipline) đã set rule operator không quote số tiền user. PII trong admin dashboard tuân theo cùng rule: default mask, opt-in unmask qua audit log.
 
-6. **License plan structure**: Khi sẵn sàng activate, định nghĩa cụ thể của Free/Pro/HNW tier (feature gates, price point) — defer đến lúc planning Phase 5.
+6. ~~**License plan structure**~~ → **RESOLVED**: Strategy V3 đã định pricing — Free (0đ) + Pro (68k) + CFO (168k). Founding 50 honors 50% lifetime discount. Activation cùng Phase 5.7.
 
-7. **Backup admin access**: Nếu Phuong mất quyền truy cập (mất password, lost 2FA), recovery flow thế nào? → Cần emergency recovery procedure.
+7. **Backup admin access**: Nếu Phuong mất quyền truy cập (mất password, lost 2FA), recovery flow thế nào? → Cần emergency recovery procedure trước khi soft launch.
 
-8. **Materialized view refresh schedule**: Khi nào thì chuyển từ on-demand query sang materialized view? → Quyết định khi DAU >500 hoặc query latency >2s.
+8. **Materialized view refresh schedule**: Khi nào thì chuyển từ on-demand query sang materialized view? → Quyết định khi DAU >500 hoặc query latency >2s. Cohort 50 → chưa cần.
+
+9. **Phase 4.2 signal integration** (NEW): Day 7 micro-survey (Phase 4.2 Epic 3) và NBA matrix click-through (Phase 4.2 Epic 2) cần surface ra dashboard ở v1.0 hay defer v1.1? → Decision: v1.0 chỉ count event total (đã có `feature_events`), v1.1 add dedicated micro-survey result panel.
 
 ---
 
-**Document version**: 1.0
+**Document version**: 2.0 (renamed Phase 3.6 → Phase 4.2.5, dependency cleanup post-Phase 4.2)
 **Last updated**: 2026-05-13
 **Next review**: Khi hoàn thành Sprint 1

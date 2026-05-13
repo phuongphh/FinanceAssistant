@@ -1,18 +1,25 @@
-# Phase 3.6: Admin Observability — User Stories & Issues
+# Phase 4.2.5: Admin Observability — User Stories & Issues
 
-> **Companion document**: `AdminDashboard-detailed.md`
-> **Total**: 24 stories across 7 Epics (gồm 1 bridge story)
-> **Estimated**: ~68 story points (~3 sprints)
-> **Convention**: Epic-as-parent, Story-as-child
-> **Last updated**: 2026-05-13 (v1.1)
+> **Companion document**: `phase-4.2.5-detailed.md`
+> **Total**: 23 stories across 7 Epics
+> **Estimated**: ~65 story points (~3 sprints)
+> **Convention**: Epic-as-parent, Story-as-child (numbered Epics theo Phase 4.2+ convention)
+> **Last updated**: 2026-05-13 (v2.0)
 
 ---
 
-## What's new in v1.1 (2026-05-13)
+## What's new in v2.0 (2026-05-13)
 
-- ✅ Added **Implementation Skeleton** section cho mọi backend story (Epic 1, 2, 3, 6, 7) — chứa code FastAPI ready-to-implement.
-- ✅ Story 1.1 update: seed credentials cụ thể (`phuongphh@nuitruc.ai`) + flag `force_password_change=true` (bắt buộc đổi password ở lần login đầu).
-- ✅ **Story 1.5 (NEW)**: Bridge migration để add cột `messages.resolved_by` — gỡ dependency từ Phase 3.5.
+- ✅ **Renamed Phase 3.6 → Phase 4.2.5** để align với master-roadmap (3.6 đã được Menu UX Revamp dùng và shipped 2026-05-05).
+- ✅ **Removed Story 1.5 (bridge migration)** vì Phase 3.5 đã ship 2026-05-02 — cột `messages.resolved_by` đã tồn tại. Total stories: 24 → 23.
+- ✅ Labels updated: `phase-3.6` → `phase-4.2.5`.
+- ✅ Story 2.4 dependency simplified: chỉ cần `1.3`, không cần bridge migration nữa.
+- ✅ Position note: chèn giữa Phase 4.2 (✅ done) và Phase 5.0 (Encryption End-to-End).
+
+### What's new in v1.1 (2026-05-13, historical)
+
+- ✅ Added **Implementation Skeleton** section cho mọi backend story (Epic 1, 2, 3, 6, 7).
+- ✅ Story 1.1 update: seed credentials cụ thể + `force_password_change=true` flag.
 - ✅ Story 2.4 update: tier thresholds chính thức (100M / 500M / 5B VND).
 
 ---
@@ -22,7 +29,7 @@
 ### Labels
 - `backend`, `frontend`, `infra`, `security`, `db`, `auth`
 - `epic`, `story`, `task`
-- `phase-3.6`, `admin-console`
+- `phase-4.2.5`, `admin-console`
 - Size: `XS` (≤2h), `S` (½ day), `M` (1 day), `L` (2 days), `XL` (3+ days)
 
 ### Sprint planning
@@ -37,9 +44,9 @@
 
 ## Epic 1: Backend Foundation & Auth
 
-**Goal**: Đặt nền móng cho admin console — data model, authentication, audit log, bridge migration.
+**Goal**: Đặt nền móng cho admin console — data model, authentication, audit log.
 
-**Stories**: 5 · **Size**: ~13 SP
+**Stories**: 4 · **Size**: ~11 SP
 
 ---
 
@@ -499,64 +506,11 @@ async def list_audit(
 
 ---
 
-### Story 1.5: Bridge migration — Add `messages.resolved_by` column
+### ~~Story 1.5: Bridge migration — Add `messages.resolved_by` column~~ — REMOVED (v2.0)
 
-**Type**: Story · **Size**: S · **Labels**: backend, db, bridge
-**Depends on**: —
-**Sprint**: 1
-
-**User story**:
-As a developer, I want to add the `resolved_by` column to existing `messages` table so that Phase 3.6 analytics (Story 2.4) can run without waiting for Phase 3.5 implementation.
-
-**Acceptance Criteria**:
-- [ ] Migration thêm cột `resolved_by VARCHAR(50) NULL` vào `messages`.
-- [ ] Index trên `(resolved_by, created_at)`.
-- [ ] Backfill: rows hiện có giữ NULL.
-- [ ] Comment: "Owned by Phase 3.5 Intent Layer; Phase 3.6 reads only."
-- [ ] Update message handler hiện tại set `resolved_by='legacy'` cho messages mới.
-- [ ] Khi Phase 3.5 ship, dispatcher sẽ set đúng giá trị (`rule` / `llm_classifier` / `clarification`).
-
-**Technical Notes**:
-- Allowed values (CHECK constraint sau khi Phase 3.5 ship): `rule`, `llm_classifier`, `clarification`, `legacy`.
-- Không drop column này — contract giữa Phase 3.5 và 3.6.
-
-**Implementation Skeleton**:
-
-```python
-# migrations/versions/XXXX_add_resolved_by_to_messages.py
-"""add resolved_by to messages"""
-from alembic import op
-import sqlalchemy as sa
-
-def upgrade():
-    op.add_column(
-        "messages",
-        sa.Column("resolved_by", sa.String(50), nullable=True)
-    )
-    op.create_index(
-        "idx_messages_resolved_by_created",
-        "messages",
-        ["resolved_by", "created_at"]
-    )
-
-def downgrade():
-    op.drop_index("idx_messages_resolved_by_created", "messages")
-    op.drop_column("messages", "resolved_by")
-```
-
-```python
-# Trong app/services/message_handler.py (hoặc tương đương):
-message = Message(
-    # ... existing fields ...
-    resolved_by="legacy",  # TODO: replace bằng output của Phase 3.5 dispatcher
-)
-```
-
-**Test scenarios**:
-- TC1: Migration apply → cột `resolved_by` xuất hiện, NULL cho rows cũ.
-- TC2: Message mới insert → `resolved_by='legacy'`.
-- TC3: Query GROUP BY resolved_by chạy được.
-- TC4: Rollback migration thành công.
+> ✅ **Obsolete since Phase 3.5 ship (2026-05-02)**. Cột `messages.resolved_by` đã tồn tại với các giá trị `rule` / `llm_classifier` / `clarification` được set bởi intent dispatcher. Phase 4.2.5 chỉ đọc trực tiếp, không cần bridge migration.
+>
+> **Migration path nếu có row legacy (rows cũ trước Phase 3.5)**: Query trong Story 2.4 đã filter `WHERE resolved_by IS NOT NULL AND resolved_by != 'legacy'` để loại trừ — không cần backfill thêm.
 
 ---
 
@@ -932,7 +886,7 @@ async def feature_clicks(
 ### Story 2.4: Intent breakdown + tier distribution endpoints
 
 **Type**: Story · **Size**: M · **Labels**: backend, api, db
-**Depends on**: 1.5, 1.3
+**Depends on**: 1.3 (Phase 3.5 đã ship `resolved_by` column từ 2026-05-02)
 **Sprint**: 2
 
 **Acceptance Criteria**:
@@ -1920,14 +1874,14 @@ async def license_summary(
 
 | Epic | Stories | Size | Sprint |
 |------|---------|------|--------|
-| 1. Backend Foundation & Auth | 5 | ~13 SP | 1 |
+| 1. Backend Foundation & Auth | 4 | ~11 SP | 1 |
 | 2. Analytics APIs | 5 | ~14 SP | 1-2 |
 | 3. User Management APIs | 3 | ~9 SP | 2 |
 | 4. Frontend Foundation | 3 | ~8 SP | 2 |
 | 5. Dashboard Components | 4 | ~14 SP | 3 |
 | 6. Security & Deployment | 3 | ~7 SP | 3 |
 | 7. License Foundation | 1 | ~3 SP | 3 |
-| **TOTAL** | **24** | **~68 SP** | **3 sprints** |
+| **TOTAL** | **23** | **~66 SP** | **3 sprints** |
 
 ### Cross-cutting concerns
 
@@ -1946,37 +1900,37 @@ async def license_summary(
 - [ ] Audit log entries verify được (cho mutation).
 - [ ] Smoke test local pass.
 
-### Risk register (updated v1.1)
+### Risk register (updated v2.0)
 
 | Risk | Probability | Impact | Mitigation |
 |------|-----------|--------|-----------|
 | Cohort retention query chậm | Medium | Medium | Cache 24h, materialized view khi >500 user |
 | Recharts không render đẹp mobile | Low | Low | Test sớm Story 5.2 |
-| ~~Phase 3.5 `resolved_by` column~~ | ~~High~~ | ~~High~~ | ✅ **Resolved**: Story 1.5 bridge migration |
+| ~~Phase 3.5 `resolved_by` column~~ | ~~High~~ | ~~High~~ | ✅ **Resolved 2026-05-02**: Phase 3.5 shipped column với dispatcher set value. Story 1.5 removed (v2.0). |
 | Caddy auto-SSL fail (DNS) | Low | Medium | Test DNS trước, fallback Cloudflare Tunnel |
 | Backfill license cho nhiều user chậm | Low | Low | Batch insert |
 | Admin password "admin" bị brute force trước khi đổi | Medium | High | ✅ **Mitigated**: force_password_change flag (Story 1.1, 1.2) + rate limit (Story 1.2) |
+| Phase 4.2 signal surface gap (Day 7 micro-survey, NBA matrix click) | Medium | Low | v1.0 chỉ count via `feature_events`; v1.1 add dedicated panel |
 
 ### Order of implementation (recommended)
 
 **Sprint 1 — Foundation + Critical APIs:**
-1. **Story 1.5** (bridge migration) — chạy trước, nhiều story khác cần.
-2. Story 1.1 → 1.2 → 1.3 → 1.4 (auth + audit).
-3. Story 2.1 → 2.2 → 2.3 (analytics APIs).
+1. Story 1.1 → 1.2 → 1.3 → 1.4 (auth + audit).
+2. Story 2.1 → 2.2 → 2.3 (analytics APIs).
 
 **Sprint 2 — Remaining APIs + Frontend Foundation:**
-4. Story 2.4 → 2.5 (intent + cohort).
-5. Story 3.1 → 3.2 → 3.3 (user management).
-6. Story 4.1 → 4.2 → 4.3 (frontend setup).
+3. Story 2.4 → 2.5 (intent + cohort).
+4. Story 3.1 → 3.2 → 3.3 (user management).
+5. Story 4.1 → 4.2 → 4.3 (frontend setup).
 
 **Sprint 3 — UI + Security + Deploy:**
-7. Story 5.1 → 5.2 → 5.3 → 5.4 (dashboard components).
-8. Story 6.2 (PII) song song với UI work.
-9. Story 7.1 (license placeholder).
-10. Story 6.1 (Caddy/HTTPS) → Story 6.3 (deploy + smoke test) → 🚀
+6. Story 5.1 → 5.2 → 5.3 → 5.4 (dashboard components).
+7. Story 6.2 (PII) song song với UI work.
+8. Story 7.1 (license placeholder).
+9. Story 6.1 (Caddy/HTTPS) → Story 6.3 (deploy + smoke test) → 🚀
 
 ---
 
-**Document version**: 1.1
+**Document version**: 2.0 (renamed Phase 3.6 → 4.2.5, Story 1.5 removed post-Phase 3.5)
 **Last updated**: 2026-05-13
-**Companion**: `AdminDashboard-detailed.md`
+**Companion**: `phase-4.2.5-detailed.md`
