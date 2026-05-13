@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 | #542 | [Story] P4.2-1.1: Trust & Privacy Moment | [issue-542.md](issue-542.md) |
 | #544 | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [issue-544.md](issue-544.md) |
+| #546 | [Story] P4.2-2.3: Query-First Soft Prompts | [issue-546.md](issue-546.md) |
 
-**Total active:** 34
+**Total active:** 35
