@@ -42,5 +42,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #545 | [Story] P4.2-2.2: First Briefing Content Quality Bar | [issue-545.md](issue-545.md) |
 | #546 | [Story] P4.2-2.3: Query-First Soft Prompts | [issue-546.md](issue-546.md) |
 | #547 | [Story] P4.2-3.1: Day 7 Positioning Micro-Survey | [issue-547.md](issue-547.md) |
+| #548 | [Story] P4.2-3.2: Positioning Misalignment Kill Criterion | [issue-548.md](issue-548.md) |
 
-**Total active:** 38
+**Total active:** 39
