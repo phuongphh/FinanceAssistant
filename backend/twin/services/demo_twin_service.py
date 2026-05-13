@@ -1,7 +1,8 @@
 """Demo Twin fast-path used by the onboarding "Để Bé Tiền dùng demo trước" button.
 
-The onboarding demo Twin is identical for every user — 50 triệu cash, no
-monthly savings, 10-year horizon. Persisting one ``TwinProjection`` row per
+The onboarding demo Twin is identical for every user — a 50 triệu diversified
+portfolio split across 2 asset classes (30tr cash savings + 20tr VN stocks),
+no monthly savings, 10-year horizon. Persisting one ``TwinProjection`` row per
 user-tap for that fixed input would be wasteful AND brittle: any read-only
 flake (FK race during onboarding, DB hiccup) currently surfaces as the
 ``compute_failed`` fallback even though we have no real recovery for it.
@@ -14,6 +15,12 @@ cone payload — no DB writes, no session state to corrupt.
 Determinism: ``seed=0`` and ``paths=500`` give the same cone every call,
 which is intentional. Every demo user sees the same picture so we can talk
 about it consistently in onboarding copy.
+
+Why 2 asset classes: a single cash bucket produced a near-straight P50
+line that looked under-impressive and undersold what a real diversified
+portfolio can do. The 60/40 cash/stocks split shows visible upside from
+diversification — closer to what a typical mass-affluent user will see
+once they enter their real assets.
 """
 
 from __future__ import annotations
@@ -28,7 +35,9 @@ from backend.twin.engine.monte_carlo import simulate_portfolio
 
 logger = logging.getLogger(__name__)
 
-DEMO_BASE_NET_WORTH_VND: Decimal = Decimal("50_000_000")
+DEMO_CASH_VND: Decimal = Decimal("30_000_000")
+DEMO_STOCKS_VN_VND: Decimal = Decimal("20_000_000")
+DEMO_BASE_NET_WORTH_VND: Decimal = DEMO_CASH_VND + DEMO_STOCKS_VN_VND
 DEMO_HORIZON_YEARS: int = 10
 DEMO_SIM_PATHS: int = 500
 DEMO_SEED: int = 0
@@ -40,16 +49,16 @@ DEMO_SEED: int = 0
 # Values rounded to whole VND to keep the YAML/JSON tiny.
 _FALLBACK_CONE: list[dict[str, Any]] = [
     {"year": 0, "p10": "50000000", "p50": "50000000", "p90": "50000000"},
-    {"year": 1, "p10": "52000000", "p50": "53000000", "p90": "54000000"},
-    {"year": 2, "p10": "54000000", "p50": "56000000", "p90": "58000000"},
-    {"year": 3, "p10": "56000000", "p50": "59000000", "p90": "63000000"},
-    {"year": 4, "p10": "58000000", "p50": "63000000", "p90": "68000000"},
-    {"year": 5, "p10": "61000000", "p50": "66000000", "p90": "73000000"},
-    {"year": 6, "p10": "63000000", "p50": "70000000", "p90": "78000000"},
-    {"year": 7, "p10": "66000000", "p50": "74000000", "p90": "84000000"},
-    {"year": 8, "p10": "69000000", "p50": "78000000", "p90": "90000000"},
-    {"year": 9, "p10": "72000000", "p50": "82000000", "p90": "97000000"},
-    {"year": 10, "p10": "75000000", "p50": "86000000", "p90": "104000000"},
+    {"year": 1, "p10": "48541000", "p50": "54097000", "p90": "61065000"},
+    {"year": 2, "p10": "50435000", "p50": "57766000", "p90": "68959000"},
+    {"year": 3, "p10": "52573000", "p50": "62158000", "p90": "79052000"},
+    {"year": 4, "p10": "54951000", "p50": "67813000", "p90": "88620000"},
+    {"year": 5, "p10": "58314000", "p50": "73095000", "p90": "99506000"},
+    {"year": 6, "p10": "61371000", "p50": "79074000", "p90": "116483000"},
+    {"year": 7, "p10": "63968000", "p50": "83654000", "p90": "136166000"},
+    {"year": 8, "p10": "68085000", "p50": "91474000", "p90": "155966000"},
+    {"year": 9, "p10": "70535000", "p50": "99358000", "p90": "171732000"},
+    {"year": 10, "p10": "73650000", "p50": "109619000", "p90": "196684000"},
 ]
 
 _cone_cache: list[dict[str, Any]] | None = None
@@ -79,9 +88,15 @@ def demo_horizon_years() -> int:
 def _simulate_demo_cone() -> list[dict[str, Any]]:
     try:
         sim = simulate_portfolio(
-            allocation={"cash_savings": DEMO_BASE_NET_WORTH_VND},
+            allocation={
+                "cash_savings": DEMO_CASH_VND,
+                "stocks_vn": DEMO_STOCKS_VN_VND,
+            },
             monthly_savings=Decimal("0"),
-            savings_split={"cash_savings": Decimal("1")},
+            savings_split={
+                "cash_savings": Decimal("0.6"),
+                "stocks_vn": Decimal("0.4"),
+            },
             horizon=DEMO_HORIZON_YEARS,
             paths=DEMO_SIM_PATHS,
             seed=DEMO_SEED,

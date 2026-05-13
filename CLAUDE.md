@@ -59,6 +59,13 @@ For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-stat
 - All user-facing strings in `content/*.yaml` (NOT hardcoded in code)
 - Test by reading aloud — if cringy or robotic, rewrite
 - "Bé Tiền" persona: warm, supportive, NEVER harsh on overspending or past-due
+- **Customer-facing positioning:** Bé Tiền is a *người đồng hành quản lý tài sản*
+  (companion that helps manage assets). Internal docs may use "Personal CFO"
+  as shorthand for product positioning, but it MUST NEVER appear in
+  user-facing text (welcome bubbles, chart watermarks, briefings, share
+  images, public-facing announcement copy). "CFO" reads cold and corporate
+  to a Vietnamese mass-affluent user — use *người đồng hành* / *quản lý
+  tài sản* instead.
 
 ### Soft delete pattern
 - Never hard-delete user data

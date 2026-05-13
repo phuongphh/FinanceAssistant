@@ -13,25 +13,36 @@ narrative: |
 
 # Demo variant — shown when user picks "Để Bé Tiền dùng demo trước".
 # Must NOT call it "Twin của bạn" — that broke trust in user testing.
+# Uses a 2-asset hypothetical portfolio (cash + VN stocks) so the demo
+# shows what diversification looks like, not a flat single-line curve.
 demo_narrative: |
-  🎭 <b>Twin demo</b> — minh hoạ với <b>50 triệu</b> tiết kiệm giả định, không phải số liệu của bạn.
+  🎭 <b>Twin demo</b> — minh hoạ với danh mục giả định <b>50 triệu</b>, gồm 2 loại tài sản:
 
-  • Đường <b>giữa</b> là điều kiện thường (kịch bản P50).
-  • Đường <b>trên</b> là nếu chủ Twin tiết kiệm chăm hơn (P90).
-  • Đường <b>dưới</b> là nếu có biến cố (P10).
+  • <b>30 triệu</b> tiết kiệm tiền mặt (cash)
+  • <b>20 triệu</b> cổ phiếu Việt Nam
 
-  Nhập tài sản thật để Bé Tiền vẽ Twin riêng cho bạn.
+  • Đường <b>giữa</b> là điều kiện thường (P50).
+  • Đường <b>trên</b> là kịch bản thị trường thuận lợi (P90).
+  • Đường <b>dưới</b> là khi có biến cố (P10).
+
+  Đây không phải số liệu của bạn — nhập tài sản thật để Bé Tiền vẽ Twin riêng cho bạn.
 
 caption: |
   📈 Twin của {name} — kịch bản {horizon} năm tới.
 
 demo_caption: |
-  📈 Twin demo — kịch bản {horizon} năm tới (50 triệu giả định).
+  📈 Twin demo — danh mục giả định 50 triệu (cash + cổ phiếu VN), kịch bản {horizon} năm tới.
 
 # Demo ack — replaces the misleading "✅ Bé Tiền ghi nhận: 50tr"
 # wording for the demo path so user doesn't think we banked their cash.
 demo_ack: |
-  🎭 Đang vẽ Twin demo với <b>50 triệu</b> giả định — chờ Bé Tiền vài giây nhé…
+  🎭 Đang vẽ Twin demo với danh mục giả định <b>50 triệu</b> (30tr tiền mặt + 20tr cổ phiếu) — chờ Bé Tiền vài giây nhé…
+
+# Sent right after the demo cone chart to reframe expectations: the
+# user's REAL Twin will be richer than this thin demo allocation. Keep
+# this in a single bubble so Telegram does not split it.
+demo_post_chart_emphasis: |
+  💡 Đây chỉ là demo với 2 loại tài sản đơn giản. <b>Bức tranh tài chính thật của bạn sẽ tốt hơn nữa</b> — với chính kế hoạch đầu tư, tiết kiệm và mục tiêu của bạn.
 
 # In-moment feedback prompt — sent 5–10s after the chart image.
 feedback_prompt:
@@ -51,7 +62,10 @@ compute_failed: |
 compute_failed_retry_label: "🔄 Thử lại"
 compute_failed_retry_callback: "onboarding_v2:retry_twin"
 
-# Completion message after feedback (or auto after 30s).
+# Activation message — shown ONLY after the user takes the first
+# next-best-action (tap CTA button OR free-text a question). Firing
+# this before the user engaged makes the onboarding feel like it ended
+# prematurely; gating it on engagement keeps the moment honest.
 completion: |
   🎉 Xong! Bé Tiền và bạn chính thức đồng hành.
 

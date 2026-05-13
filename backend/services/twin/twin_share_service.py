@@ -96,7 +96,7 @@ async def build_share_image_bytes(
     horizon_text = copy.get("horizon", "Sau {years} năm").format(years=horizon_years)
     headline = copy.get("headline", "Bé Tiền tương lai")
     subline = copy.get("subline", "Dự phóng xác suất, không phải lời hứa")
-    watermark = copy.get("watermark", "Bé Tiền — Personal CFO")
+    watermark = copy.get("watermark", "Bé Tiền — Người đồng hành quản lý tài sản")
     badge_label = (
         copy.get("founding_badge", "🌱 Founding Member")
         if user.is_founding_member

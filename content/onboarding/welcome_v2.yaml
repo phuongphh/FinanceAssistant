@@ -6,7 +6,7 @@ intro:
   default: |
     👋 Chào bạn, Bé Tiền đây!
 
-    Bé Tiền là Personal CFO cho người Việt — giúp bạn nhìn rõ tài sản, theo dõi chi tiêu, và lên kế hoạch cho mục tiêu lớn.
+    Bé Tiền là người bạn đồng hành quản lý tài sản — bên cạnh bạn nhìn rõ tài chính, theo dõi chi tiêu, và lên kế hoạch cho những mục tiêu lớn.
 
     Bấm bên dưới để bắt đầu — chỉ mất 3 phút.
 
@@ -22,15 +22,17 @@ source_variants:
   personal_fb:
     prefix: "Cảm ơn bạn đã ghé Bé Tiền từ trang Facebook cá nhân 💚"
   vn_finance_community:
-    prefix: "Cảm ơn bạn đến từ cộng đồng tài chính. Bé Tiền là Personal CFO cho người Việt mass affluent."
+    prefix: "Cảm ơn bạn đến từ cộng đồng tài chính. Bé Tiền là người đồng hành quản lý tài sản cho người Việt mass affluent."
   tg_finance_groups:
     prefix: "Cảm ơn bạn đến từ cộng đồng Telegram tài chính 💚"
   direct_msg:
     prefix: "Cảm ơn bạn đã trả lời tin nhắn của Bé Tiền — bắt đầu khám phá nhé!"
 
-# Step 1 — goal question. Three button labels keyed by goal code.
+# Goal question. Three button labels keyed by goal code.
+# NOTE: not numbered (1/3) — the user-visible 3-step counter starts at the
+# trust card (1/3). Goal pick is a preamble personalization tap.
 step_1_goal:
-  header: "(1/3) Câu hỏi đầu tiên"
+  header: "Bé Tiền hỏi nhanh"
   body: |
     Bạn muốn Bé Tiền giúp gì trước nhất?
   buttons:
@@ -68,7 +70,7 @@ demo_banner:
   body: |
     📌 <b>Demo Mode</b>
 
-    Đây là Twin của một người giả định với <b>50 triệu</b> tiết kiệm. Twin của bạn sẽ khác — nhập tài sản thật để xem Twin riêng của bạn.
+    Đây là Twin của một người giả định với danh mục <b>50 triệu</b> (30tr tiết kiệm + 20tr cổ phiếu VN). Twin của bạn sẽ khác — nhập tài sản thật để xem Twin riêng của bạn.
   cta_label: "💎 Xem Twin của tôi"
   cta_callback: "onboarding_v2:exit_demo"
 

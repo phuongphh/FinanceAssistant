@@ -5,9 +5,16 @@
 
 ---
 
+> ⚠️ **Customer-facing language rule (NON-NEGOTIABLE).**
+> "Personal CFO" is the **internal product positioning** used in strategy/architecture docs only. It MUST NEVER appear in user-facing text — welcome bubbles, briefings, chart watermarks, share images, soft-launch announcements, support replies. "CFO" reads cold and corporate to a Vietnamese mass-affluent user and undercuts the warm Bé Tiền persona.
+>
+> When talking to users, position Bé Tiền as **người đồng hành quản lý tài sản** (companion that helps manage assets). The reviewer enforces this on every user-facing change.
+
+---
+
 ## 🎯 Vision Statement (V3 — Refined)
 
-**Xây dựng Personal CFO đầu tiên cho mass affluent Việt Nam — không chỉ tracking, mà giúp user nhìn thấy tương lai tài chính của mình và optimize đường đi.**
+**Xây dựng Personal CFO đầu tiên cho mass affluent Việt Nam — không chỉ tracking, mà giúp user nhìn thấy tương lai tài chính của mình và optimize đường đi.** *(internal positioning — see the rule above for customer-facing language)*
 
 Không compete với Money Lover, MISA, Spendee. Không compete với Finhay, Tikop. Tạo ra category mới ở VN: **"Personal Financial Future Vision"** — kết hợp tracking + AI agent + predictive twin.
 
