@@ -34,7 +34,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #562 | [Epic] Expense Enhancement — Money-In/Expense with Source Tracking, Daily Summary & Dashboard | [issue-562.md](issue-562.md) |
+| #563 | [Story] US1: Transaction model — extend with source, type, linked asset | [issue-563.md](issue-563.md) |
 | #565 | [Story] US3: Money In entry flow — income tracking with source | [issue-565.md](issue-565.md) |
 | #566 | [Story] US4: Menu Chi tiêu — help text & syntax guide | [issue-566.md](issue-566.md) |
 
-**Total active:** 32
+**Total active:** 33
