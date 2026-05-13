@@ -11,8 +11,27 @@ narrative: |
 
   Bạn không cần đoán tương lai — Bé Tiền đoán giúp, bạn chỉ cần quyết định.
 
+# Demo variant — shown when user picks "Để Bé Tiền dùng demo trước".
+# Must NOT call it "Twin của bạn" — that broke trust in user testing.
+demo_narrative: |
+  🎭 <b>Twin demo</b> — minh hoạ với <b>50 triệu</b> tiết kiệm giả định, không phải số liệu của bạn.
+
+  • Đường <b>giữa</b> là điều kiện thường (kịch bản P50).
+  • Đường <b>trên</b> là nếu chủ Twin tiết kiệm chăm hơn (P90).
+  • Đường <b>dưới</b> là nếu có biến cố (P10).
+
+  Nhập tài sản thật để Bé Tiền vẽ Twin riêng cho bạn.
+
 caption: |
   📈 Twin của {name} — kịch bản {horizon} năm tới.
+
+demo_caption: |
+  📈 Twin demo — kịch bản {horizon} năm tới (50 triệu giả định).
+
+# Demo ack — replaces the misleading "✅ Bé Tiền ghi nhận: 50tr"
+# wording for the demo path so user doesn't think we banked their cash.
+demo_ack: |
+  🎭 Đang vẽ Twin demo với <b>50 triệu</b> giả định — chờ Bé Tiền vài giây nhé…
 
 # In-moment feedback prompt — sent 5–10s after the chart image.
 feedback_prompt:
@@ -26,8 +45,11 @@ feedback_prompt:
     Cảm ơn bạn — Bé Tiền ghi nhận để cải thiện 💚
 
 # Fallback if Twin compute fails. Keep short — user already on edge.
+# Tells the truth: there is NO background retry, the user has to tap.
 compute_failed: |
-  Bé Tiền đang tính Twin cho bạn, mất khoảng 1 phút. Bạn quay lại sau nhé — Bé Tiền sẽ nhắn ngay khi xong.
+  ⚠️ Bé Tiền chưa vẽ được Twin lần này. Bạn bấm <b>Thử lại</b> giúp Bé Tiền nhé.
+compute_failed_retry_label: "🔄 Thử lại"
+compute_failed_retry_callback: "onboarding_v2:retry_twin"
 
 # Completion message after feedback (or auto after 30s).
 completion: |

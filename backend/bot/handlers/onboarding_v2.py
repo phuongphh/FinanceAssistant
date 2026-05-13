@@ -466,13 +466,20 @@ async def _save_onboarding_first_asset(
         },
     )
 
-    name = user.display_name or "bạn"
-    await send_message(
-        chat_id,
-        f"✅ Bé Tiền ghi nhận: <b>{format_money_short(value)}</b>. Đang vẽ Twin cho bạn — chờ chút nhé {name}…",
-        parse_mode="HTML",
-    )
-    await _trigger_first_twin(db, chat_id, user)
+    # Demo gets its own ack so the user doesn't read "Bé Tiền ghi nhận: 50tr"
+    # and think we banked their cash. Real input keeps the personal phrasing.
+    if demo:
+        await send_message(
+            chat_id, twin_narrative_service_v2.demo_ack_text(), parse_mode="HTML"
+        )
+    else:
+        name = user.display_name or "bạn"
+        await send_message(
+            chat_id,
+            f"✅ Bé Tiền ghi nhận: <b>{format_money_short(value)}</b>. Đang vẽ Twin cho bạn — chờ chút nhé {name}…",
+            parse_mode="HTML",
+        )
+    await _trigger_first_twin(db, chat_id, user, demo=demo)
 
 
 def _bucket_label(value: Decimal) -> str:
@@ -535,6 +542,31 @@ async def _on_exit_demo(
     await _send_first_asset_prompt(db, chat_id, user)
 
 
+async def _on_retry_twin(
+    db: AsyncSession, chat_id: int, callback_id: str, user: User
+) -> None:
+    """User tapped the 🔄 Thử lại button after a compute_failed message.
+
+    Re-derives demo vs real from the session (the user may have already
+    pressed demo) and re-runs the Twin pipeline. Safe to call repeatedly:
+    the demo path is idempotent, and the real path re-inserts a fresh
+    ``TwinProjection`` row.
+    """
+    await answer_callback(callback_id)
+    session = await onboarding_service.get_session(db, user.id)
+    if session is None:
+        return
+    # Nothing to recompute if the user never picked an asset/demo value.
+    if session.first_asset_value_vnd is None:
+        await _send_first_asset_prompt(db, chat_id, user)
+        return
+    demo = bool(session.demo_mode_used)
+    analytics.track(
+        "onboarding_v2_twin_retry", user_id=user.id, properties={"demo": demo}
+    )
+    await _trigger_first_twin(db, chat_id, user, demo=demo)
+
+
 
 async def _on_asset_quality_confirm(
     db: AsyncSession,
@@ -591,57 +623,45 @@ async def _on_asset_quality_reenter(
 # ---------- Step 3 ----------------------------------------------------
 
 
-async def _trigger_first_twin(db: AsyncSession, chat_id: int, user: User) -> None:
+async def _trigger_first_twin(
+    db: AsyncSession, chat_id: int, user: User, *, demo: bool = False
+) -> None:
     """Compute Twin and push narrative → chart → feedback prompt.
 
-    Twin compute can fail (no assets after demo, market data fetch
-    error, etc.); we surface a friendly fallback and let the resume
-    worker re-engage the user later.
+    Demo flow uses a deterministic precomputed cone (no DB writes, no
+    upstream reads) so it ALWAYS succeeds — the demo Twin is the user's
+    first product moment and it cannot fail. Real flow runs the full
+    Monte Carlo and persists a ``TwinProjection`` row.
+
+    On failure the user gets a clear ⚠️ message with a retry button —
+    we never promise a phantom "1-minute" background recompute that
+    doesn't exist.
     """
-    from backend.twin.services import twin_chart_service, twin_projection_service
+    from backend.twin.services import twin_chart_service
 
     # Narrative FIRST — sets context before the chart shows up.
     await send_message(
-        chat_id, twin_narrative_service_v2.narrative_text(), parse_mode="HTML"
+        chat_id,
+        twin_narrative_service_v2.narrative_text(demo=demo),
+        parse_mode="HTML",
     )
 
-    try:
-        projections = await twin_projection_service.compute_and_store(
-            db, user.id, scenario="current"
-        )
-    except Exception:
-        logger.exception("First-Twin compute failed for user %s", user.id)
-        await send_message(
-            chat_id,
-            twin_narrative_service_v2.compute_failed_text(),
-            parse_mode="HTML",
-        )
-        # Do NOT mark twin_shown_at; leave for resume worker.
+    cone_data, horizon_years = await _resolve_twin_cone(db, user, demo=demo)
+    if cone_data is None:
+        await _send_twin_compute_failed(chat_id)
+        # Do NOT mark twin_shown_at; the retry button drives recovery.
         return
 
-    if not projections:
-        await send_message(
-            chat_id,
-            twin_narrative_service_v2.compute_failed_text(),
-            parse_mode="HTML",
-        )
-        return
-
-    proj = projections[0]
     try:
-        png = twin_chart_service.render_projection_chart(proj.cone_data)
+        png = twin_chart_service.render_projection_chart(cone_data)
     except Exception:
         logger.exception("Twin chart render failed for user %s", user.id)
-        await send_message(
-            chat_id,
-            twin_narrative_service_v2.compute_failed_text(),
-            parse_mode="HTML",
-        )
+        await _send_twin_compute_failed(chat_id)
         return
 
     name = user.display_name or "bạn"
     caption = twin_narrative_service_v2.chart_caption(
-        name=name, horizon_years=proj.horizon_years
+        name=name, horizon_years=horizon_years, demo=demo
     )
 
     from backend.ports.notifier import get_notifier
@@ -655,9 +675,7 @@ async def _trigger_first_twin(db: AsyncSession, chat_id: int, user: User) -> Non
     analytics.track(
         "onboarding_v2_twin_shown",
         user_id=user.id,
-        properties={
-            "demo": (await onboarding_service.get_session(db, user.id)).demo_mode_used
-        },
+        properties={"demo": demo},
     )
 
     # Schedule the in-moment feedback prompt 7s later in a fire-and-forget
@@ -665,6 +683,45 @@ async def _trigger_first_twin(db: AsyncSession, chat_id: int, user: User) -> Non
     # — those don't survive the worker boundary).
     asyncio.create_task(
         _send_feedback_prompt_after_delay(chat_id=chat_id, user_id=user.id, delay=7.0)
+    )
+
+
+async def _resolve_twin_cone(
+    db: AsyncSession, user: User, *, demo: bool
+) -> tuple[list[dict[str, Any]] | None, int]:
+    """Return (cone_data, horizon_years) or (None, 0) if compute failed.
+
+    Demo flow short-circuits to the precomputed/cached cone — the demo
+    is identical for every user so we never hit the DB and never let
+    a transient upstream flake break the first product moment.
+    """
+    if demo:
+        from backend.twin.services import demo_twin_service
+
+        return demo_twin_service.compute_demo_cone(), demo_twin_service.demo_horizon_years()
+
+    from backend.twin.services import twin_projection_service
+
+    try:
+        projections = await twin_projection_service.compute_and_store(
+            db, user.id, scenario="current"
+        )
+    except Exception:
+        logger.exception("First-Twin compute failed for user %s", user.id)
+        return None, 0
+    if not projections:
+        logger.warning("First-Twin compute returned no rows for user %s", user.id)
+        return None, 0
+    proj = projections[0]
+    return proj.cone_data, proj.horizon_years
+
+
+async def _send_twin_compute_failed(chat_id: int) -> None:
+    await send_message(
+        chat_id,
+        twin_narrative_service_v2.compute_failed_text(),
+        parse_mode="HTML",
+        reply_markup=twin_narrative_service_v2.compute_failed_keyboard(),
     )
 
 
@@ -954,6 +1011,10 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
 
     if action == "exit_demo":
         await _on_exit_demo(db, chat_id, callback_id, user)
+        return True
+
+    if action == "retry_twin":
+        await _on_retry_twin(db, chat_id, callback_id, user)
         return True
 
     if action == "resume":
