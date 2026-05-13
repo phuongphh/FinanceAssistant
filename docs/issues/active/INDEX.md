@@ -53,5 +53,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
 | #591 | [Story] P4.2.5-3.3: User status change action | [issue-591.md](issue-591.md) |
 | #592 | [Story] P4.2.5-4.1: Vite project setup + Tailwind + design tokens | [issue-592.md](issue-592.md) |
+| #594 | [Story] P4.2.5-4.3: Dashboard layout (header + hero + grid framework) | [issue-594.md](issue-594.md) |
 
-**Total active:** 49
+**Total active:** 50
