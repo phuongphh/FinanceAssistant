@@ -14,16 +14,19 @@ wizards):
   5. Dispatcher's UNCLEAR / OOS reply — final fallback so the user
      always gets a friendly message (no silent fail).
 """
+
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.handlers import free_form_text as intent_layer
 from backend.bot.handlers.transaction import send_transaction_confirmation
+from backend.bot.keyboards.transaction_keyboard import transaction_source_keyboard
 from backend.intent import pending_action
 from backend.intent.dispatcher import (
     OUTCOME_CLARIFY_SENT,
@@ -33,7 +36,7 @@ from backend.intent.dispatcher import (
 )
 from backend.intent.intents import IntentType
 from backend.schemas.expense import ExpenseCreate
-from backend.services import expense_service, report_service
+from backend.services import expense_service, report_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message
@@ -55,6 +58,60 @@ Quy tắc:
 Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
+
+_AMOUNT_RE = re.compile(
+    r"^\s*(?P<sign>[+-])?\s*(?P<num>\d+(?:[\.,]\d+)?)\s*(?P<unit>k|nghìn|tr|triệu|m)?\s+(?P<desc>.+)$",
+    re.IGNORECASE,
+)
+
+
+def _parse_signed_transaction(text: str) -> dict | None:
+    match = _AMOUNT_RE.match(text)
+    if not match:
+        return None
+    raw_num = match.group("num").replace(",", ".")
+    try:
+        amount = float(raw_num)
+    except ValueError:
+        return None
+    unit = (match.group("unit") or "").lower()
+    if unit in {"k", "nghìn"}:
+        amount *= 1_000
+    elif unit in {"tr", "triệu", "m"}:
+        amount *= 1_000_000
+    if amount <= 0:
+        return None
+    sign = match.group("sign") or "-"
+    desc = match.group("desc").strip()[:500]
+    return {
+        "amount": amount,
+        "merchant": desc,
+        "note": text[:1000],
+        "transaction_type": "money_in" if sign == "+" else "expense",
+    }
+
+
+async def _start_source_prompt(
+    db: AsyncSession, chat_id: int, user, parsed: dict
+) -> bool:
+    tx_type = parsed["transaction_type"]
+    await wizard_service.start_flow(
+        db,
+        user.id,
+        "transaction_source_select",
+        "source_type",
+        draft=parsed,
+    )
+    prompt = (
+        "Tiền này vào nguồn nào?" if tx_type == "money_in" else "Trừ tiền từ nguồn nào?"
+    )
+    await send_message(
+        chat_id,
+        f"{prompt}\n{parsed['merchant']} · {parsed['amount']:,.0f}đ",
+        reply_markup=transaction_source_keyboard(tx_type),
+    )
+    return True
+
 
 # Outcome kinds that mean "the user got their answer / a follow-up
 # prompt — do NOT fall through to the LLM transaction parser".
@@ -106,6 +163,11 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         await send_message(chat_id, _NOT_REGISTERED)
         return True
 
+    # Fast-path for explicit +/- expense syntax before generic intent routing.
+    signed = _parse_signed_transaction(text)
+    if signed is not None:
+        return await _start_source_prompt(db, chat_id, user, signed)
+
     # Phase 3.5 — full intent flow with confirm/clarify state handling.
     outcome = await intent_layer.classify_and_dispatch(
         db=db, chat_id=chat_id, user=user, text=text
@@ -115,10 +177,7 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         return False  # empty text — shouldn't happen given the early return
 
     # Confident execution OR terminal outcomes (clarify/confirm/OOS) — done.
-    if (
-        outcome.kind not in (OUTCOME_UNCLEAR,)
-        and outcome.intent != IntentType.UNCLEAR
-    ):
+    if outcome.kind not in (OUTCOME_UNCLEAR,) and outcome.intent != IntentType.UNCLEAR:
         return True
     if outcome.kind in _TERMINAL_OUTCOMES:
         return True
@@ -142,11 +201,7 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         logger.exception("LLM parse failed for text: %r", text)
         parsed = None
 
-    if (
-        parsed
-        and parsed.get("is_expense")
-        and float(parsed.get("amount", 0)) > 0
-    ):
+    if parsed and parsed.get("is_expense") and float(parsed.get("amount", 0)) > 0:
         expense_data = ExpenseCreate(
             amount=float(parsed["amount"]),
             merchant=parsed.get("merchant") or text,
@@ -180,9 +235,7 @@ async def handle_intent_callback(db: AsyncSession, callback_query: dict) -> bool
     from backend.intent import follow_up
 
     data = callback_query.get("data", "")
-    if not (
-        data.startswith("intent_") or data.startswith(follow_up.CALLBACK_PREFIX)
-    ):
+    if not (data.startswith("intent_") or data.startswith(follow_up.CALLBACK_PREFIX)):
         return False
 
     chat_id = callback_query["message"]["chat"]["id"]
@@ -247,6 +300,7 @@ async def _handle_followup_callback(
     await intent_layer._send_outcome(chat_id, outcome)
 
     from backend import analytics
+
     analytics.track(
         "intent_followup_tapped",
         user_id=user.id,

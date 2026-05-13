@@ -314,6 +314,7 @@ async def _get_breakdown(db: AsyncSession, user_id: uuid.UUID, month_key: str) -
             Expense.user_id == user_id,
             Expense.month_key == month_key,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         .group_by(Expense.category)
     )

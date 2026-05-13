@@ -487,13 +487,12 @@ async def get_overview(
                     "category_emoji": item["category"]["emoji"],
                     "expense_date": item["date"],
                     "note": item.get("merchant"),
-                } for item in expenses
+                }
+                for item in expenses
             ],
         },
         "error": None,
     }
-
-
 
 
 @router.get("/api/expenses")
@@ -509,7 +508,12 @@ async def miniapp_list_expenses(
     user = await _resolve_user(auth, db)
     month_key = month or dashboard_service.current_month_key()
     items = await expense_service.list_expenses(
-        db, user.id, month=month_key, limit=limit, offset=0
+        db,
+        user.id,
+        month=month_key,
+        transaction_type="expense",
+        limit=limit,
+        offset=0,
     )
     return {
         "data": [_serialize_expense_item(item) for item in items],
@@ -590,8 +594,29 @@ async def miniapp_delete_expense(
 
 
 def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
-    allowed = {"amount", "currency", "merchant", "category", "expense_date", "note", "needs_review"}
-    clean = {k: v for k, v in payload.items() if k in allowed and v not in (None, "")}
+    allowed = {
+        "amount",
+        "currency",
+        "merchant",
+        "category",
+        "expense_date",
+        "note",
+        "needs_review",
+        "transaction_type",
+        "source_type",
+        "e_wallet_provider",
+        "source_asset_id",
+    }
+    source_fields = {"source_type", "e_wallet_provider", "source_asset_id"}
+    clean = {}
+    for k, v in payload.items():
+        if k not in allowed or v == "":
+            continue
+        if v is None and not (partial and k in source_fields):
+            continue
+        clean[k] = v
+    if clean.get("transaction_type") == "money_in":
+        clean.setdefault("category", "income")
     payment_method = str(payload.get("payment_method") or "").strip()[:64]
     if payment_method:
         clean["raw_data"] = {"payment_method": payment_method}
@@ -608,6 +633,7 @@ def _serialize_expense_item(expense) -> dict:
     return {
         "id": str(expense.id),
         "amount": float(expense.amount or 0),
+        "transaction_type": getattr(expense, "transaction_type", "expense"),
         "currency": expense.currency or "VND",
         "merchant": expense.merchant,
         "category": category,
@@ -616,7 +642,16 @@ def _serialize_expense_item(expense) -> dict:
         "expense_date": expense.expense_date.isoformat(),
         "month_key": expense.month_key,
         "note": expense.note,
-        "payment_method": (expense.raw_data or {}).get("payment_method") if expense.raw_data else None,
+        "payment_method": (
+            (expense.raw_data or {}).get("payment_method") if expense.raw_data else None
+        ),
+        "source_type": getattr(expense, "source_type", None),
+        "e_wallet_provider": getattr(expense, "e_wallet_provider", None),
+        "source_asset_id": (
+            str(expense.source_asset_id)
+            if getattr(expense, "source_asset_id", None)
+            else None
+        ),
     }
 
 
@@ -716,7 +751,20 @@ async def get_expense_dashboard_overview(
             )
             daily_trend = await dashboard_service.get_daily_trend(db, user.id, days=30)
             expenses = await expense_service.list_expenses(
-                db, user.id, month=month_key, limit=200, offset=0
+                db,
+                user.id,
+                month=month_key,
+                transaction_type="expense",
+                limit=200,
+                offset=0,
+            )
+            money_in = await expense_service.list_expenses(
+                db,
+                user.id,
+                month=month_key,
+                transaction_type="money_in",
+                limit=200,
+                offset=0,
             )
 
             # Month-over-month change so the hero card can show direction.
@@ -725,9 +773,7 @@ async def get_expense_dashboard_overview(
                 db, user.id, prev_month
             )
             change_amount = total_spent - prev_total
-            change_pct = (
-                (change_amount / prev_total * 100.0) if prev_total > 0 else 0.0
-            )
+            change_pct = (change_amount / prev_total * 100.0) if prev_total > 0 else 0.0
 
             payload = {
                 "month": month_key,
@@ -741,6 +787,8 @@ async def get_expense_dashboard_overview(
                 "breakdown": top_categories,
                 "daily_trend": daily_trend,
                 "expenses": [_serialize_expense_item(e) for e in expenses],
+                "money_in": [_serialize_expense_item(e) for e in money_in],
+                "money_in_total": sum(float(e.amount or 0) for e in money_in),
             }
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
