@@ -46,9 +46,10 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #584 | [Story] P4.2.5-2.1: Overview stats endpoint | [issue-584.md](issue-584.md) |
 | #585 | [Story] P4.2.5-2.2: User growth & DAU chart endpoints | [issue-585.md](issue-585.md) |
 | #586 | [Story] P4.2.5-2.3: Feature events tracking + clicks endpoint | [issue-586.md](issue-586.md) |
+| #587 | [Story] P4.2.5-2.4: Intent breakdown + tier distribution endpoints | [issue-587.md](issue-587.md) |
 | #588 | [Story] P4.2.5-2.5: Cohort retention endpoint | [issue-588.md](issue-588.md) |
 | #589 | [Story] P4.2.5-3.1: User list endpoint voi search/filter/pagination | [issue-589.md](issue-589.md) |
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
 | #591 | [Story] P4.2.5-3.3: User status change action | [issue-591.md](issue-591.md) |
 
-**Total active:** 46
+**Total active:** 47
