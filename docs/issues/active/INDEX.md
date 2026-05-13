@@ -34,5 +34,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
+| #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 
-**Total active:** 30
+**Total active:** 31
