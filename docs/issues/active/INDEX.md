@@ -40,5 +40,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #577 | [Epic] Phase 4.2.5 — Epic 5: Dashboard Components | [issue-577.md](issue-577.md) |
 | #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
 | #580 | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [issue-580.md](issue-580.md) |
+| #581 | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [issue-581.md](issue-581.md) |
 
-**Total active:** 36
+**Total active:** 37
