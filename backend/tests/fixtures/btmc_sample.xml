@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DataList>
+  <Data row="1" n_1="1" name_1="VÀNG MIẾNG SJC" karat_1="24K" gold_content_1="999.9" buy_1="16.450" sell_1="16.750" buy_1k="16450000" sell_1k="16750000" row_date_1="08/05/2026 19:00" time_now="08/05/2026 19:00:00" />
+  <Data row="2" n_2="2" name_2="NHẪN TRÒN TRƠN BTMC" karat_2="24K" gold_content_2="999.9" buy_2="16.400" sell_2="16.700" buy_2k="16400000" sell_2k="16700000" row_date_2="08/05/2026 19:00" time_now="08/05/2026 19:00:00" />
+  <Data row="3" n_3="3" name_3="BẠC THỎI 2025" karat_3="999" gold_content_3="999" buy_3="1.250" sell_3="1.300" buy_3k="1250000" sell_3k="1300000" row_date_3="08/05/2026 19:00" time_now="08/05/2026 19:00:00" />
+</DataList>

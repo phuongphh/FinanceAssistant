@@ -1,0 +1,55 @@
+# Phase 3.7 — Tier classification fixtures.
+#
+# Each entry: (vietnamese query, expected tier, optional extras).
+# Used by test_orchestrator.py::TestHeuristics — failing here means
+# the heuristic regex YAML drifted from the spec.
+#
+# The orchestrator routes "ambiguous" through the cascade
+# (Tier 1 first); a fixture marked "ambiguous" is asserting the
+# heuristic stays out of the way.
+
+tier2:
+  - query: "Mã chứng khoán nào của tôi đang lãi?"
+    note: "filter:gain_pct>0"
+  - query: "Liệt kê các mã đang lỗ"
+    note: "filter:gain_pct<0"
+  - query: "Top 3 mã lãi nhiều nhất"
+    note: "sort+limit"
+  - query: "Top 5 chi tiêu lớn nhất tháng này"
+  - query: "Tài sản trên 1 tỷ"
+  - query: "Tài sản dưới 100 triệu"
+  - query: "Tổng lãi portfolio của tôi"
+    note: "aggregate"
+  - query: "Trung bình chi tiêu 6 tháng qua"
+  - query: "Tỷ lệ tiết kiệm tháng này"
+  - query: "Chi tháng này so với tháng trước"
+    note: "compare"
+  - query: "VNM vs HPG"
+  - query: "Mã có giá trị cao nhất"
+  - query: "Cao nhất là mã nào"
+  - query: "Chênh lệch chi tiêu"
+  - query: "Cổ phiếu lớn nhất"
+
+tier3:
+  - query: "Có nên bán FLC để cắt lỗ không?"
+    note: "should + decision"
+  - query: "Làm thế nào để đạt mục tiêu mua xe trong 2 năm?"
+    note: "plan"
+  - query: "Nếu tôi giảm chi 20% thì tiết kiệm được bao nhiêu?"
+    note: "what-if"
+  - query: "Tư vấn giúp mình portfolio"
+    note: "advice"
+  - query: "Tại sao chi tiêu tháng này tăng?"
+    note: "why"
+
+# Cascade — these should fall through to Tier 1 cleanly.
+ambiguous:
+  - query: "Tài sản của tôi có gì?"
+  - query: "VNM giá bao nhiêu?"
+  - query: "Hello"
+  - query: "Tôi nắm 100 cổ VNM"
+  - query: "Chi tiêu hôm nay"
+  - query: "Mục tiêu của tôi"
+  - query: "Đặt mục tiêu 100tr"
+  - query: "Báo cáo tháng này"
+  - query: "Help"

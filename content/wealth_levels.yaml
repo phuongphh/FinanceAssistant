@@ -1,0 +1,31 @@
+# Phase 3.8.5 — VN-native wealth levels for user profile.
+# Boundaries: inclusive lower bound, exclusive upper bound.
+levels:
+  - id: starter
+    name_vn: "Khởi Đầu"
+    name_en: "Starter"
+    icon: "🌱"
+    net_worth_min: 0
+    net_worth_max: 30000000
+    description: "Đang xây nền móng tài chính đầu tiên."
+  - id: young_prof
+    name_vn: "Trẻ Năng Động"
+    name_en: "Young Professional"
+    icon: "🚀"
+    net_worth_min: 30000000
+    net_worth_max: 200000000
+    description: "Đã có đà tích luỹ và bắt đầu mở rộng danh mục."
+  - id: mass_affluent
+    name_vn: "Trung Lưu Vững"
+    name_en: "Mass Affluent"
+    icon: "💎"
+    net_worth_min: 200000000
+    net_worth_max: 1000000000
+    description: "Nền tảng tài sản vững, phù hợp tối ưu hoá dài hạn."
+  - id: hnw
+    name_vn: "Tinh Hoa"
+    name_en: "High Net Worth"
+    icon: "🏆"
+    net_worth_min: 1000000000
+    net_worth_max: null
+    description: "Tài sản lớn, ưu tiên bảo toàn và tăng trưởng bền vững."

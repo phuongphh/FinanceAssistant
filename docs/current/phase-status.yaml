@@ -1,0 +1,261 @@
+# Phase status — single source of truth.
+#
+# This file is read by ``scripts/sync_phase_status.py`` to update the
+# marked sections in CLAUDE.md, README.md, docs/README.md, and
+# docs/current/strategy.md. Edit THIS file when phases change; the
+# auto-sync workflow propagates to the rest.
+#
+# Workflow: ``.github/workflows/sync-phase-status.yml`` reruns the
+# sync on every push that touches this file (or the consumer
+# files / the script itself). When a new ``phase-*-detailed.md``
+# is added without a matching roadmap entry, the sync script
+# auto-inserts a skeleton entry (status=planned, skeleton=true)
+# that the dev must manually fill in before re-pushing — the
+# ``--check`` mode fails CI while ``skeleton: true`` is present.
+#
+# Schema:
+#   current_phase     — id of the phase the team is actively working on
+#   phases[]          — every phase the team plans to ship, in order
+#     id              — short tag, used in section headings (e.g. "3.5")
+#     name            — human title (Vietnamese OK)
+#     status          — done | current | testing | next | planned
+#     duration        — informational ("3 tuần", "4 tuần", "TBD")
+#     detail_doc      — path (relative to repo root); empty if not yet drafted
+#     issues_doc      — path; empty if no GitHub-ready issue list
+#     description     — 1-line summary that goes into roadmap tables
+#     completed_date  — ISO date OR empty; populated when status flips to "done"
+#     icon            — emoji shown next to the name in tables
+#     skeleton        — OPTIONAL bool. Auto-set true by sync script when it
+#                       inserts a placeholder for a phase-*-detailed.md
+#                       that has no entry yet. Dev must hand-fill the real
+#                       fields and remove this key. CI --check fails while
+#                       any entry has skeleton: true.
+#
+# Adding a new phase:
+#   1. Append an entry under phases (or let sync auto-insert a skeleton
+#      placeholder, then hand-fill the real fields).
+#   2. If you flip current_phase, set the previous phase's status to "done".
+#   3. Commit. The workflow updates all marker sections.
+
+current_phase: "4.1"
+
+phases:
+  - id: "1"
+    name: "UX Foundation"
+    status: done
+    duration: "3 tuần"
+    detail_doc: "docs/archive/phase-1-detailed.md"
+    issues_doc: ""
+    description: "Telegram bot + manual entry + monthly report + Notion dashboard"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "2"
+    name: "Personality & Care"
+    status: done
+    duration: "3 tuần"
+    detail_doc: "docs/archive/phase-2-detailed.md"
+    issues_doc: ""
+    description: "Onboarding, Bé Tiền tone, milestone celebration, empathy engine"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3A"
+    name: "Wealth Foundation"
+    status: done
+    duration: "4 tuần"
+    detail_doc: "docs/archive/phase-3a-detailed.md"
+    issues_doc: "docs/archive/phase-3a-issues.md"
+    description: "Asset model, net worth, morning briefing, Mini App dashboard"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3.5"
+    name: "Intent Understanding Layer"
+    status: done
+    duration: "3 tuần"
+    detail_doc: "docs/current/phase-3.5-detailed.md"
+    issues_doc: "docs/archive/phase-3.5-issues.md"
+    description: "Rule + LLM intent classifier, confirm/clarify, advisory, voice queries"
+    completed_date: "2026-05-02"
+    icon: "✅"
+
+  - id: "3.6"
+    name: "Menu UX Revamp"
+    status: done
+    duration: "1.5 tuần"
+    detail_doc: "docs/archive/phase-3.6-detailed.md"
+    issues_doc: "docs/archive/phase-3.6-issues.md"
+    description: "Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu"
+    completed_date: "2026-05-05"
+    icon: "✅"
+
+  - id: "3.7"
+    name: "Agent Architecture"
+    status: done
+    duration: "3 tuần"
+    detail_doc: "docs/current/phase-3.7-detailed.md"
+    issues_doc: "docs/current/phase-3.7-issues.md"
+    description: "Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3.8"
+    name: "Wealth Completion"
+    status: done
+    duration: "2 tuần"
+    detail_doc: "docs/current/phase-3.8-detailed.md"
+    issues_doc: "docs/current/phase-3.8-issues.md"
+    description: "Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility"
+    completed_date: ""
+    icon: "✅"
+
+  - id: "3.8.5"
+    name: "Pre-Launch Readiness"
+    status: done
+    duration: "3-4 ngày"
+    detail_doc: "docs/current/phase-3.8.5/phase-3.8.5-detailed.md"
+    issues_doc: "docs/current/phase-3.8.5/phase-3.8.5-issues.md"
+    description: "Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows)"
+    completed_date: "2026-05-08"
+    icon: "✅"
+
+  - id: "3.9"
+    name: "Market Data Real"
+    status: done
+    duration: "3 tuần"
+    detail_doc: "docs/current/phase-3.9/phase-3.9-detailed.md"
+    issues_doc: "docs/current/phase-3.9/phase-3.9-issues.md"
+    description: "Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete"
+    completed_date: "2026-05-08"
+    icon: "✅"
+
+  - id: "3.9.5"
+    name: "Pre-Launch UX Polish"
+    status: done
+    duration: "5-7 ngày"
+    detail_doc: "docs/current/phase-3.9.5/phase-3.9.5-detailed.md"
+    issues_doc: "docs/current/phase-3.9.5/phase-3.9.5-issues.md"
+    description: "Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026."
+    completed_date: "2026-05-11"
+    icon: "✅"
+
+  - id: "3B"
+    name: "Market Intelligence"
+    status: planned
+    duration: "TBD"
+    detail_doc: "docs/current/phase-3b-outline.md"
+    issues_doc: ""
+    description: "Real market data, advisory deepening, portfolio analytics"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "4A"
+    name: "Financial Twin Conservative MVP"
+    status: done
+    duration: "~3 tuần"
+    detail_doc: "docs/current/phase-4A/phase-4A-detailed.md"
+    issues_doc: "docs/current/phase-4A/phase-4A-issues.md"
+    description: "Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation"
+    completed_date: "2026-05-11"
+    icon: "✅"
+
+  - id: "4B"
+    name: "Twin Polish + Life Events + Cashflow v2 + Zalo"
+    status: done
+    duration: "~4 tuần"
+    detail_doc: "docs/current/phase-4B/phase-4B-detailed.md"
+    issues_doc: "docs/current/phase-4B/phase-4B-issues.md"
+    description: "Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation"
+    completed_date: "2026-05-12"
+    icon: "✅"
+
+  - id: "4.1"
+    name: "Pre-Launch Hardening"
+    status: current
+    duration: "~3 tuần"
+    detail_doc: "docs/current/phase-4.1/phase-4.1-detailed.md"
+    issues_doc: "docs/current/phase-4.1/phase-4.1-issues.md"
+    description: "Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026)"
+    completed_date: ""
+    icon: "🛠"
+
+  - id: "5.1"
+    name: "Zalo Spike & OA Verification"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.2"
+    name: "Zalo Core Product Parity"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.3"
+    name: "Zalo Mini App"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.4"
+    name: "Achievement & Badges"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.5"
+    name: "Behavioral Engine"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.6"
+    name: "Household Mode"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Multi-user household: shared assets, joint goals, privacy boundaries (mỗi thành viên có view riêng), couple Twin"
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.7"
+    name: "Monetization Infrastructure"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "License management, rate limit + tier enforcement (free/pro/cfo UI), payment integration (VN gateways: VNPay/MoMo/ZaloPay), reconciliation + invoice. Pricing re-validate sau khi infra sẵn sàng."
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "6.0"
+    name: "Tết Launch (Public)"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Public launch tháng 2/2027 (Tết) — Zalo là primary channel, Telegram secondary. Marketing campaign, multi-region, public pricing live."
+    completed_date: ""
+    icon: "🔮"

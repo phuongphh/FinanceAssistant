@@ -3,11 +3,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from backend.bot.setup_commands import setup_bot_commands
 from backend.services.telegram_service import (
     answer_callback,
-    handle_menu_callback,
-    register_bot_commands,
-    send_menu,
     send_message,
     send_telegram,
 )
@@ -22,17 +20,24 @@ def mock_settings():
 
 @pytest.fixture
 def mock_httpx():
-    with patch("backend.services.telegram_service.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"ok": True, "result": True}
-        mock_response.text = '{"ok": true}'
-        mock_client.post.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+    # send_telegram() now reuses a singleton AsyncClient (see the asset-wizard
+    # latency fix). Patch the getter directly so each test gets a fresh mock
+    # without leaking the singleton across tests.
+    import backend.services.telegram_service as ts
+
+    mock_client = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"ok": True, "result": True}
+    mock_response.text = '{"ok": true}'
+    mock_client.post.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    saved_client = ts._client
+    ts._client = None
+    with patch.object(ts, "_get_client", AsyncMock(return_value=mock_client)):
         yield mock_client
+    ts._client = saved_client
 
 
 class TestSendTelegram:
@@ -57,6 +62,114 @@ class TestSendTelegram:
         result = await send_telegram("sendMessage", {"chat_id": 123})
         assert result is None
 
+    @pytest.mark.asyncio
+    async def test_retries_without_parse_mode_on_parse_entities_error(
+        self, mock_settings, mock_httpx
+    ):
+        """Last-resort retry: even if the sanitizer (#231) misses a case
+        and Telegram still rejects, we drop ``parse_mode`` so the user
+        sees raw text instead of nothing.
+
+        Uses input the sanitizer leaves alone (already-balanced) so the
+        body Telegram rejects is identical to the body we sent. This
+        keeps the test focused on the retry behaviour, not the sanitizer
+        (which has its own dedicated tests).
+        """
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: can\'t parse entities: '
+            'Can\'t find end of the entity starting at byte offset 1217"}'
+        )
+        good_response = MagicMock()
+        good_response.status_code = 200
+        good_response.json.return_value = {"ok": True, "result": {"message_id": 1}}
+        good_response.text = '{"ok": true}'
+        mock_httpx.post.side_effect = [bad_response, good_response]
+
+        result = await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "hi *balanced* text",
+                "parse_mode": "Markdown",
+            },
+        )
+
+        assert result == {"ok": True, "result": {"message_id": 1}}
+        assert mock_httpx.post.call_count == 2
+        # Retry payload must NOT carry parse_mode anymore.
+        retry_payload = mock_httpx.post.call_args_list[1][1]["json"]
+        assert "parse_mode" not in retry_payload
+        assert retry_payload["text"] == "hi *balanced* text"
+        assert retry_payload["chat_id"] == 123
+
+    @pytest.mark.asyncio
+    async def test_retries_without_entities_on_parse_entities_error(
+        self, mock_settings, mock_httpx
+    ):
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: can\'t parse entities: custom emoji invalid"}'
+        )
+        good_response = MagicMock()
+        good_response.status_code = 200
+        good_response.json.return_value = {"ok": True, "result": {"message_id": 1}}
+        good_response.text = '{"ok": true}'
+        mock_httpx.post.side_effect = [bad_response, good_response]
+
+        result = await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "💰 hello",
+                "entities": [
+                    {
+                        "type": "custom_emoji",
+                        "offset": 0,
+                        "length": 2,
+                        "custom_emoji_id": "bad-id",
+                    }
+                ],
+            },
+        )
+
+        assert result == {"ok": True, "result": {"message_id": 1}}
+        retry_payload = mock_httpx.post.call_args_list[1][1]["json"]
+        assert "entities" not in retry_payload
+        assert "parse_mode" not in retry_payload
+        assert retry_payload["text"] == "💰 hello"
+
+    @pytest.mark.asyncio
+    async def test_no_retry_when_400_is_not_parse_entities(
+        self, mock_settings, mock_httpx
+    ):
+        """Other 400s (chat not found, etc.) must not trigger a retry."""
+        from unittest.mock import MagicMock
+
+        bad_response = MagicMock()
+        bad_response.status_code = 400
+        bad_response.text = (
+            '{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}'
+        )
+        mock_httpx.post.side_effect = None
+        mock_httpx.post.return_value = bad_response
+
+        result = await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": "hi", "parse_mode": "Markdown"},
+        )
+
+        assert result is None
+        assert mock_httpx.post.call_count == 1
+
 
 class TestSendMessage:
     @pytest.mark.asyncio
@@ -67,14 +180,203 @@ class TestSendMessage:
         assert payload["text"] == "hello"
         assert payload["parse_mode"] == "Markdown"
 
-
-class TestSendMenu:
     @pytest.mark.asyncio
-    async def test_sends_inline_keyboard(self, mock_settings, mock_httpx):
-        await send_menu(123)
+    async def test_sends_entities_without_parse_mode(self, mock_settings, mock_httpx):
+        entities = [
+            {
+                "type": "custom_emoji",
+                "offset": 0,
+                "length": 2,
+                "custom_emoji_id": "money-id",
+            }
+        ]
+        await send_message(123, "💰 hello", parse_mode="Markdown", entities=entities)
         payload = mock_httpx.post.call_args[1]["json"]
-        assert "reply_markup" in payload
-        assert "inline_keyboard" in payload["reply_markup"]
+        assert payload["chat_id"] == 123
+        assert payload["text"] == "💰 hello"
+        assert payload["entities"] == entities
+        assert "parse_mode" not in payload
+
+
+class TestPreSendSanitization:
+    """The sanitizer must run BEFORE the HTTP call so unbalanced markdown
+    never reaches Telegram in the first place. The plain-text retry
+    (#230) stays as a fallback, but should rarely fire after this.
+    """
+
+    @pytest.mark.asyncio
+    async def test_unbalanced_bold_is_escaped_before_send(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "Mua *VinHomes",  # truncated mid-bold
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        # Sanitizer escaped the stray ``*`` so Telegram parses cleanly.
+        assert sent_payload["text"] == "Mua \\*VinHomes"
+        # Single API call — no retry needed because the body is now valid.
+        assert mock_httpx.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_list_bullets_are_escaped_before_send(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "sendMessage",
+            {
+                "chat_id": 123,
+                "text": "Gợi ý:\n* Mục 1\n* Mục 2",
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert "\\* Mục 1" in sent_payload["text"]
+        assert "\\* Mục 2" in sent_payload["text"]
+
+    @pytest.mark.asyncio
+    async def test_balanced_markdown_passes_through_unchanged(
+        self, mock_settings, mock_httpx
+    ):
+        original = "Hôm nay *quan trọng* và _gợi ý_ cho bạn."
+        await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": original, "parse_mode": "Markdown"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_html_mode_is_not_touched_by_sanitizer(
+        self, mock_settings, mock_httpx
+    ):
+        # The sanitizer only knows Markdown; HTML has its own escaping.
+        original = "<b>Hello *world*</b>"
+        await send_telegram(
+            "sendMessage",
+            {"chat_id": 123, "text": original, "parse_mode": "HTML"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_no_parse_mode_skips_sanitizer(
+        self, mock_settings, mock_httpx
+    ):
+        # Plain text doesn't need sanitization.
+        original = "Mua *VinHomes (raw text, no parser)"
+        await send_telegram(
+            "sendMessage", {"chat_id": 123, "text": original}
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == original
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_also_sanitized(
+        self, mock_settings, mock_httpx
+    ):
+        await send_telegram(
+            "editMessageText",
+            {
+                "chat_id": 123,
+                "message_id": 456,
+                "text": "Cập nhật *truncated",
+                "parse_mode": "Markdown",
+            },
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        assert sent_payload["text"] == "Cập nhật \\*truncated"
+
+    @pytest.mark.asyncio
+    async def test_non_text_method_payload_untouched(
+        self, mock_settings, mock_httpx
+    ):
+        # answerCallbackQuery has no body; sanitizer must be a no-op.
+        await send_telegram(
+            "answerCallbackQuery",
+            {"callback_query_id": "cb-1", "text": "Stray *marker"},
+        )
+        sent_payload = mock_httpx.post.call_args[1]["json"]
+        # No parse_mode means the sanitizer's gate skips this anyway,
+        # and we don't have answerCallbackQuery in the field map.
+        assert sent_payload["text"] == "Stray *marker"
+
+
+class TestReplyMarkupSizeGuard:
+    """Guard against the silent ``Bad Request: reply markup is too long``
+    failure when a keyboard exceeds Telegram's ~10 KB practical limit.
+
+    The transport layer is the last line of defense — primary fix is
+    pagination at the keyboard layer. The guard catches regressions from
+    future menus that forget to paginate.
+    """
+
+    def _huge_markup(self, n_rows: int = 200) -> dict:
+        # ~85 bytes per row keeps the test deterministic regardless of
+        # asset_keyboard.py changes downstream.
+        return {
+            "inline_keyboard": [
+                [{"text": f"row {i:03d} padding text", "callback_data": f"row:{i:03d}"}]
+                for i in range(n_rows)
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_small_markup_is_passed_through(self, mock_settings, mock_httpx):
+        small = {"inline_keyboard": [[{"text": "OK", "callback_data": "ok"}]]}
+        await send_telegram(
+            "sendMessage", {"chat_id": 1, "text": "hi", "reply_markup": small}
+        )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert sent["reply_markup"] == small
+
+    @pytest.mark.asyncio
+    async def test_oversized_markup_is_dropped_but_text_survives(
+        self, mock_settings, mock_httpx, caplog
+    ):
+        import logging
+
+        huge = self._huge_markup(n_rows=200)
+        with caplog.at_level(logging.ERROR, logger="backend.services.telegram_service"):
+            await send_telegram(
+                "sendMessage",
+                {"chat_id": 1, "text": "body still visible", "reply_markup": huge},
+            )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert "reply_markup" not in sent, (
+            "Oversized markup must be stripped so Telegram doesn't reject "
+            "the whole message"
+        )
+        assert sent["text"] == "body still visible"
+        assert any(
+            "reply markup" in rec.message.lower() and "cap" in rec.message.lower()
+            for rec in caplog.records
+        ), "Guard must log so silent regressions surface in production"
+
+    @pytest.mark.asyncio
+    async def test_edit_message_text_also_guarded(self, mock_settings, mock_httpx):
+        huge = self._huge_markup(n_rows=200)
+        await send_telegram(
+            "editMessageText",
+            {
+                "chat_id": 1,
+                "message_id": 9,
+                "text": "edit",
+                "reply_markup": huge,
+            },
+        )
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert "reply_markup" not in sent
+
+    @pytest.mark.asyncio
+    async def test_no_markup_payload_unchanged(self, mock_settings, mock_httpx):
+        await send_telegram("sendMessage", {"chat_id": 1, "text": "plain"})
+        sent = mock_httpx.post.call_args[1]["json"]
+        assert sent == {"chat_id": 1, "text": "plain"}
 
 
 class TestAnswerCallback:
@@ -85,24 +387,20 @@ class TestAnswerCallback:
         assert "answerCallbackQuery" in call_url
 
 
-class TestHandleMenuCallback:
-    @pytest.mark.asyncio
-    async def test_valid_callback_sends_response(self, mock_settings, mock_httpx):
-        result = await handle_menu_callback(123, "menu:gmail_scan")
-        assert result is not None
-        payload = mock_httpx.post.call_args[1]["json"]
-        assert payload["chat_id"] == 123
-        assert "Gmail" in payload["text"]
-
-    @pytest.mark.asyncio
-    async def test_invalid_callback_returns_none(self, mock_settings, mock_httpx):
-        result = await handle_menu_callback(123, "menu:nonexistent")
-        assert result is None
-
-
-class TestRegisterBotCommands:
+class TestSetupBotCommands:
     @pytest.mark.asyncio
     async def test_calls_set_my_commands(self, mock_settings, mock_httpx):
-        await register_bot_commands()
+        await setup_bot_commands()
         call_url = mock_httpx.post.call_args[0][0]
         assert "setMyCommands" in call_url
+
+    @pytest.mark.asyncio
+    async def test_sends_phase_385_commands(self, mock_settings, mock_httpx):
+        await setup_bot_commands()
+        payload = mock_httpx.post.call_args[1]["json"]
+        commands = payload["commands"]
+        names = [c["command"] for c in commands]
+        assert names == ["start", "menu", "help", "dashboard", "baocaosang", "feedback", "about"]
+        # No deprecated V1 commands surfaced — Phase 3.6 cuts the list.
+        for legacy in ("themtaisan", "taisan", "report", "goals", "market"):
+            assert legacy not in names

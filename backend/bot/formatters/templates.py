@@ -2,6 +2,7 @@
 
 Nguyên tắc: Một function = một loại tin nhắn.
 """
+
 from datetime import datetime
 
 from backend.bot.formatters.money import format_money_full, format_money_short
@@ -64,6 +65,25 @@ def format_transaction_confirmation(
                 f"Vượt ngân sách {format_money_short(-remaining)} — cần chú ý 😅"
             )
 
+    return "\n".join(lines)
+
+
+def format_transaction_batch_confirmation(
+    items: list[tuple[str, float, str]],
+    time: datetime | None = None,
+) -> str:
+    """Tin nhắn xác nhận sau khi ghi nhiều giao dịch cùng lúc."""
+    total = sum(amount for _, amount, _ in items)
+    lines: list[str] = [f"✅ Ghi xong {len(items)} khoản!", ""]
+
+    for merchant, amount, category_code in items:
+        cat = get_category(category_code)
+        lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
+
+    lines.append("")
+    lines.append(f"Tổng: {format_money_full(total)}")
+    if time:
+        lines.append(time.strftime("%H:%M"))
     return "\n".join(lines)
 
 
@@ -163,7 +183,7 @@ def format_welcome_message(display_name: str | None = None) -> str:
         "Mình là trợ lý tài chính của bạn.\n"
         "Mình không chỉ ghi chép — mình hiểu bạn.\n\n"
         "Thử ngay nhé:\n"
-        "• Gõ \"45k phở\" để ghi giao dịch\n"
+        '• Gõ "45k phở" để ghi giao dịch\n'
         "• Gửi ảnh hóa đơn\n"
         "• Gửi voice message\n\n"
         "Hoặc tap /menu để xem hướng dẫn đầy đủ 💪"

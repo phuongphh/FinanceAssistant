@@ -8,6 +8,55 @@ from backend.models.llm_cache import LLMCache
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.income_record import IncomeRecord
 from backend.models.event import Event
+from backend.models.user_milestone import MilestoneType, UserMilestone
+from backend.models.streak import UserStreak
+from backend.models.telegram_update import (
+    STATUS_DONE,
+    STATUS_FAILED,
+    STATUS_PROCESSING,
+    TelegramUpdate,
+)
+from backend.models.agent_audit_log import AgentAuditLog
+from backend.feedback.models.feedback import Feedback, PromptSentLog
+from backend.profile.models.user_profile import UserProfile
+from backend.models.bank_rate import BankRateSnapshot
+from backend.models.news_article import NewsArticle
+from backend.models.stock_historical_price import StockHistoricalPrice
+from backend.models.price_alert import NotificationSettings, PriceAlertLog
+from backend.models.twin_projection import TwinProjection
+from backend.models.life_event import LifeEvent, LifeEventType
+from backend.models.conversation_context import (
+    ROLE_ASSISTANT,
+    ROLE_USER,
+    ConversationContext,
+)
+from backend.models.cost_budget import (
+    DEFAULT_BUDGET_VND,
+    TIER_FREE,
+    TIER_PRO,
+    LLMCostLog,
+    UserCostBudget,
+)
+from backend.models.invite_code import InviteCode
+from backend.models.onboarding_session import (
+    ALL_GOALS,
+    GOAL_PLAN_GOAL,
+    GOAL_TRACK_SPENDING,
+    GOAL_UNDERSTAND_WEALTH,
+    SEGMENT_HNW,
+    SEGMENT_MASS_AFFLUENT,
+    SEGMENT_STARTER,
+    SEGMENT_YOUNG_PRO,
+    SIGNAL_CONFUSED,
+    SIGNAL_DISLIKE,
+    SIGNAL_LOVE,
+    STEP_COMPLETED,
+    STEP_FIRST_ASSET,
+    STEP_GOAL_QUESTION,
+    STEP_TWIN_SHOWN,
+    OnboardingSession,
+)
+from backend.models.twin_calibration import HORIZONS_DAYS, TwinCalibrationSnapshot
 
 __all__ = [
     "User",
@@ -20,4 +69,51 @@ __all__ = [
     "PortfolioAsset",
     "IncomeRecord",
     "Event",
+    "UserMilestone",
+    "MilestoneType",
+    "UserStreak",
+    "TelegramUpdate",
+    "STATUS_PROCESSING",
+    "STATUS_DONE",
+    "STATUS_FAILED",
+    "AgentAuditLog",
+    "Feedback",
+    "PromptSentLog",
+    "UserProfile",
+    "BankRateSnapshot",
+    "NewsArticle",
+    "ConversationContext",
+    "ROLE_USER",
+    "ROLE_ASSISTANT",
+    "StockHistoricalPrice",
+    "NotificationSettings",
+    "PriceAlertLog",
+    "TwinProjection",
+    "LifeEvent",
+    "LifeEventType",
+    # Phase 4.1
+    "UserCostBudget",
+    "LLMCostLog",
+    "TIER_FREE",
+    "TIER_PRO",
+    "DEFAULT_BUDGET_VND",
+    "InviteCode",
+    "OnboardingSession",
+    "STEP_GOAL_QUESTION",
+    "STEP_FIRST_ASSET",
+    "STEP_TWIN_SHOWN",
+    "STEP_COMPLETED",
+    "GOAL_UNDERSTAND_WEALTH",
+    "GOAL_PLAN_GOAL",
+    "GOAL_TRACK_SPENDING",
+    "ALL_GOALS",
+    "SEGMENT_STARTER",
+    "SEGMENT_YOUNG_PRO",
+    "SEGMENT_MASS_AFFLUENT",
+    "SEGMENT_HNW",
+    "SIGNAL_LOVE",
+    "SIGNAL_CONFUSED",
+    "SIGNAL_DISLIKE",
+    "TwinCalibrationSnapshot",
+    "HORIZONS_DAYS",
 ]

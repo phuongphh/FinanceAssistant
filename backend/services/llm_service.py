@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import uuid
 from datetime import datetime, timedelta
 
 from openai import AsyncOpenAI
@@ -28,6 +29,29 @@ class LLMError(Exception):
 
 def _hash_prompt(prompt: str) -> str:
     return hashlib.sha256(prompt.encode()).hexdigest()
+
+
+def _build_cache_key(
+    task_type: str,
+    prompt_hash: str,
+    user_id: uuid.UUID | None,
+    shared_cache: bool,
+) -> str:
+    """Build a cache key scoped to the right tenant.
+
+    - ``shared_cache=True`` → one entry shared across all users. Use
+      only when the prompt contains no user-specific context (e.g.
+      ``categorize_expense`` sees only merchant + amount).
+    - ``shared_cache=False`` (default) → per-user entry. Prevents one
+      user's cached response leaking through to another when the
+      prompt is personalised (display_name, goals, income, etc.).
+      Falls back to ``anon`` when caller hasn't provided a user_id
+      yet, giving those pre-auth responses their own isolated bucket.
+    """
+    if shared_cache:
+        return f"shared:{task_type}:{prompt_hash}"
+    uid_part = str(user_id) if user_id else "anon"
+    return f"{task_type}:{uid_part}:{prompt_hash}"
 
 
 async def _get_cached(db: AsyncSession, cache_key: str) -> str | None:
@@ -68,10 +92,24 @@ async def call_llm(
     prompt: str,
     task_type: str,
     db: AsyncSession | None = None,
+    user_id: uuid.UUID | None = None,
     use_cache: bool = True,
+    shared_cache: bool = False,
+    cache_ttl_days: int = 30,
 ) -> str:
+    """Call an LLM with optional caching.
+
+    Cache key is scoped by ``user_id`` unless ``shared_cache=True``.
+    Callers MUST pass either ``user_id`` (normal case) or
+    ``shared_cache=True`` (prompt has no user context) when
+    ``use_cache=True`` — enforced by a lint test, not runtime, so
+    short-lived scripts and background jobs don't have to thread a
+    user id through when they genuinely don't have one.
+
+    See docs/archive/scaling-refactor-B.md §B4 for rationale.
+    """
     prompt_hash = _hash_prompt(prompt)
-    cache_key = f"{task_type}:{prompt_hash}"
+    cache_key = _build_cache_key(task_type, prompt_hash, user_id, shared_cache)
 
     # Check cache
     if use_cache and db:
@@ -88,23 +126,37 @@ async def call_llm(
     if not deepseek_client:
         raise LLMError("DEEPSEEK_API_KEY not configured")
 
-    try:
-        response = await deepseek_client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=500,
-        )
-        result = response.choices[0].message.content.strip()
-        tokens_used = response.usage.total_tokens if response.usage else None
-    except Exception as e:
-        logger.error("DeepSeek API error: %s", e)
-        raise LLMError(f"DeepSeek API call failed: {e}") from e
+    # Phase 4.1 Story A.3 — wrap every API call in the cost-tracking
+    # context manager. Preflight raises BudgetExceededError BEFORE the
+    # upstream HTTP call when the user hit 100% cap; we let it bubble
+    # so callers can convert it to the user-facing "tạm dừng" message
+    # via content/cost/budget_messages.yaml.
+    from backend.adapters.llm.cost_tracking_adapter import tracked_call
+
+    async with tracked_call(
+        db, user_id, provider="deepseek", operation=task_type
+    ) as recorder:
+        try:
+            response = await deepseek_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=500,
+            )
+            result = response.choices[0].message.content.strip()
+            tokens_used = response.usage.total_tokens if response.usage else None
+            if response.usage:
+                recorder.tokens_in = response.usage.prompt_tokens or 0
+                recorder.tokens_out = response.usage.completion_tokens or 0
+            recorder.model_version = getattr(response, "model", "deepseek-chat")
+        except Exception as e:
+            logger.error("DeepSeek API error: %s", e)
+            raise LLMError(f"DeepSeek API call failed: {e}") from e
 
     # Save to cache
     if use_cache and db:
         await _set_cache(
-            db, cache_key, "deepseek-chat", prompt_hash, result, tokens_used
+            db, cache_key, "deepseek-chat", prompt_hash, result, tokens_used, ttl_days=cache_ttl_days
         )
 
     return result
@@ -127,13 +179,22 @@ async def categorize_expense(
     amount: float,
     db: AsyncSession | None = None,
 ) -> str:
+    """Categorize an expense via LLM.
+
+    Uses ``shared_cache=True`` — the prompt only contains merchant +
+    description + amount, never user-identifying context, so caching
+    "Highland coffee 45000" once serves every user. This keeps the
+    cache hit rate high (it's our biggest LLM cost driver).
+    """
     prompt = CATEGORIZE_PROMPT.format(
         merchant=merchant or "N/A",
         description=description or "N/A",
         amount=amount,
     )
     try:
-        result = await call_llm(prompt, task_type="categorize", db=db)
+        result = await call_llm(
+            prompt, task_type="categorize", db=db, shared_cache=True
+        )
         category = result.strip().lower().replace(" ", "_")
         valid = {
             "food_drink", "transport", "shopping", "health",

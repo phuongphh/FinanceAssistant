@@ -1,0 +1,175 @@
+# Phase 4A — Financial Twin user-facing copy.
+# Vietnamese-only copy. Keep wording probabilistic: "có thể", "dự phóng".
+
+menu:
+  title: "🔮 BÉ TIỀN TƯƠNG LAI"
+  intro:
+    starter: |-
+      Mình vẽ thử Bé Tiền của bạn trong 10 năm tới bằng xác suất, không phải lời hứa.
+      Khi tài sản đạt từ 10tr, dự phóng có thể hữu ích hơn nhé.
+    young_prof: |-
+      Mình mô phỏng 1.000 kịch bản để xem tài sản của bạn có thể đi về đâu trong 10 năm tới.
+      Bạn muốn xem lộ trình nào?
+    mass_affluent: |-
+      Đây là bản đồ xác suất cho tài sản tương lai: vùng an toàn, đường giữa và khoảng có thể đạt.
+      Mình luôn ưu tiên góc nhìn thận trọng.
+    hnw: |-
+      Financial Twin mô phỏng nhiều kịch bản thị trường cho danh mục hiện tại của bạn.
+      Dùng để tham khảo chiến lược, không thay thế tư vấn đầu tư cá nhân.
+  hint: |-
+    💡 Twin dùng P10/P50/P90: 80% kịch bản có thể nằm giữa P10 và P90.
+  buttons:
+    - label: "📈 Lộ trình"
+      callback: "menu:twin:view_current"
+    - label: "⚖️ So tối ưu"
+      callback: "menu:twin:compare_optimal"
+    - label: "📱 Mini App"
+      callback: "menu:twin:open_miniapp"
+    - label: "❓ Cách hoạt động"
+      callback: "menu:twin:how_it_works"
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+chart:
+  title: "Bé Tiền tương lai — vùng xác suất"
+  current_label: "Hiện tại"
+  p50_label: "P50 — đường giữa"
+  optimal_label: "P50 — tối ưu"
+  optimal_cone_label: "Vùng tối ưu P10–P90"
+  cone_label: "Vùng P10–P90"
+  x_label: "Năm"
+  y_label: "Giá trị tài sản"
+  watermark: "Bé Tiền — dự phóng xác suất, không phải lời hứa"
+
+recompute:
+  done: "🔮 Bé Tiền vừa cập nhật xong dự phóng tương lai cho bạn. Mở Twin để xem nhé!"
+
+trajectory:
+  empty_state: |-
+    🔮 Twin cần tối thiểu 10tr tài sản đã ghi nhận để mô phỏng có ý nghĩa.
+
+    Bạn thêm tài sản đầu tiên hoặc cập nhật tổng tài sản nhé, mình có thể vẽ tương lai sau 🌱
+  no_projection: |-
+    🔮 Mình chưa có dự phóng Twin cho bạn.
+    Đang tạo bản đầu tiên, bạn thử lại sau một chút nhé.
+  recomputing: "⏳ Mình đang dựng 1.000 kịch bản tương lai cho bạn..."
+  caption: |-
+    🔮 Bé Tiền tương lai của {name}
+
+    Năm {target_year}, tài sản có thể nằm trong khoảng {p10} — {p90}.
+    Đường giữa P50: {p50}.
+
+    Dữ liệu dự phóng: {age_text}. Đây là mô phỏng xác suất, không phải cam kết lợi nhuận.
+  age_today: "vừa cập nhật hôm nay"
+  age_days: "cập nhật {days} ngày trước"
+  stale_note: "
+
+⚠️ Dự phóng hơi cũ, mình có thể cập nhật lại ở lượt chạy kế tiếp."
+
+briefing:
+  ahead: "🚀 Twin: tài sản đang cao hơn đường giữa P50 khoảng {delta_pct}% — nhịp này ổn đó."
+  on_track: "🎯 Twin: bạn đang đi khá sát đường giữa P50 — cứ đều tay nhé."
+  behind: "🌱 Twin: đang thấp hơn P50 khoảng {delta_pct}%, không sao — mình đi chậm mà chắc."
+  accuracy_neutral: "📊 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} ({error_pct}%)."
+  accuracy_celebrate: "🎉 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} — bạn vượt kỳ vọng rồi!"
+  accuracy_reassure: "💪 Tuần trước dự báo P50 = {predicted}, thực tế = {actual} — chưa sao, mình điều chỉnh dần nhé."
+
+how_it_works: |-
+  🔮 Twin hoạt động thế nào?
+
+  • Mình lấy tổng tài sản, phân bổ danh mục và dòng tiền gần đây.
+  • Sau đó mô phỏng 1.000 kịch bản thị trường trong 10 năm.
+  • Kết quả là vùng P10/P50/P90: không phải một con số cố định, mà là “có thể nằm trong khoảng”.
+
+  Mục tiêu là giúp bạn thấy xu hướng và rủi ro trong vùng khả năng, không khẳng định tương lai.
+
+  FAQ — Tại sao Bé Tiền không cho con số chính xác?
+  Vì tương lai phụ thuộc thị trường, thu nhập và quyết định của mình. Một khoảng dự phóng có thể giúp bạn nhìn rủi ro tốt hơn một con số lẻ.
+
+miniapp:
+  not_configured: "📱 Mini App Twin chưa được cấu hình public URL. Bạn xem biểu đồ ngay trong Telegram trước nhé."
+  open_text: "📱 Mở Twin Dashboard trong Mini App:"
+  button: "Mở Twin"
+
+narrative:
+  prompt: |-
+    Bạn là Bé Tiền, trợ lý tài chính cá nhân. Viết 2-3 câu tiếng Việt, 50-200 ký tự, không markdown.
+
+    Dữ liệu của người dùng:
+    - Năm mục tiêu: {target_year}, P10={p10}, P50={p50}, P90={p90}
+    - Mức tài sản: {wealth_level}
+    - Thay đổi 30 ngày qua: {top_changes}
+    - Sự kiện gần đây: {life_events_summary}
+
+    Yêu cầu: đề cập số tiền cụ thể từ dữ liệu, nêu tên loại tài sản thực tế nếu có, không dùng câu chung chung như "tài sản của bạn", "bạn đang đi đúng hướng". Giọng ấm áp, xác suất, không hứa lợi nhuận.
+  fallback: "Nếu giữ nhịp hiện tại, P50 năm {target_year} có thể đạt {p50}. Mình theo dõi cùng bạn nhé."
+  wealth_level_labels:
+    starter: "mới bắt đầu"
+    young_prof: "đang xây dựng"
+    mass_affluent: "tích lũy tốt"
+    hnw: "tài sản lớn"
+
+scenario_comparison:
+  tooltip_optimal: "Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt."
+  delta_badge_positive: "+{delta_pct}%"
+  delta_badge_negative: "{delta_pct}%"
+  cta_savings: "Để đạt P50 tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng"
+  cta_no_change: "Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!"
+  milestone_label: "Năm {year}"
+
+comparison:
+  recomputing: "⏳ Mình đang dựng lộ trình tối ưu để so sánh..."
+  no_projection: |-
+    🔮 Mình chưa có đủ dữ liệu để so sánh tối ưu.
+    Bạn cập nhật tài sản rồi thử lại sau một chút nhé.
+  caption: |-
+    ⚖️ So sánh lộ trình hiện tại và tối ưu
+
+    Năm {target_year}, đường giữa P50 có thể tăng từ {current_p50} → {optimal_p50} ({delta_pct}).
+
+    {actions}
+
+    {disclaimer}
+    CTA "Bắt đầu kế hoạch" có thể mở ở Phase 4B; hiện tại mình chỉ dùng để tham khảo.
+  action_savings: "• Tăng tiết kiệm đều: {current_savings}/tháng → {optimal_savings}/tháng."
+  action_rebalance_add: "• Tăng tỷ trọng {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."
+  action_rebalance_trim: "• Giảm bớt {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."
+  action_hold: "• Danh mục đã khá gần mục tiêu; ưu tiên giữ nhịp và rà soát mỗi tháng."
+  disclaimer_prefix: "Đây là gợi ý chung, không phải lời khuyên đầu tư."
+
+share:
+  # Phase 4.1 Story B.1 — Shareable Twin image copy.
+  # Image MUST NOT contain absolute money amounts; only % and horizon.
+  button: "📸 Lưu thành ảnh"
+  headline: "Bé Tiền tương lai"
+  subline: "Dự phóng xác suất, không phải lời hứa"
+  growth_pct: "{sign}{value}%"
+  horizon: "Sau {years} năm"
+  watermark: "Bé Tiền — Personal CFO"
+  founding_badge: "🌱 Founding Member"
+  caption: |-
+    📸 Đây là Twin của bạn — ảnh đã ẩn số tiền tuyệt đối để bạn yên tâm chia sẻ.
+
+    Lưu về máy hoặc gửi cho bạn bè nếu thấy thú vị nhé. Bé Tiền không tự đăng đâu — quyết định là của bạn.
+  unavailable: |-
+    🔮 Mình chưa có Twin để tạo ảnh chia sẻ.
+    Bạn cập nhật tài sản rồi quay lại nhé.
+  disabled: |-
+    📸 Tính năng lưu ảnh đang tạm tắt để Bé Tiền tối ưu lại. Quay lại sau bạn nhé.
+
+calibration:
+  # Phase 4.1 Story B.2 — Predictions vs actual section.
+  # Only render when user has >=3 completed snapshots. Honest framing:
+  # never inflate; if hit-rate <50%, acknowledge openly.
+  section_title: "🎯 Bé Tiền đoán đúng bao nhiêu?"
+  hit_line: "Bé Tiền đoán đúng {correct}/{total} lần ({pct}%)."
+  learning_note: "Dự phóng chưa chuẩn, Bé Tiền đang học thêm."
+
+asset_labels:
+  stocks_vn: "cổ phiếu VN"
+  stocks_global: "cổ phiếu global"
+  crypto: "crypto"
+  gold: "vàng"
+  cash_savings: "tiền gửi/tiền mặt"
+  real_estate_vn: "bất động sản"
+  bonds_vn: "trái phiếu"

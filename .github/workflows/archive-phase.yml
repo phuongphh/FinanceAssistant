@@ -1,0 +1,99 @@
+name: Archive Phase Docs
+
+# Triggers when a test-cases file changes (tester signs off) or manually.
+# Runs archive_phase.py to git-mv completed phase docs → docs/archive/.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/current/**'
+      - 'scripts/archive_phase.py'
+      - '.github/workflows/archive-phase.yml'
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Force-archive a specific phase id (e.g. "3.6"). Leave empty to auto-detect signed phases.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run — report actions without moving files'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: archive-phase
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet PyYAML
+
+      - name: Build archive_phase.py args
+        id: build_args
+        run: |
+          ARGS=""
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [[ -n "${{ github.event.inputs.phase }}" ]]; then
+            ARGS="$ARGS --phase ${{ github.event.inputs.phase }}"
+          fi
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run archive_phase.py
+        id: archive
+        run: |
+          python scripts/archive_phase.py ${{ steps.build_args.outputs.args }}
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Sync phase status to CLAUDE.md / README / strategy.md
+        if: github.event.inputs.dry_run != 'true'
+        run: python scripts/sync_phase_status.py
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Files changed:"
+            git status --short
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No files moved — nothing to commit."
+          fi
+
+      - name: Commit and push archived files
+        if: steps.check_changes.outputs.changed == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/archive/ docs/current/ docs/current/phase-status.yaml
+          git add CLAUDE.md README.md docs/README.md docs/current/strategy.md 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: archive completed phase docs + sync roadmap links [skip ci]"
+            git push
+            echo "✓ Pushed archived phase docs."
+          else
+            echo "No staged changes to commit."
+          fi

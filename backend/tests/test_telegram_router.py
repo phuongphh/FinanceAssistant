@@ -1,13 +1,22 @@
-"""Tests for telegram router — webhook handling and authentication."""
-import hmac
+"""Tests for the telegram router — auth + webhook contract shape.
+
+Dispatch behaviour (command routing, callback routing, onboarding) is
+now tested by driving ``backend.workers.telegram_worker.route_update``
+directly — see test_telegram_worker.py and test_onboarding_integration.py.
+This file only covers what the HTTP layer itself owns: secret header
+verification and the claim-then-enqueue contract.
+"""
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
 
 client = TestClient(app)
+
+
+def _noop_enqueue(update_id, data):
+    """Stand-in for ``_enqueue_update`` in tests — does nothing."""
 
 
 class TestWebhookAuth:
@@ -16,81 +25,37 @@ class TestWebhookAuth:
             mock.telegram_webhook_secret = "correct-secret"
             resp = client.post(
                 "/api/v1/telegram/webhook",
-                json={"message": {"text": "/menu", "chat": {"id": 123}}},
+                json={"update_id": 1, "message": {"text": "/menu", "chat": {"id": 123}}},
                 headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
             )
             assert resp.status_code == 403
 
-    def test_accepts_valid_secret(self):
-        with patch("backend.routers.telegram.settings") as mock_settings, \
-             patch("backend.routers.telegram.send_menu", new_callable=AsyncMock) as mock_send:
-            mock_settings.telegram_webhook_secret = "correct-secret"
-            mock_send.return_value = {"ok": True}
-            resp = client.post(
-                "/api/v1/telegram/webhook",
-                json={"message": {"text": "/menu", "chat": {"id": 123}}},
-                headers={"X-Telegram-Bot-Api-Secret-Token": "correct-secret"},
-            )
-            assert resp.status_code == 200
-
-    def test_skips_validation_when_no_secret_configured(self):
-        with patch("backend.routers.telegram.settings") as mock_settings, \
-             patch("backend.routers.telegram.send_menu", new_callable=AsyncMock) as mock_send:
-            mock_settings.telegram_webhook_secret = ""
-            mock_send.return_value = {"ok": True}
-            resp = client.post(
-                "/api/v1/telegram/webhook",
-                json={"message": {"text": "/menu", "chat": {"id": 123}}},
-            )
-            assert resp.status_code == 200
-
-
-class TestWebhookMenuCommand:
-    @patch("backend.routers.telegram.send_menu", new_callable=AsyncMock)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
+    @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
-    def test_menu_command(self, mock_settings, mock_send):
-        mock_settings.telegram_webhook_secret = ""
-        mock_send.return_value = {"ok": True}
+    def test_accepts_valid_secret(self, mock_settings, mock_claim, _mock_task):
+        mock_settings.telegram_webhook_secret = "correct-secret"
+        mock_claim.return_value = True
         resp = client.post(
             "/api/v1/telegram/webhook",
-            json={"message": {"text": "/menu", "chat": {"id": 123}}},
+            json={"update_id": 2, "message": {"text": "/menu", "chat": {"id": 123}}},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "correct-secret"},
         )
         assert resp.status_code == 200
-        mock_send.assert_called_once_with(123)
 
-    @patch("backend.routers.telegram.send_menu", new_callable=AsyncMock)
+    @patch("backend.routers.telegram._enqueue_update", side_effect=_noop_enqueue)
+    @patch("backend.routers.telegram._claim_update", new_callable=AsyncMock)
     @patch("backend.routers.telegram.settings")
-    def test_start_command(self, mock_settings, mock_send):
+    def test_skips_validation_when_no_secret_configured(
+        self, mock_settings, mock_claim, _mock_task
+    ):
         mock_settings.telegram_webhook_secret = ""
-        mock_send.return_value = {"ok": True}
+        mock_claim.return_value = True
         resp = client.post(
             "/api/v1/telegram/webhook",
-            json={"message": {"text": "/start", "chat": {"id": 123}}},
+            json={"update_id": 3, "message": {"text": "/menu", "chat": {"id": 123}}},
         )
         assert resp.status_code == 200
-        mock_send.assert_called_once_with(123)
-
-
-class TestWebhookCallback:
-    @patch("backend.routers.telegram.handle_menu_callback", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.answer_callback", new_callable=AsyncMock)
-    @patch("backend.routers.telegram.settings")
-    def test_callback_query(self, mock_settings, mock_answer, mock_handle):
-        mock_settings.telegram_webhook_secret = ""
-        mock_handle.return_value = {"ok": True}
-        resp = client.post(
-            "/api/v1/telegram/webhook",
-            json={
-                "callback_query": {
-                    "id": "cb-123",
-                    "data": "menu:report",
-                    "message": {"chat": {"id": 456}},
-                },
-            },
-        )
-        assert resp.status_code == 200
-        mock_answer.assert_called_once_with("cb-123")
-        mock_handle.assert_called_once_with(456, "menu:report")
 
 
 class TestMenuEndpoint:

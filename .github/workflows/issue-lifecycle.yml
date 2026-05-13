@@ -1,0 +1,66 @@
+name: Issue Lifecycle Sync
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-lifecycle-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync issue file, regenerate indexes, commit and push
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ACTION: ${{ github.event.action }}
+          STATE: ${{ github.event.issue.state }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          # Each attempt resets to the latest origin/main, re-runs the
+          # idempotent sync script (writes our issue file from the event
+          # payload + regenerates indexes from filesystem), then tries to
+          # push. This avoids merge conflicts on docs/issues/INDEX.md when
+          # many issue events fire concurrently (e.g. bulk issue creation).
+          attempt_sync() {
+            git fetch origin main || return 1
+            git reset --hard origin/main || return 1
+
+            node .github/scripts/issue-lifecycle.js || return 1
+
+            git add docs/issues/
+            if git diff --cached --quiet; then
+              echo "No changes to commit — docs/issues already up to date"
+              return 0
+            fi
+
+            git commit -m "docs(issues): sync #${ISSUE_NUMBER} (${ACTION}, state=${STATE})" || return 1
+            git push origin main
+          }
+
+          for i in 1 2 3 4 5 6; do
+            if attempt_sync; then
+              exit 0
+            fi
+            sleep_secs=$((2 ** i))
+            echo "Sync attempt $i failed; retrying in ${sleep_secs}s..."
+            sleep $sleep_secs
+          done
+
+          echo "Sync failed after 6 attempts"
+          exit 1

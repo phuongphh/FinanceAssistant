@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dòng tiền</title>
+    <!-- BUILD_BOOTSTRAP -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/miniapp/static/css/style.css">
+    <link rel="stylesheet" href="/miniapp/static/css/cashflow.css">
+</head>
+<body class="cashflow-page">
+    <main id="app">
+        <section id="loading" class="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p>Đang tải dòng tiền…</p>
+        </section>
+
+        <section id="error" class="error" hidden>
+            <p id="error-message">Không tải được dữ liệu.</p>
+            <button id="retry-btn" type="button">Thử lại</button>
+        </section>
+
+        <section id="content" hidden>
+
+            <!-- Low-balance alert banner -->
+            <div id="alert-banner" class="alert-banner" hidden role="alert" aria-live="assertive">
+                <span class="alert-icon">⚠️</span>
+                <span id="alert-text"></span>
+                <button id="alert-detail-btn" type="button" class="alert-cta">Xem</button>
+            </div>
+
+            <!-- Waterfall chart -->
+            <section class="section chart-section">
+                <h2>Dự báo 3 tháng tới</h2>
+                <div class="chart-container chart-img-container">
+                    <img id="cashflow-chart" src="" alt="Biểu đồ dòng tiền 3 tháng" style="width:100%;border-radius:8px;" />
+                    <p id="chart-fallback" class="muted chart-fallback" hidden>
+                        Biểu đồ đang được tải…
+                    </p>
+                </div>
+            </section>
+
+            <!-- Monthly summary cards -->
+            <section class="section" id="monthly-summary">
+                <h2>Chi tiết theo tháng</h2>
+                <div id="month-cards" class="month-cards"></div>
+            </section>
+
+            <!-- Income patterns -->
+            <section class="section" id="income-section">
+                <h2>Thu định kỳ</h2>
+                <div id="income-list" class="pattern-list"></div>
+                <p id="no-income" class="muted" hidden>Chưa có khoản thu định kỳ nào được xác nhận.</p>
+            </section>
+
+            <!-- Expense patterns -->
+            <section class="section" id="expense-section">
+                <h2>Chi định kỳ</h2>
+                <div id="expense-list" class="pattern-list"></div>
+                <p id="no-expense" class="muted" hidden>Chưa có khoản chi định kỳ nào được xác nhận.</p>
+            </section>
+
+            <!-- Add manual pattern FAB -->
+            <button id="add-pattern-btn" class="fab" type="button" aria-label="Thêm khoản thủ công">
+                + Thêm thủ công
+            </button>
+
+        </section>
+    </main>
+
+    <!-- Edit pattern modal -->
+    <div id="edit-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+        <div class="modal-content">
+            <h3 id="edit-modal-title">Sửa khoản định kỳ</h3>
+            <label for="edit-amount">Số tiền (VNĐ)</label>
+            <input id="edit-amount" type="number" min="1000" step="1000" inputmode="numeric" />
+            <label for="edit-day">Ngày trong tháng (1–31)</label>
+            <input id="edit-day" type="number" min="1" max="31" inputmode="numeric" />
+            <div class="modal-actions">
+                <button id="edit-cancel" type="button" class="secondary-btn">Hủy</button>
+                <button id="edit-save" type="button" class="primary-btn">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add pattern modal -->
+    <div id="add-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
+        <div class="modal-content">
+            <h3 id="add-modal-title">Thêm khoản định kỳ</h3>
+            <label for="add-type">Loại</label>
+            <select id="add-type">
+                <option value="income">💰 Thu nhập</option>
+                <option value="expense">💸 Chi tiêu</option>
+            </select>
+            <label for="add-name">Tên khoản</label>
+            <input id="add-name" type="text" maxlength="200" placeholder="VD: Lương, Tiền nhà…" />
+            <label for="add-amount">Số tiền (VNĐ/tháng)</label>
+            <input id="add-amount" type="number" min="1000" step="1000" inputmode="numeric" />
+            <label for="add-day">Ngày thanh toán (tùy chọn)</label>
+            <input id="add-day" type="number" min="1" max="31" inputmode="numeric" />
+            <div class="modal-actions">
+                <button id="add-cancel" type="button" class="secondary-btn">Hủy</button>
+                <button id="add-save" type="button" class="primary-btn">Thêm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/miniapp/static/js/cashflow_dashboard.js"></script>
+</body>
+</html>

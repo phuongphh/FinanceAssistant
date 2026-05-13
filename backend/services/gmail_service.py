@@ -144,7 +144,10 @@ async def sync_new_receipts(db: AsyncSession, user_id) -> list[Expense]:
         # Parse with LLM
         try:
             prompt = PARSE_EMAIL_PROMPT.format(email_text=body[:3000])
-            result_text = await call_llm(prompt, task_type="parse_email", db=db, use_cache=False)
+            result_text = await call_llm(
+                prompt, task_type="parse_email",
+                db=db, user_id=user_id, use_cache=False,
+            )
 
             if result_text.startswith("```"):
                 lines = result_text.split("\n")

@@ -1,0 +1,70 @@
+# Phase 3.8 Epic 2 — income stream classification
+#
+# Single source of truth for the 6 income types Bé Tiền recognises.
+# Both the wizard keyboard and the agent tool description read from
+# this file. Adding a 7th type only needs a YAML edit + (because
+# the model treats ``stream_type`` as a free string) no migration.
+#
+# Conventions:
+#   - YAML keys are stable identifiers stored in DB; never rename.
+#   - ``label`` is user-facing Vietnamese.
+#   - ``is_passive`` is the default at create-time; the user can
+#     override per-stream via the wizard.
+#   - ``typical_schedule`` pre-fills the wizard's schedule pick to
+#     reduce taps for the 80% case.
+#   - ``auto_linked: true`` means streams of this type are created
+#     by other modules (Epic 1 rental_service for ``rental``); the
+#     wizard hides them from "Add new" to avoid duplicates.
+
+income_types:
+  salary:
+    label: "Lương"
+    icon: "💼"
+    is_passive: false
+    typical_schedule: "monthly"
+    examples:
+      - "Lương cứng tháng"
+      - "Lương + thưởng KPI"
+
+  freelance:
+    label: "Freelance / Công việc thêm"
+    icon: "💻"
+    is_passive: false
+    typical_schedule: "ad_hoc"
+    examples:
+      - "Project ngoài"
+      - "Consulting"
+      - "Side gig"
+
+  dividend:
+    label: "Cổ tức"
+    icon: "💵"
+    is_passive: true
+    typical_schedule: "annually"
+    examples:
+      - "Cổ tức cổ phiếu VNM"
+
+  rental:
+    label: "BĐS cho thuê"
+    icon: "🏠"
+    is_passive: true
+    typical_schedule: "monthly"
+    auto_linked: true
+    description: |-
+      Tự động tạo khi đánh dấu BĐS cho thuê. Để thêm: dùng menu
+      💎 Tài sản → 🏠 BĐS cho thuê.
+
+  interest:
+    label: "Lãi tiết kiệm"
+    icon: "🏦"
+    is_passive: true
+    typical_schedule: "monthly"
+    examples:
+      - "Tiền gửi VCB"
+      - "Trái phiếu"
+
+  other:
+    label: "Khác"
+    icon: "📦"
+    is_passive: false
+    typical_schedule: "ad_hoc"

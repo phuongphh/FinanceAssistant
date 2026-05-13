@@ -1,0 +1,68 @@
+# Phase 3.5 — out-of-scope replies.
+#
+# Used when the classifier returns out_of_scope OR a low-confidence
+# match outside Bé Tiền's actual capabilities. Tone goal: warm, brief,
+# never apologise more than once. Always pivot to what Bé Tiền CAN do.
+#
+# Categories are detected by keyword in the OOS handler — see
+# ``backend.intent.handlers.out_of_scope`` — and fall through to
+# ``general`` when no specific bucket matches. Placeholders:
+#   {name}     — user's display_name
+#   {raw_text} — first 80 chars of the original query, for echo
+
+weather:
+  # "thời tiết hôm nay", "trời mưa không"
+  - |
+    Mình chỉ rành tài chính thôi {name} ạ 🌦️
+    Tin thời tiết bạn hỏi Google Maps / app thời tiết nhé.
+
+    Còn về tiền bạc thì hỏi mình thoải mái: tài sản, chi tiêu, đầu tư...
+
+entertainment:
+  # "kể chuyện cười", "hát cho tôi nghe"
+  - |
+    Mình không kể chuyện cười được {name} ơi 😅
+    Nhưng mình có thể kể chuyện ví của bạn đang khoẻ ra sao!
+
+    Thử hỏi:
+    • "tài sản của tôi"
+    • "chi tiêu tháng này"
+
+general_knowledge:
+  # "thủ đô của Pháp", "ai là tổng thống Mỹ"
+  - |
+    Câu này hỏi search engine sẽ chuẩn hơn {name} 📚
+    Mình chuyên về tài chính cá nhân thôi.
+
+    Mình giúp được:
+    💎 Tài sản • 💸 Chi tiêu • 📈 Đầu tư VN • 🎯 Mục tiêu
+
+personal_advice:
+  # "có nên kết hôn không", "tôi nên làm bạn với ai"
+  - |
+    Quyết định lớn vậy mình không dám tư vấn đâu {name} 🤝
+    Nhưng nếu liên quan tới tài chính (cưới hỏi tốn bao nhiêu, tiết kiệm
+    cho đám cưới...) thì mình giúp được.
+
+us_market:
+  # "AAPL giá bao nhiêu", "thị trường Mỹ", "cổ phiếu nasdaq"
+  - |
+    Mình mới rành thị trường Việt Nam thôi {name} ạ 🇻🇳
+    Cổ phiếu Mỹ / NASDAQ thì bạn check qua broker hoặc Yahoo Finance.
+
+    Mình có dữ liệu VN30, ETF, BTC/ETH — hỏi thoải mái nhé.
+
+general:
+  # Default — when no specific bucket matches.
+  - |
+    Mình chưa biết trả lời câu này {name} ạ 😅
+
+    Mình giúp được về:
+    💎 Tài sản • 💸 Chi tiêu • 📈 Thị trường VN • 🎯 Mục tiêu
+
+    Bạn thử hỏi cách khác xem?
+  - |
+    Câu này hơi vượt khả năng của mình {name} 🌱
+
+    Mình chuyên: tài sản, chi tiêu, thu nhập, đầu tư VN, mục tiêu.
+    Hỏi mình một câu khác nhé!

@@ -1,0 +1,86 @@
+# Phase 3.9.5 Epic 5 — Telegram premium animation emoji mapping.
+#
+# Audit source (2026-05-10): `python scripts/audit_static_emoji.py --top 30`
+# over user-facing content and bot/backend copy found the highest-impact
+# repeated emojis: 💰, 📊, 💡, 🎯, ✅, 📈, 💸, 🌅/🌤️, 🎉, ⚠️, 💎, 🏆, 📅, 💼, 📉.
+#
+# ⚠️  STATUS: animation_id values are DISABLED until real Telegram custom
+# emoji IDs can be harvested.
+#
+# How to re-enable per emoji:
+#   1. From a Telegram Premium account, send a message containing the static
+#      emoji (rendered as the desired animated/premium variant) to the bot.
+#   2. The worker will log the incoming `entities[*].custom_emoji_id` for any
+#      `custom_emoji` entity it sees (logger to be added when we wire IDs).
+#   3. Paste the 19-digit ID into the matching ``animation_id`` field below
+#      and uncomment the line.
+#
+# emoji_animation.py:_iter_entries skips any entry whose ``animation_id`` is
+# missing/empty — so the helper safely returns an empty entities list while
+# the IDs are placeholders, and Telegram simply renders the static unicode
+# emoji (which is also the non-Premium fallback). Code path stays wired.
+
+money_bag:
+  static: "💰"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing, submenu, transaction]
+diamond:
+  static: "💎"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [submenu, milestones]
+target:
+  static: "🎯"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [submenu, briefing, milestones]
+bar_chart:
+  static: "📊"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing, submenu]
+chart_up:
+  static: "📈"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing, submenu]
+chart_down:
+  static: "📉"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing, submenu]
+light_bulb:
+  static: "💡"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing, submenu]
+fire:
+  static: "🔥"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [milestones]
+check_mark:
+  static: "✅"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [transaction, milestones]
+party:
+  static: "🎉"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [milestones]
+warning:
+  static: "⚠️"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing]
+money_wings:
+  static: "💸"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [submenu, transaction]
+trophy:
+  static: "🏆"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [milestones]
+calendar:
+  static: "📅"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [submenu]
+briefcase:
+  static: "💼"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [submenu]
+partly_sunny:
+  static: "🌤️"
+  # animation_id: "<replace with real Telegram custom_emoji_id>"
+  contexts: [briefing]

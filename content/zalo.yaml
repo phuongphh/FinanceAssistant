@@ -1,0 +1,77 @@
+# Phase 4B Epic 4 — Zalo channel copy (Vietnamese only).
+#
+# Persona: Bé Tiền — ấm áp, gần gũi, không phán xét.
+# Channel rules (Zalo):
+#   - Plain text, KHÔNG dùng Markdown (Zalo OA không hỗ trợ).
+#   - Tối đa ~300 ký tự / tin nhắn (giới hạn hiển thị Zalo).
+#   - Tối đa 2 emoji / tin nhắn.
+
+linking:
+  # Telegram: hướng dẫn ban đầu sau khi user gõ /link_zalo
+  prompt: |-
+    🔗 Để nhận thông báo qua Zalo:
+
+    1️⃣ Mở Zalo → tìm "Bé Tiền" → bấm Quan tâm
+    2️⃣ Nhắn mã sau cho Bé Tiền trên Zalo:
+
+    `{token}`
+
+    Mã có hiệu lực 10 phút và chỉ dùng được 1 lần.
+
+  # Telegram: xác nhận sau khi link thành công
+  confirm_telegram: |-
+    ✅ Đã liên kết Zalo thành công!
+    Từ giờ Bé Tiền sẽ gửi cảnh báo cashflow qua cả 2 kênh.
+
+  # Zalo: chào người dùng lần đầu sau khi link xong
+  confirm_zalo: |-
+    ✅ Xin chào! Bé Tiền đã kết nối thành công.
+    Bạn sẽ nhận thông báo cashflow tại đây.
+
+  # Zalo: trả lời khi token sai/đã dùng/hết hạn
+  token_invalid: |-
+    ❌ Mã không hợp lệ hoặc đã hết hạn.
+    Vào Telegram gõ /link_zalo để lấy mã mới nhé.
+
+  token_already_used: |-
+    ❌ Mã này đã được dùng rồi.
+    Vào Telegram gõ /link_zalo để lấy mã mới nhé.
+
+  token_expired: |-
+    ❌ Mã đã hết hạn (mã chỉ dùng được trong 10 phút).
+    Vào Telegram gõ /link_zalo để lấy mã mới nhé.
+
+  # Telegram: khi user đã link rồi mà chạy lại /link_zalo
+  already_linked: |-
+    ℹ️ Bạn đã liên kết Zalo rồi.
+    Dùng /unlink_zalo nếu muốn hủy liên kết.
+
+  # Telegram: phản hồi cho /unlink_zalo
+  unlinked: |-
+    ✅ Đã hủy liên kết Zalo.
+    Bé Tiền sẽ chỉ gửi thông báo qua Telegram.
+
+  not_linked: |-
+    ℹ️ Bạn chưa liên kết Zalo. Gõ /link_zalo để bắt đầu.
+
+  # Telegram: khi cấu hình Zalo trên server chưa sẵn sàng
+  not_configured: |-
+    ⚠️ Tính năng Zalo chưa được bật trên hệ thống.
+    Vui lòng thử lại sau nhé.
+
+# Cashflow alert format dành riêng cho Zalo — ngắn gọn hơn Telegram.
+# Tổng độ dài luôn ≤ 300 ký tự (notifier sẽ truncate nếu vượt).
+cashflow_alert:
+  body: |-
+    ⚠️ {month}: số dư có thể xuống ~{balance} (dưới ngưỡng an toàn {threshold} bạn đặt).
+
+    Gợi ý: {suggested_action}
+  body_no_threshold: |-
+    ⚠️ {month}: số dư có thể xuống ~{balance}.
+
+    Gợi ý: {suggested_action}
+
+# Profile snippet — added to /profile when Zalo linked.
+profile_status:
+  linked: "🔗 Zalo: đã liên kết"
+  not_linked: "🔗 Zalo: chưa liên kết (dùng /link_zalo)"

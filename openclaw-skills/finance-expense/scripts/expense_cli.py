@@ -5,7 +5,7 @@ Thin wrapper — parse args → call backend API → format response.
 import json
 import os
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -16,7 +16,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from backend.bot.formatters.money import format_money_full
-from backend.bot.formatters.templates import format_transaction_confirmation
 from backend.config.categories import get_category
 
 API_URL = os.environ.get("FINANCE_API_URL", "")
@@ -68,23 +67,13 @@ def add_expense(amount: float, note: str | None = None, merchant: str | None = N
     }
     resp = requests.post(
         f"{API_URL}/expenses",
-        params={"user_id": USER_ID},
+        params={"user_id": USER_ID, "push_confirmation": "true"},
         headers=_headers(),
         json=payload,
         timeout=30,
     )
     if resp.status_code == 201:
-        data = resp.json()
-        category_code = _normalize_category(data.get("category"))
-        merchant_label = data.get("merchant") or data.get("note") or "Giao dịch"
-        print(
-            format_transaction_confirmation(
-                merchant=merchant_label,
-                amount=float(data["amount"]),
-                category_code=category_code,
-                time=datetime.now(),
-            )
-        )
+        print("ok")
     else:
         print(f"Lỗi: {resp.status_code} — {resp.text}", file=sys.stderr)
         sys.exit(1)

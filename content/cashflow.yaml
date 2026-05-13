@@ -1,0 +1,57 @@
+# Phase 4B Epic 3 — Cashflow Forecasting v2 copy (Vietnamese only).
+# Persona: Bé Tiền — ấm áp, không phán xét, dự báo không phải dự đoán.
+#
+# Tone rules:
+#   - DÙNG: "có thể", "dự báo", "ước tính", "xu hướng"
+#   - TRÁNH: "chắc chắn", "sẽ xảy ra", "nguy hiểm", "thất bại tài chính"
+#   - Luôn có gợi ý hành động đi kèm alert.
+
+cashflow_alert:
+  title: "⚠️ Cashflow {month}"
+  body: >-
+    Bé Tiền dự báo số dư cuối {month} có thể xuống còn ~{balance} —
+    dưới mức an toàn {threshold} bạn đặt.
+
+    Nguyên nhân chính có thể do: {top_expense_pattern}.
+    Gợi ý: {suggested_action}
+  footer: "📊 Xem chi tiết trong mục Dòng tiền của Mini App."
+
+# Pattern review messages — sent after weekly detection cron
+pattern_review:
+  intro: |-
+    💡 Bé Tiền nhận ra {count} khoản thu chi định kỳ của bạn:
+  pattern_line: "{idx}. {type_emoji} {description} (~{amount}, ngày {day} hàng tháng)"
+  income_emoji: "💰"
+  expense_emoji: "💸"
+  outro: |-
+    Xác nhận để Bé Tiền dùng vào dự báo cashflow nhé?
+    Bấm ✅ Đúng / ❌ Không phải / ✏️ Sửa cho từng khoản.
+  no_patterns: |-
+    Bé Tiền chưa nhận ra khoản thu chi định kỳ nào trong 3 tháng vừa rồi.
+    Khi có đủ dữ liệu, Bé Tiền sẽ thông báo lại!
+
+# Morning briefing cashflow section
+briefing_cashflow:
+  section: |-
+    💰 Cashflow tháng tới: dự kiến {net_sign}{net} (thu {income} − chi {expense})
+  low_balance_warning: |-
+    ⚠️ {month}: số dư có thể xuống ~{balance} — dưới ngưỡng an toàn bạn đặt
+
+# Settings command copy
+settings:
+  threshold_updated: |-
+    ✅ Đã cập nhật ngưỡng cảnh báo cashflow: {threshold}/tháng.
+    Bé Tiền sẽ cảnh báo khi số dư dự báo xuống dưới mức này.
+  threshold_cleared: |-
+    ✅ Đã xóa ngưỡng tùy chỉnh. Bé Tiền sẽ tự tính ngưỡng dựa trên chi tiêu định kỳ.
+
+# Mini App cashflow tab
+miniapp:
+  tab_label: "Dòng tiền"
+  patterns_income_header: "Thu định kỳ"
+  patterns_expense_header: "Chi định kỳ"
+  no_patterns_income: "Chưa có khoản thu định kỳ nào được xác nhận."
+  no_patterns_expense: "Chưa có khoản chi định kỳ nào được xác nhận."
+  low_balance_banner: "⚠️ Dự báo có tháng số dư dưới ngưỡng an toàn — xem chi tiết"
+  add_manual_label: "+ Thêm thủ công"
+  edit_hint: "Chạm vào khoản để sửa"

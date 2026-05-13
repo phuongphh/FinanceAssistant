@@ -63,7 +63,10 @@ Nếu amount có "k" hoặc "K" ở cuối, nhân với 1000. Ví dụ: 150k = 1
 Chỉ trả về JSON, không giải thích."""
 
     try:
-        result_text = await call_llm(prompt, task_type="parse_manual", db=db, use_cache=False)
+        result_text = await call_llm(
+            prompt, task_type="parse_manual",
+            db=db, user_id=data.user_id, use_cache=False,
+        )
         # Strip markdown fences
         if result_text.startswith("```"):
             lines = result_text.split("\n")

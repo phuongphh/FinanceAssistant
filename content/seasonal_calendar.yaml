@@ -1,0 +1,113 @@
+# Vietnam-specific seasonal events — YAML is the SINGLE SOURCE OF TRUTH.
+#
+# Dates are specified as "when" specs (solar or lunar). The notifier
+# computes the actual trigger date for the current year each day —
+# nothing is hardcoded in Python. Rationale: Tết and Trung thu move
+# year-to-year on the solar calendar (lunar new year, lunar mid-autumn).
+# Hardcoding would rot silently.
+#
+# When spec formats:
+#   solar: {month: M, day: D}
+#     → fires on Month M, Day D of the current solar year
+#   solar: {month: M, day: D, offset_days: N}
+#     → fires N days before/after (negative = before)
+#   lunar: {month: M, day: D}
+#     → converts lunar M/D of the current lunar year to solar date
+#   lunar: {month: M, day: D, offset_days: N}
+#     → same, then shifted by N days
+#
+# Once-per-user-per-year dedup is handled by the notifier via the
+# events table (event_type=seasonal_fired, key=event name + year).
+#
+# Placeholders available in messages:
+#   {name}                     — user greeting name
+#   {last_year_mid_autumn}     — pre-formatted VND (prev Sep mid-autumn spend)
+#   {last_year_double_11}      — pre-formatted VND (prev 11.11 day spend)
+#   {tet_total}                — pre-formatted VND (current Tết category spend)
+
+events:
+
+  - name: tet_preparation
+    description: "10 days before Tết day — offer a Tết tracking category."
+    when:
+      lunar: {month: 1, day: 1, offset_days: -10}
+    message: |-
+      🧧 Còn khoảng 10 ngày nữa là Tết rồi {name}!
+
+      Mình biết đây là thời điểm chi tiêu tăng cao — lì xì, sắm Tết, biếu xén. Muốn mình tạo riêng category "Tết" để theo dõi không?
+
+      Sau Tết bạn sẽ thấy rất rõ đã chi vào đâu, năm sau plan dễ hơn 🌸
+    action: offer_tet_category
+
+  - name: tet_day
+    description: "Mùng 1 Tết — greeting message."
+    when:
+      lunar: {month: 1, day: 1}
+    message: |-
+      🎊 Chúc {name} một năm mới an khang thịnh vượng!
+
+      Tiền bạc năm nay dư dả, kế hoạch tài chính thuận lợi 💰
+
+      Mình vẫn ở đây đồng hành cùng bạn cả năm nhé 💚
+
+  - name: post_tet_review
+    description: "Mùng 8 Tết — summary of Tết spending so far."
+    when:
+      lunar: {month: 1, day: 8}
+    message: |-
+      🧮 Tết đã qua được ít hôm rồi {name}. Muốn xem tổng kết chi Tết của mình không?
+
+      Tổng hiện tại: {tet_total}
+
+      Không phán xét — Tết mà! Chỉ để biết, năm sau plan tốt hơn 🌱
+
+  - name: mid_autumn
+    description: "Trung thu — 15/8 âm lịch."
+    when:
+      lunar: {month: 8, day: 15}
+    message: |-
+      🥮 Trung thu đến rồi!
+
+      {name} có nhớ năm ngoái bạn chi {last_year_mid_autumn} cho dịp này không? (Không nhớ thì bình thường 😄)
+
+      Năm nay có dự định gì không?
+
+  - name: back_to_school
+    description: "Mid-August — back to school budget reminder."
+    when:
+      solar: {month: 8, day: 15}
+    message: |-
+      📚 Mùa tựu trường sắp đến {name}!
+
+      Nếu bạn có con (hoặc bản thân đang học), đây thường là thời điểm chi tiêu tăng: sách vở, đồng phục, học phí. Mình giúp plan ngân sách riêng cho mùa này nhé?
+
+  - name: black_friday
+    description: "4 days before Black Friday — shopping budget offer."
+    when:
+      solar: {month: 11, day: 25}  # BF in 2026 is Nov 27; 2 days earlier.
+    message: |-
+      🛍️ Black Friday sắp đến {name}.
+
+      Mình không nói "đừng mua" — mình chỉ muốn hỏi: bạn có muốn đặt trước ngân sách "Shopping dịp lễ" để tiêu có chủ ý hơn không?
+
+      Ví dụ: 2tr cho đợt này. Vượt thì mình nhắc nhẹ 😊
+
+  - name: double_11
+    description: "11.11 day — remind with last year's spend."
+    when:
+      solar: {month: 11, day: 10}
+    message: |-
+      🛒 11.11 tới rồi {name}!
+
+      Mình để ý năm ngoái bạn chi {last_year_double_11} vào dịp này. Năm nay muốn đặt limit sớm không?
+
+  - name: year_end_review
+    description: "3 days before year end — tease the Wrapped report."
+    when:
+      solar: {month: 12, day: 28}
+    message: |-
+      📅 Còn 3 ngày nữa hết năm {name} ơi!
+
+      Mình đang chuẩn bị báo cáo năm đặc biệt cho bạn — kiểu Wrapped ấy 🎁
+
+      Sẽ gửi vào 31/12 nhé, đảm bảo nhiều insight thú vị!

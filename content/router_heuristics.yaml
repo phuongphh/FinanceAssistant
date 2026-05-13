@@ -1,0 +1,72 @@
+# Phase 3.7 — Orchestrator routing heuristics.
+#
+# These regexes pre-classify a Vietnamese query so we can spend LLM
+# tokens only when strictly necessary. The orchestrator counts
+# matches; the tier with the strongest signal wins. Ambiguous
+# queries fall through to the cascade (Phase 3.5 → Tier 2 → Tier 3).
+#
+# Keep patterns SIMPLE. A regex zoo is a maintenance nightmare; a
+# missed match just means the cascade runs, which is acceptable.
+# Patterns are matched case-insensitive (caller does ``re.IGNORECASE``).
+
+# Tier 2 (DB-Agent) — filter / sort / aggregate / compare.
+tier2_signals:
+  filter:
+    - "đang lãi"
+    - "đang lỗ"
+    - "trên \\d"          # "trên 1 tỷ", "trên 100tr"
+    - "dưới \\d"
+    - "lớn hơn"
+    - "ít hơn"
+    - "nhiều hơn"
+  sort:
+    - "top \\d"
+    - "nhiều nhất"
+    - "ít nhất"
+    - "lớn nhất"
+    - "nhỏ nhất"
+    - "cao nhất"
+    - "thấp nhất"
+  aggregate:
+    - "tổng "             # "tổng lãi", "tổng tài sản" — trailing space avoids matching "tống"
+    - "tổng cộng"
+    - "trung bình"
+    - "tỷ lệ"
+    - "phần trăm"
+    - "bao nhiêu phần trăm"
+  compare:
+    - "so với"
+    - " vs "
+    - "khác nhau"
+    - "chênh lệch"
+  list:
+    - "liệt kê"
+    - "xem tất cả"
+
+# Tier 3 (Reasoning Agent) — advisory / what-if / planning.
+# These signals are intentionally narrow; matching one bumps the
+# query straight to Tier 3 without further analysis.
+tier3_signals:
+  should:
+    - "có nên"
+    - "nên không"
+    - "có ổn không"
+    - "phù hợp không"
+  plan:
+    - "làm thế nào để"
+    - "lộ trình"
+    - "kế hoạch"
+    - "cần phải làm gì"
+    - "chiến lược"
+  what_if:
+    - "nếu .* thì"        # "nếu tôi giảm chi 20% thì..."
+    - "nếu tôi"
+    - "giả sử"
+  advice:
+    - "tư vấn"
+    - "khuyên"
+    - "gợi ý"
+  why:
+    - "tại sao"
+    - "vì sao"
+    - "do đâu"

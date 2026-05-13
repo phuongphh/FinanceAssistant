@@ -1,0 +1,74 @@
+# Issue #450 §5 — Rule-based roadmap fallbacks per goal template.
+#
+# These templates are served when the LLM advisory call for a roadmap
+# query (e.g. "lộ trình mua nhà") times out or fails. Each template
+# corresponds 1:1 with an id from ``goal_templates.yaml``. The body
+# stays short (5-8 lines) and steps are concrete — the goal is "user
+# gets a usable answer fast", not "user gets the perfect personalised
+# answer slowly".
+#
+# Add an 8th template? Add the matching entry here too, otherwise the
+# fallback path will gracefully return ``None`` and the caller will
+# surface the generic timeout copy instead.
+
+roadmaps:
+  buy_car:
+    title: "🚗 Lộ trình mua xe"
+    steps:
+      - "Xác định ngân sách (mua mới vs mua cũ, sedan vs SUV)."
+      - "Dành 20-30% giá xe làm tiền cọc, phần còn lại có thể vay."
+      - "Tiết kiệm tự động hàng tháng vào tài khoản riêng cho mục tiêu."
+      - "So sánh lãi suất 3-5 ngân hàng trước khi vay; ưu tiên kỳ hạn 3-5 năm."
+      - "Đừng quên chi phí ẩn: bảo hiểm, đăng ký, bảo dưỡng (~15% giá xe/năm)."
+
+  buy_house:
+    title: "🏠 Lộ trình mua nhà"
+    steps:
+      - "Mục tiêu down-payment: 20-30% giá nhà (Việt Nam thường 30%+ để có lãi suất tốt)."
+      - "Quỹ khẩn cấp tách riêng: 6 tháng chi tiêu — đừng dùng tiền mua nhà để cover rủi ro."
+      - "Kiểm tra credit score (CIC) trước 6-12 tháng — sửa nợ xấu cần thời gian."
+      - "Cân nhắc DTI (nợ/thu nhập) < 40% để vay được lãi suất ưu đãi."
+      - "Tiết kiệm tự động ≥ 30% thu nhập vào kênh ít rủi ro (tiết kiệm có kỳ hạn, trái phiếu chính phủ)."
+      - "Lock-in giá: theo dõi 6-12 tháng khu vực muốn mua, đừng FOMO."
+
+  travel:
+    title: "✈️ Lộ trình du lịch"
+    steps:
+      - "Lên dự toán: vé máy bay + lưu trú + ăn uống + chi tiêu phát sinh (+20% buffer)."
+      - "Đặt mục tiêu tiết kiệm theo tuần/tháng tùy hạn chuyến đi."
+      - "Tận dụng promotion: săn vé sớm 3-6 tháng, dùng thẻ tích điểm."
+      - "Tách quỹ du lịch riêng để không lẫn với chi tiêu thường ngày."
+
+  retirement:
+    title: "🌅 Lộ trình hưu trí"
+    steps:
+      - "Mục tiêu: 25× chi tiêu hàng năm (quy tắc 4%) — tính trên mức sống mong muốn khi hưu."
+      - "Đóng BHXH đầy đủ — đây là tầng cơ bản."
+      - "Đầu tư dài hạn: chứng chỉ quỹ index, trái phiếu chính phủ, vàng (đa dạng hoá)."
+      - "Tự động hoá: trích 15-20% thu nhập tháng vào tài khoản đầu tư."
+      - "Review mỗi 6 tháng để rebalance theo wealth level."
+
+  education:
+    title: "🎓 Lộ trình học vấn"
+    steps:
+      - "Liệt kê chi phí: học phí + sinh hoạt + sách vở + bảo hiểm."
+      - "Tìm học bổng + chương trình tài trợ trước khi vay."
+      - "Nếu cần vay, ưu tiên gói vay sinh viên lãi suất thấp."
+      - "Tiết kiệm song song: 10-20% chi phí/tháng trước khi vào học."
+
+  wedding:
+    title: "💒 Lộ trình đám cưới"
+    steps:
+      - "Đặt budget tổng + breakdown: tiệc, lễ phục, chụp ảnh, tuần trăng mật."
+      - "Buffer 15-20% cho chi phí phát sinh (đặt cọc, tip, quà cảm ơn)."
+      - "Tiết kiệm 12-18 tháng trước ngày cưới — chia đều hàng tháng."
+      - "Phân biệt rõ: chi phí 1 lần (cưới) vs chi phí dài hạn (cuộc sống chung)."
+
+  emergency_fund:
+    title: "🛡️ Lộ trình quỹ khẩn cấp"
+    steps:
+      - "Mục tiêu: 6 tháng chi tiêu cố định (tiền nhà, ăn uống, học phí, BHYT)."
+      - "Để ở kênh thanh khoản cao: tiết kiệm online không kỳ hạn hoặc kỳ hạn ngắn ≤ 3 tháng."
+      - "Tách hoàn toàn khỏi đầu tư — đây là tiền 'phòng cháy', không phải tiền sinh lời."
+      - "Tiết kiệm tự động: 10-15% thu nhập/tháng cho tới khi đạt mục tiêu."
+      - "Đụng đến khi nào? Mất việc, ốm nặng, sửa nhà khẩn. Không phải mua iPhone mới."

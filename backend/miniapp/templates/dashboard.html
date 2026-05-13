@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dashboard</title>
+    <!-- BUILD_BOOTSTRAP -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <link rel="stylesheet" href="/miniapp/static/css/style.css">
@@ -44,8 +45,42 @@
                     <canvas id="trend-chart" role="img" aria-label="Biểu đồ chi tiêu theo ngày"></canvas>
                 </div>
             </section>
+
+            <section class="section expense-manager" aria-label="Quản lý chi tiêu">
+                <div class="section-heading-row">
+                    <h2>Giao dịch tháng này</h2>
+                    <button id="add-expense-btn" class="small-primary-btn" type="button">+ Thêm</button>
+                </div>
+                <label class="filter-label" for="expense-month">Lọc theo tháng</label>
+                <input id="expense-month" class="month-input" type="month" />
+                <div id="expense-list" class="expense-list"></div>
+                <p id="expense-empty" class="empty-state" hidden>Chưa có chi tiêu trong tháng này.</p>
+            </section>
+
+            <!-- APP_VERSION_MARKER -->
         </section>
     </main>
+
+    <div id="expense-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+        <div class="modal-content">
+            <h3 id="expense-modal-title">Thêm chi tiêu</h3>
+            <label for="expense-amount">Số tiền (VNĐ)</label>
+            <input id="expense-amount" type="number" min="1000" step="1000" inputmode="numeric" />
+            <label for="expense-category">Danh mục</label>
+            <select id="expense-category"></select>
+            <label for="expense-date">Ngày</label>
+            <input id="expense-date" type="date" />
+            <label for="expense-note">Ghi chú / cửa hàng</label>
+            <input id="expense-note" type="text" maxlength="200" placeholder="VD: ăn trưa, Grab…" />
+            <label for="expense-payment">Phương thức thanh toán</label>
+            <input id="expense-payment" type="text" maxlength="64" placeholder="Tiền mặt, thẻ, chuyển khoản…" />
+            <div class="modal-actions">
+                <button id="expense-delete" type="button" class="danger-btn" hidden>Xoá</button>
+                <button id="expense-cancel" type="button" class="secondary-btn">Quay về</button>
+                <button id="expense-save" type="button" class="primary-btn">Lưu</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/miniapp/static/js/dashboard.js" defer></script>
 </body>

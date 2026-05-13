@@ -14,6 +14,7 @@ Webhook JSON arrives as:
 Handlers dispatch by prefix, resolve the current user, act on the DB,
 and edit the triggering message in place.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +22,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -29,6 +29,7 @@ from backend.bot.formatters.templates import format_transaction_confirmation
 from backend.bot.handlers.transaction import (
     _normalize_category,
     resolve_transaction_by_callback_id,
+    resolve_transactions_by_batch_id,
 )
 from backend.bot.keyboards.common import CallbackPrefix, parse_callback
 from backend.bot.keyboards.transaction_keyboard import (
@@ -37,8 +38,8 @@ from backend.bot.keyboards.transaction_keyboard import (
     transaction_actions_keyboard,
 )
 from backend.models.expense import Expense
-from backend.models.user import User
 from backend.services import expense_service
+from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_reply_markup,
@@ -48,16 +49,6 @@ from backend.services.telegram_service import (
 logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
-
-
-async def _get_user_by_telegram_id(
-    db: AsyncSession, telegram_id: int
-) -> User | None:
-    stmt = select(User).where(
-        User.telegram_id == telegram_id,
-        User.deleted_at.is_(None),
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def _rerender_transaction_message(
@@ -100,6 +91,7 @@ async def handle_transaction_callback(
         CallbackPrefix.CONFIRM_ACTION: _handle_confirm_action,
         CallbackPrefix.CANCEL_ACTION: _handle_cancel_action,
         CallbackPrefix.UNDO_TRANSACTION: _handle_undo_transaction,
+        CallbackPrefix.UNDO_TRANSACTION_BATCH: _handle_undo_transaction_batch,
         CallbackPrefix.EDIT_TRANSACTION: _handle_edit_transaction,
     }
 
@@ -114,7 +106,7 @@ async def handle_transaction_callback(
     chat_id = message.get("chat", {}).get("id")
     message_id = message.get("message_id")
 
-    user = await _get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+    user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
 
     analytics.track(
         analytics.EventType.BUTTON_TAPPED,
@@ -148,17 +140,21 @@ async def handle_transaction_callback(
     return True
 
 
-async def _handle_change_category(
-    *, db, user, args, callback_id, chat_id, message_id
-):
+async def _handle_change_category(*, db, user, args, callback_id, chat_id, message_id):
     """2-step flow: show picker → update DB + re-render message."""
     if not args:
-        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
+        await answer_callback(
+            callback_id,
+            text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?",
+            show_alert=True,
+        )
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
+        await answer_callback(
+            callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True
+        )
         return
 
     if len(args) == 1:
@@ -189,12 +185,18 @@ async def _handle_delete_transaction(
     *, db, user, args, callback_id, chat_id, message_id
 ):
     if not args:
-        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
+        await answer_callback(
+            callback_id,
+            text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?",
+            show_alert=True,
+        )
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
+        await answer_callback(
+            callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True
+        )
         return
 
     await edit_message_reply_markup(
@@ -205,9 +207,7 @@ async def _handle_delete_transaction(
     await answer_callback(callback_id)
 
 
-async def _handle_confirm_action(
-    *, db, user, args, callback_id, chat_id, message_id
-):
+async def _handle_confirm_action(*, db, user, args, callback_id, chat_id, message_id):
     if len(args) < 2:
         await answer_callback(callback_id)
         return
@@ -219,7 +219,9 @@ async def _handle_confirm_action(
 
     expense = await resolve_transaction_by_callback_id(db, user.id, resource_id)
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
+        await answer_callback(
+            callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True
+        )
         return
 
     await expense_service.delete_expense(db, user.id, expense.id)
@@ -238,9 +240,7 @@ async def _handle_confirm_action(
     )
 
 
-async def _handle_cancel_action(
-    *, db, user, args, callback_id, chat_id, message_id
-):
+async def _handle_cancel_action(*, db, user, args, callback_id, chat_id, message_id):
     """User tap 'Hủy'. Nếu có tx_id, đưa keyboard về trạng thái actions gốc."""
     if args:
         expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
@@ -258,17 +258,21 @@ async def _handle_cancel_action(
     await answer_callback(callback_id)
 
 
-async def _handle_undo_transaction(
-    *, db, user, args, callback_id, chat_id, message_id
-):
+async def _handle_undo_transaction(*, db, user, args, callback_id, chat_id, message_id):
     """Undo chỉ trong UNDO_WINDOW_SECONDS đầu tiên sau khi tạo expense."""
     if not args:
-        await answer_callback(callback_id, text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?", show_alert=True)
+        await answer_callback(
+            callback_id,
+            text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?",
+            show_alert=True,
+        )
         return
 
     expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
     if not expense:
-        await answer_callback(callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True)
+        await answer_callback(
+            callback_id, text="Giao dịch này mình không thấy nữa 🫣", show_alert=True
+        )
         return
 
     created_at = expense.created_at
@@ -301,9 +305,66 @@ async def _handle_undo_transaction(
     )
 
 
-async def _handle_edit_transaction(
+async def _handle_undo_transaction_batch(
     *, db, user, args, callback_id, chat_id, message_id
 ):
+    """Undo toàn bộ batch trong UNDO_WINDOW_SECONDS đầu tiên."""
+    if not args:
+        await answer_callback(
+            callback_id,
+            text="Hmm, thiếu thông tin giao dịch — thử tap lại giúp mình?",
+            show_alert=True,
+        )
+        return
+
+    expenses = await resolve_transactions_by_batch_id(db, user.id, args[0])
+    if not expenses:
+        await answer_callback(
+            callback_id,
+            text="Nhóm giao dịch này mình không thấy nữa 🫣",
+            show_alert=True,
+        )
+        return
+
+    now = datetime.now(timezone.utc)
+    ages: list[float] = []
+    for expense in expenses:
+        created_at = expense.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        ages.append((now - created_at).total_seconds() if created_at else 9999)
+
+    age = max(ages, default=9999)
+    if age > UNDO_WINDOW_SECONDS:
+        await answer_callback(
+            callback_id,
+            text="Quá muộn để hủy — dùng nút 🗑 Xóa nhé",
+            show_alert=True,
+        )
+        return
+
+    for expense in expenses:
+        await expense_service.delete_expense(db, user.id, expense.id)
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=f"↶ Đã hủy {len(expenses)} giao dịch",
+        parse_mode="HTML",
+        reply_markup={"inline_keyboard": []},
+    )
+    await answer_callback(callback_id, text="Đã hủy tất cả ✅")
+    analytics.track(
+        analytics.EventType.TRANSACTION_DELETED,
+        user_id=user.id,
+        properties={
+            "via": "undo_batch",
+            "count": len(expenses),
+            "age_seconds": round(age, 2),
+        },
+    )
+
+
+async def _handle_edit_transaction(*, db, user, args, callback_id, chat_id, message_id):
     """Placeholder — full amount/merchant edit UI ships in a later issue."""
     await answer_callback(
         callback_id,

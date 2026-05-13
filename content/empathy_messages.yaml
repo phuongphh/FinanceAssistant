@@ -1,0 +1,118 @@
+# Empathy trigger messages — Vietnamese.
+#
+# SINGLE SOURCE OF TRUTH for empathy copy. Do not hardcode strings in
+# Python. The engine loads this file once per process and picks a
+# random variation for each fire.
+#
+# Keys match trigger names in `backend.bot.personality.empathy_engine`.
+# Each trigger holds:
+#   conditions     — human-readable explanation (for editors/reviewers)
+#   cooldown_days  — minimum days before the same trigger can fire again
+#                    for the same user. 0 means "only ever once".
+#   messages       — list of variations; engine picks one at random.
+#
+# Placeholders (rendered via str.format, unresolved ones pass through):
+#   {name}              — user.get_greeting_name() (falls back to "bạn")
+#   {amount}            — pre-formatted currency string
+#   {category}          — Vietnamese category label (e.g. "Ăn uống")
+#   {days_silent}       — days since last event
+#   {weekend_pct}       — e.g. "62%"
+#   {suggested_amount}  — pre-formatted currency string
+#
+# TONE RULES (docs/tone_guide.md):
+# - Never use "đừng", "không nên", "phải", "sai", "tệ", "lãng phí".
+# - Always: acknowledge context, offer choice, "mình"/"bạn", keep short.
+# - Use "Mình để ý thấy...", "Không phán xét...", "Mình hiểu..." openings.
+
+# -------------------------------------------------------------------
+# Priority high → low. When multiple triggers match, the engine fires
+# the FIRST one not on cooldown (see empathy_engine.check_all_triggers).
+# -------------------------------------------------------------------
+
+large_transaction:
+  conditions: "Latest expense amount > 3× median of last 30 days (skip transfers)"
+  cooldown_days: 1
+  messages:
+    - |-
+      Ồ, giao dịch lớn! {amount} là khoản đáng chú ý đó {name}.
+
+      Mình xếp vào đâu cho hợp lý nhỉ? Hay bạn cho mình thêm context một chút?
+    - |-
+      {amount} — đây là khoản lớn nhất của {name} trong 30 ngày qua.
+
+      Nếu là khoản dự kiến (học phí, sửa xe, du lịch...) thì yên tâm nhé. Mình có thể tạo category riêng để bạn theo dõi không?
+
+payday_splurge:
+  conditions: "3 days after salary received AND spent > 35% of salary"
+  cooldown_days: 30
+  messages:
+    - |-
+      Lương vừa vào được 3 ngày... {name} đã chi kha khá rồi 🫣
+
+      Không phán xét đâu — cảm giác có lương luôn vui. Mình có một gợi ý nhỏ: muốn "khóa" trước {suggested_amount} vào tiết kiệm không? Còn lại tha hồ dùng 💰
+
+over_budget_monthly:
+  conditions: "Monthly spend exceeds budget ceiling by at least 10%"
+  cooldown_days: 14
+  messages:
+    - |-
+      Hmm, mình để ý tháng này bạn chi nhiều hơn một chút {name} ạ.
+
+      Không phải trách đâu — tháng nào cũng có những khoản đáng giá. Thử cùng nhau điều chỉnh tháng sau nhé? 🌸
+    - |-
+      {name} ơi, tháng này ngân sách hơi căng một chút.
+
+      Mình hiểu — không phải tháng nào cũng đều. Quan trọng là chúng ta nhìn thấy được, không phải giấu nó đi 💚
+
+user_silent_7_days:
+  conditions: "No activity for 7–29 days"
+  cooldown_days: 14
+  messages:
+    - |-
+      👋 Lâu rồi không gặp {name}.
+
+      Mọi thứ ổn không? Nếu đang bận, bạn cứ tập trung việc của bạn nhé — mình vẫn ở đây khi bạn cần 🌱
+    - |-
+      {name} ơi, mọi thứ thế nào?
+
+      Mình thấy tuần này bạn im lặng. Không sao cả, mình chỉ muốn ghé chào một chút thôi 💭
+
+user_silent_30_days:
+  conditions: "No activity for 30+ days"
+  cooldown_days: 60
+  messages:
+    - |-
+      {name} ơi... đã lâu rồi.
+
+      Mình không biết có phải bạn đang bận, hay mình chưa đủ hữu ích. Nếu có điều gì mình có thể làm tốt hơn, bạn nói cho mình biết được không? 🙏
+
+weekend_high_spending:
+  conditions: "Weekend spend > 50% of 7-day total"
+  cooldown_days: 30
+  messages:
+    - |-
+      Haha cuối tuần mà {name} 😄 Tận hưởng thôi!
+
+      Mình nhắc nhẹ một chút: đây là pattern của bạn — cuối tuần thường chi nhiều hơn. Không phải xấu, chỉ là biết để tính ngân sách cho thực tế hơn 🌸
+    - |-
+      {weekend_pct} chi cuối tuần — {name} là weekend warrior đây nhỉ 🎉
+
+      Mình không có ý gì đâu, chỉ là thông tin hay ho. Nếu thích, mình gợi ý đặt một "ngân sách cuối tuần" riêng cho dễ cân bằng.
+
+first_saving_month:
+  conditions: "First month where income > expense"
+  cooldown_days: 0
+  messages:
+    - |-
+      🌟 Tháng này bạn có tiết kiệm dương, {name}!
+
+      Nghĩa là thu > chi. Nghe tưởng đơn giản nhưng nhiều người không làm được đâu. Bạn đang đi đúng hướng 💪
+
+consecutive_over_budget:
+  conditions: "Same category exceeded budget for 3 consecutive months"
+  cooldown_days: 60
+  messages:
+    - |-
+      {name} ơi, mình để ý danh mục {category} đã vượt ngân sách 3 tháng liên tục rồi.
+
+      Có thể ngân sách đặt hơi thấp so với nhu cầu thực tế chăng? Chúng ta điều chỉnh cho hợp lý hơn nhé — không có gì xấu hổ cả, thực tế đang nói với chúng ta một điều gì đó 🌱

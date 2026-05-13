@@ -1,7 +1,19 @@
+from __future__ import annotations
+
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Index, Numeric, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +40,19 @@ class Expense(Base):
     raw_data: Mapped[dict | None] = mapped_column(JSONB)
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
     gmail_message_id: Mapped[str | None] = mapped_column(String(255))
+
+    # Phase 3.8 Epic 3 — link a transaction to its recurring pattern.
+    # ``is_recurring`` is denormalised from ``recurrence_id IS NOT
+    # NULL`` so the agent can filter "khoản định kỳ tháng này"
+    # without joining recurring_patterns. Both fields default safe
+    # for the 95% of one-off transactions.
+    is_recurring: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    recurrence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("recurring_patterns.id", ondelete="SET NULL"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -43,5 +68,13 @@ class Expense(Base):
             "idx_expenses_gmail_id",
             "gmail_message_id",
             postgresql_where=text("gmail_message_id IS NOT NULL"),
+        ),
+        # Phase 3.8 Epic 3 — partial index for "was this period
+        # already paid?" lookups. Most rows have no recurrence_id so
+        # the partial keeps the index small.
+        Index(
+            "idx_expenses_recurrence",
+            "recurrence_id", "expense_date",
+            postgresql_where=text("recurrence_id IS NOT NULL"),
         ),
     )

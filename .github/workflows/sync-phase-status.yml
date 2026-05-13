@@ -1,0 +1,78 @@
+name: Sync Phase Status
+
+# Triggers when phase-status.yaml changes, or manually via workflow_dispatch.
+# Updates marker sections in CLAUDE.md, README.md, docs/README.md, strategy.md
+# whenever the source-of-truth phase-status.yaml is modified.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/current/phase-status.yaml'
+      - 'scripts/sync_phase_status.py'
+      - '.github/workflows/sync-phase-status.yml'
+  workflow_dispatch:
+
+# Need write permission to commit synced changes back.
+permissions:
+  contents: write
+
+# Prevent concurrent runs from racing on commits.
+concurrency:
+  group: sync-phase-status
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Use default GITHUB_TOKEN; fine for committing to same repo.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch enough history so commits don't fail on shallow clones.
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet PyYAML
+
+      - name: Run phase status sync
+        run: python scripts/sync_phase_status.py
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Files changed:"
+            git status --short
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes detected."
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Sync targets + any test-cases files that received seeded markers.
+          git add CLAUDE.md README.md docs/README.md docs/current/strategy.md 2>/dev/null || true
+          git add 'docs/current/**/*test-cases*.md' 2>/dev/null || true
+          git add docs/current/ 2>/dev/null || true
+          # Commit only if there are staged changes (some files may not exist).
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: sync phase status + seed test-cases markers [skip ci]"
+            git push
+            echo "✓ Pushed phase status sync."
+          else
+            echo "No tracked files to commit (markers may be missing in target files)."
+          fi
