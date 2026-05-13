@@ -39,6 +39,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #576 | [Epic] Phase 4.2.5 — Epic 4: Frontend Foundation | [issue-576.md](issue-576.md) |
 | #577 | [Epic] Phase 4.2.5 — Epic 5: Dashboard Components | [issue-577.md](issue-577.md) |
 | #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
+| #579 | [Epic] Phase 4.2.5 — Epic 7: License Foundation | [issue-579.md](issue-579.md) |
 | #580 | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [issue-580.md](issue-580.md) |
 | #581 | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [issue-581.md](issue-581.md) |
 | #582 | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [issue-582.md](issue-582.md) |
@@ -52,4 +53,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
 | #591 | [Story] P4.2.5-3.3: User status change action | [issue-591.md](issue-591.md) |
 
-**Total active:** 47
+**Total active:** 48
