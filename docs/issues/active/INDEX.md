@@ -62,5 +62,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #599 | [Story] P4.2.5-6.1: Caddy + HTTPS + CORS + rate limit | [issue-599.md](issue-599.md) |
 | #600 | [Story] P4.2.5-6.2: PII protection layer | [issue-600.md](issue-600.md) |
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
+| #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 58
+**Total active:** 59
