@@ -35,8 +35,16 @@ async def _adjust_source_asset(
 ) -> None:
     if not expense.source_asset_id:
         return
-    asset = await db.get(Asset, expense.source_asset_id)
-    if asset is None or asset.user_id != expense.user_id:
+    stmt = (
+        select(Asset)
+        .where(
+            Asset.id == expense.source_asset_id,
+            Asset.user_id == expense.user_id,
+        )
+        .with_for_update()
+    )
+    asset = (await db.execute(stmt)).scalar_one_or_none()
+    if asset is None:
         return
     asset.current_value = Decimal(asset.current_value or 0) + (
         _source_asset_delta(expense) * multiplier
@@ -138,9 +146,20 @@ async def resolve_source_asset_for_payload(
 async def create_expense(
     db: AsyncSession, user_id: uuid.UUID, data: ExpenseCreate
 ) -> Expense:
-    # Auto-categorize if category is needs_review and we have context
+    # Auto-categorize only outflows. Inflows are not spending categories,
+    # and letting the expense classifier see salary/bonus text can leak
+    # money-in rows into report buckets if a caller forgets to set category.
     category = data.category
-    if category == "needs_review" and (data.merchant or data.note):
+    if (
+        data.transaction_type == TRANSACTION_TYPE_MONEY_IN
+        and category == "needs_review"
+    ):
+        category = "income"
+    if (
+        data.transaction_type == TRANSACTION_TYPE_EXPENSE
+        and category == "needs_review"
+        and (data.merchant or data.note)
+    ):
         from backend.services.llm_service import categorize_expense
 
         category = await categorize_expense(
@@ -270,32 +289,42 @@ async def update_expense(
         or "source_type" in update_data
         or "e_wallet_provider" in update_data
     ):
-        merged = ExpenseCreate(
-            amount=float(update_data.get("amount", expense.amount)),
-            transaction_type=update_data.get(
-                "transaction_type", expense.transaction_type
-            ),
-            currency=update_data.get("currency", expense.currency),
-            merchant=update_data.get("merchant", expense.merchant),
-            category=update_data.get("category", expense.category),
-            source=expense.source,
-            source_asset_id=update_data.get("source_asset_id", expense.source_asset_id),
-            source_type=update_data.get("source_type", expense.source_type),
-            e_wallet_provider=update_data.get(
-                "e_wallet_provider", expense.e_wallet_provider
-            ),
-            expense_date=update_data.get("expense_date", expense.expense_date),
-            note=update_data.get("note", expense.note),
-            raw_data=update_data.get("raw_data", expense.raw_data),
-            needs_review=update_data.get("needs_review", expense.needs_review),
-        )
-        resolved_asset_id, _warning = await resolve_source_asset_for_payload(
-            db, user_id, merged
-        )
-        update_data["source_asset_id"] = resolved_asset_id
-        update_data["e_wallet_provider"] = (
-            merged.e_wallet_provider if merged.source_type == "e_wallet" else None
-        )
+        clear_source = (
+            "source_asset_id" in update_data and update_data["source_asset_id"] is None
+        ) or ("source_type" in update_data and update_data["source_type"] is None)
+        if clear_source:
+            update_data["source_asset_id"] = None
+            update_data["source_type"] = None
+            update_data["e_wallet_provider"] = None
+        else:
+            merged = ExpenseCreate(
+                amount=float(update_data.get("amount", expense.amount)),
+                transaction_type=update_data.get(
+                    "transaction_type", expense.transaction_type
+                ),
+                currency=update_data.get("currency", expense.currency),
+                merchant=update_data.get("merchant", expense.merchant),
+                category=update_data.get("category", expense.category),
+                source=expense.source,
+                source_asset_id=update_data.get(
+                    "source_asset_id", expense.source_asset_id
+                ),
+                source_type=update_data.get("source_type", expense.source_type),
+                e_wallet_provider=update_data.get(
+                    "e_wallet_provider", expense.e_wallet_provider
+                ),
+                expense_date=update_data.get("expense_date", expense.expense_date),
+                note=update_data.get("note", expense.note),
+                raw_data=update_data.get("raw_data", expense.raw_data),
+                needs_review=update_data.get("needs_review", expense.needs_review),
+            )
+            resolved_asset_id, _warning = await resolve_source_asset_for_payload(
+                db, user_id, merged
+            )
+            update_data["source_asset_id"] = resolved_asset_id
+            update_data["e_wallet_provider"] = (
+                merged.e_wallet_provider if merged.source_type == "e_wallet" else None
+            )
     for field, value in update_data.items():
         setattr(expense, field, value)
     if "expense_date" in update_data and expense.expense_date is not None:
