@@ -9,6 +9,8 @@ explainer: |
 
   Hôm nay Bé Tiền nói về:
 
+  Hoặc hỏi cụ thể — vd: <code>sao tài sản của tôi giảm?</code>
+
 # Button shown below the briefing — explains each metric in detail.
 explain_button:
   label: "💡 Bé Tiền đang nói gì?"

@@ -16,7 +16,7 @@ caption: |
 
 # In-moment feedback prompt — sent 5–10s after the chart image.
 feedback_prompt:
-  body: "💬 Bạn cảm thấy thế nào về Twin đầu tiên?"
+  body: "💬 Bạn cảm thấy thế nào về Twin đầu tiên? Có câu hỏi về Twin? Cứ hỏi Bé Tiền nhé"
   buttons:
     love: "😍 Rất thích"
     confused: "🤔 Hơi khó hiểu"

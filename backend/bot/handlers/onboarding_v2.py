@@ -42,7 +42,7 @@ from backend.models.onboarding_session import (
 from backend.models.user import User
 from backend.services import onboarding_service as legacy_onboarding_service
 from backend.services.founding import founding_member_service
-from backend.services.onboarding import data_quality_service, onboarding_service
+from backend.services.onboarding import data_quality_service, next_action_service, onboarding_service
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
@@ -741,6 +741,7 @@ async def _on_feedback_signal(
         user_id=user.id,
         properties={"signal": signal},
     )
+    await _send_next_best_action(db, chat_id, user)
     await _complete(db, chat_id, user)
 
 
@@ -775,6 +776,96 @@ async def _complete(db: AsyncSession, chat_id: int, user: User) -> None:
             else None,
         },
     )
+
+
+async def _send_next_best_action(db: AsyncSession, chat_id: int, user: User) -> None:
+    """Insert the personalized CTA before the morning-briefing promise."""
+    cta = await next_action_service.compute(db, user.id)
+    await send_message(
+        chat_id,
+        cta.message_text,
+        parse_mode="HTML",
+        reply_markup=cta.reply_markup,
+    )
+    analytics.track(
+        "next_best_action_shown",
+        user_id=user.id,
+        properties={
+            "asset_state": cta.asset_state,
+            "goal": cta.goal,
+            "button_key": cta.button_key,
+        },
+    )
+
+
+async def maybe_mark_query_next_action(db: AsyncSession, user: User) -> None:
+    """Mark free-text after first Twin as query-first activation."""
+    session = await onboarding_service.get_session(db, user.id)
+    if (
+        session is None
+        or session.first_twin_shown_at is None
+        or session.next_best_action_taken is not None
+    ):
+        return
+    await next_action_service.mark_taken(
+        db, user.id, next_action_service.ACTION_ASKED_QUERY
+    )
+    analytics.track(
+        "next_best_action_taken",
+        user_id=user.id,
+        properties={"action_type": next_action_service.ACTION_ASKED_QUERY},
+    )
+
+
+async def handle_next_action_callback(db: AsyncSession, callback_query: dict) -> bool:
+    """Route ``next_action:*`` shortcut buttons."""
+    data = callback_query.get("data") or ""
+    if not data.startswith("next_action:"):
+        return False
+
+    callback_id = callback_query["id"]
+    message = callback_query.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    telegram_id = (callback_query.get("from") or {}).get("id")
+    if chat_id is None or telegram_id is None:
+        await answer_callback(callback_id)
+        return True
+
+    from backend.services.dashboard_service import get_user_by_telegram_id
+
+    user = await get_user_by_telegram_id(db, telegram_id)
+    if user is None:
+        await answer_callback(callback_id, text="Gõ /start để bắt đầu nhé")
+        return True
+
+    action = data.split(":", 1)[1]
+    action_type = next_action_service.action_type_for_callback(data) or action
+    await next_action_service.mark_taken(db, user.id, action_type)
+    analytics.track(
+        "next_best_action_taken",
+        user_id=user.id,
+        properties={"action_type": action_type, "button_key": action},
+    )
+    await answer_callback(callback_id, text="Bắt đầu nhé 💚")
+
+    if action == "add_asset":
+        from backend.bot.handlers.asset_entry import start_asset_wizard
+        await start_asset_wizard(db, chat_id, user)
+    elif action == "add_income":
+        from backend.bot.handlers.income_entry import start_income_wizard
+        await start_income_wizard(db, chat_id, user)
+    elif action == "set_goal":
+        from backend.bot.handlers.goal_entry import start_goals_wizard
+        await start_goals_wizard(db, chat_id, user)
+    elif action == "log_expense":
+        await send_message(
+            chat_id,
+            "🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>",
+            parse_mode="HTML",
+        )
+    else:
+        await send_message(chat_id, "Gõ /menu để chọn bước tiếp theo nhé.")
+    return True
 
 
 # ---------- Resume ---------------------------------------------------

@@ -62,16 +62,8 @@ async def is_first_briefing(db: AsyncSession, user_id: uuid.UUID) -> bool:
     return (count or 0) == 0
 
 
-def decorate(text: str) -> tuple[str, dict]:
-    """Prepend the first-briefing explainer + attach inline keyboard.
-
-    Returns ``(decorated_text, reply_markup)`` — caller passes both to
-    Notifier.send_message in place of the plain briefing text and the
-    default briefing keyboard.
-    """
-    copy = _copy()
-    decorated = f"{copy['explainer']}\n\n{text}"
-    reply_markup = {
+def _reply_markup(copy: dict[str, Any]) -> dict:
+    return {
         "inline_keyboard": [
             [
                 {
@@ -81,7 +73,28 @@ def decorate(text: str) -> tuple[str, dict]:
             ]
         ]
     }
-    return decorated, reply_markup
+
+
+def decorate(text: str) -> tuple[str, dict]:
+    """Prepend the first-briefing explainer + attach inline keyboard.
+
+    Kept for tests/legacy callers. The scheduler uses
+    :func:`decorate_for_user` so briefing #1 also carries a personalized
+    quality-bar insight.
+    """
+    copy = _copy()
+    decorated = f"{copy['explainer']}\n\n{text}"
+    return decorated, _reply_markup(copy)
+
+
+async def decorate_for_user(db: AsyncSession, user_id: uuid.UUID, text: str) -> tuple[str, dict]:
+    """Decorate briefing #1 with explainer and one personalized insight."""
+    from backend.services.briefing import briefing_content_quality_service
+
+    copy = _copy()
+    insight = await briefing_content_quality_service.compute_insight(db, user_id)
+    decorated = f"{copy['explainer']}\n\n{insight.render_text}\n\n{text}"
+    return decorated, _reply_markup(copy)
 
 
 def explanation_text() -> str:

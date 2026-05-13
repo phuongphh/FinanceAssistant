@@ -1,0 +1,28 @@
+# Phase 4.2 Epic 2 — First briefing personalized insight templates.
+# Each insight must compare segment, suggest an action, or pose a follow-up.
+
+templates:
+  young_pro_cash_only:
+    trigger_condition: "segment = young_pro AND cash_ratio = 100%"
+    insight_text: "Bé Tiền nhận thấy bạn đang giữ 100% tiền mặt; người cùng segment thường bắt đầu đa dạng hóa từng phần."
+    suggested_query: "gợi ý đầu tư an toàn"
+  mass_affluent_single_class:
+    trigger_condition: "segment = mass_affluent AND asset_class_count = 1"
+    insight_text: "Bé Tiền nhận thấy portfolio tập trung ở {top_asset}. Đa dạng hóa có thể giảm rủi ro biến động."
+    suggested_query: "phân tích đa dạng hóa"
+  track_spending_no_logs:
+    trigger_condition: "goal = track_spending AND expense_count = 0"
+    insight_text: "Bé Tiền nhận thấy bạn muốn theo dõi chi tiêu nhưng chưa ghi khoản nào; bắt đầu với 1 khoản hôm nay nhé?"
+    suggested_query: "ghi chi tiêu đầu tiên"
+  hnw_portfolio:
+    trigger_condition: "segment = hnw"
+    insight_text: "Bé Tiền nhận thấy danh mục của bạn cần góc nhìn rủi ro tổng thể hơn là chỉ nhìn số dư từng tài sản."
+    suggested_query: "rủi ro danh mục của tôi"
+  starter_first_asset:
+    trigger_condition: "segment = starter"
+    insight_text: "Bé Tiền nhận thấy bạn đang ở bước xây nền; ưu tiên rõ nhất là tạo thói quen ghi nhận đều đặn."
+    suggested_query: "bắt đầu quản lý tài chính"
+
+fallback:
+  insight_text: "Bé Tiền nhận thấy dữ liệu còn mới và đang học pattern của bạn; kiểm tra lại sau 1 tuần sẽ rõ hơn."
+  suggested_query: "Bé Tiền đang thấy gì?"
