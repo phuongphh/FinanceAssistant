@@ -317,8 +317,9 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #562 | Pre-Phase | [Epic] Expense Enhancement — Money-In/Expense with Source Tracking, Daily Summary & Dashboard | [pre-phase/issue-562.md](by-phase/pre-phase/issue-562.md) |
 | #563 | Pre-Phase | [Story] US1: Transaction model — extend with source, type, linked asset | [pre-phase/issue-563.md](by-phase/pre-phase/issue-563.md) |
 | #564 | Pre-Phase | [Story] US2: Expense flow — add source selection with +/- syntax | [pre-phase/issue-564.md](by-phase/pre-phase/issue-564.md) |
+| #565 | Pre-Phase | [Story] US3: Money In entry flow — income tracking with source | [pre-phase/issue-565.md](by-phase/pre-phase/issue-565.md) |
 | #566 | Pre-Phase | [Story] US4: Menu Chi tiêu — help text & syntax guide | [pre-phase/issue-566.md](by-phase/pre-phase/issue-566.md) |
 | #567 | Pre-Phase | [Story] US5: Daily transaction summary (22:00 cron) | [pre-phase/issue-567.md](by-phase/pre-phase/issue-567.md) |
 
-**Total:** 315 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 298 Pre-Phase)
+**Total:** 316 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 299 Pre-Phase)
