@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Pre-Launch Hardening** (current) — [detail](docs/current/phase-4.1/phase-4.1-detailed.md)
+🚀 **Admin Observability** (current) — [detail](docs/current/phase-4.2.5/phase-4.2.5-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
