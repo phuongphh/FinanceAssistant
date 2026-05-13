@@ -47,5 +47,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #585 | [Story] P4.2.5-2.2: User growth & DAU chart endpoints | [issue-585.md](issue-585.md) |
 | #586 | [Story] P4.2.5-2.3: Feature events tracking + clicks endpoint | [issue-586.md](issue-586.md) |
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
+| #591 | [Story] P4.2.5-3.3: User status change action | [issue-591.md](issue-591.md) |
 
-**Total active:** 43
+**Total active:** 44
