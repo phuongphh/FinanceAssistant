@@ -39,5 +39,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #565 | [Story] US3: Money In entry flow — income tracking with source | [issue-565.md](issue-565.md) |
 | #566 | [Story] US4: Menu Chi tiêu — help text & syntax guide | [issue-566.md](issue-566.md) |
 | #567 | [Story] US5: Daily transaction summary (22:00 cron) | [issue-567.md](issue-567.md) |
+| #568 | [Story] US6: Expense Dashboard — Money In list + CRUD | [issue-568.md](issue-568.md) |
 
-**Total active:** 35
+**Total active:** 36
