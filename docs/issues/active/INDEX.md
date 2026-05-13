@@ -36,10 +36,9 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 | #545 | [Story] P4.2-2.2: First Briefing Content Quality Bar | [issue-545.md](issue-545.md) |
-| #546 | [Story] P4.2-2.3: Query-First Soft Prompts | [issue-546.md](issue-546.md) |
 | #547 | [Story] P4.2-3.1: Day 7 Positioning Micro-Survey | [issue-547.md](issue-547.md) |
 | #548 | [Story] P4.2-3.2: Positioning Misalignment Kill Criterion | [issue-548.md](issue-548.md) |
 | #551 | [Task] P4.2-M3: Migration positioning_survey | [issue-551.md](issue-551.md) |
 | #553 | [Task] P4.2-D2: Content Quality Playbook | [issue-553.md](issue-553.md) |
 
-**Total active:** 37
+**Total active:** 36
