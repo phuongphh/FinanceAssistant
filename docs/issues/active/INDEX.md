@@ -37,5 +37,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 | #542 | [Story] P4.2-1.1: Trust & Privacy Moment | [issue-542.md](issue-542.md) |
+| #544 | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [issue-544.md](issue-544.md) |
 
-**Total active:** 33
+**Total active:** 34
