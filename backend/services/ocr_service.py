@@ -24,7 +24,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.services.llm_service import call_llm
+from backend.services.llm_service import LLMError, call_llm
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -167,14 +167,22 @@ async def parse_receipt_image(
         }
 
     prompt = _STRUCTURE_PROMPT.format(text=ocr_text)
-    response_text = await call_llm(
-        prompt,
-        task_type="parse_receipt",
-        db=db,
-        user_id=user_id,
-        # Cache per-user: identical receipts re-uploaded shouldn't pay twice.
-        use_cache=bool(db and user_id),
-    )
+    try:
+        response_text = await call_llm(
+            prompt,
+            task_type="parse_receipt",
+            db=db,
+            user_id=user_id,
+            # Cache per-user: identical receipts re-uploaded shouldn't pay twice.
+            use_cache=bool(db and user_id),
+        )
+    except LLMError as exc:
+        # Missing key, upstream timeout/quota — surface as a ValueError so
+        # the router's OCR_PROVIDER_ERROR path returns 502 instead of 500.
+        # BudgetExceededError is intentionally NOT caught: callers convert
+        # it to the user-facing "tạm dừng" message (see CLAUDE.md).
+        logger.warning("Receipt structuring LLM failed: %s", exc)
+        raise ValueError(f"Receipt parser unavailable: {exc}") from exc
 
     response_text = _strip_code_fence(response_text)
     try:
