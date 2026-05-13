@@ -320,6 +320,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #565 | Pre-Phase | [Story] US3: Money In entry flow — income tracking with source | [pre-phase/issue-565.md](by-phase/pre-phase/issue-565.md) |
 | #566 | Pre-Phase | [Story] US4: Menu Chi tiêu — help text & syntax guide | [pre-phase/issue-566.md](by-phase/pre-phase/issue-566.md) |
 | #567 | Pre-Phase | [Story] US5: Daily transaction summary (22:00 cron) | [pre-phase/issue-567.md](by-phase/pre-phase/issue-567.md) |
+| #568 | Pre-Phase | [Story] US6: Expense Dashboard — Money In list + CRUD | [pre-phase/issue-568.md](by-phase/pre-phase/issue-568.md) |
 
-**Total:** 316 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 299 Pre-Phase)
+**Total:** 317 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 300 Pre-Phase)
