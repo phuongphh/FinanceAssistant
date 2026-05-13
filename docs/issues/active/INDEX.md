@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #573 | [Epic] Phase 4.2.5 — Epic 1: Backend Foundation & Auth | [issue-573.md](issue-573.md) |
 | #574 | [Epic] Phase 4.2.5 — Epic 2: Analytics APIs | [issue-574.md](issue-574.md) |
+| #575 | [Epic] Phase 4.2.5 — Epic 3: User Management APIs | [issue-575.md](issue-575.md) |
 
-**Total active:** 31
+**Total active:** 32
