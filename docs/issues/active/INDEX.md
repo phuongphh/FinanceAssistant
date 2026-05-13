@@ -36,7 +36,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #539 | [Epic] Phase 4.2 — Epic 1: Trust & Data Integrity | [issue-539.md](issue-539.md) |
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
-| #542 | [Story] P4.2-1.1: Trust & Privacy Moment | [issue-542.md](issue-542.md) |
 | #543 | [Story] P4.2-1.2: Financial Data Quality Guardrails | [issue-543.md](issue-543.md) |
 | #544 | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [issue-544.md](issue-544.md) |
 | #545 | [Story] P4.2-2.2: First Briefing Content Quality Bar | [issue-545.md](issue-545.md) |
@@ -50,4 +49,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #553 | [Task] P4.2-D2: Content Quality Playbook | [issue-553.md](issue-553.md) |
 | #554 | [Task] P4.2-D3: Manual Review Briefing #1 (Soft Launch Cohort) | [issue-554.md](issue-554.md) |
 
-**Total active:** 45
+**Total active:** 44
