@@ -16,10 +16,8 @@ import re
 import time
 from pathlib import Path
 
-from urllib.parse import urlencode
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -208,27 +206,17 @@ def current_build_hash() -> str:
     return _STATIC_VERSION
 
 
-def _redirect_if_stale_build(
-    path: str, b: str | None, extra_params: dict[str, str] | None = None
-) -> RedirectResponse | None:
-    """Redirect ``/miniapp/<page>?b=<old>`` to the same page with the current
-    hash so any URL that escaped the helper (legacy inline buttons in chat
-    history, hand-typed URLs, share links from older clients) self-heals on
-    the first request the server actually sees.
-
-    Returns ``None`` when the request already carries the current hash so
-    the caller can fall through to serving the page. We keep
-    ``extra_params`` (e.g., ``source=briefing``) on the redirect target so
-    analytics attribution survives the bounce.
-    """
-    if b == _STATIC_VERSION:
-        return None
-    params: dict[str, str] = {"b": _STATIC_VERSION}
-    if extra_params:
-        params.update({k: v for k, v in extra_params.items() if v is not None})
-    # 302 (not 301) so a future deploy can change the target without
-    # browsers honoring a permanent redirect to a now-stale hash.
-    return RedirectResponse(f"{path}?{urlencode(params)}", status_code=302)
+# Note: Mini App page handlers always return 200 OK with fresh HTML and
+# never 3xx — Telegram's WebView (especially iOS WebKit) does not follow
+# HTTP redirects automatically, so a 302 here would render a blank panel
+# (issue #608). Cache busting is owned end-to-end by the client-side
+# bootstrap injected by ``_build_bootstrap_script``: it (1) reloads the
+# page when the embedded build hash drifts from ``localStorage`` and
+# (2) live-probes ``/miniapp/api/version`` so a stale-in-memory WebView
+# self-heals to a fresh ``?b=<hash>`` URL without a server bounce. URL
+# helpers (see ``backend/miniapp/urls.py``) still emit ``?b=<hash>`` on
+# every freshly-rendered button so each deploy gets a never-before-seen
+# URL that Telegram treats as uncached.
 
 
 def _detect_git_sha() -> str:
@@ -671,15 +659,10 @@ async def get_recent(
 
 @router.get("/twin", response_class=HTMLResponse)
 async def twin_dashboard(
-    b: str | None = Query(None),
-    source: str | None = Query(None),
+    b: str | None = Query(None),  # noqa: ARG001 — accepted for client-side cache-bust
+    source: str | None = Query(None),  # noqa: ARG001
 ):
     """Serve the Phase 4A Financial Twin dashboard shell."""
-    redirect = _redirect_if_stale_build(
-        "/miniapp/twin", b, {"source": source} if source else None
-    )
-    if redirect is not None:
-        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "twin"},
@@ -689,8 +672,8 @@ async def twin_dashboard(
 
 @router.get("/expense", include_in_schema=False)
 async def expense_page(
-    b: str | None = Query(None),
-    source: str | None = Query(None),
+    b: str | None = Query(None),  # noqa: ARG001 — accepted for client-side cache-bust
+    source: str | None = Query(None),  # noqa: ARG001
 ):
     """Serve the Expense Dashboard mini-app shell.
 
@@ -698,11 +681,6 @@ async def expense_page(
     layer; an authenticated ``MINIAPP_LOADED`` beacon arrives once JS
     finishes its initial render.
     """
-    redirect = _redirect_if_stale_build(
-        "/miniapp/expense", b, {"source": source} if source else None
-    )
-    if redirect is not None:
-        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "expense"},
@@ -859,8 +837,8 @@ async def get_expense_dashboard_trend(
 
 @router.get("/wealth", include_in_schema=False)
 async def wealth_page(
-    b: str | None = Query(None),
-    source: str | None = Query(None),
+    b: str | None = Query(None),  # noqa: ARG001 — accepted for client-side cache-bust
+    source: str | None = Query(None),  # noqa: ARG001
 ):
     """Serve the wealth dashboard HTML.
 
@@ -869,15 +847,12 @@ async def wealth_page(
     initData hasn't been verified yet — the JS sends an authenticated
     ``WEALTH_DASHBOARD_VIEWED`` event once the API call succeeds.
 
-    A stale or missing ``?b=`` triggers a 302 to the current build URL so
-    any link that didn't go through :func:`wealth_dashboard_url` (legacy
-    inline buttons, hand-typed URLs) lands on the canonical cache key.
+    Always responds 200 OK with the freshly-rendered HTML (which embeds
+    the current build hash). Cache-busting is handled entirely by the
+    JS bootstrap — see the module-level note above. Telegram Mini App
+    WebViews do not follow 3xx redirects, so the previous "redirect to
+    canonical ?b=<hash>" behaviour rendered a blank panel (issue #608).
     """
-    redirect = _redirect_if_stale_build(
-        "/miniapp/wealth", b, {"source": source} if source else None
-    )
-    if redirect is not None:
-        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "wealth"},
@@ -887,15 +862,10 @@ async def wealth_page(
 
 @router.get("/cashflow", include_in_schema=False)
 async def cashflow_page(
-    b: str | None = Query(None),
-    source: str | None = Query(None),
+    b: str | None = Query(None),  # noqa: ARG001 — accepted for client-side cache-bust
+    source: str | None = Query(None),  # noqa: ARG001
 ):
     """Serve the Phase 4B Cashflow dashboard shell (Epic 3, S20)."""
-    redirect = _redirect_if_stale_build(
-        "/miniapp/cashflow", b, {"source": source} if source else None
-    )
-    if redirect is not None:
-        return redirect
     analytics.track(
         analytics.EventType.MINIAPP_OPENED,
         properties={"page": "cashflow"},
