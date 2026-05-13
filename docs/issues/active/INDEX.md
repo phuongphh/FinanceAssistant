@@ -36,5 +36,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #539 | [Epic] Phase 4.2 — Epic 1: Trust & Data Integrity | [issue-539.md](issue-539.md) |
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
+| #542 | [Story] P4.2-1.1: Trust & Privacy Moment | [issue-542.md](issue-542.md) |
 
-**Total active:** 32
+**Total active:** 33
