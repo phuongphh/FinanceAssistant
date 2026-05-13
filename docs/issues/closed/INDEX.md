@@ -321,6 +321,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #566 | Pre-Phase | [Story] US4: Menu Chi tiêu — help text & syntax guide | [pre-phase/issue-566.md](by-phase/pre-phase/issue-566.md) |
 | #567 | Pre-Phase | [Story] US5: Daily transaction summary (22:00 cron) | [pre-phase/issue-567.md](by-phase/pre-phase/issue-567.md) |
 | #568 | Pre-Phase | [Story] US6: Expense Dashboard — Money In list + CRUD | [pre-phase/issue-568.md](by-phase/pre-phase/issue-568.md) |
+| #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 
-**Total:** 317 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 300 Pre-Phase)
+**Total:** 318 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 301 Pre-Phase)
