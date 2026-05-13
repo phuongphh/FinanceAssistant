@@ -299,6 +299,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #526 | Pre-Phase | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [pre-phase/issue-526.md](by-phase/pre-phase/issue-526.md) |
 | #542 | Pre-Phase | [Story] P4.2-1.1: Trust & Privacy Moment | [pre-phase/issue-542.md](by-phase/pre-phase/issue-542.md) |
 | #543 | Pre-Phase | [Story] P4.2-1.2: Financial Data Quality Guardrails | [pre-phase/issue-543.md](by-phase/pre-phase/issue-543.md) |
+| #552 | Pre-Phase | [Task] P4.2-D1: Editorial Discipline Doc cho Operator | [pre-phase/issue-552.md](by-phase/pre-phase/issue-552.md) |
 
-**Total:** 295 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 278 Pre-Phase)
+**Total:** 296 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 279 Pre-Phase)
