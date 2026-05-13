@@ -55,5 +55,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #592 | [Story] P4.2.5-4.1: Vite project setup + Tailwind + design tokens | [issue-592.md](issue-592.md) |
 | #593 | [Story] P4.2.5-4.2: Auth flow (login + protected routes + change password) | [issue-593.md](issue-593.md) |
 | #594 | [Story] P4.2.5-4.3: Dashboard layout (header + hero + grid framework) | [issue-594.md](issue-594.md) |
+| #595 | [Story] P4.2.5-5.1: KPI cards grid | [issue-595.md](issue-595.md) |
 
-**Total active:** 51
+**Total active:** 52
