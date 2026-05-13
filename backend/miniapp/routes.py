@@ -55,10 +55,12 @@ _STATIC_REF_FILES = (
     "css/wealth.css",
     "css/twin.css",
     "css/cashflow.css",
+    "css/expense.css",
     "js/dashboard.js",
     "js/wealth_dashboard.js",
     "js/twin_dashboard.js",
     "js/cashflow_dashboard.js",
+    "js/expense_dashboard.js",
 )
 # HTML templates contribute to the version hash so an HTML-only change
 # (e.g., adding a new sort button, changing copy) still bumps the build
@@ -71,6 +73,7 @@ _TEMPLATE_REF_FILES = (
     "twin_dashboard.html",
     "cashflow_dashboard.html",
     "dashboard.html",
+    "expense_dashboard.html",
 )
 _STATIC_URL_PATTERN = re.compile(r'(/miniapp/static/[^"\'?#\s]+)')
 _VERSION_MARKER_PATTERN = re.compile(r"<!--\s*APP_VERSION_MARKER\s*-->")
@@ -529,6 +532,7 @@ async def miniapp_create_expense(
     expense = await expense_service.create_expense(db, user.id, data)
     await db.commit()
     invalidate_wealth_cache_for_user(user.id)
+    invalidate_expense_cache_for_user(user.id)
     return {"data": _serialize_expense_item(expense), "error": None}
 
 
@@ -556,6 +560,7 @@ async def miniapp_update_expense(
         raise HTTPException(status_code=404, detail="Không tìm thấy chi tiêu.")
     await db.commit()
     invalidate_wealth_cache_for_user(user.id)
+    invalidate_expense_cache_for_user(user.id)
     return {"data": _serialize_expense_item(expense), "error": None}
 
 
@@ -580,6 +585,7 @@ async def miniapp_delete_expense(
         raise HTTPException(status_code=404, detail="Không tìm thấy chi tiêu.")
     await db.commit()
     invalidate_wealth_cache_for_user(user.id)
+    invalidate_expense_cache_for_user(user.id)
     return {"data": {"ok": True}, "error": None}
 
 
@@ -644,6 +650,163 @@ async def twin_dashboard(
         properties={"page": "twin"},
     )
     return _serve_html("twin_dashboard.html")
+
+
+@router.get("/expense", include_in_schema=False)
+async def expense_page(
+    b: str | None = Query(None),
+    source: str | None = Query(None),
+):
+    """Serve the Expense Dashboard mini-app shell.
+
+    Mirrors :func:`wealth_page` — auth happens per-request in the API
+    layer; an authenticated ``MINIAPP_LOADED`` beacon arrives once JS
+    finishes its initial render.
+    """
+    redirect = _redirect_if_stale_build(
+        "/miniapp/expense", b, {"source": source} if source else None
+    )
+    if redirect is not None:
+        return redirect
+    analytics.track(
+        analytics.EventType.MINIAPP_OPENED,
+        properties={"page": "expense"},
+    )
+    return _serve_html("expense_dashboard.html")
+
+
+@router.get("/api/expense-dashboard/overview")
+async def get_expense_dashboard_overview(
+    month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    source: str | None = Query(
+        None,
+        max_length=32,
+        pattern=r"^[a-z_]{1,32}$",
+        description="Where the open came from: menu|deep_link",
+    ),
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bundled payload for the Expense Dashboard — one round-trip.
+
+    Returns hero total, transaction count, prior-month delta, category
+    breakdown (pie + list), 30-day daily trend, and the month's expense
+    rows. Cached 30s per (user, month) so consecutive renders during a
+    burst (open → edit → reload) don't re-aggregate.
+    """
+    from backend.services import expense_service
+
+    user = await _resolve_user(auth, db)
+    month_key = month or dashboard_service.current_month_key()
+
+    cache_key = (user.id, "expense_overview", month_key)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        payload = cached
+    else:
+        try:
+            total_spent = await dashboard_service.get_month_total(
+                db, user.id, month_key
+            )
+            transaction_count = await dashboard_service.get_month_transaction_count(
+                db, user.id, month_key
+            )
+            top_categories = await dashboard_service.get_category_breakdown(
+                db, user.id, month_key
+            )
+            daily_trend = await dashboard_service.get_daily_trend(db, user.id, days=30)
+            expenses = await expense_service.list_expenses(
+                db, user.id, month=month_key, limit=200, offset=0
+            )
+
+            # Month-over-month change so the hero card can show direction.
+            prev_month = _previous_month_key(month_key)
+            prev_total = await dashboard_service.get_month_total(
+                db, user.id, prev_month
+            )
+            change_amount = total_spent - prev_total
+            change_pct = (
+                (change_amount / prev_total * 100.0) if prev_total > 0 else 0.0
+            )
+
+            payload = {
+                "month": month_key,
+                "total_spent": total_spent,
+                "transaction_count": transaction_count,
+                "change_month": {
+                    "amount": change_amount,
+                    "pct": change_pct,
+                    "previous": prev_total,
+                },
+                "breakdown": top_categories,
+                "daily_trend": daily_trend,
+                "expenses": [_serialize_expense_item(e) for e in expenses],
+            }
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=500,
+                detail="Không tải được dữ liệu chi tiêu, thử lại nhé.",
+            ) from exc
+        _cache_set(cache_key, payload)
+
+    analytics.track(
+        "expense_dashboard_viewed",
+        user_id=user.id,
+        properties={
+            "from": source or "unknown",
+            "month": month_key,
+            "transaction_count": payload.get("transaction_count", 0),
+        },
+    )
+    return {"data": payload, "error": None}
+
+
+def _previous_month_key(month_key: str) -> str:
+    """Return YYYY-MM for the calendar month immediately before ``month_key``."""
+    year, month = month_key.split("-")
+    year_i, month_i = int(year), int(month)
+    if month_i == 1:
+        return f"{year_i - 1:04d}-12"
+    return f"{year_i:04d}-{month_i - 1:02d}"
+
+
+def invalidate_expense_cache_for_user(user_id) -> None:
+    """Drop expense-dashboard cache entries for one user after an edit."""
+    stale_keys = [
+        key
+        for key in _wealth_cache
+        if key
+        and key[0] == user_id
+        and len(key) > 1
+        and key[1] in ("expense_overview", "expense_trend")
+    ]
+    for key in stale_keys:
+        _wealth_cache.pop(key, None)
+
+
+_EXPENSE_TREND_DAYS_ALLOWED = (30, 90, 365)
+
+
+@router.get("/api/expense-dashboard/trend")
+async def get_expense_dashboard_trend(
+    days: int = Query(30, description="Trend window in days; one of 30, 90, 365"),
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily expense totals for the trend selector. 30s per-user cache."""
+    if days not in _EXPENSE_TREND_DAYS_ALLOWED:
+        raise HTTPException(
+            status_code=422,
+            detail=f"days must be one of {list(_EXPENSE_TREND_DAYS_ALLOWED)}",
+        )
+    user = await _resolve_user(auth, db)
+    cache_key = (user.id, "expense_trend", days)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return {"data": cached, "error": None}
+    trend = await dashboard_service.get_daily_trend(db, user.id, days=days)
+    _cache_set(cache_key, trend)
+    return {"data": trend, "error": None}
 
 
 @router.get("/wealth", include_in_schema=False)

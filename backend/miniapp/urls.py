@@ -39,6 +39,10 @@ def wealth_dashboard_url(source: str) -> str | None:
     return _miniapp_url("/miniapp/wealth", source=source)
 
 
+def expense_dashboard_url(source: str) -> str | None:
+    return _miniapp_url("/miniapp/expense", source=source)
+
+
 def twin_dashboard_url(source: str) -> str | None:
     return _miniapp_url("/miniapp/twin", source=source)
 

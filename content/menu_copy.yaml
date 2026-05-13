@@ -248,21 +248,13 @@ submenu_expenses:
       Quản lý chi tiêu lớn và phân tích theo loại.
 
   buttons:
-    - label: "➕ Thêm chi tiêu"
-      callback: "menu:expenses:add"
-      description: "Ghi giao dịch mới — gõ chữ hoặc ghi âm"
-
-    - label: "📷 Đọc hoá đơn"
-      callback: "menu:expenses:ocr"
-      description: "Chụp hóa đơn, mình tự đọc"
-
-    - label: "📊 Báo cáo chi tiêu"
+    - label: "📊 Báo cáo"
       callback: "menu:expenses:report"
-      description: "Tổng quan tháng này, theo loại, xu hướng"
+      description: "Mở Mini App Dashboard — thêm/sửa/xoá nhanh, có biểu đồ"
 
-    - label: "🏷️ Theo phân loại"
-      callback: "menu:expenses:by_category"
-      description: "Ăn uống, di chuyển, sức khỏe…"
+    - label: "✍️ Quản lý chi tiêu"
+      callback: "menu:expenses:manage"
+      description: "Hướng dẫn thêm/sửa/xoá chi tiêu"
 
     - label: "🔄 Khoản định kỳ"
       callback: "menu:expenses:recurring"
@@ -276,6 +268,36 @@ submenu_expenses:
     • "chi tiêu tháng này"
     • "chi cho ăn uống tuần qua"
     • "vừa chi 200k cafe"
+
+# Direct-action copy for the Chi tiêu menu — mirrors the
+# ``action_assets_*`` blocks so the Expense Dashboard and its
+# Quản lý guide stay visually consistent with the Asset side.
+action_expenses_report:
+  open_dashboard: "📊 Mở dashboard chi tiêu:"
+  miniapp_button: "Mở Dashboard"
+  not_configured: |-
+    📊 Dashboard chưa sẵn sàng — admin cần cấu hình `MINIAPP_BASE_URL` trước nhé.
+
+action_expenses_manage:
+  title: "✏️ *THÊM / SỬA / XOÁ CHI TIÊU*"
+  body: |-
+    Mình có 3 cách để {name} quản lý chi tiêu — chọn cách tiện nhất nhé:
+
+    *1️⃣ Mini App Dashboard* _(khuyên dùng)_
+    • Bấm nút *📊 Báo cáo* ở menu Chi tiêu
+    • Giao diện trực quan: thêm/sửa/xoá nhanh, có biểu đồ theo loại
+
+    *2️⃣ Nói chuyện tự nhiên với Bé Tiền*
+    💡 _Mẹo — thử gõ:_
+    • "vừa chi 200k cafe"
+    • "mua xe máy 35tr"
+    • "trả tiền điện 1.2tr"
+
+    *3️⃣ Gửi ảnh hoá đơn*
+    • Chụp/forward ảnh hoá đơn — mình tự đọc số tiền, merchant và phân loại giúp.
+  open_miniapp_button: "Mở Dashboard"
+  ocr_button: "📷 Đọc hoá đơn"
+  back_button: "◀️ Quay về menu"
 
 # ============================================================
 # SUB-MENU: DÒNG TIỀN (Level 2)

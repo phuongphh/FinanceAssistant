@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chi tiêu của tôi</title>
+    <!-- BUILD_BOOTSTRAP -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <link rel="stylesheet" href="/miniapp/static/css/style.css">
+    <link rel="stylesheet" href="/miniapp/static/css/wealth.css">
+    <link rel="stylesheet" href="/miniapp/static/css/expense.css">
+</head>
+<body class="wealth-page expense-page">
+    <main id="app">
+        <section id="loading" class="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p>Đang tải chi tiêu…</p>
+        </section>
+
+        <section id="error" class="error" hidden>
+            <p id="error-message">Không tải được dữ liệu.</p>
+            <button id="retry-btn" type="button">Thử lại</button>
+        </section>
+
+        <section id="content" hidden>
+            <header class="hero-card" aria-label="Chi tiêu tháng">
+                <div class="hero-label">💸 Chi tiêu tháng này</div>
+                <div class="hero-amount" id="total-spent">—</div>
+                <div class="hero-change">
+                    <span id="change-icon" aria-hidden="true">➖</span>
+                    <span id="change-amount">—</span>
+                    <span class="change-period" id="change-period">so với tháng trước</span>
+                </div>
+                <div class="hero-meta">
+                    <span class="level-pill" id="month-pill">—</span>
+                    <span class="asset-count" id="txn-count">0 giao dịch</span>
+                </div>
+            </header>
+
+            <section id="empty-state" class="section empty-card" hidden>
+                <div class="empty-emoji">🌱</div>
+                <h2>Chưa có chi tiêu tháng này</h2>
+                <p>Hãy thêm khoản chi đầu tiên — hoặc nhắn cho mình "vừa chi 200k cafe" để mình tự ghi giúp nhé.</p>
+                <button class="primary-btn" id="add-first-expense-btn" type="button">+ Thêm chi tiêu</button>
+            </section>
+
+            <section class="section" id="breakdown-section">
+                <h2>Phân bổ theo loại</h2>
+                <div class="chart-container">
+                    <canvas id="pie-chart" role="img" aria-label="Biểu đồ phân loại chi tiêu"></canvas>
+                </div>
+                <div id="breakdown-list" class="breakdown-list"></div>
+            </section>
+
+            <section class="section" id="trend-section">
+                <h2 id="trend-heading">Xu hướng 30 ngày</h2>
+                <div class="chart-container">
+                    <canvas id="trend-chart" role="img" aria-label="Biểu đồ chi tiêu theo ngày"></canvas>
+                </div>
+                <div class="period-selector" role="tablist" aria-label="Chọn khoảng thời gian">
+                    <button class="period-btn active" data-days="30" type="button" role="tab" aria-selected="true">30 ngày</button>
+                    <button class="period-btn" data-days="90" type="button" role="tab">90 ngày</button>
+                    <button class="period-btn" data-days="365" type="button" role="tab">1 năm</button>
+                </div>
+            </section>
+
+            <section class="section" id="expenses-section">
+                <h2>📦 Giao dịch tháng này</h2>
+                <div class="asset-sort-selector" role="tablist" aria-label="Sắp xếp giao dịch">
+                    <button class="asset-sort-btn active" data-sort="date_desc" type="button" role="tab" aria-selected="true">📅 Mới nhất</button>
+                    <button class="asset-sort-btn" data-sort="date_asc" type="button" role="tab">📅 Cũ nhất</button>
+                    <button class="asset-sort-btn" data-sort="amount_desc" type="button" role="tab">📈 Lớn → Nhỏ</button>
+                    <button class="asset-sort-btn" data-sort="amount_asc" type="button" role="tab">📉 Nhỏ → Lớn</button>
+                </div>
+                <div class="category-filter-row">
+                    <label class="filter-label" for="category-filter">Lọc theo loại</label>
+                    <select id="category-filter" class="category-filter-select">
+                        <option value="">Tất cả</option>
+                    </select>
+                </div>
+                <p class="section-hint">✏️ Sửa · 🗑️ Xoá chi tiêu</p>
+                <div id="expenses-list"></div>
+                <button class="add-btn" id="add-expense-btn" type="button">+ Thêm chi tiêu</button>
+            </section>
+
+            <!-- APP_VERSION_MARKER -->
+        </section>
+    </main>
+
+    <div id="expense-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+        <div class="modal-content">
+            <h3 id="expense-modal-title">Thêm chi tiêu</h3>
+            <label for="expense-amount">Số tiền (VNĐ)</label>
+            <input id="expense-amount" type="number" min="1000" step="1000" inputmode="numeric" />
+            <label for="expense-category">Danh mục</label>
+            <select id="expense-category"></select>
+            <label for="expense-date">Ngày</label>
+            <input id="expense-date" type="date" />
+            <label for="expense-note">Ghi chú / cửa hàng</label>
+            <input id="expense-note" type="text" maxlength="200" placeholder="VD: ăn trưa, Grab…" />
+            <label for="expense-payment">Phương thức thanh toán</label>
+            <input id="expense-payment" type="text" maxlength="64" placeholder="Tiền mặt, thẻ, chuyển khoản…" />
+            <div class="modal-actions">
+                <button id="expense-delete-btn" type="button" class="danger-btn" hidden>Xoá</button>
+                <button id="expense-cancel-btn" type="button" class="secondary-btn">Quay về</button>
+                <button id="expense-save-btn" type="button" class="primary-btn">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/miniapp/static/js/expense_dashboard.js" defer></script>
+</body>
+</html>
