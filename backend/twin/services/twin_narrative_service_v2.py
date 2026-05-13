@@ -31,12 +31,42 @@ def load_copy() -> dict[str, Any]:
         return yaml.safe_load(fh)
 
 
-def narrative_text() -> str:
-    return load_copy()["narrative"]
+def narrative_text(*, demo: bool = False) -> str:
+    copy = load_copy()
+    if demo:
+        return copy["demo_narrative"]
+    return copy["narrative"]
 
 
-def chart_caption(*, name: str, horizon_years: int) -> str:
-    return load_copy()["caption"].format(name=name, horizon=horizon_years)
+def chart_caption(*, name: str, horizon_years: int, demo: bool = False) -> str:
+    copy = load_copy()
+    if demo:
+        return copy["demo_caption"].format(horizon=horizon_years)
+    return copy["caption"].format(name=name, horizon=horizon_years)
+
+
+def demo_ack_text() -> str:
+    """Demo-specific replacement for the '✅ Bé Tiền ghi nhận: 50tr…' line.
+
+    Plain Vietnamese: 'I'm sketching a demo Twin with a hypothetical 50tr'.
+    The real-input ack stays in the handler since it embeds the user's number.
+    """
+    return load_copy()["demo_ack"]
+
+
+def compute_failed_keyboard() -> dict:
+    """Single-row retry button for the compute_failed fallback."""
+    copy = load_copy()
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": copy["compute_failed_retry_label"],
+                    "callback_data": copy["compute_failed_retry_callback"],
+                }
+            ]
+        ]
+    }
 
 
 def feedback_keyboard() -> dict:
