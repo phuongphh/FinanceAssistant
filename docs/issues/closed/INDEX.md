@@ -300,9 +300,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #539 | Pre-Phase | [Epic] Phase 4.2 — Epic 1: Trust & Data Integrity | [pre-phase/issue-539.md](by-phase/pre-phase/issue-539.md) |
 | #542 | Pre-Phase | [Story] P4.2-1.1: Trust & Privacy Moment | [pre-phase/issue-542.md](by-phase/pre-phase/issue-542.md) |
 | #543 | Pre-Phase | [Story] P4.2-1.2: Financial Data Quality Guardrails | [pre-phase/issue-543.md](by-phase/pre-phase/issue-543.md) |
+| #544 | Pre-Phase | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [pre-phase/issue-544.md](by-phase/pre-phase/issue-544.md) |
 | #549 | Pre-Phase | [Task] P4.2-M1: Migration asset_quality_flags | [pre-phase/issue-549.md](by-phase/pre-phase/issue-549.md) |
 | #550 | Pre-Phase | [Task] P4.2-M2: Migration onboarding_trust_state | [pre-phase/issue-550.md](by-phase/pre-phase/issue-550.md) |
 | #552 | Pre-Phase | [Task] P4.2-D1: Editorial Discipline Doc cho Operator | [pre-phase/issue-552.md](by-phase/pre-phase/issue-552.md) |
 
-**Total:** 299 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 282 Pre-Phase)
+**Total:** 300 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 283 Pre-Phase)
