@@ -52,5 +52,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #589 | [Story] P4.2.5-3.1: User list endpoint voi search/filter/pagination | [issue-589.md](issue-589.md) |
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
 | #591 | [Story] P4.2.5-3.3: User status change action | [issue-591.md](issue-591.md) |
+| #592 | [Story] P4.2.5-4.1: Vite project setup + Tailwind + design tokens | [issue-592.md](issue-592.md) |
 
-**Total active:** 48
+**Total active:** 49
