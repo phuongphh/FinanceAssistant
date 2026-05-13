@@ -59,5 +59,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #596 | [Story] P4.2.5-5.2: Growth charts (User growth + DAU) | [issue-596.md](issue-596.md) |
 | #597 | [Story] P4.2.5-5.3: Distribution charts + Cohort table | [issue-597.md](issue-597.md) |
 | #598 | [Story] P4.2.5-5.4: User directory table | [issue-598.md](issue-598.md) |
+| #599 | [Story] P4.2.5-6.1: Caddy + HTTPS + CORS + rate limit | [issue-599.md](issue-599.md) |
 
-**Total active:** 55
+**Total active:** 56
