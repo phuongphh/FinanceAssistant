@@ -36,5 +36,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #573 | [Epic] Phase 4.2.5 — Epic 1: Backend Foundation & Auth | [issue-573.md](issue-573.md) |
 | #574 | [Epic] Phase 4.2.5 — Epic 2: Analytics APIs | [issue-574.md](issue-574.md) |
 | #575 | [Epic] Phase 4.2.5 — Epic 3: User Management APIs | [issue-575.md](issue-575.md) |
+| #577 | [Epic] Phase 4.2.5 — Epic 5: Dashboard Components | [issue-577.md](issue-577.md) |
 
-**Total active:** 32
+**Total active:** 33
