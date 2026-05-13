@@ -1,0 +1,24 @@
+question: "💭 Bé Tiền tò mò 1 chút — sau 7 ngày dùng thử, bạn thấy Bé Tiền giống nhất với gì?"
+ack: "Cảm ơn bạn — giúp Bé Tiền hiểu rõ mình hơn 💚"
+duplicate_ack: "Bé Tiền đã ghi nhận câu trả lời trước đó rồi 💚"
+callback_prefix: "positioning_survey"
+target_aligned_percent: 60
+alert_misaligned_percent: 30
+minimum_responses_for_alert: 20
+options:
+  expense_tracker:
+    label: "📊 App quản lý chi tiêu"
+    order: 1
+    aligned: false
+  personal_cfo:
+    label: "🤖 Trợ lý tài chính cá nhân"
+    order: 2
+    aligned: true
+  future_tool:
+    label: "🔮 Công cụ nhìn tương lai tài chính"
+    order: 3
+    aligned: true
+  unclear:
+    label: "🤔 Chưa hiểu rõ"
+    order: 4
+    aligned: false

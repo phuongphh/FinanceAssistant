@@ -17,6 +17,7 @@ from backend.models.event import Event
 from backend.models.goal import Goal
 from backend.models.user import User
 from backend.services.telegram_service import send_telegram
+from backend.services.survey import positioning_survey_service
 
 PROMPTS_PATH = Path(__file__).resolve().parents[3] / "content" / "feedback_prompts.yaml"
 MAX_ACTIVE_PROMPTS_PER_30_DAYS = 2
@@ -197,19 +198,21 @@ class PromptScheduler:
         )
         db.add(log)
         await db.flush()
-        await send_telegram(
-            "sendMessage",
-            {
-                "chat_id": user.telegram_id,
-                "text": prompt.message,
-                "reply_markup": {
-                    "inline_keyboard": [[
-                        {"text": prompt.cta_button, "callback_data": f"feedback:cta:{prompt.id}"},
-                        {"text": prompt.skip_button, "callback_data": f"feedback:skip:{prompt.id}"},
-                    ]]
-                },
-            },
-        )
+        payload: dict[str, Any] = {
+            "chat_id": user.telegram_id,
+            "text": prompt.message,
+        }
+        if prompt.id == positioning_survey_service.DEFAULT_SOURCE_PROMPT_ID:
+            payload["text"] = positioning_survey_service.append_question(prompt.message)
+            payload["reply_markup"] = positioning_survey_service.survey_keyboard()
+        else:
+            payload["reply_markup"] = {
+                "inline_keyboard": [[
+                    {"text": prompt.cta_button, "callback_data": f"feedback:cta:{prompt.id}"},
+                    {"text": prompt.skip_button, "callback_data": f"feedback:skip:{prompt.id}"},
+                ]]
+            }
+        await send_telegram("sendMessage", payload)
 
 
 async def check_briefing_read_prompt(db: AsyncSession, user_id: uuid.UUID) -> list[str]:

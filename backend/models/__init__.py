@@ -57,6 +57,16 @@ from backend.models.onboarding_session import (
     OnboardingSession,
 )
 from backend.models.twin_calibration import HORIZONS_DAYS, TwinCalibrationSnapshot
+from backend.models.positioning_survey import (
+    ALIGNED_POSITIONING_RESPONSES,
+    MISALIGNED_POSITIONING_RESPONSES,
+    POSITIONING_EXPENSE_TRACKER,
+    POSITIONING_FUTURE_TOOL,
+    POSITIONING_PERSONAL_CFO,
+    POSITIONING_UNCLEAR,
+    VALID_POSITIONING_RESPONSES,
+    PositioningSurveyResponse,
+)
 
 __all__ = [
     "User",
@@ -116,4 +126,12 @@ __all__ = [
     "SIGNAL_DISLIKE",
     "TwinCalibrationSnapshot",
     "HORIZONS_DAYS",
+    "PositioningSurveyResponse",
+    "POSITIONING_EXPENSE_TRACKER",
+    "POSITIONING_PERSONAL_CFO",
+    "POSITIONING_FUTURE_TOOL",
+    "POSITIONING_UNCLEAR",
+    "VALID_POSITIONING_RESPONSES",
+    "ALIGNED_POSITIONING_RESPONSES",
+    "MISALIGNED_POSITIONING_RESPONSES",
 ]
