@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "4.1"
+current_phase: "4.2.5"
 
 phases:
   - id: "1"
@@ -172,13 +172,43 @@ phases:
 
   - id: "4.1"
     name: "Pre-Launch Hardening"
-    status: current
+    status: done
     duration: "~3 tuần"
     detail_doc: "docs/current/phase-4.1/phase-4.1-detailed.md"
     issues_doc: "docs/current/phase-4.1/phase-4.1-issues.md"
     description: "Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026)"
+    completed_date: "2026-05-13"
+    icon: "✅"
+
+  - id: "4.2"
+    name: "Customer Experience Hardening"
+    status: done
+    duration: "~2 tuần"
+    detail_doc: "docs/current/phase-4.2/phase-4.2-detailed.md"
+    issues_doc: "docs/current/phase-4.2/phase-4.2-issues.md"
+    description: "CX-ready bridge: Trust card + financial data integrity, Next Best Action 9-CTA matrix + briefing content quality + query-first prompts, Day 7 positioning micro-survey + kill criterion update. 7 stories + 3 migrations + 3 deploy tasks."
+    completed_date: "2026-05-13"
+    icon: "✅"
+
+  - id: "4.2.5"
+    name: "Admin Observability"
+    status: current
+    duration: "~3 tuần"
+    detail_doc: "docs/current/phase-4.2.5/phase-4.2.5-detailed.md"
+    issues_doc: "docs/current/phase-4.2.5/phase-4.2.5-issues.md"
+    description: "Admin dashboard (React + Vite + FastAPI) cho operator monitor soft launch: KPI hero, 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention), user directory với search/filter/PII mask, audit log, JWT auth + force_password_change, license placeholder cho Phase 5.7. 23 stories / 7 Epics / ~66 SP. Ship trước soft launch tháng 6/2026."
     completed_date: ""
     icon: "🛠"
+
+  - id: "5.0"
+    name: "Encryption End-to-End"
+    status: planned
+    duration: "TBD"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature."
+    completed_date: ""
+    icon: "🔮"
 
   - id: "5.1"
     name: "Zalo Spike & OA Verification"

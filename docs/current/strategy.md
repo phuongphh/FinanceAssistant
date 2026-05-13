@@ -101,29 +101,36 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 
 ## 🏛️ 3 Trụ Cột (Updated)
 
-### Trụ Cột 1: Wealth Tracking & Management ✅ MOSTLY DONE
+### Trụ Cột 1: Wealth Tracking & Management ✅ DONE
 - Cash, stocks, BĐS, crypto, vàng (Phase 3A) ✅
 - Multi-asset portfolio view (Phase 3A) ✅
 - AI agent queries (Phase 3.7) ✅
-- **Gap:** Rental property, multi-income tracking → Phase 3.8
+- Rental property, multi-income tracking (Phase 3.8) ✅
 
-### Trụ Cột 2: Cashflow Intelligence 🟡 PARTIAL
+### Trụ Cột 2: Cashflow Intelligence ✅ DONE
 - Basic income/expense (Phase 3A) ✅
 - Threshold-based capture (Phase 3A) ✅
 - AI agent for queries (Phase 3.7) ✅
-- **Gap:** Recurring transactions, forecasting, multi-income → Phase 3.8
+- Recurring transactions, forecasting v1 (Phase 3.8) ✅
+- Cashflow forecasting v2 + low-balance alerts (Phase 4B) ✅
 
-### Trụ Cột 3: Investment Intelligence 🟡 PARTIAL
-- Real-time market data (Phase 3.9 — scheduled)
+### Trụ Cột 3: Investment Intelligence ✅ DONE
+- Real-time market data (Phase 3.9 SSI/VNDIRECT/CoinGecko/SJC) ✅
 - AI advisory (Phase 3.7 Tier 3) ✅
-- **Gap:** Real APIs replace stubs → Phase 3.9
-- **Future:** Twin projections (Phase 4)
+- Twin projections (Phase 4A/4B) ✅
 
-### Trụ Cột 4 NEW: Future Vision (THE DIFFERENTIATOR)
-- Financial Twin với probability cones
-- Trajectory comparison
-- Daily twin updates
-- Life event simulation (Phase 4B)
+### Trụ Cột 4: Future Vision ✅ DONE (THE DIFFERENTIATOR)
+- Financial Twin với probability cones (Phase 4A) ✅
+- Trajectory comparison (current vs optimal) (Phase 4A) ✅
+- Daily twin updates (Phase 4A) ✅
+- Life event simulation (Phase 4B) ✅
+- **Operator monitoring** layer (Phase 4.2.5 — in planning) để track Twin engagement với cohort
+
+### Trụ Cột 5 (Operational): Customer Experience & Trust ✅ DONE
+- Onboarding 3-step + first-Twin shortcut (Phase 4.1) ✅
+- Trust card + financial data integrity (Phase 4.2 Epic 1) ✅
+- Next Best Action 9-CTA matrix + briefing quality (Phase 4.2 Epic 2) ✅
+- Day 7 positioning micro-survey (Phase 4.2 Epic 3) ✅
 
 ---
 
@@ -188,8 +195,8 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 
 ### JUNE 2026 — Soft Launch
 
-#### Phase 3.9: Market Data Real
-**Duration:** ~1 tuần | **Target ship:** Mid June 2026
+#### Phase 3.9: Market Data Real — ✅ DONE
+**Shipped:** 2026-05-08
 
 - SSI/VNDIRECT integration (stocks)
 - CoinGecko (crypto)
@@ -197,69 +204,134 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 - Bank rate aggregator
 - Replace Phase 3.7 market data stubs
 
+#### Phase 3.9.5: Pre-Launch UX Polish — ✅ DONE
+**Shipped:** 2026-05-11
+
+- 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus)
+- 2 menu renames + Telegram animation emoji upgrade
+- Clean foundation cho soft launch
+
+#### Phase 4A: Financial Twin Conservative MVP — ✅ DONE
+**Shipped:** 2026-05-11
+
+- Monte Carlo probability cones (P10/P50/P90)
+- Current vs Optimal trajectory
+- Telegram + Mini App basic surface
+- Weekly cron + daily snapshot delta
+- Channel-agnostic foundation
+
+#### Phase 4B: Twin Polish + Life Events + Cashflow v2 + Zalo — ✅ DONE
+**Shipped:** 2026-05-12
+
+- Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths)
+- Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts)
+- Twin UX polish
+- Zalo OA adapter foundation (deferred activation to Phase 5.x)
+
+#### Phase 4.1: Pre-Launch Hardening — ✅ DONE
+**Shipped:** 2026-05-13
+
+- Onboarding 3-step + first-Twin shortcut
+- Cost guardrail per user
+- Sentry + KPI digest + feedback triage SLA
+- Shareable Twin image
+- Predictions-vs-actual calibration
+- 50-user soft launch playbook
+
+#### Phase 4.2: Customer Experience Hardening — ✅ DONE
+**Shipped:** 2026-05-13
+
+CX-ready bridge giữa engineering readiness và cohort expansion:
+- Epic 1: Trust card + financial data integrity guardrails
+- Epic 2: Next Best Action 9-CTA matrix + briefing content quality + query-first prompts
+- Epic 3: Day 7 positioning micro-survey + kill criterion update
+- 7 stories + 3 migrations + 3 deploy tasks
+
+#### Phase 4.2.5: Admin Observability — 🔵 PLANNING (current)
+**Duration:** ~3 tuần | **Target ship:** Trước soft launch tháng 6/2026
+
+Admin dashboard (React + Vite + FastAPI) cho operator/founder monitor soft launch:
+- KPI hero (DAU/MAU/stickiness/cost per user)
+- 6 charts: User growth, DAU, feature clicks, intent breakdown, tier distribution, cohort retention
+- User directory với search/filter/PII mask + audit log
+- JWT auth với force-password-change first login
+- License data model placeholder (activate ở Phase 5.7 cùng Pro launch)
+- 23 stories / 7 Epics / ~66 SP
+- Inserted để không phải query DB tay khi cohort scale 50 → 500
+
 **🎉 Tháng 6 SOFT LAUNCH** với foundation complete:
-- Public availability (limited marketing)
-- Feedback collection
+- 50 founding member (50% lifetime discount khi Pro ra mắt — commitment honored)
+- Admin dashboard monitor sức khỏe sản phẩm
+- Feedback collection (Phase 3.8.5) + Day 7 micro-survey (Phase 4.2)
 - Bug fixes + content polish
 - Begin building user base for cohort data later
 
-### JULY-SEPTEMBER 2026 — Build the Twin
+### JULY-AUGUST 2026 — Encryption + Zalo Rollout
 
-#### Phase 4A: Financial Twin Conservative MVP
+> **Note (rev 2026-05-13):** Phase 4A/4B đã ship sớm hơn dự kiến (mid-May, không phải July). Twin polish + Life Events đã merge vào Phase 4B. Roadmap July–August giờ tập trung vào encryption infra + Zalo channel expansion.
+
+#### Phase 5.0: Encryption End-to-End
 **Duration:** ~2-3 tuần | **Target ship:** Late July 2026
 
-- Net worth projection 5/10 năm
-- Visual twin dashboard (Mini App centric)
-- Trajectory comparison (current vs optimal)
-- Daily twin updates
-- **Probability cones, NOT single numbers**
+- Encryption infrastructure (at-rest + in-transit hardening)
+- **KHÔNG expose user-facing** trong trust copy (PM decision: tránh confuse user về commitment chưa hoàn thiện)
+- Foundation cho future trust-and-safety improvements
+- Operator editorial discipline (Phase 4.2 D.1) vẫn áp dụng cho đến khi encryption fully shipped
 
-#### Phase 4B: Twin Polish + Cashflow Forecasting v2
-**Duration:** ~2 tuần | **Target ship:** Mid August 2026
+#### Phase 5.1–5.3: Zalo Channel Rollout
+**Duration:** ~4-6 tuần | **Target ship:** Mid August – Mid September 2026
 
-- Pattern-based forecasting (upgrade từ simple average)
-- "Predictions vs actual" tracking
-- Share-able twin image generation
-- A/B test framings
-- Trust-building through transparency
-
-#### Phase 4.5: Achievement System + Wealth Badges (Private)
-**Duration:** ~1-2 tuần | **Target ship:** Late August 2026 | **NEW (May 2026 insertion)**
-
-- Achievement engine (track behaviors + milestones)
-- Wealth Level badges (Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa)
-- Streak tracking, growth markers
-- Personal celebrations với Twin context
-- **Private only — no social sharing** (match Vietnamese mass affluent psychology)
-- Achievement examples: "30 ngày streak tracking", "Diversification master", "Emergency fund champion"
-
-**Why private:** Vietnamese mass affluent culture is "kín tiếng về tiền" — public wealth display creates fraud risk + comparison anxiety. Gamification through personal achievement, not social validation.
+- **5.1 Zalo Spike & OA Verification**: Verified business account, webhook + adapter spike, validate 300-char limit
+- **5.2 Zalo Core Product Parity**: Toàn bộ product hiện tại lên Zalo (intent classifier, asset entry, Twin view, briefing, advisory)
+- **5.3 Zalo Mini App**: Mini App equivalent của Telegram Mini App (Twin dashboard, portfolio view)
+- Channel strategy: full-parity với Telegram (corrected từ Mini App-only proposal)
+- 48h window engagement design
 
 ### SEPTEMBER-NOVEMBER 2026 — Behavioral & Social
 
-#### Phase 5: Behavioral Engine + Peer Benchmarking Light
-**Duration:** ~2-3 tuần | **Target ship:** Mid September 2026
+#### Phase 5.4: Achievement & Badges (Private)
+**Duration:** ~1-2 tuần | **Target ship:** Mid September 2026
+
+- Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing)
+- Wealth Level badges (Khởi Đầu / Trẻ Năng Động / Trung Lưu Vững / Tinh Hoa)
+- Streak tracking, growth markers, personal celebrations với Twin context
+- **Private only — no social sharing / leaderboard** (Vietnamese mass affluent culture is "kín tiếng về tiền")
+
+**Why private:** Public wealth display creates fraud risk + comparison anxiety. Gamification through personal achievement, not social validation.
+
+#### Phase 5.5: Behavioral Engine
+**Duration:** ~2-3 tuần | **Target ship:** Late September 2026
 
 - Anomaly detection (pattern breaks)
 - Personalized nudges (wealth-aware)
 - **Synthetic cohort data** (not real peer yet)
-- Financial DNA profile
+- Financial DNA profile (spend patterns + risk tolerance)
+- Chạy sau ≥ 2 tháng real data
 
 **Critical:** Real peer data requires user base. Synthetic placeholder until data đủ.
 
-#### Phase 6: Household Mode
+#### Phase 5.6: Household Mode
 **Duration:** ~2 tuần | **Target ship:** Mid October 2026
 
-- Multi-user wealth account
-- Shared assets, separate liabilities
-- Couple goals
-- Permission management
+- Multi-user household: shared assets, joint goals
+- Privacy boundaries (mỗi thành viên có view riêng)
+- Couple Twin
 - **Match Mass Affluent target** (most have spouses)
 
 ### NOVEMBER-DECEMBER 2026 — Pre-Tết Polish
 
-#### Phase 7A: Tết Special Features
-**Duration:** ~3 tuần | **Target ship:** Mid November 2026
+#### Phase 5.7: Monetization Infrastructure
+**Duration:** ~3 tuần | **Target ship:** November 2026
+
+- License management activated (Phase 4.2.5 placeholder → full implementation)
+- Plan tiers: Free / Pro (68k) / CFO (168k) với feature gates
+- **Founding 50 honors 50% lifetime discount** (Phase 4.1 commitment)
+- Payment integration: VNPay/MoMo/ZaloPay (VN-first)
+- Revenue metrics: MRR, ARR, churn, LTV, ARPU, CAC
+- Trial conversion funnel + churn risk scoring
+
+#### Tết Special Features
+**Duration:** ~3 tuần | **Target ship:** Mid December 2026
 
 - Lì xì tracker
 - Twin year-end review
@@ -269,23 +341,26 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 
 ### JANUARY-FEBRUARY 2027 — TẾT BÙNG NỔ 🎆
 
-#### Phase 7B: Public Marketing Push + Pricing Tiers
+#### Phase 6.0: Tết Launch (Public)
 **Duration:** Ongoing
 
-- **Pricing tiers go live:** Free + Pro 68k + CFO 168k
+- **Pricing tiers go live:** Free + Pro 68k + CFO 168k (gated by Phase 5.7)
+- **Zalo là primary channel, Telegram secondary** (matched cohort distribution)
 - Influencer partnerships
 - **Real peer data activated** (đủ users by now)
-- Life Event Simulator (option C from review)
 - Marketing campaign full force
+- Public PR moments (TechCrunch VN, etc.)
 
 ### MARCH 2027+ — Scale Phase
 
-#### Phase 8+: Scale Infrastructure
+#### Phase 7+: Scale Infrastructure
+- Native mobile app (only when PMF proven: Pro conversion ≥ 3%, DAU ≥ 40%)
 - PWA web dashboard
-- Zalo Mini App
 - Cashflow forecasting v3 (ML-based)
 - Multi-region (TBD)
 - Advanced features based on real usage data
+
+> **Carry-forward commitments** (xem `docs/current/phase-4.2/master-roadmap.md` section "Carry-Forward Commitments" cho full list — founding 50 discount, trust card commitment, Zalo full-parity, operator editorial discipline).
 
 ---
 
@@ -390,6 +465,32 @@ Following decisions made during strategic review (May 2026):
 - Risk: minimal — additive, not disruptive
 
 **New Phase 4.5 added:** Achievement System + Wealth Badges (Private), inserted between Phase 4B và Phase 5.
+
+### Phase 4.2.5 Insertion (May 2026, post-Phase-4.2)
+
+**Decision:** Insert Phase 4.2.5 (Admin Observability Layer) giữa Phase 4.2 và Phase 5.0.
+
+**Reason:** Soft launch 50 founding member (June 2026) cần operator dashboard để monitor sức khỏe sản phẩm — không thể tiếp tục query DB tay khi cohort scale 50 → 500. Phase 4.2 đã ship Day 7 micro-survey + NBA matrix + briefing content quality, nhưng signals từ những work này cần một surface để đọc.
+
+**Scope:**
+- 7 Epics, 23 stories, ~3 sprints
+- React + Vite frontend với "financial editorial" aesthetic (không "AI slop dashboard")
+- FastAPI namespace `/api/admin/*`
+- JWT auth + force-password-change first login
+- 6 KPI cards + 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention)
+- User directory với PII mask + audit log
+- License data model placeholder cho Phase 5.7 (Pro launch)
+- **No test-cases file** — test scenarios inline trong từng story; smoke test checklist trong Epic 6.3
+
+**Naming history:** Originally drafted dưới tên "Phase 3.6 Admin Dashboard" (docs/current/AdminDashboard/) — renamed Phase 4.2.5 vì 3.6 đã được Menu UX Revamp dùng và shipped 2026-05-05.
+
+**Story 1.5 bridge migration removed:** Phase 3.5 (Intent Layer) đã ship `messages.resolved_by` column từ 2026-05-02 — original bridge migration không còn cần thiết.
+
+**Roadmap impact:**
+- Phase 4.1 ✅ Done, Phase 4.2 ✅ Done.
+- Soft launch tháng 6 vẫn safe (3-tuần dev buffer trong roadmap).
+- Phase 5.0 (Encryption) push back ~3 tuần.
+- License placeholder ship sớm tránh migration đau đầu khi Phase 5.7 activate Pro tier.
 
 ---
 
