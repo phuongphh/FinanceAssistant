@@ -63,6 +63,7 @@ async def _expenses(
     stmt = select(func.coalesce(func.sum(Expense.amount), 0)).where(
         Expense.user_id == user_id,
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
         Expense.expense_date >= start,
         Expense.expense_date <= end,
     )

@@ -35,20 +35,106 @@ from backend.bot.keyboards.common import CallbackPrefix, parse_callback
 from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
     confirm_delete_keyboard,
+    e_wallet_provider_keyboard,
     transaction_actions_keyboard,
 )
 from backend.models.expense import Expense
+from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_reply_markup,
     edit_message_text,
+    send_message,
 )
 
 logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
+
+
+async def _handle_source_selection_callback(
+    db: AsyncSession, callback_query: dict[str, Any]
+) -> bool:
+    callback_id = callback_query["id"]
+    data = callback_query.get("data", "")
+    from_user = callback_query.get("from") or {}
+    telegram_id = from_user.get("id")
+    message = callback_query.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
+    user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+    if not user:
+        await answer_callback(
+            callback_id, text="Bạn gửi /start trước nhé 🌱", show_alert=True
+        )
+        return True
+
+    state = user.wizard_state or {}
+    if state.get("flow") != "transaction_source_select":
+        await answer_callback(
+            callback_id, text="Yêu cầu này đã hết hạn rồi 🌱", show_alert=True
+        )
+        return True
+    draft = dict(state.get("draft") or {})
+
+    source_type = None
+    wallet_provider = None
+    if data == "txsrc:e_wallet":
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=e_wallet_provider_keyboard(),
+        )
+        await answer_callback(callback_id)
+        return True
+    if data.startswith("txsrc_wallet:"):
+        source_type = "e_wallet"
+        wallet_provider = data.split(":", 1)[1]
+    elif data.startswith("txsrc:"):
+        chosen = data.split(":", 1)[1]
+        if chosen != "skip":
+            source_type = chosen
+
+    expense_data = ExpenseCreate(
+        amount=float(draft.get("amount", 0)),
+        transaction_type=draft.get("transaction_type", "expense"),
+        merchant=draft.get("merchant") or "Giao dịch",
+        note=draft.get("note"),
+        source="manual",
+        source_type=source_type,
+        e_wallet_provider=wallet_provider,
+    )
+    expense = await expense_service.create_expense(db, user.id, expense_data)
+    from backend.services import wizard_service
+
+    await wizard_service.clear(db, user.id)
+    tx_sign = "+" if expense.transaction_type == "money_in" else "-"
+    source_label = {
+        "cash": "Tiền mặt",
+        "bank_account": "Tài khoản",
+        "momo": "Ví Momo",
+        "vnpay": "Ví VNPay",
+        "zalopay": "Ví ZaloPay",
+        "viettelpay": "Ví ViettelPay",
+    }.get(wallet_provider or source_type, "không liên kết nguồn")
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}",
+        parse_mode=None,
+        reply_markup={"inline_keyboard": []},
+    )
+    if expense.transaction_type == "expense" and (expense.raw_data or {}).get(
+        "source_warning"
+    ):
+        await send_message(
+            chat_id,
+            "⚠️ Nguồn này có thể không đủ số dư, mình vẫn ghi nhận theo yêu cầu nhé.",
+        )
+    await answer_callback(callback_id, text="Đã ghi nhận ✅")
+    return True
 
 
 async def _rerender_transaction_message(
@@ -82,6 +168,9 @@ async def handle_transaction_callback(
     data: str = callback_query.get("data", "")
     if not data:
         return False
+
+    if data.startswith("txsrc:") or data.startswith("txsrc_wallet:"):
+        return await _handle_source_selection_callback(db, callback_query)
 
     prefix, args = parse_callback(data)
 

@@ -41,12 +41,19 @@ async def list_expenses(
     user_id: uuid.UUID = Query(...),
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     category: str | None = None,
+    transaction_type: str | None = Query("expense", pattern=r"^(expense|money_in)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     return await expense_service.list_expenses(
-        db, user_id, month=month, category=category, limit=limit, offset=offset
+        db,
+        user_id,
+        month=month,
+        category=category,
+        transaction_type=transaction_type,
+        limit=limit,
+        offset=offset,
     )
 
 

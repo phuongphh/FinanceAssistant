@@ -329,6 +329,7 @@ async def _avg_monthly_expense(
         Expense.expense_date >= period_start,
         Expense.expense_date < date(today.year, today.month, 1),
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
     )
     rows = list((await db.execute(stmt)).scalars().all())
     if not rows:
