@@ -33,8 +33,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #563 | [Story] US1: Transaction model — extend with source, type, linked asset | [issue-563.md](issue-563.md) |
 | #565 | [Story] US3: Money In entry flow — income tracking with source | [issue-565.md](issue-565.md) |
 | #568 | [Story] US6: Expense Dashboard — Money In list + CRUD | [issue-568.md](issue-568.md) |
 
-**Total active:** 32
+**Total active:** 31
