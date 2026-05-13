@@ -256,6 +256,10 @@ submenu_expenses:
       callback: "menu:expenses:manage"
       description: "Hướng dẫn thêm/sửa/xoá chi tiêu"
 
+    - label: "💚 Tiền vào"
+      callback: "menu:expenses:manage"
+      description: "Ghi nhận thưởng, lì xì, hoàn tiền vào nguồn tiền"
+
     - label: "🔄 Khoản định kỳ"
       callback: "menu:expenses:recurring"
       description: "Thuê nhà, internet, gym… + nhắc nhở"
@@ -267,6 +271,9 @@ submenu_expenses:
     💡 Hoặc hỏi nhanh:
     • "chi tiêu tháng này"
     • "chi cho ăn uống tuần qua"
+    • "+20k tiền thưởng" → tiền vào
+    • "-100k ăn trưa" → chi tiêu
+    • "được thưởng 200k", "được bố cho 500k", "được lì xì 50k trên momo"
     • "vừa chi 200k cafe"
 
 # Direct-action copy for the Chi tiêu menu — mirrors the
@@ -289,9 +296,13 @@ action_expenses_manage:
 
     *2️⃣ Nói chuyện tự nhiên với Bé Tiền*
     💡 _Mẹo — thử gõ:_
+    • "+20k tiền thưởng" → tiền vào
+    • "-100k ăn trưa" → chi tiêu
+    • "được thưởng 200k", "được bố cho 500k", "được lì xì 50k trên momo"
     • "vừa chi 200k cafe"
     • "mua xe máy 35tr"
     • "trả tiền điện 1.2tr"
+    • "+200k được thưởng" hoặc "+ 50k lì xì" để ghi tiền vào
 
     *3️⃣ Gửi ảnh hoá đơn*
     • Chụp/forward ảnh hoá đơn — mình tự đọc số tiền, merchant và phân loại giúp.

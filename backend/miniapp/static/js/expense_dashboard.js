@@ -25,6 +25,7 @@
         breakdownSection: document.getElementById('breakdown-section'),
         trendSection: document.getElementById('trend-section'),
         expensesSection: document.getElementById('expenses-section'),
+        moneyInSection: document.getElementById('money-in-section'),
         totalSpent: document.getElementById('total-spent'),
         changeIcon: document.getElementById('change-icon'),
         changeAmount: document.getElementById('change-amount'),
@@ -37,15 +38,19 @@
         trendHeading: document.getElementById('trend-heading'),
         categoryFilter: document.getElementById('category-filter'),
         expensesList: document.getElementById('expenses-list'),
+        moneyInList: document.getElementById('money-in-list'),
         addExpenseBtn: document.getElementById('add-expense-btn'),
+        addMoneyInBtn: document.getElementById('add-money-in-btn'),
         addFirstExpenseBtn: document.getElementById('add-first-expense-btn'),
         modal: document.getElementById('expense-modal'),
         modalTitle: document.getElementById('expense-modal-title'),
         modalAmount: document.getElementById('expense-amount'),
+        modalType: document.getElementById('expense-type'),
         modalCategory: document.getElementById('expense-category'),
         modalDate: document.getElementById('expense-date'),
         modalNote: document.getElementById('expense-note'),
         modalPayment: document.getElementById('expense-payment'),
+        modalSource: document.getElementById('expense-source'),
         modalDelete: document.getElementById('expense-delete-btn'),
         modalCancel: document.getElementById('expense-cancel-btn'),
         modalSave: document.getElementById('expense-save-btn'),
@@ -85,9 +90,11 @@
     initModalForm();
     initCategoryFilter();
     els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
-    els.addExpenseBtn.addEventListener('click', () => openModal());
-    els.addFirstExpenseBtn.addEventListener('click', () => openModal());
+    els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
+    if (els.addMoneyInBtn) els.addMoneyInBtn.addEventListener('click', () => openModal(null, 'money_in'));
+    if (els.addFirstExpenseBtn) els.addFirstExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
     els.expensesList.addEventListener('click', onExpenseRowClick);
+    if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
     els.modalCancel.addEventListener('click', closeModal);
     els.modalSave.addEventListener('click', onSave);
     els.modalDelete.addEventListener('click', onDelete);
@@ -213,7 +220,7 @@
     function renderAll() {
         if (!lastOverview) return;
         renderHero(lastOverview);
-        const isEmpty = (lastOverview.transaction_count || 0) === 0;
+        const isEmpty = ((lastOverview.transaction_count || 0) === 0) && !((lastOverview.money_in || []).length);
         toggleSections(isEmpty);
         if (!isEmpty) {
             renderPie(lastOverview.breakdown || []);
@@ -221,13 +228,15 @@
             renderTrend(lastOverview.daily_trend || []);
             populateCategoryFilter(lastOverview.breakdown || []);
             renderExpensesSection();
+            renderMoneyInSection();
         }
     }
 
     function renderHero(data) {
         els.totalSpent.textContent = formatMoneyFull(data.total_spent || 0);
         els.monthPill.textContent = formatMonthLabel(data.month);
-        els.txnCount.textContent = `${data.transaction_count || 0} giao dịch`;
+        const moneyInCount = (data.money_in || []).length;
+        els.txnCount.textContent = `${data.transaction_count || 0} chi · ${moneyInCount} tiền vào`;
 
         // For expenses, "up" (spending more) is bad → red, "down" → green.
         const change = data.change_month || { amount: 0, pct: 0 };
@@ -262,6 +271,7 @@
         els.breakdownSection.hidden = isEmpty;
         els.trendSection.hidden = isEmpty;
         els.expensesSection.hidden = isEmpty;
+        if (els.moneyInSection) els.moneyInSection.hidden = isEmpty;
     }
 
     // -- Pie / breakdown --------------------------------------------------
@@ -428,6 +438,14 @@
         renderExpenses(items);
     }
 
+    function renderMoneyInSection() {
+        if (!els.moneyInList) return;
+        const items = ((lastOverview && lastOverview.money_in) || []).slice().sort(
+            (a, b) => (b.expense_date || '').localeCompare(a.expense_date || '') || (b.id || '').localeCompare(a.id || '')
+        );
+        renderMoneyIn(items);
+    }
+
     function filteredSortedExpenses() {
         const all = (lastOverview && lastOverview.expenses) || [];
         let items = all;
@@ -470,11 +488,50 @@
         }).join('');
     }
 
+
+    function sourceLabel(it) {
+        const map = {
+            cash: 'Tiền mặt',
+            bank_account: 'Tài khoản',
+            momo: 'Ví Momo',
+            vnpay: 'Ví VNPay',
+            zalopay: 'Ví ZaloPay',
+            viettelpay: 'Ví ViettelPay',
+        };
+        if (it.source_type === 'e_wallet') return map[it.e_wallet_provider] || 'Ví điện tử';
+        return map[it.source_type] || 'Chưa chọn nguồn';
+    }
+
+    function renderMoneyIn(items) {
+        if (!els.moneyInList) return;
+        if (!items.length) {
+            els.moneyInList.innerHTML = '<p class="empty-state">Chưa có khoản tiền vào tháng này 🌱</p>';
+            return;
+        }
+        els.moneyInList.innerHTML = items.map((it) => {
+            const title = it.merchant || it.note || 'Tiền vào';
+            return `
+                <div class="expense-row money-in-row" data-id="${escapeHtml(it.id)}">
+                    <span class="expense-icon">💚</span>
+                    <div class="expense-info">
+                        <div class="expense-title">${escapeHtml(title)}</div>
+                        <div class="expense-meta">${formatDate(it.expense_date)} · ${escapeHtml(sourceLabel(it))}</div>
+                    </div>
+                    <div class="expense-amount money-in-amount">+${formatMoneyShort(it.amount || 0)}</div>
+                    <div class="expense-actions">
+                        <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Xoá ${escapeHtml(title)}">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
     async function onExpenseRowClick(event) {
         const row = event.target.closest('.expense-row[data-id]');
         if (!row) return;
         const id = row.dataset.id;
-        const item = (lastOverview?.expenses || []).find((x) => x.id === id);
+        const item = (lastOverview?.expenses || []).concat(lastOverview?.money_in || []).find((x) => x.id === id);
         if (!item) return;
 
         if (event.target.closest('.expense-delete-row-btn')) {
@@ -534,6 +591,7 @@
         }
         lastOverview.total_spent = total;
         lastOverview.transaction_count = expenses.length;
+        lastOverview.money_in_total = (lastOverview.money_in || []).reduce((s, e) => s + (e.amount || 0), 0);
         lastOverview.breakdown = Array.from(byCat.values()).sort(
             (a, b) => b.amount - a.amount
         );
@@ -545,20 +603,22 @@
 
     function applyDeleteOptimistic(id) {
         if (!lastOverview) return;
-        lastOverview.expenses = (lastOverview.expenses || []).filter(
-            (x) => x.id !== id
-        );
+        lastOverview.expenses = (lastOverview.expenses || []).filter((x) => x.id !== id);
+        lastOverview.money_in = (lastOverview.money_in || []).filter((x) => x.id !== id);
         recomputeOverview();
         renderAll();
     }
 
     function applyUpsertOptimistic(item) {
         if (!lastOverview) return;
-        const list = lastOverview.expenses || [];
+        const targetKey = item.transaction_type === 'money_in' ? 'money_in' : 'expenses';
+        const otherKey = targetKey === 'money_in' ? 'expenses' : 'money_in';
+        lastOverview[otherKey] = (lastOverview[otherKey] || []).filter((x) => x.id !== item.id);
+        const list = lastOverview[targetKey] || [];
         const idx = list.findIndex((x) => x.id === item.id);
         if (idx >= 0) list[idx] = item;
         else list.unshift(item);
-        lastOverview.expenses = list;
+        lastOverview[targetKey] = list;
         recomputeOverview();
         renderAll();
     }
@@ -576,14 +636,17 @@
         els.categoryFilter.innerHTML = '<option value="">Tất cả</option>';
     }
 
-    function openModal(item) {
+    function openModal(item, forcedType) {
         editingExpenseId = item?.id || null;
-        els.modalTitle.textContent = editingExpenseId ? 'Sửa chi tiêu' : 'Thêm chi tiêu';
+        const txType = item?.transaction_type || forcedType || 'expense';
+        els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
+        els.modalType.value = txType;
         els.modalAmount.value = item ? Math.round(item.amount || 0) : '';
         els.modalCategory.value = item?.category || 'other';
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
         els.modalNote.value = item?.merchant || item?.note || '';
         els.modalPayment.value = item?.payment_method || '';
+        els.modalSource.value = sourceValue(item);
         els.modalDelete.hidden = !editingExpenseId;
         els.modalSave.disabled = false;
         els.modalDelete.disabled = false;
@@ -596,6 +659,21 @@
         editingExpenseId = null;
     }
 
+
+    function sourceValue(item) {
+        if (!item || !item.source_type) return '';
+        if (item.source_type === 'e_wallet') return `e_wallet:${item.e_wallet_provider || 'momo'}`;
+        return item.source_type;
+    }
+
+    function parseSourceValue(value) {
+        if (!value) return { source_type: null, e_wallet_provider: null };
+        if (value.startsWith('e_wallet:')) {
+            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo' };
+        }
+        return { source_type: value, e_wallet_provider: null };
+    }
+
     async function onSave() {
         const amount = parseFloat(els.modalAmount.value);
         if (!amount || amount < 1000) {
@@ -606,11 +684,13 @@
         const note = els.modalNote.value.trim();
         const body = {
             amount,
+            transaction_type: els.modalType.value || 'expense',
             category: els.modalCategory.value || 'other',
             expense_date: els.modalDate.value,
             note: note || null,
             merchant: note || null,
             payment_method: els.modalPayment.value.trim() || null,
+            ...parseSourceValue(els.modalSource.value),
         };
         els.modalSave.disabled = true;
         let saved;

@@ -418,6 +418,7 @@ async def generate_investment_advice(db: AsyncSession, user_id: uuid.UUID) -> st
         Expense.user_id == user_id,
         Expense.month_key == month_key,
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
     )
     total_expense = (await db.execute(expense_stmt)).scalar() or 0
 

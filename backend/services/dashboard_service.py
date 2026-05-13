@@ -4,6 +4,7 @@ Kept separate from `report_service.py` (which generates monthly
 LLM-authored narratives) because the dashboard needs cheap,
 cache-friendly reads that run on every page load.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,9 +35,7 @@ def current_month_key(today: date | None = None) -> str:
     return (today or date.today()).strftime("%Y-%m")
 
 
-async def get_user_by_telegram_id(
-    db: AsyncSession, telegram_id: int
-) -> User | None:
+async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User | None:
     stmt = select(User).where(
         User.telegram_id == telegram_id,
         User.deleted_at.is_(None),
@@ -44,9 +43,7 @@ async def get_user_by_telegram_id(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def get_user_by_id(
-    db: AsyncSession, user_id: uuid.UUID
-) -> User | None:
+async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     """Look up a user by primary key, honouring soft-delete.
 
     Used by handlers that have an internal ``user_id`` (e.g. from an
@@ -94,6 +91,7 @@ async def get_month_total(
         Expense.user_id == user_id,
         Expense.month_key == month_key,
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
     )
     total = (await db.execute(stmt)).scalar_one()
     return float(total or 0)
@@ -107,6 +105,7 @@ async def get_month_transaction_count(
         Expense.user_id == user_id,
         Expense.month_key == month_key,
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
     )
     return int((await db.execute(stmt)).scalar_one() or 0)
 
@@ -127,6 +126,7 @@ async def get_category_breakdown(
             Expense.user_id == user_id,
             Expense.month_key == month_key,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         .group_by(Expense.category)
     )
@@ -173,6 +173,7 @@ async def get_daily_trend(
             Expense.expense_date >= start_date,
             Expense.expense_date <= end_date,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         .group_by(Expense.expense_date)
     )
@@ -182,9 +183,7 @@ async def get_daily_trend(
     trend = []
     current = start_date
     while current <= end_date:
-        trend.append(
-            {"date": current.isoformat(), "amount": by_day.get(current, 0.0)}
-        )
+        trend.append({"date": current.isoformat(), "amount": by_day.get(current, 0.0)})
         current += timedelta(days=1)
     return trend
 
@@ -199,6 +198,7 @@ async def get_recent_transactions(
         .where(
             Expense.user_id == user_id,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         .order_by(Expense.expense_date.desc(), Expense.created_at.desc())
         .limit(limit)

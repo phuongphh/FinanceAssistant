@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     # edit. Override via env var if product-renamed.
     miniapp_menu_label: str = "💰 Tài sản"
 
+    # Expense Enhancement — opt-in 22:00 ICT daily transaction summary.
+    daily_transaction_summary_enabled: bool = False
+
     # ``extra="ignore"`` lets the .env file hold sibling env vars used by
     # docker-compose (e.g. POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
     # without pydantic-settings 2.x rejecting them as extras.

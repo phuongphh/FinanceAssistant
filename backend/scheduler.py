@@ -21,6 +21,7 @@ from backend.jobs.feedback_sla_job import run_feedback_sla_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
+from backend.jobs.daily_transaction_summary_job import run_daily_transaction_summary
 from backend.jobs.eod_revaluation_job import revalue_and_snapshot
 from backend.jobs.market_poller import poll_market
 from backend.jobs.monthly_report import generate_all_monthly_reports
@@ -100,6 +101,11 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         create_daily_snapshots, "cron",
         hour=23, minute=59, timezone="Asia/Ho_Chi_Minh",
         id="daily_asset_snapshot",
+    )
+    scheduler.add_job(
+        run_daily_transaction_summary, "cron",
+        hour=22, minute=0, timezone="Asia/Ho_Chi_Minh",
+        id="daily_transaction_summary",
     )
     # End-of-day revaluation: at 02:00 ICT (~11h after HOSE close) we
     # re-price every stock/crypto/gold holding against the latest market
