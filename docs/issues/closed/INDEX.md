@@ -301,11 +301,12 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #542 | Pre-Phase | [Story] P4.2-1.1: Trust & Privacy Moment | [pre-phase/issue-542.md](by-phase/pre-phase/issue-542.md) |
 | #543 | Pre-Phase | [Story] P4.2-1.2: Financial Data Quality Guardrails | [pre-phase/issue-543.md](by-phase/pre-phase/issue-543.md) |
 | #544 | Pre-Phase | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [pre-phase/issue-544.md](by-phase/pre-phase/issue-544.md) |
+| #545 | Pre-Phase | [Story] P4.2-2.2: First Briefing Content Quality Bar | [pre-phase/issue-545.md](by-phase/pre-phase/issue-545.md) |
 | #546 | Pre-Phase | [Story] P4.2-2.3: Query-First Soft Prompts | [pre-phase/issue-546.md](by-phase/pre-phase/issue-546.md) |
 | #549 | Pre-Phase | [Task] P4.2-M1: Migration asset_quality_flags | [pre-phase/issue-549.md](by-phase/pre-phase/issue-549.md) |
 | #550 | Pre-Phase | [Task] P4.2-M2: Migration onboarding_trust_state | [pre-phase/issue-550.md](by-phase/pre-phase/issue-550.md) |
 | #552 | Pre-Phase | [Task] P4.2-D1: Editorial Discipline Doc cho Operator | [pre-phase/issue-552.md](by-phase/pre-phase/issue-552.md) |
 | #554 | Pre-Phase | [Task] P4.2-D3: Manual Review Briefing #1 (Soft Launch Cohort) | [pre-phase/issue-554.md](by-phase/pre-phase/issue-554.md) |
 
-**Total:** 302 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 285 Pre-Phase)
+**Total:** 303 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 286 Pre-Phase)
