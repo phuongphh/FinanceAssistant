@@ -166,6 +166,29 @@ async def cmd_menu(db: AsyncSession, chat_id: int, user: User | None) -> None:
         user_id=user_id,
         properties={"source": "command", "level": level},
     )
+    if user is not None:
+        await _maybe_send_next_action(db, chat_id, user)
+
+
+async def _maybe_send_next_action(db: AsyncSession, chat_id: int, user: User) -> None:
+    """Recompute the Phase 4.2 activation CTA on /menu without spamming completers."""
+    from backend.models.onboarding_session import OnboardingSession
+    from backend.services.onboarding import next_action_service
+
+    session = await db.get(OnboardingSession, user.id)
+    if (
+        session is None
+        or session.first_twin_shown_at is None
+        or session.next_best_action_taken is not None
+    ):
+        return
+    cta = await next_action_service.compute(db, user.id)
+    await send_message(
+        chat_id=chat_id,
+        text=cta.message_text,
+        parse_mode="HTML",
+        reply_markup=cta.reply_markup,
+    )
 
 
 # -----------------------------------------------------------------

@@ -186,14 +186,13 @@ async def run_morning_briefing_job(
                 is_first = await first_briefing_service.is_first_briefing(
                     db, user.id
                 )
-
-            if is_first:
-                text_to_send, reply_markup = first_briefing_service.decorate(
-                    result.text
-                )
-            else:
-                text_to_send = result.text
-                reply_markup = briefing_actions_keyboard()
+                if is_first:
+                    text_to_send, reply_markup = await first_briefing_service.decorate_for_user(
+                        db, user.id, result.text
+                    )
+                else:
+                    text_to_send = result.text
+                    reply_markup = briefing_actions_keyboard()
 
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,

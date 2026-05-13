@@ -532,6 +532,9 @@ async def _handle_message(
             return resolved_user.id
 
     # Natural-language message → NL expense parser / report intent / menu fallback.
+    if text and resolved_user is not None and not command.startswith("/"):
+        from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+        await onboarding_v2_handlers.maybe_mark_query_next_action(db, resolved_user)
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
 
@@ -746,6 +749,11 @@ async def _handle_callback(
 
         if await handle_first_briefing_callback(db, callback_query):
             return await _resolved_user_id()
+
+    # Phase 4.2 Epic 2 — Next Best Action shortcut buttons.
+    from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+    if await onboarding_v2_handlers.handle_next_action_callback(db, callback_query):
+        return await _resolved_user_id()
 
     # Morning-briefing button taps (briefing:*). Handled before the
     # transaction router because the briefing keyboard sits on its own

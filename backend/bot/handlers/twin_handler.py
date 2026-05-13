@@ -196,6 +196,27 @@ async def send_twin_current(
         )
     )
     await _send_channel_content(notifier, chat_id, content)
+    await _maybe_send_next_action(db, chat_id, user, notifier)
+
+
+async def _maybe_send_next_action(
+    db: AsyncSession, chat_id: int, user: User, notifier: Notifier
+) -> None:
+    """Recompute activation CTA when the user opens Twin view."""
+    from backend.models.onboarding_session import OnboardingSession
+    from backend.services.onboarding import next_action_service
+
+    session = await db.get(OnboardingSession, user.id)
+    if (
+        session is None
+        or session.first_twin_shown_at is None
+        or session.next_best_action_taken is not None
+    ):
+        return
+    cta = await next_action_service.compute(db, user.id)
+    await notifier.send_message(
+        chat_id, cta.message_text, parse_mode="HTML", reply_markup=cta.reply_markup
+    )
 
 
 async def send_twin_share(
