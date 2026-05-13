@@ -19,7 +19,7 @@ router can map it to a 404.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -47,6 +47,10 @@ async def create_asset(
     extra: dict | None = None,
     description: str | None = None,
     source: str = SOURCE_USER_INPUT,
+    is_placeholder_asset: bool = False,
+    is_confirmed: bool = True,
+    source_input_raw: str | None = None,
+    data_quality_warning_type: str | None = None,
 ) -> Asset:
     """Create asset + first snapshot in one transaction.
 
@@ -71,6 +75,11 @@ async def create_asset(
         last_valued_at=datetime.utcnow(),
         extra=extra or {},
         is_active=True,
+        is_placeholder_asset=is_placeholder_asset,
+        is_confirmed=is_confirmed,
+        source_input_raw=source_input_raw,
+        data_quality_warning_type=data_quality_warning_type,
+        data_quality_warning_at=datetime.now(timezone.utc) if data_quality_warning_type else None,
     )
     db.add(asset)
     # flush() so the asset gets an id (UUID generated client-side here, but
@@ -109,12 +118,15 @@ async def get_user_assets(
     user_id: uuid.UUID,
     *,
     include_inactive: bool = False,
+    include_placeholders: bool = False,
     asset_type: str | None = None,
 ) -> list[Asset]:
     """List assets for a user. By default only active (non-sold) assets."""
     stmt = select(Asset).where(Asset.user_id == user_id)
     if not include_inactive:
         stmt = stmt.where(Asset.is_active.is_(True))
+    if not include_placeholders:
+        stmt = stmt.where(Asset.is_placeholder_asset.is_(False), Asset.is_confirmed.is_(True))
     if asset_type is not None:
         stmt = stmt.where(Asset.asset_type == asset_type)
     stmt = stmt.order_by(Asset.created_at.desc())

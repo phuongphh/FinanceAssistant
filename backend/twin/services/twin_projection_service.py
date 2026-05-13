@@ -26,6 +26,7 @@ from backend.twin.engine.life_events import apply_life_events
 from backend.twin.engine.monte_carlo import Array2D, simulate_portfolio
 from backend.twin.engine.optimal_trajectory import simulate_optimal
 from backend.wealth.ladder import detect_level
+from backend.models.onboarding_session import OnboardingSession
 from backend.wealth.services import asset_service
 from backend.wealth.services import net_worth_calculator as wealth_service
 
@@ -149,6 +150,16 @@ async def load_portfolio_snapshot(
     monthly_savings = await cashflow_service.last_3_month_avg_savings(db, user_id)
     assets = await asset_service.get_user_assets(db, user_id)
 
+    # Phase 4.2: demo placeholders stay out of real net-worth surfaces.
+    # For the first demo Twin only, still render a demo cone using the
+    # onboarding value so the user can evaluate the product before trusting
+    # us with real asset details.
+    demo_base_net_worth: Decimal | None = None
+    if not assets and net_worth.total == 0:
+        session = await db.get(OnboardingSession, user_id)
+        if session is not None and session.demo_mode_used and session.first_asset_value_vnd:
+            demo_base_net_worth = Decimal(session.first_asset_value_vnd)
+
     allocation_amounts: dict[str, Decimal] = {}
     for asset in assets:
         twin_class = _map_asset_to_twin_class(asset.asset_type, asset.subtype)
@@ -156,7 +167,9 @@ async def load_portfolio_snapshot(
             twin_class, Decimal(0)
         ) + Decimal(asset.current_value or 0)
 
-    total = net_worth.total
+    if demo_base_net_worth is not None:
+        allocation_amounts["cash_savings"] = demo_base_net_worth
+    total = demo_base_net_worth if demo_base_net_worth is not None else net_worth.total
     allocation_weights = (
         {
             asset_class: (amount / total).quantize(Decimal("0.0001"))

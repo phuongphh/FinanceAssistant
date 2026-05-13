@@ -33,6 +33,7 @@ from backend.models.onboarding_session import (
     STEP_COMPLETED,
 )
 from backend.models.user import User
+from backend.wealth.models.asset import Asset
 from backend.ports.notifier import get_notifier
 from backend.services.cost.cost_report_service import daily_summary
 
@@ -62,6 +63,7 @@ class EngagementSection:
 @dataclass
 class QualitySection:
     onboarding_signals: dict[str, int]
+    data_quality_warning_count: int = 0
 
     def render(self) -> str:
         love = self.onboarding_signals.get("love", 0)
@@ -69,7 +71,8 @@ class QualitySection:
         dislike = self.onboarding_signals.get("dislike", 0)
         return (
             "<b>✅ Quality (24h)</b>\n"
-            f"• Onboarding feedback: 😍{love} / 🤔{confused} / 😕{dislike}"
+            f"• Onboarding feedback: 😍{love} / 🤔{confused} / 😕{dislike}\n"
+            f"• data_quality_warning_count: {self.data_quality_warning_count}"
         )
 
 
@@ -177,8 +180,19 @@ async def _quality(db: AsyncSession, *, day: date) -> QualitySection:
             .group_by(OnboardingSession.onboarding_feedback_signal)
         )
     ).all()
+    warning_count = (
+        await db.execute(
+            select(func.count())
+            .select_from(Asset)
+            .where(
+                Asset.data_quality_warning_at >= start,
+                Asset.data_quality_warning_at < end,
+            )
+        )
+    ).scalar() or 0
     return QualitySection(
-        onboarding_signals={signal: int(count) for signal, count in rows}
+        onboarding_signals={signal: int(count) for signal, count in rows},
+        data_quality_warning_count=int(warning_count),
     )
 
 

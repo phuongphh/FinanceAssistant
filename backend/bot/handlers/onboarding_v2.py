@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
@@ -27,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.bot.formatters.money import format_money_short
+from backend.feedback.models.feedback import FEEDBACK_STATUS_NEW, Feedback
 from backend.models.onboarding_session import (
     SIGNAL_CONFUSED,
     SIGNAL_DISLIKE,
@@ -34,20 +36,60 @@ from backend.models.onboarding_session import (
     STEP_COMPLETED,
     STEP_FIRST_ASSET,
     STEP_GOAL_QUESTION,
+    STEP_TRUST_PRIVACY,
     STEP_TWIN_SHOWN,
 )
 from backend.models.user import User
 from backend.services import onboarding_service as legacy_onboarding_service
 from backend.services.founding import founding_member_service
-from backend.services.onboarding import onboarding_service
+from backend.services.onboarding import data_quality_service, onboarding_service
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
     send_message,
 )
 from backend.twin.services import twin_narrative_service_v2
+from backend.wealth.services import asset_service
 
 logger = logging.getLogger(__name__)
+
+_TRUST_COPY_PATH = (
+    Path(__file__).resolve().parents[3] / "content" / "onboarding" / "trust_card.yaml"
+)
+
+
+def _load_trust_copy() -> dict[str, Any]:
+    import yaml
+
+    with open(_TRUST_COPY_PATH, encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def _trust_keyboard(copy: dict[str, Any]) -> dict:
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": copy["buttons"]["ok_label"],
+                    "callback_data": copy["callbacks"]["ok"],
+                }
+            ],
+            [
+                {
+                    "text": copy["buttons"]["question_label"],
+                    "callback_data": copy["callbacks"]["question"],
+                }
+            ],
+        ]
+    }
+
+
+def _quality_keyboard(value: Decimal) -> dict:
+    rows = []
+    for idx, (_, candidate) in enumerate(data_quality_service.estimate_options(value)):
+        rows.append([{"text": f"✅ {format_money_short(candidate)}", "callback_data": f"onboarding_v2:asset_confirm:{idx}"}])
+    rows.append([{"text": "✍️ Nhập lại", "callback_data": "onboarding_v2:asset_reenter"}])
+    return {"inline_keyboard": rows}
 
 
 # ---------- Feature toggle -------------------------------------------
@@ -264,7 +306,48 @@ async def _on_goal_picked(
         user_id=user.id,
         properties={"goal": goal_code},
     )
+    if session.current_step == STEP_TRUST_PRIVACY:
+        await _send_trust_card(db, chat_id, user)
+    else:
+        await _send_first_asset_prompt(db, chat_id, user)
+
+
+# ---------- Trust moment ---------------------------------------------
+
+
+async def _send_trust_card(db: AsyncSession, chat_id: int, user: User) -> None:
+    copy = _load_trust_copy()
+    bullets = "\n".join(f"• {line}" for line in copy.get("bullets", []))
+    text = f"<b>{copy['header']}</b>\n\n{copy['body']}\n\n{bullets}"
+    await onboarding_service.mark_trust_shown(db, user.id)
+    await send_message(chat_id, text, parse_mode="HTML", reply_markup=_trust_keyboard(copy))
+    analytics.track("onboarding_trust_card_shown", user_id=user.id)
+
+
+async def _on_trust_ok(db: AsyncSession, chat_id: int, callback_id: str, user: User) -> None:
+    await onboarding_service.accept_trust(db, user.id)
+    await answer_callback(callback_id, text="Cảm ơn bạn 💚")
+    analytics.track("onboarding_trust_accepted", user_id=user.id)
     await _send_first_asset_prompt(db, chat_id, user)
+
+
+async def _on_trust_question(db: AsyncSession, chat_id: int, callback_id: str, user: User) -> None:
+    before = await onboarding_service.get_session(db, user.id)
+    should_create_feedback = before is not None and before.trust_question_raised_at is None
+    await onboarding_service.mark_trust_question_raised(db, user.id)
+    if should_create_feedback:
+        db.add(Feedback(
+            user_id=user.id,
+            content="[trust_question] User asked a question before entering assets",
+            trigger="onboarding_trust_card",
+            status=FEEDBACK_STATUS_NEW,
+            priority="high",
+        ))
+    await db.flush()
+    copy = _load_trust_copy()
+    await answer_callback(callback_id, text="Đã ghi nhận")
+    await send_message(chat_id, copy["question_ack"], parse_mode="HTML")
+    analytics.track("onboarding_trust_question_raised", user_id=user.id)
 
 
 # ---------- Step 2 ----------------------------------------------------
@@ -309,11 +392,78 @@ async def handle_asset_text_input(
         await send_message(chat_id, step["too_large"], parse_mode="HTML")
         return True
 
-    await onboarding_service.set_first_asset(db, user.id, value, demo=False)
+    warning = await data_quality_service.first_warning(
+        db,
+        user.id,
+        asset_type="cash",
+        amount_vnd=value,
+        segment=session.inferred_wealth_segment,
+    )
+    if warning is not None:
+        user.wizard_state = {
+            "flow": "onboarding_asset_quality",
+            "step": "confirm",
+            "draft": {
+                "value_vnd": str(value),
+                "raw_text": raw_text[:500],
+                "warning_type": warning.warning_type,
+            },
+        }
+        await db.flush()
+        await send_message(
+            chat_id,
+            f"⚠️ <b>Kiểm tra lại số tiền</b>\n\n{warning.message}\n\nBé Tiền hiểu là <b>{format_money_short(value)}</b>. Bạn chọn số đúng nhé:",
+            parse_mode="HTML",
+            reply_markup=_quality_keyboard(value),
+        )
+        analytics.track(
+            "data_quality_warning_shown",
+            user_id=user.id,
+            properties={"warning_type": warning.warning_type, "surface": "onboarding"},
+        )
+        return True
+
+    await _save_onboarding_first_asset(
+        db, chat_id, user, value, raw_text=raw_text, warning_type=None, demo=False
+    )
+    return True
+
+
+
+async def _save_onboarding_first_asset(
+    db: AsyncSession,
+    chat_id: int,
+    user: User,
+    value: Decimal,
+    *,
+    raw_text: str | None,
+    warning_type: str | None,
+    demo: bool,
+) -> None:
+    await asset_service.create_asset(
+        db,
+        user.id,
+        asset_type="cash",
+        subtype="onboarding_demo" if demo else "onboarding_first_asset",
+        name="Twin demo" if demo else "Tài sản ban đầu",
+        initial_value=value,
+        current_value=value,
+        is_placeholder_asset=demo,
+        is_confirmed=True,
+        source_input_raw=raw_text,
+        data_quality_warning_type=warning_type,
+    )
+    await onboarding_service.set_first_asset(db, user.id, value, demo=demo)
+    user.wizard_state = None
+    await db.flush()
     analytics.track(
         "onboarding_v2_asset_captured",
         user_id=user.id,
-        properties={"value_vnd_bucket": _bucket_label(value)},
+        properties={
+            "value_vnd_bucket": _bucket_label(value),
+            "demo": demo,
+            "warning_type": warning_type,
+        },
     )
 
     name = user.display_name or "bạn"
@@ -323,7 +473,6 @@ async def handle_asset_text_input(
         parse_mode="HTML",
     )
     await _trigger_first_twin(db, chat_id, user)
-    return True
 
 
 def _bucket_label(value: Decimal) -> str:
@@ -341,9 +490,7 @@ async def _on_demo_pressed(
     db: AsyncSession, chat_id: int, callback_id: str, user: User
 ) -> None:
     await answer_callback(callback_id)
-    session = await onboarding_service.set_first_asset(
-        db, user.id, onboarding_service.DEMO_ASSET_VND, demo=True
-    )
+    session = await onboarding_service.get_session(db, user.id)
     if session is None:
         return
     copy = onboarding_service.load_copy()
@@ -359,7 +506,15 @@ async def _on_demo_pressed(
         chat_id, banner["body"], parse_mode="HTML", reply_markup=keyboard
     )
     analytics.track("onboarding_v2_demo_chosen", user_id=user.id)
-    await _trigger_first_twin(db, chat_id, user)
+    await _save_onboarding_first_asset(
+        db,
+        chat_id,
+        user,
+        onboarding_service.DEMO_ASSET_VND,
+        raw_text="demo",
+        warning_type=None,
+        demo=True,
+    )
 
 
 async def _on_exit_demo(
@@ -377,6 +532,59 @@ async def _on_exit_demo(
     session.demo_mode_used = True  # keep the analytics marker
     session.first_asset_value_vnd = None
     await db.flush()
+    await _send_first_asset_prompt(db, chat_id, user)
+
+
+
+async def _on_asset_quality_confirm(
+    db: AsyncSession,
+    chat_id: int,
+    callback_id: str,
+    message_id: int | None,
+    user: User,
+    option_index: str,
+) -> None:
+    state = user.wizard_state or {}
+    if state.get("flow") != "onboarding_asset_quality":
+        await answer_callback(callback_id, text="Không còn yêu cầu xác nhận")
+        return
+    draft = state.get("draft") or {}
+    try:
+        original = Decimal(str(draft.get("value_vnd")))
+        idx = int(option_index)
+        value = data_quality_service.estimate_options(original)[idx][1]
+    except Exception:
+        await answer_callback(callback_id, text="Lựa chọn không hợp lệ", show_alert=True)
+        return
+    if message_id is not None:
+        try:
+            await edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=f"✅ Đã xác nhận: <b>{format_money_short(value)}</b>",
+                parse_mode="HTML",
+                reply_markup={"inline_keyboard": []},
+            )
+        except Exception:
+            logger.debug("edit quality confirm failed", exc_info=True)
+    await answer_callback(callback_id)
+    await _save_onboarding_first_asset(
+        db,
+        chat_id,
+        user,
+        value,
+        raw_text=draft.get("raw_text"),
+        warning_type=draft.get("warning_type"),
+        demo=False,
+    )
+
+
+async def _on_asset_quality_reenter(
+    db: AsyncSession, chat_id: int, callback_id: str, user: User
+) -> None:
+    user.wizard_state = None
+    await db.flush()
+    await answer_callback(callback_id)
     await _send_first_asset_prompt(db, chat_id, user)
 
 
@@ -575,6 +783,8 @@ async def _complete(db: AsyncSession, chat_id: int, user: User) -> None:
 async def _resume_at(db: AsyncSession, chat_id: int, user: User, session) -> None:
     if session.current_step == STEP_GOAL_QUESTION:
         await _send_goal_question(db, chat_id, user)
+    elif session.current_step == STEP_TRUST_PRIVACY:
+        await _send_trust_card(db, chat_id, user)
     elif session.current_step == STEP_FIRST_ASSET:
         await _send_first_asset_prompt(db, chat_id, user)
     elif session.current_step == STEP_TWIN_SHOWN:
@@ -629,6 +839,22 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
 
     if action == "goal" and len(parts) >= 3:
         await _on_goal_picked(db, chat_id, callback_id, message_id, user, parts[2])
+        return True
+
+    if action == "trust_ok":
+        await _on_trust_ok(db, chat_id, callback_id, user)
+        return True
+
+    if action == "trust_question":
+        await _on_trust_question(db, chat_id, callback_id, user)
+        return True
+
+    if action == "asset_confirm" and len(parts) >= 3:
+        await _on_asset_quality_confirm(db, chat_id, callback_id, message_id, user, parts[2])
+        return True
+
+    if action == "asset_reenter":
+        await _on_asset_quality_reenter(db, chat_id, callback_id, user)
         return True
 
     if action == "demo":
