@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #539 | [Epic] Phase 4.2 — Epic 1: Trust & Data Integrity | [issue-539.md](issue-539.md) |
 | #540 | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [issue-540.md](issue-540.md) |
 | #541 | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [issue-541.md](issue-541.md) |
 | #544 | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [issue-544.md](issue-544.md) |
@@ -45,4 +44,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #553 | [Task] P4.2-D2: Content Quality Playbook | [issue-553.md](issue-553.md) |
 | #554 | [Task] P4.2-D3: Manual Review Briefing #1 (Soft Launch Cohort) | [issue-554.md](issue-554.md) |
 
-**Total active:** 40
+**Total active:** 39
