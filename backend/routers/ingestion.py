@@ -34,7 +34,17 @@ async def ocr_receipt(
     if len(image_bytes) > 10 * 1024 * 1024:  # 10MB limit
         raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
 
-    result = await parse_receipt_image(image_bytes, file.content_type)
+    try:
+        result = await parse_receipt_image(
+            image_bytes, file.content_type, db=db, user_id=user_id
+        )
+    except ValueError as exc:
+        # Provider/transport failures or invalid JSON — surface a clean 502
+        # so the bot can show a friendly "thử lại" message instead of a 500.
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "OCR_PROVIDER_ERROR", "message": str(exc)},
+        ) from exc
 
     if result.get("error") == "not_a_receipt":
         return {"data": None, "error": {"code": "NOT_A_RECEIPT", "message": "Image is not a receipt"}}

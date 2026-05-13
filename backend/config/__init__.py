@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     anthropic_api_key: str = ""
+    # External OCR provider (text extraction from receipt images). The
+    # response is then parsed into structured fields by DeepSeek via
+    # ``llm_service.call_llm`` — this keeps vision and reasoning concerns
+    # separate and avoids paying Claude vision prices for every receipt.
+    ocr_api_url: str = "https://ocr.nuitruc.ai/api/v1/ocr/extract"
+    ocr_api_key: str = ""  # Optional bearer token; empty = no auth header
+    ocr_api_timeout_seconds: float = 20.0
     # OpenAI key — currently used only for Whisper voice transcription.
     # Empty in dev/CI is fine; the voice path falls back to a friendly
     # "tính năng voice chưa bật" message.
