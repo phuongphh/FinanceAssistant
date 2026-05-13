@@ -1,7 +1,14 @@
 prompts:
   - id: post_onboarding_day_7
     trigger: account_age_days == 7
-    message: "Bé Tiền đồng hành với bạn được 7 ngày rồi 💚 Trải nghiệm ban đầu ổn không?"
+    message: |
+      🌱 Chào bạn,
+
+      Bé Tiền đã đồng hành cùng bạn được 7 ngày rồi — cảm ơn bạn đã thử.
+
+      Trong 7 ngày qua, điều gì Bé Tiền giúp bạn được nhiều nhất — và điều gì còn thiếu?
+
+      Bạn có thể nhắn tự do hoặc gửi /feedback — founder đọc từng câu.
     cta_button: "Chia sẻ cảm nhận"
     skip_button: "Để sau"
     cooldown_days: 60

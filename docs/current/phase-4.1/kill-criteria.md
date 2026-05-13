@@ -20,6 +20,16 @@ real signal is a quarter of a year.
 If a criterion is missing one of the three, it's a wish, not a kill
 criterion. Reject the PR.
 
+## Table of contents
+
+1. [4-week retention < 20%](#1--4-week-retention--20)
+2. [Cost per active user > 50.000đ/tháng](#2--cost-per-active-user--50000đtháng)
+3. [Critical bug rate (Sentry P1) > 1/ngày](#3--critical-bug-rate-sentry-p1--1ngày)
+4. [Bé Tiền persona violation reported > 5/tuần](#4--bé-tiền-persona-violation-reported--5tuần)
+5. [In-onboarding emoji signal 😕 > 30%](#5--in-onboarding-emoji-signal---30)
+6. [Twin within-band hit rate < 40% sau 90 ngày](#6--twin-within-band-hit-rate--40-sau-90-ngày)
+7. [Positioning misalignment > 30%](#7--positioning-misalignment--30)
+
 ---
 
 ## §1 — 4-week retention < 20%
@@ -188,6 +198,33 @@ trust. The calibration storytelling (B.2) is dependent on this.
 
 ---
 
+## §7 — Positioning misalignment > 30%
+
+**Owner:** Founder/PM
+**Source:** `positioning_survey_responses` from the Phase 4.2 Day 7
+micro-survey. Misalignment = % users choosing option 1
+("App quản lý chi tiêu") or option 4 ("Chưa hiểu rõ").
+
+**Threshold:** > 30% misalignment, starting from week 2 after Phase 4.2
+launch, and only once the survey has ≥ 20 responses.
+
+**Why this is the kill line:** Bé Tiền is intended to be a Personal CFO
+/ future-looking financial companion, not only an expense tracker. If
+more than 30% of early users either see an expense app or do not
+understand the product, acquisition would amplify the wrong mental
+model instead of validating the proposition.
+
+**Action plan if tripped:**
+1. **Day 0:** Freeze acquisition and stop expanding the founding cohort.
+   Read all survey + qualitative feedback from the affected users.
+2. **Day 1–14:** Redesign the welcome copy, first Twin narrative, and
+   briefing intro as one positioning system. Do not patch only one line.
+3. **Day 14:** Re-run with a fresh cohort of 20 users. Resume
+   acquisition only if option 2/3 reaches ≥ 60% and misalignment drops
+   below 30%.
+
+---
+
 ## Operating procedure
 
 - The daily KPI digest (08:00 ICT) is the primary signal feed. Operator
@@ -209,4 +246,4 @@ ourselves.
 
 ---
 
-*Last updated: Phase 4.1 implementation — 12/05/2026.*
+*Last updated: Phase 4.2 Epic 3 positioning validation — 13/05/2026.*

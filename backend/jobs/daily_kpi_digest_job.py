@@ -36,6 +36,7 @@ from backend.models.user import User
 from backend.wealth.models.asset import Asset
 from backend.ports.notifier import get_notifier
 from backend.services.cost.cost_report_service import daily_summary
+from backend.services.survey.positioning_survey_service import kpi_snapshot, load_copy
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,39 @@ class ChurnSection:
             "<b>💤 Churn signals</b>\n"
             f"• Inactive 7+ ngày: {self.inactive_7d}{founding_clause}"
         )
+
+
+@dataclass
+class PositioningSection:
+    counts: dict[str, int]
+    total: int
+    aligned_percent: float
+    misaligned_percent: float
+    should_alert: bool
+    target_aligned_percent: int
+    alert_misaligned_percent: int
+    minimum_responses_for_alert: int
+
+    def render(self) -> str:
+        copy = load_copy()
+        lines = ["<b>🧭 Positioning</b>"]
+        if self.total == 0:
+            lines.append("• Chưa có response Day 7 survey")
+        else:
+            for option in copy.options:
+                count = self.counts.get(option.key, 0)
+                percent = count / self.total * 100 if self.total else 0.0
+                lines.append(f"• {option.label}: {percent:.0f}% ({count})")
+        lines.append(
+            f"• Aligned (option 2/3): {self.aligned_percent:.0f}% "
+            f"(target ≥ {self.target_aligned_percent}%)"
+        )
+        alert_prefix = "🚨 " if self.should_alert else ""
+        lines.append(
+            f"• {alert_prefix}Misaligned (option 1/4): {self.misaligned_percent:.0f}% "
+            f"(alert > {self.alert_misaligned_percent}%, n≥{self.minimum_responses_for_alert})"
+        )
+        return "\n".join(lines)
 
 
 @dataclass
@@ -231,6 +265,20 @@ async def _churn(db: AsyncSession, *, day: date) -> ChurnSection:
     return ChurnSection(int(inactive_count), int(inactive_founding))
 
 
+async def _positioning(db: AsyncSession) -> PositioningSection:
+    snapshot = await kpi_snapshot(db)
+    return PositioningSection(
+        counts=snapshot.counts,
+        total=snapshot.total,
+        aligned_percent=snapshot.aligned_percent,
+        misaligned_percent=snapshot.misaligned_percent,
+        should_alert=snapshot.should_alert,
+        target_aligned_percent=snapshot.target_aligned_percent,
+        alert_misaligned_percent=snapshot.alert_misaligned_percent,
+        minimum_responses_for_alert=snapshot.minimum_responses_for_alert,
+    )
+
+
 async def _feedback_queue(db: AsyncSession) -> FeedbackSection:
     rows = (
         await db.execute(
@@ -267,6 +315,7 @@ async def compose_digest(db: AsyncSession, *, day: date | None = None) -> str:
     eng = await _engagement(db, day=day)
     qual = await _quality(db, day=day)
     churn = await _churn(db, day=day)
+    positioning = await _positioning(db)
     fb = await _feedback_queue(db)
 
     parts = [
@@ -275,6 +324,7 @@ async def compose_digest(db: AsyncSession, *, day: date | None = None) -> str:
         eng.render(),
         qual.render(),
         churn.render(),
+        positioning.render(),
         fb.render(),
     ]
     return "\n\n".join(parts)[:TELEGRAM_MESSAGE_MAX_CHARS]

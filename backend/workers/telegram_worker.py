@@ -78,6 +78,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import income_entry as income_entry_handlers
     from backend.bot.handlers import life_event_entry as life_event_entry_handlers
     from backend.bot.handlers import onboarding as onboarding_handlers
+    from backend.bot.handlers import positioning_survey as positioning_survey_handlers
     from backend.bot.handlers import recurring_entry as recurring_entry_handlers
     from backend.bot.handlers import storytelling as storytelling_handlers
     from backend.feedback.handlers import feedback_command as feedback_handlers
@@ -681,6 +682,10 @@ async def _handle_callback(
         callback_data=callback_data,
         dashboard_service=dashboard_service,
     )
+
+    # Phase 4.2 Epic 3 — Day 7 positioning survey callbacks.
+    if await positioning_survey_handlers.handle_positioning_survey_callback(db, callback_query):
+        return await _resolved_user_id()
 
     # Feedback prompt callbacks own the feedback:* namespace.
     if await feedback_handlers.handle_feedback_callback(db, callback_query):
