@@ -54,6 +54,16 @@ def demo_ack_text() -> str:
     return load_copy()["demo_ack"]
 
 
+def demo_post_chart_emphasis_text() -> str:
+    """Reframe message sent right after the demo cone chart.
+
+    Tells the user the real Twin will be richer than this thin 2-asset
+    demo so they don't anchor on the demo numbers. Demo-only — never
+    sent on the real-input path.
+    """
+    return load_copy()["demo_post_chart_emphasis"]
+
+
 def compute_failed_keyboard() -> dict:
     """Single-row retry button for the compute_failed fallback."""
     copy = load_copy()

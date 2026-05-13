@@ -671,6 +671,15 @@ async def _trigger_first_twin(
         chat_id=chat_id, photo=png, caption=caption, parse_mode="HTML"
     )
 
+    # Demo path only: reframe the chart so the user doesn't anchor on the
+    # thin 2-asset demo allocation. The real Twin will look better — say so.
+    if demo:
+        await send_message(
+            chat_id,
+            twin_narrative_service_v2.demo_post_chart_emphasis_text(),
+            parse_mode="HTML",
+        )
+
     await onboarding_service.mark_twin_shown(db, user.id)
     analytics.track(
         "onboarding_v2_twin_shown",
@@ -798,11 +807,25 @@ async def _on_feedback_signal(
         user_id=user.id,
         properties={"signal": signal},
     )
+    # Silently finalize the session before the CTA so /menu, briefing
+    # eligibility, etc. light up immediately — but DO NOT send the
+    # "Xong! Bé Tiền và bạn chính thức đồng hành" message yet. That
+    # message fires only after the user takes the first next-best-action
+    # (tap CTA button OR free-text a question); otherwise it lands
+    # before the user has actually done anything and reads as premature.
+    await _finalize_session_silently(db, user)
     await _send_next_best_action(db, chat_id, user)
-    await _complete(db, chat_id, user)
 
 
-async def _complete(db: AsyncSession, chat_id: int, user: User) -> None:
+async def _finalize_session_silently(db: AsyncSession, user: User) -> None:
+    """Mark the session COMPLETED without sending the activation bubble.
+
+    Separated from ``_send_activation_message_if_first_engagement`` so the
+    DB state machine can advance to COMPLETED (legacy ``users.onboarding_step``
+    mirror included) without the user-facing message. The visible "we're
+    officially in this together" message is gated on engagement — see
+    ``_send_activation_message_if_first_engagement``.
+    """
     session = await onboarding_service.get_session(db, user.id)
     if session is None or session.current_step == STEP_COMPLETED:
         return
@@ -813,9 +836,6 @@ async def _complete(db: AsyncSession, chat_id: int, user: User) -> None:
     # onboarded user without needing a parallel branch.
     await legacy_onboarding_service.mark_completed(db, user.id)
 
-    await send_message(
-        chat_id, twin_narrative_service_v2.completion_text(), parse_mode="HTML"
-    )
     analytics.track(
         "onboarding_v2_completed",
         user_id=user.id,
@@ -833,6 +853,38 @@ async def _complete(db: AsyncSession, chat_id: int, user: User) -> None:
             else None,
         },
     )
+
+
+async def _send_activation_message_if_first_engagement(
+    db: AsyncSession, chat_id: int, user: User
+) -> bool:
+    """Send the "🎉 Xong! Bé Tiền và bạn chính thức đồng hành…" bubble
+    exactly once, on the user's first post-Twin engagement.
+
+    Gating signal: ``OnboardingSession.next_best_action_taken``. If it is
+    None at the start of the call, the user has not yet engaged → this
+    IS their first engagement → send the message. Both call sites
+    (button tap and free-text query) invoke this BEFORE ``mark_taken``
+    so the gate fires reliably.
+
+    Returns True if the message was sent, False otherwise. Safe to call
+    when the session is missing or not yet finalized — those branches
+    no-op silently.
+    """
+    session = await onboarding_service.get_session(db, user.id)
+    if session is None:
+        return False
+    if session.next_best_action_taken is not None:
+        return False
+    if session.current_step != STEP_COMPLETED:
+        # Finalization hasn't run yet (e.g., user typed a question before
+        # tapping any feedback). Don't show the activation bubble until
+        # the session is actually complete — that would lie about state.
+        return False
+    await send_message(
+        chat_id, twin_narrative_service_v2.completion_text(), parse_mode="HTML"
+    )
+    return True
 
 
 async def _send_next_best_action(db: AsyncSession, chat_id: int, user: User) -> None:
@@ -855,8 +907,15 @@ async def _send_next_best_action(db: AsyncSession, chat_id: int, user: User) -> 
     )
 
 
-async def maybe_mark_query_next_action(db: AsyncSession, user: User) -> None:
-    """Mark free-text after first Twin as query-first activation."""
+async def maybe_mark_query_next_action(
+    db: AsyncSession, chat_id: int | None, user: User
+) -> None:
+    """Mark free-text after first Twin as query-first activation.
+
+    ``chat_id`` may be None when the caller has no chat context (unusual
+    but defensive); in that case the activation message is skipped — the
+    user will see it on their next button tap.
+    """
     session = await onboarding_service.get_session(db, user.id)
     if (
         session is None
@@ -864,6 +923,11 @@ async def maybe_mark_query_next_action(db: AsyncSession, user: User) -> None:
         or session.next_best_action_taken is not None
     ):
         return
+    # First post-Twin engagement via free text → show the activation
+    # bubble BEFORE marking taken so the gate inside the helper still
+    # sees ``next_best_action_taken is None``.
+    if chat_id is not None:
+        await _send_activation_message_if_first_engagement(db, chat_id, user)
     await next_action_service.mark_taken(
         db, user.id, next_action_service.ACTION_ASKED_QUERY
     )
@@ -897,6 +961,12 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
     action = data.split(":", 1)[1]
     action_type = next_action_service.action_type_for_callback(data) or action
+    # Show the warm "we're officially in this together" bubble BEFORE
+    # marking the action taken — the helper gates on
+    # ``next_best_action_taken IS NULL`` to ensure single-fire, so order
+    # matters here. If the user already engaged via free-text the helper
+    # is a no-op.
+    await _send_activation_message_if_first_engagement(db, chat_id, user)
     await next_action_service.mark_taken(db, user.id, action_type)
     analytics.track(
         "next_best_action_taken",
@@ -936,8 +1006,16 @@ async def _resume_at(db: AsyncSession, chat_id: int, user: User, session) -> Non
     elif session.current_step == STEP_FIRST_ASSET:
         await _send_first_asset_prompt(db, chat_id, user)
     elif session.current_step == STEP_TWIN_SHOWN:
-        # Twin already shown — just complete (feedback is optional).
-        await _complete(db, chat_id, user)
+        # Twin already shown — finalize the session silently so /menu and
+        # briefings light up, then hand off to the menu for a normal
+        # returning-user experience. The activation bubble waits for the
+        # user's first deliberate engagement (button tap or free text).
+        await _finalize_session_silently(db, user)
+        from backend.bot.handlers.menu_handler import cmd_menu
+
+        name = user.display_name or "bạn"
+        await send_message(chat_id, f"Chào lại {name}! 👋", parse_mode="HTML")
+        await cmd_menu(db, chat_id, user)
 
 
 # ---------- Callback router ------------------------------------------

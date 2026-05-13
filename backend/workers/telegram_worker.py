@@ -536,7 +536,9 @@ async def _handle_message(
     # Natural-language message → NL expense parser / report intent / menu fallback.
     if text and resolved_user is not None and not command.startswith("/"):
         from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
-        await onboarding_v2_handlers.maybe_mark_query_next_action(db, resolved_user)
+        await onboarding_v2_handlers.maybe_mark_query_next_action(
+            db, chat_id, resolved_user
+        )
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
 

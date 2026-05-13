@@ -1,12 +1,12 @@
-header: "Trước khi nhập tài sản thật"
+header: "(1/3) Bé Tiền tôn trọng tài chính của bạn"
 body: |
-  Bé Tiền dùng số này chỉ để vẽ Twin tài chính cho bạn.
+  Trước khi vẽ Twin tài chính, Bé Tiền hứa với bạn 3 điều:
 bullets:
-  - "Chỉ bạn thấy chi tiết tài sản — không user nào khác nhìn được."
-  - "Bạn có thể dùng số ước tính hoặc chọn Twin demo trước."
-  - "Có thể xoá/sửa tài sản bất cứ lúc nào."
+  - "🔒 Chỉ bạn thấy chi tiết tài sản — không ai khác nhìn được."
+  - "✍️ Bạn có thể xoá hoặc sửa tài sản bất cứ lúc nào."
+  - "🎭 Chưa sẵn sàng? Dùng số ước tính hoặc chọn Twin demo trước."
 buttons:
-  ok_label: "✅ OK, tiếp tục"
+  ok_label: "✅ OK, Bé Tiền đi tiếp"
   question_label: "💬 Tôi có câu hỏi"
 callbacks:
   ok: "onboarding_v2:trust_ok"
