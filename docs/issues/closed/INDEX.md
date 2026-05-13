@@ -299,6 +299,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #526 | Pre-Phase | [Feature/UI] US8: VNIndex — Top 5 VN30 by Trading Value + Gainers + Losers | [pre-phase/issue-526.md](by-phase/pre-phase/issue-526.md) |
 | #539 | Pre-Phase | [Epic] Phase 4.2 — Epic 1: Trust & Data Integrity | [pre-phase/issue-539.md](by-phase/pre-phase/issue-539.md) |
 | #540 | Pre-Phase | [Epic] Phase 4.2 — Epic 2: Activation & Engagement | [pre-phase/issue-540.md](by-phase/pre-phase/issue-540.md) |
+| #541 | Pre-Phase | [Epic] Phase 4.2 — Epic 3: Positioning Validation | [pre-phase/issue-541.md](by-phase/pre-phase/issue-541.md) |
 | #542 | Pre-Phase | [Story] P4.2-1.1: Trust & Privacy Moment | [pre-phase/issue-542.md](by-phase/pre-phase/issue-542.md) |
 | #543 | Pre-Phase | [Story] P4.2-1.2: Financial Data Quality Guardrails | [pre-phase/issue-543.md](by-phase/pre-phase/issue-543.md) |
 | #544 | Pre-Phase | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [pre-phase/issue-544.md](by-phase/pre-phase/issue-544.md) |
@@ -313,5 +314,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #553 | Pre-Phase | [Task] P4.2-D2: Content Quality Playbook | [pre-phase/issue-553.md](by-phase/pre-phase/issue-553.md) |
 | #554 | Pre-Phase | [Task] P4.2-D3: Manual Review Briefing #1 (Soft Launch Cohort) | [pre-phase/issue-554.md](by-phase/pre-phase/issue-554.md) |
 
-**Total:** 308 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 291 Pre-Phase)
+**Total:** 309 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 292 Pre-Phase)
