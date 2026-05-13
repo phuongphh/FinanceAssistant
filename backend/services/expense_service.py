@@ -235,7 +235,7 @@ async def list_expenses(
     user_id: uuid.UUID,
     month: str | None = None,
     category: str | None = None,
-    transaction_type: str | None = None,
+    transaction_type: str | None = TRANSACTION_TYPE_EXPENSE,
     limit: int = 50,
     offset: int = 0,
 ) -> list[Expense]:

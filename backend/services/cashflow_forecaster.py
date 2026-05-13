@@ -328,6 +328,7 @@ async def _compute_ambient_monthly_expense(
         Expense.expense_date >= since,
         Expense.expense_date < date(today.year, today.month, 1),
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
         Expense.recurrence_id.is_(None),
     )
     rows = list((await db.execute(stmt)).scalars().all())
@@ -390,6 +391,7 @@ async def _compute_ambient_essential(
         Expense.expense_date >= since,
         Expense.expense_date < date(today.year, today.month, 1),
         Expense.deleted_at.is_(None),
+        Expense.transaction_type == "expense",
         Expense.recurrence_id.is_(None),
         Expense.category.notin_(LIFESTYLE_CATEGORIES),
     )

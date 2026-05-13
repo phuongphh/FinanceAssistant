@@ -508,7 +508,12 @@ async def miniapp_list_expenses(
     user = await _resolve_user(auth, db)
     month_key = month or dashboard_service.current_month_key()
     items = await expense_service.list_expenses(
-        db, user.id, month=month_key, limit=limit, offset=0
+        db,
+        user.id,
+        month=month_key,
+        transaction_type="expense",
+        limit=limit,
+        offset=0,
     )
     return {
         "data": [_serialize_expense_item(item) for item in items],
@@ -602,7 +607,14 @@ def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
         "e_wallet_provider",
         "source_asset_id",
     }
-    clean = {k: v for k, v in payload.items() if k in allowed and v not in (None, "")}
+    source_fields = {"source_type", "e_wallet_provider", "source_asset_id"}
+    clean = {}
+    for k, v in payload.items():
+        if k not in allowed or v == "":
+            continue
+        if v is None and not (partial and k in source_fields):
+            continue
+        clean[k] = v
     if clean.get("transaction_type") == "money_in":
         clean.setdefault("category", "income")
     payment_method = str(payload.get("payment_method") or "").strip()[:64]

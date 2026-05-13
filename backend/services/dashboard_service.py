@@ -198,6 +198,7 @@ async def get_recent_transactions(
         .where(
             Expense.user_id == user_id,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         .order_by(Expense.expense_date.desc(), Expense.created_at.desc())
         .limit(limit)

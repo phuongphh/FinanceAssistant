@@ -101,6 +101,7 @@ class GetTransactionsTool(Tool):
         stmt = select(Expense).where(
             Expense.user_id == user_id,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == "expense",
         )
         if filt:
             if filt.category:
