@@ -4,19 +4,11 @@
 
 ## Phase 4.2 — Epic 1: Trust & Data Integrity
 
-> **Type:** Epic | **Priority:** P0 | **Estimate:** ~2.5 ngay | **Stories:** 2
+> **Type:** Epic | **Priority:** P0 | **Estimate:** ~2.5 ngay
 
-## Muc tieu
-Dam bao user moi co trust signal truoc khi nhap tai san + input data sach truoc khi feed Twin engine.
-
-## Stories in this Epic
-_(Se update)_
-- [ ] [Story] P4.2-1.1: Trust & Privacy Moment
-- [ ] [Story] P4.2-1.2: Financial Data Quality Guardrails
-
-## Migrations
-- M.1: asset_quality_flags
-- M.2: onboarding_trust_state
-
-## Reference
-`docs/current/phase-4.2/phase-4.2-detailed.md`
+## Stories
+- [ ] #542 [Story] P4.2-1.1: Trust & Privacy Moment
+- [ ] #543 [Story] P4.2-1.2: Financial Data Quality Guardrails
+- [ ] #549 [Task] M.1: Migration asset_quality_flags
+- [ ] #550 [Task] M.2: Migration onboarding_trust_state
+- [ ] #552 [Task] D.1: Editorial Discipline Doc
