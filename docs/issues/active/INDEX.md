@@ -39,7 +39,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #542 | [Story] P4.2-1.1: Trust & Privacy Moment | [issue-542.md](issue-542.md) |
 | #543 | [Story] P4.2-1.2: Financial Data Quality Guardrails | [issue-543.md](issue-543.md) |
 | #544 | [Story] P4.2-2.1: Next Best Action — 9-CTA Matrix | [issue-544.md](issue-544.md) |
+| #545 | [Story] P4.2-2.2: First Briefing Content Quality Bar | [issue-545.md](issue-545.md) |
 | #546 | [Story] P4.2-2.3: Query-First Soft Prompts | [issue-546.md](issue-546.md) |
 | #547 | [Story] P4.2-3.1: Day 7 Positioning Micro-Survey | [issue-547.md](issue-547.md) |
 
-**Total active:** 37
+**Total active:** 38
