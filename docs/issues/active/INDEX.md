@@ -44,6 +44,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #582 | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [issue-582.md](issue-582.md) |
 | #583 | [Story] P4.2.5-1.4: Audit log infrastructure | [issue-583.md](issue-583.md) |
 | #584 | [Story] P4.2.5-2.1: Overview stats endpoint | [issue-584.md](issue-584.md) |
+| #585 | [Story] P4.2.5-2.2: User growth & DAU chart endpoints | [issue-585.md](issue-585.md) |
 | #586 | [Story] P4.2.5-2.3: Feature events tracking + clicks endpoint | [issue-586.md](issue-586.md) |
 
-**Total active:** 41
+**Total active:** 42
