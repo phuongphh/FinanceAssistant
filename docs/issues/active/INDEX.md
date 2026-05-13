@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #564 | [Story] US2: Expense flow — add source selection with +/- syntax | [issue-564.md](issue-564.md) |
 | #565 | [Story] US3: Money In entry flow — income tracking with source | [issue-565.md](issue-565.md) |
 | #566 | [Story] US4: Menu Chi tiêu — help text & syntax guide | [issue-566.md](issue-566.md) |
+| #567 | [Story] US5: Daily transaction summary (22:00 cron) | [issue-567.md](issue-567.md) |
 
-**Total active:** 34
+**Total active:** 35
