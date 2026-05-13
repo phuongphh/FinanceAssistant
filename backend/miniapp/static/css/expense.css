@@ -204,3 +204,12 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.money-in-row {
+    border-left: 3px solid #2ecc71;
+}
+
+.money-in-amount {
+    color: #1f9d55;
+    font-weight: 700;
+}

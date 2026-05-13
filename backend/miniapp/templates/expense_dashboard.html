@@ -84,6 +84,13 @@
                 <button class="add-btn" id="add-expense-btn" type="button">+ Thêm chi tiêu</button>
             </section>
 
+            <section class="section" id="money-in-section">
+                <h2>💚 Tiền vào tháng này</h2>
+                <p class="section-hint">Theo dõi thưởng, lì xì, hoàn tiền… và nguồn nhận tiền.</p>
+                <div id="money-in-list"></div>
+                <button class="add-btn" id="add-money-in-btn" type="button">+ Thêm tiền vào</button>
+            </section>
+
             <!-- APP_VERSION_MARKER -->
         </section>
     </main>
@@ -93,12 +100,27 @@
             <h3 id="expense-modal-title">Thêm chi tiêu</h3>
             <label for="expense-amount">Số tiền (VNĐ)</label>
             <input id="expense-amount" type="number" min="1000" step="1000" inputmode="numeric" />
+            <label for="expense-type">Loại giao dịch</label>
+            <select id="expense-type">
+                <option value="expense">Chi tiêu (-)</option>
+                <option value="money_in">Tiền vào (+)</option>
+            </select>
             <label for="expense-category">Danh mục</label>
             <select id="expense-category"></select>
             <label for="expense-date">Ngày</label>
             <input id="expense-date" type="date" />
             <label for="expense-note">Ghi chú / cửa hàng</label>
             <input id="expense-note" type="text" maxlength="200" placeholder="VD: ăn trưa, Grab…" />
+            <label for="expense-source">Nguồn tiền</label>
+            <select id="expense-source">
+                <option value="">Không liên kết nguồn</option>
+                <option value="cash">Tiền mặt</option>
+                <option value="bank_account">Tài khoản</option>
+                <option value="e_wallet:momo">Ví Momo</option>
+                <option value="e_wallet:vnpay">Ví VNPay</option>
+                <option value="e_wallet:zalopay">Ví ZaloPay</option>
+                <option value="e_wallet:viettelpay">Ví ViettelPay</option>
+            </select>
             <label for="expense-payment">Phương thức thanh toán</label>
             <input id="expense-payment" type="text" maxlength="64" placeholder="Tiền mặt, thẻ, chuyển khoản…" />
             <div class="modal-actions">

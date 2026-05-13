@@ -1,15 +1,138 @@
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.models.expense import Expense
+from backend.wealth.models.asset import Asset
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 
 logger = logging.getLogger(__name__)
+
+
+TRANSACTION_TYPE_EXPENSE = "expense"
+TRANSACTION_TYPE_MONEY_IN = "money_in"
+SOURCE_TYPES = {"cash", "bank_account", "e_wallet"}
+EWALLET_PROVIDERS = {"momo", "vnpay", "zalopay", "viettelpay"}
+
+
+def _transaction_direction(transaction_type: str | None) -> int:
+    return 1 if transaction_type == TRANSACTION_TYPE_MONEY_IN else -1
+
+
+def _source_asset_delta(expense: Expense) -> Decimal:
+    return Decimal(str(expense.amount or 0)) * _transaction_direction(
+        expense.transaction_type
+    )
+
+
+async def _adjust_source_asset(
+    db: AsyncSession, expense: Expense, multiplier: int = 1
+) -> None:
+    if not expense.source_asset_id:
+        return
+    asset = await db.get(Asset, expense.source_asset_id)
+    if asset is None or asset.user_id != expense.user_id:
+        return
+    asset.current_value = Decimal(asset.current_value or 0) + (
+        _source_asset_delta(expense) * multiplier
+    )
+    asset.last_valued_at = datetime.utcnow()
+
+
+async def get_or_create_source_asset(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    source_type: str,
+    e_wallet_provider: str | None = None,
+) -> Asset:
+    """Resolve a user's cash-like source asset, creating a zero-balance one if needed."""
+    if source_type not in SOURCE_TYPES:
+        raise ValueError("source_type is not supported")
+    if source_type != "e_wallet":
+        e_wallet_provider = None
+    elif e_wallet_provider not in EWALLET_PROVIDERS:
+        raise ValueError("e_wallet_provider is not supported")
+
+    subtype = e_wallet_provider if source_type == "e_wallet" else source_type
+    stmt = (
+        select(Asset)
+        .where(
+            Asset.user_id == user_id,
+            Asset.asset_type == "cash",
+            Asset.subtype == subtype,
+            Asset.is_active.is_(True),
+        )
+        .order_by(Asset.created_at.asc())
+        .limit(1)
+    )
+    asset = (await db.execute(stmt)).scalar_one_or_none()
+    if asset is not None:
+        return asset
+
+    names = {
+        "cash": "Tiền mặt",
+        "bank_account": "Tài khoản ngân hàng",
+        "momo": "Ví Momo",
+        "vnpay": "Ví VNPay",
+        "zalopay": "Ví ZaloPay",
+        "viettelpay": "Ví ViettelPay",
+    }
+    asset = Asset(
+        user_id=user_id,
+        asset_type="cash",
+        subtype=subtype,
+        name=names.get(subtype, "Nguồn tiền"),
+        description="Tự tạo từ luồng ghi nhận giao dịch",
+        initial_value=Decimal("0"),
+        current_value=Decimal("0"),
+        acquired_at=datetime.utcnow().date(),
+        extra={"source_type": source_type, "e_wallet_provider": e_wallet_provider},
+    )
+    db.add(asset)
+    await db.flush()
+    await db.refresh(asset)
+    return asset
+
+
+async def resolve_source_asset_for_payload(
+    db: AsyncSession, user_id: uuid.UUID, data: ExpenseCreate
+) -> tuple[uuid.UUID | None, dict | None]:
+    if data.source_asset_id:
+        asset = await db.get(Asset, data.source_asset_id)
+        if asset is None or asset.user_id != user_id or not asset.is_active:
+            raise ValueError("source_asset_id không hợp lệ")
+        warning = None
+        if data.transaction_type == TRANSACTION_TYPE_EXPENSE and Decimal(
+            asset.current_value or 0
+        ) < Decimal(str(data.amount)):
+            warning = {
+                "insufficient_balance": True,
+                "balance": float(asset.current_value or 0),
+            }
+        return asset.id, warning
+    if not data.source_type:
+        return None, None
+    asset = await get_or_create_source_asset(
+        db,
+        user_id,
+        source_type=data.source_type,
+        e_wallet_provider=data.e_wallet_provider,
+    )
+    warning = None
+    if data.transaction_type == TRANSACTION_TYPE_EXPENSE and Decimal(
+        asset.current_value or 0
+    ) < Decimal(str(data.amount)):
+        warning = {
+            "insufficient_balance": True,
+            "balance": float(asset.current_value or 0),
+        }
+    return asset.id, warning
 
 
 async def create_expense(
@@ -19,28 +142,42 @@ async def create_expense(
     category = data.category
     if category == "needs_review" and (data.merchant or data.note):
         from backend.services.llm_service import categorize_expense
+
         category = await categorize_expense(
-            merchant=data.merchant, description=data.note,
-            amount=data.amount, db=db,
+            merchant=data.merchant,
+            description=data.note,
+            amount=data.amount,
+            db=db,
         )
 
     month_key = data.expense_date.strftime("%Y-%m")
+    source_asset_id, source_warning = await resolve_source_asset_for_payload(
+        db, user_id, data
+    )
+    raw_data = dict(data.raw_data or {})
+    if source_warning:
+        raw_data["source_warning"] = source_warning
     expense = Expense(
         user_id=user_id,
         amount=data.amount,
+        transaction_type=data.transaction_type,
         currency=data.currency,
         merchant=data.merchant,
         category=category,
         source=data.source,
+        source_asset_id=source_asset_id,
+        source_type=data.source_type,
+        e_wallet_provider=data.e_wallet_provider,
         expense_date=data.expense_date,
         month_key=month_key,
         note=data.note,
-        raw_data=data.raw_data,
+        raw_data=raw_data or None,
         needs_review=data.needs_review,
         gmail_message_id=data.gmail_message_id,
     )
     db.add(expense)
     await db.flush()
+    await _adjust_source_asset(db, expense, multiplier=1)
     await db.refresh(expense)
 
     analytics.track(
@@ -48,6 +185,8 @@ async def create_expense(
         user_id=user_id,
         properties={
             "source": data.source,
+            "transaction_type": data.transaction_type,
+            "source_type": data.source_type,
             "category": category,
             "needs_review": bool(data.needs_review),
             "auto_categorized": data.category == "needs_review",
@@ -62,6 +201,7 @@ async def create_expense(
     # receipt" semantics that a bare try/except does NOT provide with
     # SQLAlchemy's async transaction state model.
     from backend.services import streak_service
+
     try:
         async with db.begin_nested():
             result = await streak_service.record_activity(db, user_id)
@@ -95,6 +235,7 @@ async def list_expenses(
     user_id: uuid.UUID,
     month: str | None = None,
     category: str | None = None,
+    transaction_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[Expense]:
@@ -106,6 +247,8 @@ async def list_expenses(
         stmt = stmt.where(Expense.month_key == month)
     if category:
         stmt = stmt.where(Expense.category == category)
+    if transaction_type:
+        stmt = stmt.where(Expense.transaction_type == transaction_type)
     stmt = stmt.order_by(Expense.expense_date.desc()).limit(limit).offset(offset)
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -120,12 +263,45 @@ async def update_expense(
     expense = await get_expense(db, user_id, expense_id)
     if not expense:
         return None
+    await _adjust_source_asset(db, expense, multiplier=-1)
     update_data = data.model_dump(exclude_unset=True)
+    if (
+        "source_asset_id" in update_data
+        or "source_type" in update_data
+        or "e_wallet_provider" in update_data
+    ):
+        merged = ExpenseCreate(
+            amount=float(update_data.get("amount", expense.amount)),
+            transaction_type=update_data.get(
+                "transaction_type", expense.transaction_type
+            ),
+            currency=update_data.get("currency", expense.currency),
+            merchant=update_data.get("merchant", expense.merchant),
+            category=update_data.get("category", expense.category),
+            source=expense.source,
+            source_asset_id=update_data.get("source_asset_id", expense.source_asset_id),
+            source_type=update_data.get("source_type", expense.source_type),
+            e_wallet_provider=update_data.get(
+                "e_wallet_provider", expense.e_wallet_provider
+            ),
+            expense_date=update_data.get("expense_date", expense.expense_date),
+            note=update_data.get("note", expense.note),
+            raw_data=update_data.get("raw_data", expense.raw_data),
+            needs_review=update_data.get("needs_review", expense.needs_review),
+        )
+        resolved_asset_id, _warning = await resolve_source_asset_for_payload(
+            db, user_id, merged
+        )
+        update_data["source_asset_id"] = resolved_asset_id
+        update_data["e_wallet_provider"] = (
+            merged.e_wallet_provider if merged.source_type == "e_wallet" else None
+        )
     for field, value in update_data.items():
         setattr(expense, field, value)
     if "expense_date" in update_data and expense.expense_date is not None:
         expense.month_key = expense.expense_date.strftime("%Y-%m")
     await db.flush()
+    await _adjust_source_asset(db, expense, multiplier=1)
     await db.refresh(expense)
     return expense
 
@@ -137,6 +313,7 @@ async def delete_expense(
     if not expense:
         return False
     expense.deleted_at = datetime.utcnow()
+    await _adjust_source_asset(db, expense, multiplier=-1)
     await db.flush()
     analytics.track(
         analytics.EventType.TRANSACTION_DELETED,
@@ -146,9 +323,7 @@ async def delete_expense(
     return True
 
 
-async def get_expense_summary(
-    db: AsyncSession, user_id: uuid.UUID, month: str
-) -> dict:
+async def get_expense_summary(db: AsyncSession, user_id: uuid.UUID, month: str) -> dict:
     stmt = (
         select(
             Expense.category,
@@ -159,6 +334,7 @@ async def get_expense_summary(
             Expense.user_id == user_id,
             Expense.month_key == month,
             Expense.deleted_at.is_(None),
+            Expense.transaction_type == TRANSACTION_TYPE_EXPENSE,
         )
         .group_by(Expense.category)
     )

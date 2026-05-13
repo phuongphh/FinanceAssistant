@@ -120,3 +120,37 @@ def confirm_delete_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
             ]
         ],
     }
+
+
+def transaction_source_keyboard(transaction_type: str) -> InlineKeyboardMarkup:
+    """Source picker for signed manual expense/money-in syntax."""
+    prefix = "txsrc"
+    skip_label = (
+        "Bỏ qua nguồn" if transaction_type == "expense" else "Ghi nhận không liên kết"
+    )
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
+                {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_account"},
+            ],
+            [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:e_wallet"}],
+            [{"text": f"↪️ {skip_label}", "callback_data": f"{prefix}:skip"}],
+        ]
+    }
+
+
+def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "Momo", "callback_data": "txsrc_wallet:momo"},
+                {"text": "VNPay", "callback_data": "txsrc_wallet:vnpay"},
+            ],
+            [
+                {"text": "ZaloPay", "callback_data": "txsrc_wallet:zalopay"},
+                {"text": "ViettelPay", "callback_data": "txsrc_wallet:viettelpay"},
+            ],
+            [{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}],
+        ]
+    }

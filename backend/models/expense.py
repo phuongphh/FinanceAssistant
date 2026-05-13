@@ -30,10 +30,18 @@ class Expense(Base):
         UUID(as_uuid=True), nullable=False, index=True
     )
     amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="expense", server_default="expense"
+    )
     currency: Mapped[str] = mapped_column(String(10), default="VND")
     merchant: Mapped[str | None] = mapped_column(String(500))
     category: Mapped[str] = mapped_column(String(100), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL")
+    )
+    source_type: Mapped[str | None] = mapped_column(String(30))
+    e_wallet_provider: Mapped[str | None] = mapped_column(String(30))
     expense_date: Mapped[date] = mapped_column(Date, nullable=False)
     month_key: Mapped[str] = mapped_column(String(7), nullable=False)
     note: Mapped[str | None] = mapped_column(Text)
@@ -46,9 +54,7 @@ class Expense(Base):
     # NULL`` so the agent can filter "khoản định kỳ tháng này"
     # without joining recurring_patterns. Both fields default safe
     # for the 95% of one-off transactions.
-    is_recurring: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     recurrence_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("recurring_patterns.id", ondelete="SET NULL"),
@@ -64,6 +70,12 @@ class Expense(Base):
     __table_args__ = (
         Index("idx_expenses_month_key", "user_id", "month_key"),
         Index("idx_expenses_category", "user_id", "category"),
+        Index("idx_expenses_type_month", "user_id", "transaction_type", "month_key"),
+        Index(
+            "idx_expenses_source_asset",
+            "source_asset_id",
+            postgresql_where=text("source_asset_id IS NOT NULL"),
+        ),
         Index(
             "idx_expenses_gmail_id",
             "gmail_message_id",
@@ -74,7 +86,8 @@ class Expense(Base):
         # the partial keeps the index small.
         Index(
             "idx_expenses_recurrence",
-            "recurrence_id", "expense_date",
+            "recurrence_id",
+            "expense_date",
             postgresql_where=text("recurrence_id IS NOT NULL"),
         ),
     )
