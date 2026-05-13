@@ -4,12 +4,9 @@
 
 ## Phase 4.2.5 — Epic 4: Frontend Foundation
 
-> **Sprint:** 2 | **Stories:** 3 | **Size:** ~8 SP
-
-## Muc tieu
-Setup project Vite, auth flow, layout chung.
+> **Sprint:** 2 | **Stories:** 3
 
 ## Stories
-- [Story] 4.1: Vite project setup + Tailwind + design tokens
-- [Story] 4.2: Auth flow (login + protected routes + change password)
-- [Story] 4.3: Dashboard layout (header + hero + grid framework)
+- [ ] #592 [Story] 4.1: Vite project setup + Tailwind + design tokens
+- [ ] #593 [Story] 4.2: Auth flow (login + protected routes + change password)
+- [ ] #594 [Story] 4.3: Dashboard layout (header + hero + grid framework)
