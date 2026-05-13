@@ -423,6 +423,26 @@ async def _handle_message(
         if consumed:
             return resolved_user.id
 
+    # Issue #603 — photo (or image document) = receipt OCR. Runs before
+    # any text/wizard branches because photos carry no text payload,
+    # and we want OCR to work regardless of wizard state so users can
+    # snap a receipt anytime.
+    if (
+        resolved_user is not None
+        and (
+            message.get("photo")
+            or (
+                (message.get("document") or {}).get("mime_type", "")
+                .startswith("image/")
+            )
+        )
+    ):
+        from backend.bot.handlers.photo_receipt import handle_photo_message
+
+        consumed = await handle_photo_message(db, message, resolved_user)
+        if consumed:
+            return resolved_user.id
+
     # Plain text during the onboarding name step must be consumed here —
     # otherwise the NL expense parser would try to parse the user's name
     # as a transaction.
