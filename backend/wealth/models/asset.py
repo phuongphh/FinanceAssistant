@@ -49,6 +49,15 @@ class Asset(Base):
     extra: Mapped[dict | None] = mapped_column(JSONB)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Phase 4.2 Epic 1 — quality flags. Demo/placeholder rows must not
+    # leak into real net-worth/Twin math, and risky inputs carry an audit
+    # marker so support/KPI digest can review them later.
+    is_placeholder_asset: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    source_input_raw: Mapped[str | None] = mapped_column(Text)
+    data_quality_warning_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    data_quality_warning_type: Mapped[str | None] = mapped_column(String(50))
     sold_at: Mapped[date | None] = mapped_column(Date)
     sold_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
 
@@ -81,6 +90,8 @@ class Asset(Base):
     __table_args__ = (
         Index("idx_assets_user_active", "user_id", "is_active"),
         Index("idx_assets_type", "asset_type"),
+        Index("idx_assets_real", "user_id", "is_active", "is_placeholder_asset", "is_confirmed"),
+        Index("idx_assets_recent", "user_id", "asset_type", "created_at"),
     )
 
     @property

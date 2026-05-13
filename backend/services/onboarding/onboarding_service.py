@@ -18,6 +18,7 @@ router boundary commits.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -34,6 +35,7 @@ from backend.models.onboarding_session import (
     OnboardingSession,
     STEP_COMPLETED,
     STEP_FIRST_ASSET,
+    STEP_TRUST_PRIVACY,
     STEP_GOAL_QUESTION,
     STEP_TWIN_SHOWN,
 )
@@ -77,6 +79,16 @@ MIN_ASSET_VND = Decimal("1_000_000")
 MAX_ASSET_VND = Decimal("100_000_000_000_000")
 
 DEMO_ASSET_VND = Decimal("50_000_000")  # Demo Twin uses 50tr placeholder.
+TRUST_CARD_FLAG_ENV = "TRUST_CARD_ENABLED"
+
+
+def is_trust_card_enabled() -> bool:
+    return os.environ.get(TRUST_CARD_FLAG_ENV, "true").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
 
 
 def parse_asset_amount(raw: str) -> Decimal | None:
@@ -162,7 +174,41 @@ async def set_goal(
     if session is None:
         return None
     session.goal_choice = goal_code
+    if is_trust_card_enabled() and session.trust_accepted_at is None:
+        session.current_step = STEP_TRUST_PRIVACY
+    else:
+        session.current_step = STEP_FIRST_ASSET
+    await db.flush()
+    return session
+
+
+async def mark_trust_shown(db: AsyncSession, user_id: uuid.UUID) -> OnboardingSession | None:
+    session = await get_session(db, user_id)
+    if session is None:
+        return None
+    if session.trust_shown_at is None:
+        session.trust_shown_at = datetime.now(timezone.utc)
+    await db.flush()
+    return session
+
+
+async def accept_trust(db: AsyncSession, user_id: uuid.UUID) -> OnboardingSession | None:
+    session = await get_session(db, user_id)
+    if session is None:
+        return None
+    if session.trust_accepted_at is None:
+        session.trust_accepted_at = datetime.now(timezone.utc)
     session.current_step = STEP_FIRST_ASSET
+    await db.flush()
+    return session
+
+
+async def mark_trust_question_raised(db: AsyncSession, user_id: uuid.UUID) -> OnboardingSession | None:
+    session = await get_session(db, user_id)
+    if session is None:
+        return None
+    if session.trust_question_raised_at is None:
+        session.trust_question_raised_at = datetime.now(timezone.utc)
     await db.flush()
     return session
 

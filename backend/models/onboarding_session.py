@@ -28,6 +28,7 @@ from backend.database import Base
 
 
 STEP_GOAL_QUESTION = "goal_question"
+STEP_TRUST_PRIVACY = "trust_privacy"
 STEP_FIRST_ASSET = "first_asset"
 STEP_TWIN_SHOWN = "twin_shown"
 STEP_COMPLETED = "completed"
@@ -69,6 +70,14 @@ class OnboardingSession(Base):
     first_twin_shown_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # Phase 4.2 Epic 1 — trust moment between goal and asset input.
+    trust_shown_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trust_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trust_question_raised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Phase 4.2 Epic 2 fields are migrated with the same trust-state task
+    # so later activation stories do not need another hot table ALTER.
+    next_best_action_taken: Mapped[str | None] = mapped_column(String(50))
+    next_best_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     nudge_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     onboarding_feedback_signal: Mapped[str | None] = mapped_column(String(16))

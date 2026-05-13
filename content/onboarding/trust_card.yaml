@@ -1,0 +1,17 @@
+header: "Trước khi nhập tài sản thật"
+body: |
+  Bé Tiền dùng số này chỉ để vẽ Twin tài chính cho bạn.
+bullets:
+  - "Chỉ bạn thấy chi tiết tài sản — không user nào khác nhìn được."
+  - "Bạn có thể dùng số ước tính hoặc chọn Twin demo trước."
+  - "Có thể xoá/sửa tài sản bất cứ lúc nào."
+buttons:
+  ok_label: "✅ OK, tiếp tục"
+  question_label: "💬 Tôi có câu hỏi"
+callbacks:
+  ok: "onboarding_v2:trust_ok"
+  question: "onboarding_v2:trust_question"
+question_ack: |
+  Bé Tiền đã ghi nhận câu hỏi của bạn để founder ưu tiên trả lời.
+
+  Trong lúc chờ, bạn có thể nhập số ước tính hoặc chọn Twin demo — không cần nhập quá chi tiết ngay lúc này.
