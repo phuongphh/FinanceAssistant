@@ -337,10 +337,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #590 | Pre-Phase | [Story] P4.2.5-3.2: User detail endpoint | [pre-phase/issue-590.md](by-phase/pre-phase/issue-590.md) |
 | #591 | Pre-Phase | [Story] P4.2.5-3.3: User status change action | [pre-phase/issue-591.md](by-phase/pre-phase/issue-591.md) |
 | #592 | Pre-Phase | [Story] P4.2.5-4.1: Vite project setup + Tailwind + design tokens | [pre-phase/issue-592.md](by-phase/pre-phase/issue-592.md) |
+| #594 | Pre-Phase | [Story] P4.2.5-4.3: Dashboard layout (header + hero + grid framework) | [pre-phase/issue-594.md](by-phase/pre-phase/issue-594.md) |
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
 
-**Total:** 337 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 320 Pre-Phase)
+**Total:** 338 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 321 Pre-Phase)

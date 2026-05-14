@@ -38,7 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
 | #579 | [Epic] Phase 4.2.5 — Epic 7: License Foundation | [issue-579.md](issue-579.md) |
 | #593 | [Story] P4.2.5-4.2: Auth flow (login + protected routes + change password) | [issue-593.md](issue-593.md) |
-| #594 | [Story] P4.2.5-4.3: Dashboard layout (header + hero + grid framework) | [issue-594.md](issue-594.md) |
 | #595 | [Story] P4.2.5-5.1: KPI cards grid | [issue-595.md](issue-595.md) |
 | #596 | [Story] P4.2.5-5.2: Growth charts (User growth + DAU) | [issue-596.md](issue-596.md) |
 | #597 | [Story] P4.2.5-5.3: Distribution charts + Cohort table | [issue-597.md](issue-597.md) |
@@ -48,4 +47,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
 | #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 43
+**Total active:** 42
