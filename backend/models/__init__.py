@@ -1,4 +1,6 @@
 from backend.models.user import User
+from backend.models.admin_user import AdminUser
+from backend.models.admin_audit_log import AdminAuditLog
 from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.report import MonthlyReport
@@ -70,6 +72,8 @@ from backend.models.positioning_survey import (
 
 __all__ = [
     "User",
+    "AdminUser",
+    "AdminAuditLog",
     "Expense",
     "Goal",
     "MonthlyReport",

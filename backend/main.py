@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from backend.config import get_settings
+from backend.api.admin import audit as admin_audit, auth as admin_auth
 from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import (
@@ -219,6 +220,8 @@ app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")
 app.include_router(admin_agent_metrics.router, prefix="/api/v1")
+app.include_router(admin_auth.router, prefix="/api/admin")
+app.include_router(admin_audit.router, prefix="/api/admin")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 
