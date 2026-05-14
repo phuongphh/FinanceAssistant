@@ -156,7 +156,13 @@ class QueryMarketHandler(IntentHandler):
             if quote.is_stale:
                 stale_times.append(quote.fetched_at)
             stale = " (dữ liệu cũ)" if quote.is_stale else ""
-            lines.append(f"• {symbol}: {quote.price:,.0f}đ{stale}")
+            change = quote.metadata.get("change_pct_24h")
+            change_text = ""
+            if change is not None:
+                change_pct = Decimal(str(change))
+                sign = "+" if change_pct >= 0 else ""
+                change_text = f" · {sign}{change_pct:.2f}%"
+            lines.append(f"• {symbol}: {quote.price:,.0f}đ{change_text}{stale}")
 
         if stale_times:
             latest = max(stale_times).astimezone().strftime("%H:%M")
