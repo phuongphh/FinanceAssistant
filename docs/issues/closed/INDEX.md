@@ -362,6 +362,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #627 | Pre-Phase | [UI/UX] US3: Crypto card — add date, remove "24h" | [pre-phase/issue-627.md](by-phase/pre-phase/issue-627.md) |
 | #628 | Pre-Phase | [UI/UX] US4: Recurring — fix date format dd/mm/yyyy | [pre-phase/issue-628.md](by-phase/pre-phase/issue-628.md) |
 | #629 | Pre-Phase | [Bug] US5: Briefing "Đổi giờ" button not working | [pre-phase/issue-629.md](by-phase/pre-phase/issue-629.md) |
+| #635 | Pre-Phase | bug: KeyError 'vip' in menu_formatter.format_main_menu when wealth_level is 'vip' | [pre-phase/issue-635.md](by-phase/pre-phase/issue-635.md) |
 
-**Total:** 358 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 341 Pre-Phase)
+**Total:** 359 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 342 Pre-Phase)
