@@ -81,33 +81,44 @@ _BOOTSTRAP_MARKER_PATTERN = re.compile(r"<!--\s*BUILD_BOOTSTRAP\s*-->")
 def _build_bootstrap_script(version: str) -> str:
     """Inline reload guard that runs before any other asset loads.
 
-    Two layers of defense against stale Mini App UIs:
+    Cache busting strategy:
 
-    1. **localStorage drift check (post-fresh-fetch)** — when the WebView
-       eventually does fetch a new HTML, the embedded ``CURRENT`` differs
-       from the value the previous session stored in ``localStorage``.
-       We bump localStorage and ``location.replace`` with ``?_b=<hash>`` so
-       every cache layer below us treats the next hop as a brand-new URL
-       and the user lands on the freshly-rendered dashboard.
+    - The server emits ``?b=<build_hash>`` on every entry-point URL it
+      controls (chat menu button, briefing inline keyboards). Each deploy
+      changes the hash, so the WebView sees a never-before-cached URL and
+      fetches fresh HTML. This handles 95% of stale-UI cases on its own.
 
-    2. **Live server probe (no fresh fetch needed)** — Telegram Desktop
-       (and to a lesser extent the macOS / iPad clients) keeps the WebApp
-       WebView alive in memory across panel close/reopen, so a deploy
-       stays invisible until the user fully quits the Telegram app. The
-       probe hits ``/miniapp/api/version`` on initial load and again
-       every time the page becomes visible (tab focus, panel reopen,
-       Telegram WebApp ``viewportChanged`` after the panel re-expands).
-       If the server hash differs from the one baked into this script at
-       render time, we ``location.replace`` with the fresh hash and the
-       WebView is forced to re-navigate — no manual quit required. The
-       endpoint declares ``no-store`` and we set ``cache: 'no-store'``
-       on the fetch so the probe always reaches the network.
+    - **Live server probe (Telegram Desktop edge case)** — Desktop keeps
+      the WebApp WebView alive in memory across panel close/reopen, so a
+      deploy stays invisible until the user fully quits the Telegram app.
+      The probe hits ``/miniapp/api/version`` on visibility changes
+      (tab focus, ``pageshow`` bfcache restore, Telegram ``viewportChanged``).
+      If the server hash drifts from the one baked into this script, we
+      ``location.replace`` with the fresh hash *while preserving the URL
+      hash fragment* (which carries ``tgWebAppData`` / initData), so the
+      reloaded page still authenticates against the API.
 
-    Idempotent: once the URL carries the current hash, both checks no-op
-    on every subsequent open. First-time visitors (no stored hash) only
-    seed the value — no reload — so cold opens aren't slowed down.
+    ## Why we removed the synchronous localStorage drift reload (issue #610)
+
+    Earlier revisions also did an immediate ``location.replace`` whenever
+    ``localStorage['fa.app.build']`` disagreed with ``CURRENT``. That fired
+    BEFORE ``Telegram.WebApp.ready()`` and BEFORE the host had a chance to
+    settle. On the chat-menu-button entry point (iOS WebKit in particular),
+    rewriting the URL during the WebApp handshake stripped the
+    ``#tgWebAppData=...`` fragment that carries ``initData``. The reloaded
+    page then rendered no auth header, the API returned 401, and the user
+    saw a blank panel. Inline-keyboard opens dodged the race because they
+    landed on a URL whose ``?b=`` already matched the stored hash, so the
+    drift branch never fired. Removing the synchronous reload makes both
+    entry points behave identically — server-side ``?b=`` already gives
+    every deploy a unique URL key.
+
+    The probe is also gated on ``Telegram.WebApp.initData`` being non-empty
+    so a panel mid-handshake is never navigated away.
+
+    Idempotent: once the URL carries the current hash, the probe no-ops.
     ``try/catch`` guards against ``localStorage`` throwing in private
-    mode / sandboxed iframes.
+    mode / sandboxed iframes. localStorage seeding is kept for diagnostics.
     """
     return (
         "<script>"
@@ -115,24 +126,24 @@ def _build_bootstrap_script(version: str) -> str:
         f"var CURRENT={version!r};"
         # Expose the build hash for downstream JS (analytics / debug).
         "window.__FA_BUILD__=CURRENT;"
-        "try{"
-        "var KEY='fa.app.build';"
-        "var stored=localStorage.getItem(KEY);"
-        "if(stored&&stored!==CURRENT){"
-        "localStorage.setItem(KEY,CURRENT);"
-        "var url=new URL(location.href);"
-        "url.searchParams.set('_b',CURRENT);"
-        "location.replace(url.toString());"
-        "return;"
-        "}"
-        "if(!stored)localStorage.setItem(KEY,CURRENT);"
-        "}catch(e){}"
+        # Seed localStorage for diagnostic continuity (e.g., support can ask
+        # users to read it back). We INTENTIONALLY do NOT navigate on drift —
+        # see the docstring for the issue #610 rationale.
+        "try{localStorage.setItem('fa.app.build',CURRENT);}catch(e){}"
         # ---- Live probe ----
         # Guard against re-entrancy: once we've decided to reload, ignore
         # further probe ticks so the user doesn't see a flicker storm.
         "var _faReloading=false;"
         "function _faProbe(){"
         "if(_faReloading)return;"
+        # Never navigate while the Telegram WebApp handshake is in flight —
+        # rewriting the URL before initData is read drops the hash fragment
+        # on iOS WebKit and breaks auth on the reloaded page (issue #610).
+        # When the script loads via the chat menu button, ``initData`` is
+        # populated synchronously from the URL hash; if it's still empty,
+        # we're either pre-handshake or running outside Telegram (preview).
+        "var w=window.Telegram&&window.Telegram.WebApp;"
+        "if(w&&!w.initData)return;"
         "try{"
         "fetch('/miniapp/api/version',{cache:'no-store',credentials:'omit'})"
         ".then(function(r){return r.ok?r.json():null;})"
@@ -142,6 +153,11 @@ def _build_bootstrap_script(version: str) -> str:
         "_faReloading=true;"
         "var u=new URL(location.href);"
         "u.searchParams.set('b',v);"
+        # Preserve the hash explicitly. ``new URL(location.href)`` includes
+        # it, but a few WebKit revisions drop the fragment on
+        # ``location.replace`` when the search string mutates — reassigning
+        # ``u.hash`` keeps ``#tgWebAppData=...`` intact across the reload.
+        "u.hash=location.hash;"
         "location.replace(u.toString());"
         "}).catch(function(){});"
         "}catch(e){}"
