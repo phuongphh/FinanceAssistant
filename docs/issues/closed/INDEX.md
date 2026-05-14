@@ -355,6 +355,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
+| #623 | Pre-Phase | perf: repeated user lookups cause slow menu navigation callbacks | [pre-phase/issue-623.md](by-phase/pre-phase/issue-623.md) |
 | #624 | Pre-Phase | [Epic] Enhance UI/UX 4 — Chat-first guidance, Money-in, crypto date, date format, briefing fix | [pre-phase/issue-624.md](by-phase/pre-phase/issue-624.md) |
 | #625 | Pre-Phase | [UI/UX] US1: Chat-first guidance in Asset card | [pre-phase/issue-625.md](by-phase/pre-phase/issue-625.md) |
 | #626 | Pre-Phase | [UI/UX] US2: Money-in list in Expense Dashboard | [pre-phase/issue-626.md](by-phase/pre-phase/issue-626.md) |
@@ -362,5 +363,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #628 | Pre-Phase | [UI/UX] US4: Recurring — fix date format dd/mm/yyyy | [pre-phase/issue-628.md](by-phase/pre-phase/issue-628.md) |
 | #629 | Pre-Phase | [Bug] US5: Briefing "Đổi giờ" button not working | [pre-phase/issue-629.md](by-phase/pre-phase/issue-629.md) |
 
-**Total:** 357 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 340 Pre-Phase)
+**Total:** 358 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 341 Pre-Phase)
