@@ -33,6 +33,7 @@ main_menu:
     young_prof: "👋 Bé Tiền — Trợ lý tài chính của {name}"
     mass_affluent: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
     hnw: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
+    vip: "👋 Bé Tiền — Trợ lý Tài sản của {name}"
 
   intro:
     starter: "Chào {name}! Mình ở đây cùng bạn — từng bước nhỏ nhé 🌱\nHôm nay muốn bắt đầu từ đâu?"
@@ -42,6 +43,8 @@ main_menu:
     mass_affluent: "Chào {name}! Mình sẵn sàng cùng bạn phân tích và tối ưu nhé.\nHôm nay muốn làm gì?"
 
     hnw: "Chào {name}! Mình luôn ở đây — đồng hành từng bước cùng bạn.\nHôm nay muốn xem mục nào?"
+
+    vip: "Chào {name}! Mình đồng hành cùng bạn quản lý tài sản — kín đáo và sát sao.\nHôm nay muốn xem mục nào?"
 
   buttons:
     - label: "💎 Tài sản"
@@ -98,6 +101,10 @@ submenu_twin:
     hnw: |-
       Financial Twin mô phỏng nhiều kịch bản thị trường cho danh mục hiện tại của bạn.
       Dùng để tham khảo chiến lược, không thay thế tư vấn đầu tư cá nhân.
+
+    vip: |-
+      Financial Twin mô phỏng nhiều kịch bản dài hạn cho danh mục của {name}.
+      Mình ưu tiên góc nhìn bảo toàn tài sản và kế thừa, chỉ để tham khảo chiến lược.
 
   buttons:
     - label: "📈 Lộ trình"
@@ -156,6 +163,11 @@ submenu_assets:
       Tổng quan tài sản và chỉ số hiệu quả của {name}.
 
       Bao gồm tư vấn tối ưu hóa phân bổ.
+
+    vip: |-
+      Tổng quan tài sản, hiệu quả danh mục và phân bổ chiến lược của {name}.
+
+      Mình ưu tiên góc nhìn bảo toàn tài sản và tối ưu dài hạn.
 
   buttons:
     - label: "📈 Báo cáo"
@@ -246,6 +258,11 @@ submenu_expenses:
 
     hnw: |-
       Quản lý chi tiêu lớn và phân tích theo loại.
+
+    vip: |-
+      Quản lý các khoản chi đáng kể và phân tích theo loại.
+
+      Mình giữ báo cáo gọn, kín đáo — chỉ tập trung khoản trọng yếu.
 
   buttons:
     - label: "📊 Báo cáo"
@@ -340,6 +357,10 @@ submenu_cashflow:
       Dòng tiền tháng này của {name}: thu chủ động + thụ động,
       chi tiêu và phần còn lại để điều phối mục tiêu.
 
+    vip: |-
+      Dòng tiền tháng này của {name}: thu chủ động, thụ động và phần
+      điều phối cho các kế hoạch dài hạn.
+
   buttons:
     - label: "📅 Chi tiết"
       callback: "menu:cashflow:monthly_report"
@@ -394,6 +415,10 @@ submenu_goals:
     hnw: |-
       Mục tiêu dài hạn, kế hoạch nghỉ hưu, kế hoạch kế thừa.
 
+    vip: |-
+      Mục tiêu dài hạn của {name}: bảo toàn tài sản, kế hoạch nghỉ hưu
+      và kế hoạch kế thừa cho thế hệ sau.
+
   buttons:
     - label: "📋 Mục tiêu hiện tại"
       callback: "menu:goals:list"
@@ -441,6 +466,11 @@ submenu_market:
 
     hnw: |-
       Phân tích thị trường chuyên sâu và ý tưởng đầu tư.
+
+    vip: |-
+      Phân tích thị trường chuyên sâu và ý tưởng đầu tư cho danh mục lớn.
+
+      Mình ưu tiên góc nhìn bảo toàn và đa dạng hoá tài sản.
 
   buttons:
     - label: "🇻🇳 VN-Index"

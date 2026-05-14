@@ -7,6 +7,7 @@ Epic 2 wires real detection at the call site.
 """
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -15,8 +16,33 @@ import yaml
 
 from backend.wealth.ladder import WealthLevel
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_LEVEL = WealthLevel.YOUNG_PROFESSIONAL.value
 VALID_LEVELS = frozenset(level.value for level in WealthLevel)
+
+
+def _pick_localized(
+    bucket: dict[str, str], band: str, *, context: str
+) -> str:
+    """Return ``bucket[band]`` with a graceful fallback path.
+
+    Order: requested ``band`` → ``DEFAULT_LEVEL`` → first available key.
+    Missing keys are logged once so content drift is visible without
+    breaking the webhook (root cause of issue #635).
+    """
+    if band in bucket:
+        return bucket[band]
+    logger.warning(
+        "menu_copy missing localization for %s at level %r — falling back",
+        context,
+        band,
+    )
+    if DEFAULT_LEVEL in bucket:
+        return bucket[DEFAULT_LEVEL]
+    # Last resort: any value we have. ``known_categories`` and the
+    # YAML schema test guarantee at least one key exists in practice.
+    return next(iter(bucket.values()))
 
 _MENU_COPY_PATH = (
     Path(__file__).resolve().parents[3] / "content" / "menu_copy.yaml"
@@ -55,8 +81,8 @@ def format_main_menu(
     band = _resolve_level(level)
     name = _name_for(user)
 
-    title = config["title"][band].format(name=name)
-    intro = config["intro"][band].format(name=name)
+    title = _pick_localized(config["title"], band, context="main_menu.title").format(name=name)
+    intro = _pick_localized(config["intro"], band, context="main_menu.intro").format(name=name)
     text = f"{title}\n\n{intro}\n\n{config['hint']}"
 
     buttons = config["buttons"]
@@ -89,7 +115,9 @@ def format_submenu(
     band = _resolve_level(level)
     name = _name_for(user)
 
-    intro = config["intro"][band].format(name=name)
+    intro = _pick_localized(
+        config["intro"], band, context=f"{config_key}.intro"
+    ).format(name=name)
     text = f"{config['title']}\n\n{intro}\n\n{config['hint']}"
 
     keyboard: list[list[dict]] = [
