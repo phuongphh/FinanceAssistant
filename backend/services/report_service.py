@@ -143,9 +143,10 @@ def _prev_month_key(month_key: str) -> str:
 # echoing English at the user.
 _LEVEL_LABEL_VI = {
     WealthLevel.STARTER: "Khởi Đầu (<30tr)",
-    WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 200tr)",
-    WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (200tr – 1 tỷ)",
-    WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (>1 tỷ)",
+    WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 300tr)",
+    WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (300tr – 3 tỷ)",
+    WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (3 tỷ – 30 tỷ)",
+    WealthLevel.VIP: "Đỉnh Cao (>30 tỷ)",
 }
 
 # Per-level guidance for the LLM. Keyed on WealthLevel; controls the tone
@@ -186,6 +187,18 @@ _LEVEL_GUIDANCE = {
         "hỏi user có muốn allocate từ tài sản hiện có không.\n"
         "Closing: action-oriented CFO prompt (review allocation, "
         "log passive income, rebalance), KHÔNG 'để mình nhắc cuối tháng'."
+    ),
+    WealthLevel.VIP: (
+        "Tone: Trợ lý Tài sản cấp cao, strategic, ngắn gọn.\n"
+        "Focus: bảo toàn tài sản đa thế hệ, estate planning, "
+        "alternative investments, tax/legal structure, family-office "
+        "mindset, horizon 10+ năm.\n"
+        "TUYỆT ĐỐI tránh: cashflow/budget framing, comment tuyệt đối "
+        "về chi tiêu, tone nhắc nhở. Mục tiêu cá nhân nhỏ (xe, du "
+        "lịch) phải acknowledge là noise — không xếp vào weekly review.\n"
+        "Frame mọi con số theo % portfolio và risk to legacy.\n"
+        "Closing: 1 strategic prompt (rebalance, review trustee/family "
+        "structure, audit alternative allocations)."
     ),
 }
 

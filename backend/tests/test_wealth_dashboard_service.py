@@ -385,9 +385,10 @@ class TestBuildOverview:
 
         types = [b["asset_type"] for b in result["breakdown"]]
         assert types == ["real_estate", "stock", "cash"]
-        # Largest band is HNW → next_milestone goes to next billion.
-        assert result["level"] == "hnw"
-        assert result["next_milestone"]["target"] == 2_000_000_000.0
+        # 50tr + 200tr + 1.5B = 1.75B → Mass Affluent band (300tr – 3B);
+        # next level-up milestone is 3 tỷ → Tinh Hoa.
+        assert result["level"] == "mass_affluent"
+        assert result["next_milestone"]["target"] == 3_000_000_000.0
 
 
 @pytest.mark.asyncio

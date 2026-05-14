@@ -251,20 +251,22 @@ async def test_query_net_worth_handler_shows_true_ytd_for_hnw():
     from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
     from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
 
+    # HNW band starts at 3 tỷ — use 5 tỷ so the handler picks the HNW
+    # style which is the only one that surfaces the YTD line.
     breakdown = MagicMock()
-    breakdown.total = Decimal("1500000000")
+    breakdown.total = Decimal("5000000000")
     breakdown.asset_count = 5
 
     change = MagicMock()
-    change.previous = Decimal("1400000000")
+    change.previous = Decimal("4900000000")
     change.change_absolute = Decimal("100000000")
-    change.change_percentage = 7.14
+    change.change_percentage = 2.04
     change.period_label = "tháng trước"
 
     ytd = NetWorthYtdReturn(
-        current=Decimal("1500000000"),
-        base=Decimal("1200000000"),
-        change_absolute=Decimal("300000000"),
+        current=Decimal("5000000000"),
+        base=Decimal("4000000000"),
+        change_absolute=Decimal("1000000000"),
         change_percentage=25.0,
         period_label="YTD",
     )
@@ -295,7 +297,7 @@ async def test_query_net_worth_handler_shows_true_ytd_for_hnw():
 
     assert "📈 YTD: +25.0%" in response
     ytd_mock.assert_awaited_once_with(
-        ANY, user.id, Decimal("1500000000"), account_created_at=user.created_at
+        ANY, user.id, Decimal("5000000000"), account_created_at=user.created_at
     )
 
 
@@ -304,20 +306,21 @@ async def test_query_net_worth_handler_shows_dash_for_zero_ytd_base():
     from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
     from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
 
+    # HNW user (≥ 3 tỷ) — only HNW style shows the YTD fallback line.
     breakdown = MagicMock()
-    breakdown.total = Decimal("1500000000")
+    breakdown.total = Decimal("5000000000")
     breakdown.asset_count = 5
 
     change = MagicMock()
-    change.previous = Decimal("1400000000")
+    change.previous = Decimal("4900000000")
     change.change_absolute = Decimal("100000000")
-    change.change_percentage = 7.14
+    change.change_percentage = 2.04
     change.period_label = "tháng trước"
 
     ytd = NetWorthYtdReturn(
-        current=Decimal("1500000000"),
+        current=Decimal("5000000000"),
         base=Decimal("0"),
-        change_absolute=Decimal("1500000000"),
+        change_absolute=Decimal("5000000000"),
         change_percentage=None,
         period_label="Từ ngày tham gia",
         is_join_date_fallback=True,

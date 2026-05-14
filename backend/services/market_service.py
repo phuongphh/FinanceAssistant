@@ -367,15 +367,26 @@ _INVEST_LEVEL_GUIDANCE = {
         "cho 'tiền dư để đầu tư' (vô nghĩa với HNW). Frame mọi con "
         "số theo % tổng tài sản. Không khuyên cổ phiếu cụ thể."
     ),
+    WealthLevel.VIP: (
+        "Tone: ngắn gọn, strategic, không jargon thừa.\n"
+        "Focus: bảo toàn tài sản đa thế hệ, estate planning, "
+        "alternative investments (private equity, BĐS lớn, vàng, "
+        "art), tax structure, family-office mindset, horizon 10+ "
+        "năm.\n"
+        "TUYỆT ĐỐI tránh: cashflow analysis, budgeting, hay khuyên "
+        "cổ phiếu/tài sản cụ thể. Frame mọi gợi ý theo % portfolio "
+        "và risk to legacy."
+    ),
 }
 
 
 def _level_label_vi(level: WealthLevel) -> str:
     return {
         WealthLevel.STARTER: "Khởi Đầu (<30tr)",
-        WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 200tr)",
-        WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (200tr – 1 tỷ)",
-        WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (>1 tỷ)",
+        WealthLevel.YOUNG_PROFESSIONAL: "Trẻ Năng Động (30tr – 300tr)",
+        WealthLevel.MASS_AFFLUENT: "Trung Lưu Vững (300tr – 3 tỷ)",
+        WealthLevel.HIGH_NET_WORTH: "Tinh Hoa (3 tỷ – 30 tỷ)",
+        WealthLevel.VIP: "Đỉnh Cao (>30 tỷ)",
     }[level]
 
 

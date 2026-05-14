@@ -1,11 +1,13 @@
 """Wealth-level-aware response adaptation for Phase 3.5 read handlers.
 
-The four bands have very different content needs (CLAUDE.md §0):
+The five bands have very different content needs:
 
-  Starter (<30tr)     — simple, encouraging, no jargon, hide metrics
-  Young Prof (30tr+)  — growth context, suggest investments
-  Mass Affluent (200tr+) — full breakdown, change tracking, allocation %
-  HNW (1B+)           — portfolio analytics, YTD return, advisor-level
+  Starter (<30tr)        — simple, encouraging, no jargon, hide metrics
+  Young Prof (30tr+)     — growth context, suggest investments
+  Mass Affluent (300tr+) — full breakdown, change tracking, allocation %
+  HNW (3 tỷ+)            — portfolio analytics, YTD return, advisor-level
+  Đỉnh Cao (30 tỷ+)      — inherits HNW presentation; tone shifts to
+                            preservation / legacy in copy layer only.
 
 This module gives handlers two cheap primitives:
 
@@ -96,7 +98,9 @@ def style_for_level(level: WealthLevel, net_worth: Decimal) -> LevelStyle:
             encouragement=None,
             growth_hint=None,
         )
-    # HNW
+    # HNW and Đỉnh Cao (VIP) share the most-detailed analytics — they
+    # both want portfolio %, PnL %, YTD return. Persona / copy
+    # differences live in services/prompts, not in presentation flags.
     return LevelStyle(
         level=level,
         net_worth=net_worth,

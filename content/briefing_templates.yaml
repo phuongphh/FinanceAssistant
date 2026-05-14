@@ -170,6 +170,36 @@ hnw:
       • Đa dạng hóa: {div_score}
     placeholder: "📈 Chỉ số hiệu quả danh mục — sắp ra mắt ở Phase 3B."
 
+# Đỉnh Cao (≥ 30 tỷ) — same data shape as HNW. Greeting nhấn vào tôn
+# kính + ngắn gọn; phần phân tích danh mục giữ nguyên format vì user
+# muốn data dày đặc, không cần motivational framing.
+vip:
+  greeting:
+    - "🌅 Kính chào {name}."
+    - "🌅 Chào buổi sáng, {name}."
+
+  net_worth_display:
+    template: |
+      💰 Tổng tài sản: {net_worth}
+      {change_emoji} Biến động: {change} ({pct}%) {period}
+
+      📊 Phân bổ:
+      {breakdown_lines}
+    no_change: |
+      💰 Tổng tài sản: {net_worth}
+      Chưa đổi so với {period}.
+
+      📊 Phân bổ:
+      {breakdown_lines}
+
+  detailed_breakdown:
+    template: |
+      📈 Hiệu quả danh mục:
+      • Lợi nhuận từ đầu năm: {ytd_return}
+      • Mức biến động: {volatility}
+      • Đa dạng hóa: {div_score}
+    placeholder: "📈 Chỉ số hiệu quả danh mục — sắp ra mắt ở Phase 3B."
+
 # ─────────────────────────────────────────────────────────────
 # Common — không phụ thuộc level
 # ─────────────────────────────────────────────────────────────

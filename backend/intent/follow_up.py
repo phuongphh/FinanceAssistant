@@ -172,6 +172,16 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
         FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
     ),
+    # Đỉnh Cao (VIP) gets the same analytics-first surface as HNW —
+    # the persona/copy difference lives in prompts, not in follow-ups.
+    (IntentType.QUERY_ASSETS, WealthLevel.VIP): (
+        FollowUp("📈 YTD return", IntentType.QUERY_PORTFOLIO),
+        FollowUp("💼 Portfolio detail", IntentType.QUERY_PORTFOLIO),
+    ),
+    (IntentType.QUERY_NET_WORTH, WealthLevel.VIP): (
+        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
+    ),
 }
 
 

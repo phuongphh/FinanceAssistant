@@ -262,3 +262,23 @@ wealth_level_down_mass_affluent:
     🏠 Quay lại Phú hộ cũng không sao {name}.
     Tài sản nền tảng vẫn còn — dài hạn vẫn đi lên nếu bạn không hoảng.
     🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+
+wealth_level_up_vip:
+  - |-
+    👑 {name} ơi, chính thức cấp {level_label} — Đỉnh Cao!
+    Ở mốc này, câu hỏi không còn là tăng trưởng mà là truyền thừa, bảo toàn nhiều thế hệ.
+    🎯 Mục tiêu tiếp: {next_target}
+  - |-
+    🏛 Chúc mừng {name} chạm mốc {level_label}!
+    Estate planning, family office, alternative investments — toàn bộ bộ công cụ cao cấp đã mở khoá.
+    🎯 Mục tiêu tiếp: {next_target}
+
+wealth_level_down_hnw:
+  - |-
+    🌊 {name}, tài sản tạm về cấp {level_label}.
+    Ở quy mô lớn, sóng thị trường mạnh hơn — kỷ luật và horizon dài là chìa khoá.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}
+  - |-
+    🏆 Quay lại Tinh Hoa cũng không sao {name}.
+    Nền tảng vẫn còn nguyên — câu chuyện dài hạn của bạn không đổi.
+    🎯 Mục tiêu phục hồi: {next_target} → {next_level_label}

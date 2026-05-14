@@ -79,13 +79,15 @@ class MilestoneType:
     STREAK_100 = "streak_100"
 
     # Wealth-level transitions (#155). No UP_STARTER (users start there)
-    # and no DOWN_HNW (no higher band to descend from).
+    # and no DOWN_VIP (no higher band to descend from).
     WEALTH_LEVEL_UP_YOUNG_PROF = "wealth_level_up_young_prof"
     WEALTH_LEVEL_UP_MASS_AFFLUENT = "wealth_level_up_mass_affluent"
     WEALTH_LEVEL_UP_HNW = "wealth_level_up_hnw"
+    WEALTH_LEVEL_UP_VIP = "wealth_level_up_vip"
     WEALTH_LEVEL_DOWN_STARTER = "wealth_level_down_starter"
     WEALTH_LEVEL_DOWN_YOUNG_PROF = "wealth_level_down_young_prof"
     WEALTH_LEVEL_DOWN_MASS_AFFLUENT = "wealth_level_down_mass_affluent"
+    WEALTH_LEVEL_DOWN_HNW = "wealth_level_down_hnw"
 
     @classmethod
     def all(cls) -> list[str]:

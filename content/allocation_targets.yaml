@@ -47,3 +47,14 @@ levels:
       gold: 0.15
       cash_savings: 0.10
       real_estate_vn: 0.25
+  vip:
+    # Đỉnh Cao: bảo toàn đa thế hệ, lean về real assets + global equities,
+    # cash slim (10%), crypto trimmed to tactical hedge only.
+    name_vn: "Đỉnh Cao"
+    targets:
+      stocks_vn: 0.15
+      stocks_global: 0.25
+      crypto: 0.03
+      gold: 0.17
+      cash_savings: 0.10
+      real_estate_vn: 0.30
