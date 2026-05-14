@@ -21,7 +21,7 @@ from backend.wealth.ladder import WealthLevel
         (WealthLevel.STARTER, Decimal("10_000_000"), False, False, False, False),
         (WealthLevel.YOUNG_PROFESSIONAL, Decimal("100_000_000"), True, True, False, False),
         (WealthLevel.MASS_AFFLUENT, Decimal("500_000_000"), True, True, True, False),
-        (WealthLevel.HIGH_NET_WORTH, Decimal("2_000_000_000"), True, True, True, True),
+        (WealthLevel.HIGH_NET_WORTH, Decimal("5_000_000_000"), True, True, True, True),
     ],
 )
 def test_level_style_progressive_disclosure(
@@ -50,7 +50,7 @@ def test_mass_affluent_and_hnw_get_no_extra_line():
     """They already see analytics — no need to bolt encouragement on."""
     for level, nw in (
         (WealthLevel.MASS_AFFLUENT, Decimal("500_000_000")),
-        (WealthLevel.HIGH_NET_WORTH, Decimal("2_000_000_000")),
+        (WealthLevel.HIGH_NET_WORTH, Decimal("5_000_000_000")),
     ):
         style = style_for_level(level, nw)
         assert style.encouragement is None
@@ -79,7 +79,7 @@ def test_decorate_returns_unchanged_when_no_extra_line():
 async def test_resolve_style_uses_real_net_worth_calculator():
     """Style detection sources net worth from the calculator."""
     breakdown = MagicMock()
-    breakdown.total = Decimal("250_000_000")  # Mass Affluent
+    breakdown.total = Decimal("500_000_000")  # Mass Affluent (300tr – 3 tỷ band)
     user = MagicMock()
     user.id = "u1"
 
@@ -104,7 +104,7 @@ def test_styles_produce_distinct_response_shapes():
         (WealthLevel.STARTER, Decimal("10_000_000")),
         (WealthLevel.YOUNG_PROFESSIONAL, Decimal("100_000_000")),
         (WealthLevel.MASS_AFFLUENT, Decimal("500_000_000")),
-        (WealthLevel.HIGH_NET_WORTH, Decimal("2_000_000_000")),
+        (WealthLevel.HIGH_NET_WORTH, Decimal("5_000_000_000")),
     ]
     samples: dict[WealthLevel, str] = {}
     for level, nw in levels:
