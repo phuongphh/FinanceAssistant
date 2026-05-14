@@ -33,11 +33,10 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
 | #579 | [Epic] Phase 4.2.5 — Epic 7: License Foundation | [issue-579.md](issue-579.md) |
 | #599 | [Story] P4.2.5-6.1: Caddy + HTTPS + CORS + rate limit | [issue-599.md](issue-599.md) |
 | #600 | [Story] P4.2.5-6.2: PII protection layer | [issue-600.md](issue-600.md) |
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
 | #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 35
+**Total active:** 34
