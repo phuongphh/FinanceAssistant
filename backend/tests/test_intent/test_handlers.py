@@ -797,10 +797,13 @@ async def test_query_market_handler_crypto_category_shows_top_crypto_prices():
     ):
         response = await QueryMarketHandler().handle(intent, _user(), _fake_db())
 
-    assert "Giá tiền số" in response
-    assert "BTC" in response
-    assert "ETH" in response
-    assert "+1.25%" in response
+    assert "Giá tiền số phổ biến" in response
+    assert "/" in response.splitlines()[0]
+    btc_line = next(line for line in response.splitlines() if "BTC" in line)
+    eth_line = next(line for line in response.splitlines() if "ETH" in line)
+    assert "24h" not in response
+    assert "+1.25%" in btc_line
+    assert "-0.75%" in eth_line
     assert "Bạn muốn xem giá mã nào" not in response
 
 
