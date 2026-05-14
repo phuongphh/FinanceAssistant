@@ -1,13 +1,45 @@
 import { apiFetch } from './client';
+import { buildAdminDashboardPath, buildStatusChangeBody, buildUsersQueryParams } from '../utils/adminDashboardUtils';
 
 export function getOverview(period) {
-  return apiFetch(`/stats/overview?period=${encodeURIComponent(period)}`);
+  return apiFetch(buildAdminDashboardPath('/stats/overview', { period }));
 }
 
 export function getUserGrowth(days) {
-  return apiFetch(`/charts/user-growth?days=${encodeURIComponent(days)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/user-growth', { days }));
 }
 
 export function getDau(days) {
-  return apiFetch(`/charts/dau?days=${encodeURIComponent(days)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/dau', { days }));
+}
+
+export function getFeatureClicks(days, limit = 10) {
+  return apiFetch(buildAdminDashboardPath('/charts/feature-clicks', { days, limit }));
+}
+
+export function getIntentBreakdown(days) {
+  return apiFetch(buildAdminDashboardPath('/charts/intent-breakdown', { days }));
+}
+
+export function getUserTiers() {
+  return apiFetch('/charts/user-tiers');
+}
+
+export function getCohortRetention(weeks = 8) {
+  return apiFetch(buildAdminDashboardPath('/charts/cohort-retention', { weeks }));
+}
+
+export function getUsers(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/users', buildUsersQueryParams(params)));
+}
+
+export function getUserDetail(userId) {
+  return apiFetch(`/users/${encodeURIComponent(userId)}`);
+}
+
+export function changeUserStatus(userId, status, reason) {
+  return apiFetch(`/users/${encodeURIComponent(userId)}/status`, {
+    method: 'PATCH',
+    body: buildStatusChangeBody(status, reason),
+  });
 }
