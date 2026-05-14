@@ -41,6 +41,34 @@ from backend.services.telegram_service import send_telegram
 
 logger = logging.getLogger(__name__)
 
+# Tunnel hostnames that always serve ngrok's abuse interstitial to any
+# request whose User-Agent starts with ``Mozilla`` (i.e. every Telegram
+# WebView on iOS / Android / Desktop). The interstitial replaces our
+# dashboard HTML with a "Visit Site" warning page that the WebView either
+# renders blank (mobile) or hides below the panel fold — users see a
+# blank Mini App. ngrok-free has NO programmatic bypass: the only
+# escape hatches are the user manually clicking "Visit Site" (sets a
+# per-WebView cookie that doesn't persist across sessions) or upgrading
+# to a paid plan / custom domain. We can't fix this at runtime, but we
+# CAN make the failure mode loud at boot so the next person who points
+# the bot at ngrok-free.dev gets a clear pointer instead of a blank
+# panel mystery.
+_NGROK_FREE_INTERSTITIAL_SUFFIXES = (".ngrok-free.dev", ".ngrok-free.app")
+
+
+def _is_ngrok_free_interstitial_host(base_url: str) -> bool:
+    """Return True if ``base_url`` will trigger ngrok's free-tier abuse
+    interstitial on every Telegram WebView open.
+
+    Hostname check only — ngrok rotates the LHS subdomain on every restart
+    of a free tunnel, so we match on the suffix.
+    """
+    try:
+        host = (urlsplit(base_url).hostname or "").lower()
+    except ValueError:
+        return False
+    return any(host.endswith(suffix) for suffix in _NGROK_FREE_INTERSTITIAL_SUFFIXES)
+
 
 def _bumped_mini_app_url(base: str, build_hash: str) -> str:
     """Return ``{base}/miniapp/wealth?b={build_hash}`` preserving any existing
@@ -74,27 +102,51 @@ async def setup_chat_menu_button(build_hash: str) -> dict | None:
     call OVERRIDES whatever was configured manually. Idempotent: calling it
     twice with identical args is a no-op on Telegram's side.
 
-    Returns ``None`` (and logs once at INFO) when the bot token or
-    ``miniapp_base_url`` aren't configured — dev/CI typically has no public
-    HTTPS URL to advertise, and Telegram rejects ``http://`` URLs on
-    ``web_app``. Errors don't propagate so a transient Telegram 5xx during
-    deploy can't fail the boot — the lifespan hook still wraps in
-    try/except, but skipping cleanly is the more useful default.
+    Returns ``None`` when the bot token or ``miniapp_base_url`` aren't
+    configured — dev/CI typically has no public HTTPS URL to advertise, and
+    Telegram rejects ``http://`` URLs on ``web_app``. Errors don't
+    propagate so a transient Telegram 5xx during deploy can't fail the
+    boot — the lifespan hook still wraps in try/except, but skipping
+    cleanly is the more useful default.
+
+    Failure surfacing: every outcome is logged at WARNING or higher so it
+    reaches the launchd-captured stderr log (root logger has no INFO
+    handler by default, hence using WARNING for the "we acted but
+    something is off" cases). Previously a Telegram 4xx response made
+    ``send_telegram`` return ``None`` and this function returned silently
+    — operators had no signal that the menu URL was stale until they
+    tapped the button and saw a blank panel.
     """
     settings = get_settings()
 
     if not settings.telegram_bot_token:
-        logger.info(
+        logger.warning(
             "Skipping chat menu button setup: TELEGRAM_BOT_TOKEN not configured"
         )
         return None
 
     if not settings.miniapp_base_url:
-        logger.info(
+        logger.warning(
             "Skipping chat menu button setup: MINIAPP_BASE_URL not configured "
             "(dev/CI without public HTTPS); BotFather's manual config still applies"
         )
         return None
+
+    if _is_ngrok_free_interstitial_host(settings.miniapp_base_url):
+        # The button URL is still set so devs can poke at the panel
+        # manually after clicking through the interstitial, but anyone
+        # opening this from a Telegram chat will see a blank screen.
+        logger.warning(
+            "MINIAPP_BASE_URL=%s points at an ngrok-free tunnel — Telegram "
+            "WebView will be blocked by ngrok's abuse interstitial "
+            "(ERR_NGROK_6024), users see a BLANK MINI APP on chat menu "
+            "button tap. Switch to a Cloudflare named tunnel (see "
+            "scripts/tunnel-named-setup.sh) or upgrade to a paid ngrok "
+            "plan with a custom domain. Inline-keyboard 'Mở dashboard' "
+            "buttons hit the same wall — they only appear to work because "
+            "Telegram caches the bypass cookie from a prior manual click.",
+            settings.miniapp_base_url,
+        )
 
     url = _bumped_mini_app_url(settings.miniapp_base_url, build_hash)
     payload = {
@@ -105,10 +157,26 @@ async def setup_chat_menu_button(build_hash: str) -> dict | None:
         }
     }
     result = await send_telegram("setChatMenuButton", payload)
-    if result is not None:
-        logger.info(
-            "Chat menu button synced: text=%r url=%s",
+    if result is None:
+        # ``send_telegram`` already logged the HTTP status + body at ERROR,
+        # but the context that would have made it actionable (which call,
+        # what URL, what label) lived only in this caller's locals — so we
+        # re-log it here. The bot keeps running with whatever menu button
+        # BotFather has on file, which may be stale or even un-set.
+        logger.error(
+            "Chat menu button sync FAILED — Telegram rejected setChatMenuButton "
+            "(text=%r url=%s). Users keep the previously-registered button URL "
+            "until the next successful boot. Check the preceding "
+            "'Telegram API error' line for the response body; common causes: "
+            "URL not HTTPS, host not publicly reachable, or BUTTON_URL_INVALID "
+            "from a malformed tunnel hostname.",
             settings.miniapp_menu_label,
             url,
         )
+        return None
+    logger.warning(
+        "Chat menu button synced: text=%r url=%s",
+        settings.miniapp_menu_label,
+        url,
+    )
     return result
