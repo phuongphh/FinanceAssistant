@@ -48,3 +48,6 @@ launchd/*.plist
 .cloudflared/config.yml
 # Keep template and hostname hint
 !.cloudflared/config.yml.template
+
+# Node
+node_modules/
