@@ -475,9 +475,10 @@ class TestDesktopLiveProbe:
         assert "viewportChanged" in body
 
     def test_bootstrap_reload_uses_canonical_b_param(self):
-        """On mismatch the probe sets ``?b=`` (not the legacy ``?_b=``) so
-        the server-side stale-build redirect doesn't fire a second hop
-        after the JS reload."""
+        """On mismatch the probe sets ``?b=`` so the reloaded URL matches
+        the canonical cache-bust convention used by ``wealth_dashboard_url``
+        and the chat-menu-button helper — keeping a single ``?b=<hash>``
+        URL key per build across every entry point."""
         body = self._fetch_dashboard().text
         assert "searchParams.set('b'," in body
 
@@ -489,32 +490,38 @@ class TestDesktopLiveProbe:
 
 
 class TestBuildHashRedirect:
-    """Stale or missing ``?b=`` on dashboard URLs 302s to the current hash.
+    """Dashboard pages must always serve 200 OK with the freshly-rendered
+    HTML — never a 3xx — because Telegram Mini App WebViews do not follow
+    HTTP redirects automatically (issue #608: 302 → blank panel).
 
-    This is the second half of the cache-bust strategy: ``wealth_dashboard_url``
-    emits new URLs with the current hash for every future click, and this
-    redirect catches old inline buttons still in users' chat history so the
-    server-hit path also lands on a fresh URL Telegram hasn't cached.
+    Cache busting is owned by the JS bootstrap inside the HTML (localStorage
+    drift check + ``/miniapp/api/version`` live probe), so a stale or
+    missing ``?b=`` on the request URL still lands the user on a fresh
+    dashboard. ``wealth_dashboard_url`` continues to emit ``?b=<hash>`` on
+    every freshly-rendered button so each deploy gets a never-before-seen
+    URL that Telegram treats as uncached.
     """
 
-    def test_missing_b_redirects_to_current_hash(self):
+    def test_missing_b_serves_html_directly(self):
+        """No ``?b=`` arrives → server still responds 200 with the current
+        HTML (which bakes the current build hash into the bootstrap)."""
         resp = client.get("/miniapp/wealth", follow_redirects=False)
-        assert resp.status_code == 302
-        location = resp.headers["location"]
-        assert location.startswith("/miniapp/wealth?")
-        assert f"b={miniapp_routes._STATIC_VERSION}" in location
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        # Fresh HTML must contain the current build hash so the bootstrap's
+        # probe + localStorage check both see the canonical value.
+        assert f"'{miniapp_routes._STATIC_VERSION}'" in resp.text
 
-    def test_stale_b_redirects_and_preserves_source(self):
+    def test_stale_b_serves_html_directly(self):
+        """An old inline button still in chat history (``?b=oldhash``) must
+        load — Telegram cannot follow a redirect to the fresh hash, so we
+        serve the page directly and let the JS bootstrap reconcile."""
         resp = client.get(
             "/miniapp/wealth?b=oldhash&source=briefing", follow_redirects=False
         )
-        assert resp.status_code == 302
-        location = resp.headers["location"]
-        assert f"b={miniapp_routes._STATIC_VERSION}" in location
-        assert "source=briefing" in location, (
-            "Source attribution must survive the redirect so analytics "
-            "still distinguish briefing vs. /dashboard funnels"
-        )
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        assert f"'{miniapp_routes._STATIC_VERSION}'" in resp.text
 
     def test_current_b_serves_html_directly(self):
         resp = client.get(
@@ -524,15 +531,20 @@ class TestBuildHashRedirect:
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
 
-    def test_twin_page_also_protected(self):
+    def test_twin_page_serves_html_without_redirect(self):
         resp = client.get("/miniapp/twin", follow_redirects=False)
-        assert resp.status_code == 302
-        assert f"b={miniapp_routes._STATIC_VERSION}" in resp.headers["location"]
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
 
-    def test_cashflow_page_also_protected(self):
+    def test_cashflow_page_serves_html_without_redirect(self):
         resp = client.get("/miniapp/cashflow", follow_redirects=False)
-        assert resp.status_code == 302
-        assert f"b={miniapp_routes._STATIC_VERSION}" in resp.headers["location"]
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+
+    def test_expense_page_serves_html_without_redirect(self):
+        resp = client.get("/miniapp/expense", follow_redirects=False)
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
 
     def test_html_template_change_bumps_static_version(self, tmp_path, monkeypatch):
         """Without HTML in the hash, an HTML-only edit (sort buttons, copy,
