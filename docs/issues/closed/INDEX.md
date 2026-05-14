@@ -331,9 +331,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #585 | Pre-Phase | [Story] P4.2.5-2.2: User growth & DAU chart endpoints | [pre-phase/issue-585.md](by-phase/pre-phase/issue-585.md) |
 | #586 | Pre-Phase | [Story] P4.2.5-2.3: Feature events tracking + clicks endpoint | [pre-phase/issue-586.md](by-phase/pre-phase/issue-586.md) |
 | #587 | Pre-Phase | [Story] P4.2.5-2.4: Intent breakdown + tier distribution endpoints | [pre-phase/issue-587.md](by-phase/pre-phase/issue-587.md) |
+| #588 | Pre-Phase | [Story] P4.2.5-2.5: Cohort retention endpoint | [pre-phase/issue-588.md](by-phase/pre-phase/issue-588.md) |
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 
-**Total:** 330 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 313 Pre-Phase)
+**Total:** 331 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 314 Pre-Phase)
