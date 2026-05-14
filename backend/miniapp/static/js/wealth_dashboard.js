@@ -2,8 +2,9 @@
 //
 // Loads /miniapp/api/wealth/overview, renders hero net-worth card,
 // doughnut breakdown, line trend (with period selector), milestone
-// progress (Starter only), and asset list. Confetti fires when a user
-// crosses a wealth-level threshold between session loads.
+// progress (every wealth level — level-up milestones at band edges and
+// sub-milestones inside a band), and asset list. Confetti fires when a
+// user crosses a wealth-level threshold between session loads.
 (function () {
     'use strict';
 
@@ -339,14 +340,12 @@
         }
     }
 
-    // -- Milestone (Starter only) -----------------------------------------
+    // -- Milestone --------------------------------------------------------
 
     function renderMilestone(data) {
         const level = data.level;
         const milestone = data.next_milestone;
-        // Only show for Starter — higher levels see the same data via the
-        // hero card and don't need motivational framing.
-        if (level !== 'starter' || !milestone || milestone.target <= 0) {
+        if (!milestone || milestone.target <= 0) {
             els.milestoneSection.hidden = true;
             return;
         }
@@ -364,9 +363,14 @@
         const remaining = milestone.remaining || 0;
         if (remaining <= 0) {
             els.milestoneCheer.textContent = '🎉 Bạn đã chạm mốc — chuẩn bị lên cấp!';
-        } else {
+        } else if (milestone.target_level && milestone.target_level !== level) {
             els.milestoneCheer.textContent =
                 `Còn ${formatMoneyShort(remaining)} nữa để đạt ${milestone.target_label || 'mốc tiếp theo'}!`;
+        } else {
+            // Sub-milestone inside the current band — don't claim the user
+            // is climbing toward their current level's label.
+            els.milestoneCheer.textContent =
+                `Còn ${formatMoneyShort(remaining)} nữa để cán mốc ${formatMoneyShort(milestone.target)}!`;
         }
     }
 
