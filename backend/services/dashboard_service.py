@@ -35,12 +35,27 @@ def current_month_key(today: date | None = None) -> str:
     return (today or date.today()).strftime("%Y-%m")
 
 
+# Key into ``AsyncSession.info`` for the per-session telegram_id → User
+# cache. The worker opens one session per Telegram update, so this gives
+# us a request-scoped cache that's discarded on session close — no
+# cross-request leakage, no manual invalidation. SQLAlchemy's identity
+# map only dedups primary-key lookups, so without this each repeated
+# ``get_user_by_telegram_id`` call (telegram_worker hits it 3-4× per
+# callback) issued a fresh wide SELECT.
+_USER_BY_TELEGRAM_ID_CACHE_KEY = "_user_by_telegram_id_cache"
+
+
 async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User | None:
+    cache = db.info.setdefault(_USER_BY_TELEGRAM_ID_CACHE_KEY, {})
+    if telegram_id in cache:
+        return cache[telegram_id]
     stmt = select(User).where(
         User.telegram_id == telegram_id,
         User.deleted_at.is_(None),
     )
-    return (await db.execute(stmt)).scalar_one_or_none()
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    cache[telegram_id] = user
+    return user
 
 
 async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
@@ -80,6 +95,9 @@ async def get_or_create_user(
     # flush() populates user.id from the DB default without ending the tx.
     await db.flush()
     await db.refresh(user)
+    # Seed the request-scoped cache so subsequent lookups in this session
+    # (e.g. the worker stamping user_id on telegram_updates) skip the DB.
+    db.info.setdefault(_USER_BY_TELEGRAM_ID_CACHE_KEY, {})[telegram_id] = user
     return user, True
 
 
