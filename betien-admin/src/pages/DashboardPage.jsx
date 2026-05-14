@@ -49,6 +49,25 @@ import {
   getUserTiers,
 } from '../api/adminDashboard';
 import { DateRangeProvider, useDateRange } from '../context/DateRangeContext';
+import {
+  buildUsersQueryParams,
+  formatDate,
+  formatNumber,
+  formatTier,
+  formatValue,
+  formatVnd,
+  getFeatureBarWidthPct,
+  getRetentionCellPresentation,
+  latestDauWindow,
+  pieColors,
+  shortId,
+  sortOptions,
+  statusClasses,
+  statusLabel,
+  statusOptions,
+  tierOptions,
+  toDatedChartData,
+} from '../utils/adminDashboardUtils';
 
 const metricCards = [
   { key: 'total_users', label: 'Total users', icon: Users, format: 'number', delta: 'total_users_delta_pct', accent: 'bg-gold' },
@@ -64,40 +83,6 @@ const metricCards = [
   { key: 'briefing_open_rate_pct', label: 'Briefing open', icon: Eye, format: 'percent', accent: 'bg-sage' },
   { key: 'error_rate_pct', label: 'Error rate', icon: ShieldAlert, format: 'percent', inverseDelta: true, accent: 'bg-burgundy' },
 ];
-
-const tierOptions = [
-  { value: '', label: 'All tiers' },
-  { value: 'starter', label: 'Starter' },
-  { value: 'young_pro', label: 'Young Pro' },
-  { value: 'mass_affluent', label: 'Mass Affluent' },
-  { value: 'hnw', label: 'HNW' },
-];
-
-const statusOptions = [
-  { value: '', label: 'All status' },
-  { value: 'active', label: 'Active' },
-  { value: 'at_risk', label: 'At risk' },
-  { value: 'dormant', label: 'Dormant' },
-  { value: 'new', label: 'New' },
-  { value: 'suspended', label: 'Suspended' },
-];
-
-const sortOptions = [
-  { value: 'last_active_desc', label: 'Last active' },
-  { value: 'cost_desc', label: 'LLM cost' },
-  { value: 'joined_desc', label: 'Joined' },
-  { value: 'messages_desc', label: 'Messages' },
-];
-
-const statusClasses = {
-  active: 'bg-sage/10 text-sage border-sage/20',
-  at_risk: 'bg-orange/10 text-orange border-orange/20',
-  dormant: 'bg-ink-100 text-ink-500 border-ink-100',
-  new: 'bg-gold-50 text-gold border-gold/20',
-  suspended: 'bg-burgundy/10 text-burgundy border-burgundy/20',
-};
-
-const pieColors = ['#B8945A', '#5A7A4F', '#C97B4A', '#8B2635', '#0A2540'];
 
 export default function DashboardPage() {
   return (
@@ -164,7 +149,7 @@ function DashboardContent() {
         <KPIGrid loading={loading} metrics={overview?.metrics || {}} />
         <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <UserGrowthChart loading={loading} growth={growth} />
-          <DAUChart loading={loading} dau={dau.slice(-14)} />
+          <DAUChart loading={loading} dau={latestDauWindow(dau)} />
         </section>
         <section className="grid gap-6 xl:grid-cols-3">
           <FeatureClicksChart loading={loading} data={featureClicks} />
@@ -226,7 +211,7 @@ function KPICard({ card, metrics }) {
 }
 
 function UserGrowthChart({ loading, growth }) {
-  const data = useMemo(() => growth.map((item) => ({ ...item, label: String(item.date).slice(5) })), [growth]);
+  const data = useMemo(() => toDatedChartData(growth), [growth]);
   return (
     <MetricShell eyebrow="Growth" title="User growth">
       <p className="-mt-2 mb-4 text-xs text-ink-500">Cumulative users and new signups over the selected period.</p>
@@ -253,7 +238,7 @@ function UserGrowthChart({ loading, growth }) {
 }
 
 function DAUChart({ loading, dau }) {
-  const data = useMemo(() => dau.map((item) => ({ ...item, label: String(item.date).slice(5) })), [dau]);
+  const data = useMemo(() => toDatedChartData(dau), [dau]);
   return (
     <MetricShell eyebrow="Engagement" title="DAU">
       <p className="-mt-2 mb-4 text-xs text-ink-500">Daily active users for the latest 14 days.</p>
@@ -286,7 +271,7 @@ function FeatureClicksChart({ loading, data }) {
               <span className="font-mono text-ink-500">{formatNumber(item.clicks)}</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-gold-50">
-              <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max((item.clicks / maxClicks) * 100, 4)}%` }} />
+              <div className="h-full rounded-full bg-gold" style={{ width: getFeatureBarWidthPct(item.clicks, maxClicks) }} />
             </div>
           </div>
         ))}
@@ -374,12 +359,11 @@ function CohortRetentionTable({ loading, cohorts }) {
 }
 
 function RetentionCell({ value }) {
-  if (value === null || value === undefined) return <td className="rounded-xl bg-paper px-3 py-3" />;
-  const opacity = Math.max(Number(value) / 100, 0.12);
-  const textColor = Number(value) >= 55 ? 'text-white' : 'text-ink-900';
+  const presentation = getRetentionCellPresentation(value);
+  if (!presentation) return <td className="rounded-xl bg-paper px-3 py-3" />;
   return (
-    <td className={`rounded-xl px-3 py-3 text-center font-mono text-xs font-semibold ${textColor}`} style={{ backgroundColor: `rgba(184, 148, 90, ${opacity})` }}>
-      {value}%
+    <td className={`rounded-xl px-3 py-3 text-center font-mono text-xs font-semibold ${presentation.className}`} style={presentation.style}>
+      {presentation.text}
     </td>
   );
 }
@@ -412,7 +396,7 @@ function UserDirectory({ refreshNonce }) {
       setLoading(true);
       setError('');
       try {
-        const nextPayload = await getUsers({ search, tier, status, sort, limit, offset: page * limit });
+        const nextPayload = await getUsers(buildUsersQueryParams({ search, tier, status, sort, limit, offset: page * limit }));
         if (alive) setPayload(nextPayload);
       } catch (err) {
         if (alive) setError(err.message || 'Không tải được user directory.');
@@ -713,38 +697,4 @@ function EmptyState({ message, className = 'h-32' }) {
 
 function SkeletonRows() {
   return <div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-7 animate-pulse rounded-full bg-ink-100" />)}</div>;
-}
-
-function formatValue(value, format) {
-  if (value === undefined || value === null) return '—';
-  const safe = Number(value || 0);
-  if (format === 'percent') return `${safe.toFixed(1)}%`;
-  if (format === 'usd') return `$${safe.toFixed(2)}`;
-  return formatNumber(safe);
-}
-
-function formatNumber(value) {
-  return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(new Date(value));
-}
-
-function formatVnd(value) {
-  return `${formatNumber(value)}₫`;
-}
-
-function shortId(value) {
-  return value ? `${value.slice(0, 8)}…${value.slice(-4)}` : '—';
-}
-
-function formatTier(value) {
-  return tierOptions.find((item) => item.value === value)?.label || value || '—';
-}
-
-function statusLabel(value) {
-  if (value === 'at_risk') return 'At risk';
-  return value ? value.charAt(0).toUpperCase() + value.slice(1) : '—';
 }

@@ -1,23 +1,24 @@
 import { apiFetch } from './client';
+import { buildAdminDashboardPath, buildStatusChangeBody, buildUsersQueryParams } from '../utils/adminDashboardUtils';
 
 export function getOverview(period) {
-  return apiFetch(`/stats/overview?period=${encodeURIComponent(period)}`);
+  return apiFetch(buildAdminDashboardPath('/stats/overview', { period }));
 }
 
 export function getUserGrowth(days) {
-  return apiFetch(`/charts/user-growth?days=${encodeURIComponent(days)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/user-growth', { days }));
 }
 
 export function getDau(days) {
-  return apiFetch(`/charts/dau?days=${encodeURIComponent(days)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/dau', { days }));
 }
 
 export function getFeatureClicks(days, limit = 10) {
-  return apiFetch(`/charts/feature-clicks?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/feature-clicks', { days, limit }));
 }
 
 export function getIntentBreakdown(days) {
-  return apiFetch(`/charts/intent-breakdown?days=${encodeURIComponent(days)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/intent-breakdown', { days }));
 }
 
 export function getUserTiers() {
@@ -25,17 +26,11 @@ export function getUserTiers() {
 }
 
 export function getCohortRetention(weeks = 8) {
-  return apiFetch(`/charts/cohort-retention?weeks=${encodeURIComponent(weeks)}`);
+  return apiFetch(buildAdminDashboardPath('/charts/cohort-retention', { weeks }));
 }
 
 export function getUsers(params = {}) {
-  const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.set(key, String(value));
-    }
-  });
-  return apiFetch(`/users?${searchParams.toString()}`);
+  return apiFetch(buildAdminDashboardPath('/users', buildUsersQueryParams(params)));
 }
 
 export function getUserDetail(userId) {
@@ -45,6 +40,6 @@ export function getUserDetail(userId) {
 export function changeUserStatus(userId, status, reason) {
   return apiFetch(`/users/${encodeURIComponent(userId)}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status, reason }),
+    body: buildStatusChangeBody(status, reason),
   });
 }
