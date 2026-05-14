@@ -150,6 +150,7 @@ def track(
     written synchronously via a fresh session; failures are swallowed.
     """
     clean_props = sanitize_properties(properties)
+    _mirror_feature_event(event_type, user_id, clean_props)
     event = Event_(
         event_type=event_type,
         user_id=user_id,
@@ -178,12 +179,33 @@ async def atrack(
 ) -> None:
     """Async variant — await this if the caller needs ordering guarantees."""
     clean_props = sanitize_properties(properties)
+    _mirror_feature_event(event_type, user_id, clean_props)
     event = Event_(
         event_type=event_type,
         user_id=user_id,
         properties=clean_props,
     )
     await _persist(event)
+
+
+def _mirror_feature_event(
+    event_type: str,
+    user_id: uuid.UUID | None,
+    properties: dict[str, Any],
+) -> None:
+    """Best-effort bridge from legacy analytics events to feature-click stream."""
+    try:
+        from backend.services.feature_events import feature_key_for_event, record_feature_event
+
+        feature_key = feature_key_for_event(event_type, properties)
+        if feature_key:
+            record_feature_event(
+                feature_key,
+                user_id=user_id,
+                metadata={"source_event_type": event_type, **properties},
+            )
+    except Exception:
+        logger.debug("analytics: feature event mirror failed for %s", event_type, exc_info=True)
 
 
 async def _persist(event: Event_) -> None:

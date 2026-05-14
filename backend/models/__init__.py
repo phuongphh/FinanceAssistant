@@ -10,6 +10,7 @@ from backend.models.llm_cache import LLMCache
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.income_record import IncomeRecord
 from backend.models.event import Event
+from backend.models.feature_event import FeatureEvent
 from backend.models.user_milestone import MilestoneType, UserMilestone
 from backend.models.streak import UserStreak
 from backend.models.telegram_update import (
@@ -83,6 +84,7 @@ __all__ = [
     "PortfolioAsset",
     "IncomeRecord",
     "Event",
+    "FeatureEvent",
     "UserMilestone",
     "MilestoneType",
     "UserStreak",
