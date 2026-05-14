@@ -1,5 +1,7 @@
 # Phase 3.8.5 — VN-native wealth levels for user profile.
 # Boundaries: inclusive lower bound, exclusive upper bound.
+# Bands re-scaled to fit Vietnam mass-affluent reality (2026 revision):
+# YP up to 300tr, MA to 3 tỷ, HNW to 30 tỷ, plus a new Đỉnh Cao tier ≥30 tỷ.
 levels:
   - id: starter
     name_vn: "Khởi Đầu"
@@ -13,19 +15,26 @@ levels:
     name_en: "Young Professional"
     icon: "🚀"
     net_worth_min: 30000000
-    net_worth_max: 200000000
+    net_worth_max: 300000000
     description: "Đã có đà tích luỹ và bắt đầu mở rộng danh mục."
   - id: mass_affluent
     name_vn: "Trung Lưu Vững"
     name_en: "Mass Affluent"
     icon: "💎"
-    net_worth_min: 200000000
-    net_worth_max: 1000000000
+    net_worth_min: 300000000
+    net_worth_max: 3000000000
     description: "Nền tảng tài sản vững, phù hợp tối ưu hoá dài hạn."
   - id: hnw
     name_vn: "Tinh Hoa"
     name_en: "High Net Worth"
     icon: "🏆"
-    net_worth_min: 1000000000
-    net_worth_max: null
+    net_worth_min: 3000000000
+    net_worth_max: 30000000000
     description: "Tài sản lớn, ưu tiên bảo toàn và tăng trưởng bền vững."
+  - id: vip
+    name_vn: "Đỉnh Cao"
+    name_en: "Ultra High Net Worth"
+    icon: "👑"
+    net_worth_min: 30000000000
+    net_worth_max: null
+    description: "Tài sản đa thế hệ, ưu tiên truyền thừa và bảo toàn dài hạn."

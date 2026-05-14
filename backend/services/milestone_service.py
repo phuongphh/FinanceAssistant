@@ -238,17 +238,19 @@ async def _check_streak_milestones(
 
 
 # Mapping: each non-Starter level has its own UP milestone code; each
-# non-HNW level has its own DOWN milestone code. Lookup tables keep
+# non-VIP level has its own DOWN milestone code. Lookup tables keep
 # `_check_wealth_level_changes` linear and obvious.
 _UP_MILESTONE_BY_LEVEL: dict[ladder.WealthLevel, str] = {
     ladder.WealthLevel.YOUNG_PROFESSIONAL: MilestoneType.WEALTH_LEVEL_UP_YOUNG_PROF,
     ladder.WealthLevel.MASS_AFFLUENT: MilestoneType.WEALTH_LEVEL_UP_MASS_AFFLUENT,
     ladder.WealthLevel.HIGH_NET_WORTH: MilestoneType.WEALTH_LEVEL_UP_HNW,
+    ladder.WealthLevel.VIP: MilestoneType.WEALTH_LEVEL_UP_VIP,
 }
 _DOWN_MILESTONE_BY_LEVEL: dict[ladder.WealthLevel, str] = {
     ladder.WealthLevel.STARTER: MilestoneType.WEALTH_LEVEL_DOWN_STARTER,
     ladder.WealthLevel.YOUNG_PROFESSIONAL: MilestoneType.WEALTH_LEVEL_DOWN_YOUNG_PROF,
     ladder.WealthLevel.MASS_AFFLUENT: MilestoneType.WEALTH_LEVEL_DOWN_MASS_AFFLUENT,
+    ladder.WealthLevel.HIGH_NET_WORTH: MilestoneType.WEALTH_LEVEL_DOWN_HNW,
 }
 
 

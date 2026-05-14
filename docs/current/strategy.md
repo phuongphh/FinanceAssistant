@@ -88,12 +88,13 @@ Visual avatar/dashboard show financial future based on current trajectory. Updat
 
 ## 👥 Target User — Refined
 
-Vẫn 4-level ladder, nhưng **focus chính: Level 1-2 (Young Pro + Mass Affluent)**:
+5-level ladder (2026 rescale), **focus chính: Level 1-2 (Young Pro + Mass Affluent)**:
 
 - **Level 0 (Starter, 0-30tr):** Free tier, low priority for marketing
-- **Level 1 (Young Pro, 30-200tr):** Pro target, biggest growth segment
-- **Level 2 (Mass Affluent, 200tr-1 tỷ):** CFO target, highest LTV
-- **Level 3 (HNW, 1 tỷ+):** CFO target, white-glove acquisition
+- **Level 1 (Young Pro, 30-300tr):** Pro target, biggest growth segment
+- **Level 2 (Mass Affluent, 300tr-3 tỷ):** Trợ lý Tài sản target, highest LTV
+- **Level 3 (HNW, 3 tỷ - 30 tỷ):** Trợ lý Tài sản target, white-glove acquisition
+- **Level 4 (Đỉnh Cao, 30 tỷ+):** Multi-generational, family-office mindset, preservation-first
 
 Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin show "trajectory đẹp" có ý nghĩa.
 
@@ -182,11 +183,12 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 2. **User Profile Minimal (auto-derived):**
    - Profile view với auto-derived stats (account age, wealth level VN, asset diversity, tracking streak)
    - Editable: display name, age range (optional), notification prefs
-   - **Wealth Level mapping (Vietnamese):**
-     - Khởi Đầu (0-30tr)
-     - Trẻ Năng Động (30-200tr)
-     - Trung Lưu Vững (200tr-1 tỷ)
-     - Tinh Hoa (1 tỷ+)
+   - **Wealth Level mapping (Vietnamese, 2026 rescale):**
+     - Khởi Đầu (0-30tr) 🌱
+     - Trẻ Năng Động (30-300tr) 🚀
+     - Trung Lưu Vững (300tr-3 tỷ) 💎
+     - Tinh Hoa (3 tỷ - 30 tỷ) 🏆
+     - Đỉnh Cao (30 tỷ+) 👑
 
 **Out of scope (deferred):**
 - ❌ Wealth Badge → Phase 4.5 (sau Twin để có context richer)

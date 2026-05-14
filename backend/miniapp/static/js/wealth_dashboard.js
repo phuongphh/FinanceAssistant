@@ -62,8 +62,9 @@
         young_prof: 'Trẻ Năng Động',
         mass_affluent: 'Trung Lưu Vững',
         hnw: 'Tinh Hoa',
+        vip: 'Đỉnh Cao',
     };
-    const LEVEL_RANK = ['starter', 'young_prof', 'mass_affluent', 'hnw'];
+    const LEVEL_RANK = ['starter', 'young_prof', 'mass_affluent', 'hnw', 'vip'];
     const LAST_LEVEL_KEY = 'wealth.last_level';
 
     els.retryBtn.addEventListener('click', renderDashboard);

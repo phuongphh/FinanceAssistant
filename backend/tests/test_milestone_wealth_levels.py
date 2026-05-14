@@ -145,8 +145,9 @@ class TestCheckWealthLevelChanges:
         assert out[0].extra["new_level"] == "starter"
 
     async def test_down_from_hnw_fires_down_mass_affluent(self):
-        """No DOWN_HNW exists by design — descending from HNW lands as
-        a DOWN milestone for the level the user is *now* in."""
+        """Descending from HNW lands as a DOWN milestone for the level
+        the user is *now* in — the helper keys on current level, not
+        the level they fell from."""
         user = _fake_user()
         db = MagicMock()
         db.get = AsyncMock(return_value=user)
@@ -306,18 +307,20 @@ class TestLadderLabels:
             ladder.format_level(ladder.WealthLevel.HIGH_NET_WORTH, "short")
             == "Tinh Hoa"
         )
+        assert ladder.format_level(ladder.WealthLevel.VIP, "short") == "Đỉnh Cao"
 
     def test_full_labels(self):
         assert ladder.format_level(ladder.WealthLevel.STARTER, "full") == "Khởi Đầu"
         assert (
             ladder.format_level(ladder.WealthLevel.HIGH_NET_WORTH, "full") == "Tinh Hoa"
         )
+        assert ladder.format_level(ladder.WealthLevel.VIP, "full") == "Đỉnh Cao"
 
     def test_level_order_monotonic(self):
         """Sanity-check that LEVEL_ORDER matches the band thresholds —
         if someone reorders the enum without updating LEVEL_ORDER, the
         index() lookups in _check_wealth_level_changes silently break."""
         assert ladder.LEVEL_ORDER[0] == ladder.WealthLevel.STARTER
-        assert ladder.LEVEL_ORDER[-1] == ladder.WealthLevel.HIGH_NET_WORTH
+        assert ladder.LEVEL_ORDER[-1] == ladder.WealthLevel.VIP
         for i, level in enumerate(ladder.LEVEL_ORDER):
             assert ladder.LEVEL_ORDER.index(level) == i

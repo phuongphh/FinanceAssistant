@@ -263,6 +263,7 @@ def _level_to_vi(level: str) -> str:
         "young_prof": "Trẻ Năng Động",
         "mass_affluent": "Trung Lưu Vững",
         "hnw": "Tinh Hoa",
+        "vip": "Đỉnh Cao",
     }.get(level, level)
 
 

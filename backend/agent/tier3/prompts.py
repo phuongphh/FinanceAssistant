@@ -54,6 +54,14 @@ _LEVEL_FOCUS = {
         "TUYỆT ĐỐI tránh dùng monthly_income − expenses làm proxy "
         "cho 'tiền dư đầu tư'."
     ),
+    WealthLevel.VIP: (
+        "User Đỉnh Cao (≥30 tỷ). Focus bảo toàn tài sản đa thế hệ, "
+        "estate planning, alternative investments (private equity, "
+        "BĐS lớn, vàng, art), tax/legal structure, horizon 10+ năm. "
+        "Tone ngắn gọn, strategic, không jargon thừa. TUYỆT ĐỐI tránh "
+        "cashflow/budget analysis — vô nghĩa ở level này. Frame mọi "
+        "advice theo % portfolio và risk to legacy."
+    ),
 }
 
 

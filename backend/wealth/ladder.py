@@ -1,11 +1,12 @@
 """Wealth-level detection — drives ladder-aware UI / messaging.
 
-Four bands from CLAUDE.md § 0:
+Five bands (2026 revision — bands rescaled to fit VN mass-affluent reality):
 
-    Starter            : 0 – 30tr
-    Young Professional : 30tr – 200tr
-    Mass Affluent      : 200tr – 1 tỷ
-    High Net Worth     : 1 tỷ+
+    Starter            : 0      – 30tr
+    Young Professional : 30tr   – 300tr
+    Mass Affluent      : 300tr  – 3 tỷ
+    High Net Worth     : 3 tỷ   – 30 tỷ
+    Đỉnh Cao (VIP)     : 30 tỷ+
 
 Boundaries are inclusive on the lower bound, exclusive on the upper —
 so 30tr exactly is Young Professional, not Starter.
@@ -31,6 +32,7 @@ class WealthLevel(str, Enum):
     YOUNG_PROFESSIONAL = "young_prof"
     MASS_AFFLUENT = "mass_affluent"
     HIGH_NET_WORTH = "hnw"
+    VIP = "vip"
 
 
 _WEALTH_LEVELS_PATH = (
@@ -41,6 +43,7 @@ _LEVEL_ID_BY_ENUM = {
     WealthLevel.YOUNG_PROFESSIONAL: "young_prof",
     WealthLevel.MASS_AFFLUENT: "mass_affluent",
     WealthLevel.HIGH_NET_WORTH: "hnw",
+    WealthLevel.VIP: "vip",
 }
 
 
@@ -61,6 +64,7 @@ def wealth_level_meta(level: WealthLevel | str) -> dict[str, Any]:
         WealthLevel.YOUNG_PROFESSIONAL: ("Trẻ Năng Động", "🚀"),
         WealthLevel.MASS_AFFLUENT: ("Trung Lưu Vững", "💎"),
         WealthLevel.HIGH_NET_WORTH: ("Tinh Hoa", "🏆"),
+        WealthLevel.VIP: ("Đỉnh Cao", "👑"),
     }[enum_level]
     return {
         "id": level_id,
@@ -91,21 +95,29 @@ LEVEL_ORDER: list[WealthLevel] = [
     WealthLevel.YOUNG_PROFESSIONAL,
     WealthLevel.MASS_AFFLUENT,
     WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
 ]
 
 
 def format_level(level: WealthLevel, style: str = "short") -> str:
     """Return the Vietnamese label for ``level``.
 
-    ``style="short"`` → "Kho thóc" (themed, used in messages).
-    ``style="full"`` → "Có chút tiết kiệm" (descriptive, used in dashboards).
+    ``style="short"`` and ``style="full"`` both return the VN-native
+    product name today — kept as a single source so message templates
+    can interpolate either without divergence.
     """
     return LEVEL_LABELS[level][style]
 
 
+# Band boundaries. Keep names aligned with the magnitude (M = triệu,
+# B = tỷ) so call-sites read as intent rather than arithmetic.
 _BAND_30M = Decimal("30_000_000")
-_BAND_200M = Decimal("200_000_000")
+_BAND_100M = Decimal("100_000_000")
+_BAND_300M = Decimal("300_000_000")
 _BAND_1B = Decimal("1_000_000_000")
+_BAND_3B = Decimal("3_000_000_000")
+_BAND_10B = Decimal("10_000_000_000")
+_BAND_30B = Decimal("30_000_000_000")
 
 
 def detect_level(net_worth: Decimal | int | float) -> WealthLevel:
@@ -113,11 +125,13 @@ def detect_level(net_worth: Decimal | int | float) -> WealthLevel:
     nw = Decimal(net_worth or 0)
     if nw < _BAND_30M:
         return WealthLevel.STARTER
-    if nw < _BAND_200M:
+    if nw < _BAND_300M:
         return WealthLevel.YOUNG_PROFESSIONAL
-    if nw < _BAND_1B:
+    if nw < _BAND_3B:
         return WealthLevel.MASS_AFFLUENT
-    return WealthLevel.HIGH_NET_WORTH
+    if nw < _BAND_30B:
+        return WealthLevel.HIGH_NET_WORTH
+    return WealthLevel.VIP
 
 
 def next_milestone(
@@ -125,26 +139,43 @@ def next_milestone(
 ) -> tuple[Decimal, WealthLevel]:
     """Next round target the user is climbing toward + the level it unlocks.
 
-    Sub-milestones inside a band keep early users motivated (Starter who
-    hits 10tr sees "30tr next" not "1 tỷ"). For HNW we tick up by 1 tỷ
-    each — the spec assumes those users are interested in 1B granularity.
+    One sub-milestone + one level-up per band so every user always has
+    a near-term goal:
+
+        0      – 30tr   → 30tr   (level-up to Trẻ Năng Động)
+        30tr   – 100tr  → 100tr  (sub-milestone in YP)
+        100tr  – 300tr  → 300tr  (level-up to Trung Lưu Vững)
+        300tr  – 1 tỷ   → 1 tỷ   (sub-milestone in MA)
+        1 tỷ   – 3 tỷ   → 3 tỷ   (level-up to Tinh Hoa)
+        3 tỷ   – 10 tỷ  → 10 tỷ  (sub-milestone in HNW)
+        10 tỷ  – 30 tỷ  → 30 tỷ  (level-up to Đỉnh Cao)
+        30 tỷ+         → round up to next +10 tỷ (sub-milestone in VIP)
+
+    ``target_level`` equals the *current* level for sub-milestones, so
+    callers can distinguish "đạt level mới" from "cán mốc trong band".
     """
     nw = Decimal(net_worth or 0)
 
     if nw < _BAND_30M:
         return _BAND_30M, WealthLevel.YOUNG_PROFESSIONAL
-    if nw < Decimal("100_000_000"):
-        return Decimal("100_000_000"), WealthLevel.YOUNG_PROFESSIONAL
-    if nw < _BAND_200M:
-        return _BAND_200M, WealthLevel.MASS_AFFLUENT
-    if nw < Decimal("500_000_000"):
-        return Decimal("500_000_000"), WealthLevel.MASS_AFFLUENT
+    if nw < _BAND_100M:
+        return _BAND_100M, WealthLevel.YOUNG_PROFESSIONAL
+    if nw < _BAND_300M:
+        return _BAND_300M, WealthLevel.MASS_AFFLUENT
     if nw < _BAND_1B:
-        return _BAND_1B, WealthLevel.HIGH_NET_WORTH
+        return _BAND_1B, WealthLevel.MASS_AFFLUENT
+    if nw < _BAND_3B:
+        return _BAND_3B, WealthLevel.HIGH_NET_WORTH
+    if nw < _BAND_10B:
+        return _BAND_10B, WealthLevel.HIGH_NET_WORTH
+    if nw < _BAND_30B:
+        return _BAND_30B, WealthLevel.VIP
 
-    # HNW: round up to the next whole billion.
-    current_billions = int(nw // _BAND_1B)
-    return _BAND_1B * (current_billions + 1), WealthLevel.HIGH_NET_WORTH
+    # VIP: tick up by the next round 10 tỷ. So 30 tỷ → 40 tỷ, 47 tỷ →
+    # 50 tỷ, 100 tỷ → 110 tỷ. Granularity stays meaningful without
+    # going stale for super-rich balances.
+    current_tens = int(nw // _BAND_10B)
+    return _BAND_10B * (current_tens + 1), WealthLevel.VIP
 
 
 async def update_user_level(

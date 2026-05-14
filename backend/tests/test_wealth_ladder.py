@@ -1,7 +1,7 @@
 """Unit tests for ``backend.wealth.ladder``.
 
 Boundary values are the high-risk path (Starter ↔ YP at 30tr exactly,
-YP ↔ Mass Affluent at 200tr, etc.) so we test each one explicitly.
+YP ↔ Mass Affluent at 300tr, etc.) so we test each one explicitly.
 """
 from __future__ import annotations
 
@@ -29,12 +29,15 @@ class TestDetectLevel:
             (29_999_999, WealthLevel.STARTER),
             (30_000_000, WealthLevel.YOUNG_PROFESSIONAL),
             (100_000_000, WealthLevel.YOUNG_PROFESSIONAL),
-            (199_999_999, WealthLevel.YOUNG_PROFESSIONAL),
-            (200_000_000, WealthLevel.MASS_AFFLUENT),
-            (500_000_000, WealthLevel.MASS_AFFLUENT),
-            (999_999_999, WealthLevel.MASS_AFFLUENT),
-            (1_000_000_000, WealthLevel.HIGH_NET_WORTH),
-            (5_000_000_000, WealthLevel.HIGH_NET_WORTH),
+            (299_999_999, WealthLevel.YOUNG_PROFESSIONAL),
+            (300_000_000, WealthLevel.MASS_AFFLUENT),
+            (1_000_000_000, WealthLevel.MASS_AFFLUENT),
+            (2_999_999_999, WealthLevel.MASS_AFFLUENT),
+            (3_000_000_000, WealthLevel.HIGH_NET_WORTH),
+            (10_000_000_000, WealthLevel.HIGH_NET_WORTH),
+            (29_999_999_999, WealthLevel.HIGH_NET_WORTH),
+            (30_000_000_000, WealthLevel.VIP),
+            (100_000_000_000, WealthLevel.VIP),
         ],
     )
     def test_boundary_values(self, amount, expected):
@@ -56,31 +59,52 @@ class TestNextMilestone:
         assert level == WealthLevel.YOUNG_PROFESSIONAL
 
     def test_intermediate_yp_target_is_100m(self):
-        target, _ = next_milestone(Decimal("50_000_000"))
+        target, level = next_milestone(Decimal("50_000_000"))
         assert target == Decimal("100_000_000")
+        # Sub-milestone — stays in YP.
+        assert level == WealthLevel.YOUNG_PROFESSIONAL
 
-    def test_late_yp_target_is_200m(self):
+    def test_late_yp_target_is_300m(self):
         target, level = next_milestone(Decimal("150_000_000"))
-        assert target == Decimal("200_000_000")
+        assert target == Decimal("300_000_000")
         assert level == WealthLevel.MASS_AFFLUENT
 
-    def test_mass_affluent_500m_target(self):
-        target, _ = next_milestone(Decimal("300_000_000"))
-        assert target == Decimal("500_000_000")
-
-    def test_late_mass_affluent_to_1b(self):
-        target, level = next_milestone(Decimal("700_000_000"))
+    def test_mass_affluent_1b_sub_milestone(self):
+        target, level = next_milestone(Decimal("500_000_000"))
         assert target == Decimal("1_000_000_000")
+        # Sub-milestone — stays in MA.
+        assert level == WealthLevel.MASS_AFFLUENT
+
+    def test_late_mass_affluent_to_3b(self):
+        target, level = next_milestone(Decimal("2_000_000_000"))
+        assert target == Decimal("3_000_000_000")
         assert level == WealthLevel.HIGH_NET_WORTH
 
-    def test_hnw_climbs_by_billion(self):
-        target, level = next_milestone(Decimal("1_500_000_000"))
-        assert target == Decimal("2_000_000_000")
+    def test_hnw_10b_sub_milestone(self):
+        target, level = next_milestone(Decimal("5_000_000_000"))
+        assert target == Decimal("10_000_000_000")
+        # Sub-milestone — stays in HNW.
         assert level == WealthLevel.HIGH_NET_WORTH
 
-    def test_hnw_exact_billion_climbs_to_next(self):
-        target, _ = next_milestone(Decimal("3_000_000_000"))
-        assert target == Decimal("4_000_000_000")
+    def test_late_hnw_to_30b(self):
+        target, level = next_milestone(Decimal("20_000_000_000"))
+        assert target == Decimal("30_000_000_000")
+        assert level == WealthLevel.VIP
+
+    def test_vip_climbs_by_ten_billion(self):
+        target, level = next_milestone(Decimal("35_000_000_000"))
+        assert target == Decimal("40_000_000_000")
+        assert level == WealthLevel.VIP
+
+    def test_vip_exact_threshold_climbs_to_next(self):
+        # 30B exactly is VIP — next target is 40B.
+        target, _ = next_milestone(Decimal("30_000_000_000"))
+        assert target == Decimal("40_000_000_000")
+
+    def test_vip_extreme_value(self):
+        target, _ = next_milestone(Decimal("999_000_000_000"))
+        # 999B → next round of 10B above = 1000B.
+        assert target == Decimal("1_000_000_000_000")
 
 
 @pytest.mark.asyncio
@@ -122,3 +146,18 @@ class TestUpdateUserLevel:
             db, uuid.uuid4(), Decimal("50_000_000")
         )
         assert result is None
+
+    async def test_persists_vip_level(self):
+        user = User()
+        user.id = uuid.uuid4()
+        user.wealth_level = "hnw"
+
+        db = MagicMock()
+        db.get = AsyncMock(return_value=user)
+        db.flush = AsyncMock()
+
+        new_level = await update_user_level(
+            db, user.id, Decimal("50_000_000_000")
+        )
+        assert new_level == WealthLevel.VIP
+        assert user.wealth_level == "vip"
