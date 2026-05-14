@@ -584,6 +584,16 @@ def _hnw_user(name: str = "Tùng"):
     )
 
 
+def _vip_user(name: str = "Anh Phương"):
+    """Net worth 50 tỷ → wealth_level='vip'. Regression guard for #638."""
+    return SimpleNamespace(
+        display_name=name,
+        id="user-vip",
+        wealth_level="vip",
+        get_greeting_name=lambda: name,
+    )
+
+
 class TestAdaptiveIntros:
     """Same buttons across wealth levels, distinct intro copy.
 
@@ -601,6 +611,7 @@ class TestAdaptiveIntros:
             (_young_prof_user, "young_prof"),
             (_mass_affluent_user, "mass_affluent"),
             (_hnw_user, "hnw"),
+            (_vip_user, "vip"),
         ],
     )
     def test_main_menu_renders_yaml_for_each_level(self, user_factory, level):
@@ -618,9 +629,10 @@ class TestAdaptiveIntros:
         assert expected_intro in text
 
     def test_each_level_produces_distinct_main_menu_text(self):
-        # All 4 levels must render different text — otherwise the
-        # adaptive layer is a no-op. Compare pairwise (6 pairs).
-        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        # All 5 levels must render different text — otherwise the
+        # adaptive layer is a no-op. Compare pairwise (10 pairs).
+        # vip included as regression guard for #638.
+        levels = ["starter", "young_prof", "mass_affluent", "hnw", "vip"]
         renders = {lvl: format_main_menu(_user(), level=lvl)[0] for lvl in levels}
         for i, a in enumerate(levels):
             for b in levels[i + 1 :]:
@@ -632,7 +644,7 @@ class TestAdaptiveIntros:
         "category", ["assets", "expenses", "cashflow", "goals", "market"]
     )
     def test_each_level_produces_distinct_submenu_text(self, category):
-        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        levels = ["starter", "young_prof", "mass_affluent", "hnw", "vip"]
         renders = {
             lvl: format_submenu(_user(), category, level=lvl)[0] for lvl in levels
         }
@@ -643,7 +655,7 @@ class TestAdaptiveIntros:
                 )
 
     def test_buttons_identical_across_levels(self):
-        levels = ["starter", "young_prof", "mass_affluent", "hnw"]
+        levels = ["starter", "young_prof", "mass_affluent", "hnw", "vip"]
         keyboards = [
             format_main_menu(_user(), level=lvl)[1]["inline_keyboard"] for lvl in levels
         ]
