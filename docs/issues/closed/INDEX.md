@@ -339,6 +339,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
+| #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
 
-**Total:** 335 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 318 Pre-Phase)
+**Total:** 336 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 319 Pre-Phase)
