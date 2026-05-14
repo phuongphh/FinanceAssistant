@@ -10,7 +10,7 @@ Schema details + rationale in `docs/tone_guide.md` → Metrics section.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, String
+from sqlalchemy import DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +29,7 @@ class Event(Base):
         UUID(as_uuid=True), nullable=True, index=True
     )
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     properties: Mapped[dict | None] = mapped_column(JSONB)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True
@@ -37,4 +38,5 @@ class Event(Base):
     __table_args__ = (
         Index("idx_events_user_type", "user_id", "event_type"),
         Index("idx_events_type_timestamp", "event_type", "timestamp"),
+        Index("idx_events_tenant_type_time", "tenant_id", "event_type", "timestamp"),
     )

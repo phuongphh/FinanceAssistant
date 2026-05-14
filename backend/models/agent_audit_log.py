@@ -40,6 +40,8 @@ class AgentAuditLog(Base):
     # Raw query — see PII note in module docstring. 2000 chars is
     # enough for any free-form input we accept (Telegram caps at 4096
     # but those are voice transcripts at most).
+    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
+
     query_text: Mapped[str | None] = mapped_column(String(2000))
     query_timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow,
@@ -74,6 +76,7 @@ class AgentAuditLog(Base):
     __table_args__ = (
         # Tier-by-day aggregations (e.g. "Tier 3 cost today").
         Index("idx_agent_audit_tier_time", "tier_used", "query_timestamp"),
+        Index("idx_agent_audit_tenant_time", "tenant_id", "query_timestamp"),
         # Slow-query hunting.
         Index("idx_agent_audit_latency", "total_latency_ms"),
     )

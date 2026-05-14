@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -78,3 +78,88 @@ class AuditLogListResponse(BaseModel):
     limit: int
     offset: int
     entries: list[AuditLogEntryOut]
+
+
+class OverviewMetrics(BaseModel):
+    total_users: int
+    total_users_delta_pct: float
+    new_users_period: int
+    new_users_delta_pct: float = 0.0
+    dau: int
+    dau_delta_pct: float
+    wau: int
+    mau: int
+    stickiness_pct: float
+    activation_rate_pct: float
+    total_llm_cost_usd: float
+    cost_delta_pct: float
+    avg_cost_per_active_user: float
+    asset_coverage_pct: float
+    briefing_open_rate_pct: float
+    error_rate_pct: float
+
+
+class OverviewStatsResponse(BaseModel):
+    period: str
+    generated_at: datetime
+    metrics: OverviewMetrics
+
+
+class UserGrowthPoint(BaseModel):
+    date: date
+    cumulative: int
+    new_users: int
+
+
+class UserGrowthResponse(BaseModel):
+    data: list[UserGrowthPoint]
+
+
+class DauPoint(BaseModel):
+    date: date
+    dau: int
+
+
+class DauChartResponse(BaseModel):
+    data: list[DauPoint]
+
+
+class FeatureClickPoint(BaseModel):
+    feature_key: str
+    feature_name: str
+    clicks: int
+
+
+class FeatureClicksResponse(BaseModel):
+    data: list[FeatureClickPoint]
+
+
+class IntentBreakdownPoint(BaseModel):
+    resolved_by: str
+    label: str
+    count: int
+    pct: float
+
+
+class IntentBreakdownResponse(BaseModel):
+    data: list[IntentBreakdownPoint]
+
+
+class UserTierPoint(BaseModel):
+    tier: str
+    label: str
+    count: int
+
+
+class UserTiersResponse(BaseModel):
+    data: list[UserTierPoint]
+
+
+class CohortRetentionRow(BaseModel):
+    cohort_week: date
+    cohort_size: int
+    retention: dict[str, int | None]
+
+
+class CohortRetentionResponse(BaseModel):
+    cohorts: list[CohortRetentionRow]
