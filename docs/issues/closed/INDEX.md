@@ -324,6 +324,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #573 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 1: Backend Foundation & Auth | [pre-phase/issue-573.md](by-phase/pre-phase/issue-573.md) |
 | #574 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 2: Analytics APIs | [pre-phase/issue-574.md](by-phase/pre-phase/issue-574.md) |
 | #575 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 3: User Management APIs | [pre-phase/issue-575.md](by-phase/pre-phase/issue-575.md) |
+| #576 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 4: Frontend Foundation | [pre-phase/issue-576.md](by-phase/pre-phase/issue-576.md) |
 | #580 | Pre-Phase | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [pre-phase/issue-580.md](by-phase/pre-phase/issue-580.md) |
 | #581 | Pre-Phase | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [pre-phase/issue-581.md](by-phase/pre-phase/issue-581.md) |
 | #582 | Pre-Phase | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [pre-phase/issue-582.md](by-phase/pre-phase/issue-582.md) |
@@ -344,5 +345,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
 
-**Total:** 339 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 322 Pre-Phase)
+**Total:** 340 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 323 Pre-Phase)
