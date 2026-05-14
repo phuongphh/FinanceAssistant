@@ -119,7 +119,7 @@ def income_start_date_keyboard() -> InlineKeyboardMarkup:
                 "callback_data": build_callback(CB_INCOME, "start_date", "today"),
             }],
             [{
-                "text": "✏️ Tự nhập (YYYY-MM-DD)",
+                "text": "✏️ Tự nhập (dd/mm/yyyy)",
                 "callback_data": build_callback(CB_INCOME, "start_date", "custom"),
             }],
             [{"text": "❌ Hủy", "callback_data": build_callback(CB_INCOME, "cancel")}],

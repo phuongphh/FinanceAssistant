@@ -64,10 +64,6 @@ _ACTION_PLACEHOLDER = {
         "📊 Dashboard chỉ khả dụng khi cấu hình MINIAPP_BASE_URL. "
         "Tạm thời gõ /baocao để xem báo cáo nhé."
     ),
-    BRIEFING_ACTION_SETTINGS: (
-        "⚙️ Mặc định mình gửi briefing lúc 7:00. "
-        "Tính năng đổi giờ sẽ có ở bản tới."
-    ),
 }
 
 
@@ -193,6 +189,15 @@ async def handle_briefing_callback(
             )
             return True
         # Fall through to the placeholder when MINIAPP_BASE_URL is unset.
+
+    if action == BRIEFING_ACTION_SETTINGS:
+        # Reuse the Profile notification time picker so every entry point
+        # writes ``UserProfile.briefing_time`` + ``User.briefing_time`` via
+        # the same validated callback flow.
+        from backend.profile.handlers.profile_menu import send_briefing_time_settings
+
+        await send_briefing_time_settings(chat_id)
+        return True
 
     if action == BRIEFING_ACTION_STORY:
         # Forward into storytelling, tagging the source as "from

@@ -161,9 +161,9 @@ async def test_tap_with_no_recent_send_does_not_record_open():
         "backend.bot.handlers.briefing.answer_callback",
         new=AsyncMock(),
     ), patch(
-        "backend.bot.handlers.briefing.send_message",
+        "backend.profile.handlers.profile_menu.send_briefing_time_settings",
         new=AsyncMock(),
-    ), patch(
+    ) as settings_mock, patch(
         "backend.bot.handlers.briefing.analytics.atrack",
         atrack_mock,
     ), patch(
@@ -173,8 +173,9 @@ async def test_tap_with_no_recent_send_does_not_record_open():
         await h.handle_briefing_callback(db, _callback("settings"))
 
     atrack_mock.assert_not_awaited()
-    # Click event still records — user did tap something
+    # Click event still records — user did tap something, then opens the real Profile time picker.
     track_mock.assert_called_once()
+    settings_mock.assert_awaited_once_with(999)
 
 
 @pytest.mark.asyncio

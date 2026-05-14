@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +54,20 @@ from backend.wealth.schemas.income import IncomeStreamCreate, IncomeStreamUpdate
 from backend.wealth.services import income_service
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_vietnamese_date(value: str) -> date | None:
+    cleaned = (value or "").strip()
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            pass
+    # Backward-compatible fallback for old YYYY-MM-DD prompts still visible in chat history.
+    try:
+        return date.fromisoformat(cleaned)
+    except ValueError:
+        return None
 
 
 class IncomeEvent:
@@ -428,8 +442,8 @@ async def _handle_start_date_pick(
             chat_id=chat_id,
             text=(
                 "✏️ <b>Ngày bắt đầu?</b>\n\n"
-                "Format: <code>YYYY-MM-DD</code>\n"
-                "Ví dụ: <code>2024-01-15</code>"
+                "Format: <code>dd/mm/yyyy</code>\n"
+                "Ví dụ: <code>15/01/2024</code>"
             ),
             parse_mode="HTML",
         )
@@ -439,12 +453,11 @@ async def _handle_start_date_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict,
 ) -> None:
     cleaned = text.strip()
-    try:
-        d = date.fromisoformat(cleaned)
-    except ValueError:
+    d = _parse_vietnamese_date(cleaned)
+    if d is None:
         await send_message(
             chat_id=chat_id,
-            text="Format: <code>YYYY-MM-DD</code>. Ví dụ: <code>2024-01-15</code>",
+            text="Format: <code>dd/mm/yyyy</code>. Ví dụ: <code>15/01/2024</code>",
             parse_mode="HTML",
         )
         return

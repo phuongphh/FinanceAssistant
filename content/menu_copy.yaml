@@ -202,19 +202,19 @@ action_assets_report:
 action_assets_manage:
   title: "✏️ *THÊM / SỬA / XOÁ TÀI SẢN*"
   body: |-
-    Mình có 3 cách để {name} quản lý tài sản — chọn cách tiện nhất nhé:
+    Cứ nói chuyện tự nhiên với mình trước nhé — {name} có thể gõ:
+    • "thêm 100tr vào VCB"
+    • "thêm 50 triệu tiền mặt"
+    • "sửa cổ phiếu FPT thành 200 cổ"
+    • "xoá tài sản VNM"
 
-    *1️⃣ Mini App Dashboard* _(khuyên dùng)_
+    Nếu muốn thao tác bằng nút, mình vẫn giữ đủ 2 cách bên dưới:
+
+    *1️⃣ Mini App Dashboard*
     • Gõ /dashboard hoặc bấm nút menu 📊 góc trái khung chat
     • Giao diện trực quan: thêm/sửa/xoá nhanh, có biểu đồ
 
-    *2️⃣ Nói chuyện tự nhiên với Bé Tiền*
-    💡 _Mẹo — thử gõ:_
-    • "thêm 50 triệu tiền mặt"
-    • "sửa cổ phiếu FPT thành 200 cổ"
-    • "xoá tài sản vàng SJC"
-
-    *3️⃣ Xem nhanh tổng tài sản*
+    *2️⃣ Xem nhanh tổng tài sản*
     • Vào menu 💎 Tài sản — tổng tài sản hiển thị ngay phía trên
   open_miniapp_button: "Mở Dashboard"
   back_button: "◀️ Quay về menu"
