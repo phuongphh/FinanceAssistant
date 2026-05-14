@@ -160,6 +160,24 @@ async def route_update(data: dict) -> None:
             raise
 
 
+async def _reject_if_suspended(
+    db: AsyncSession, *, telegram_id: int | None, chat_id: int, dashboard_service
+) -> bool:
+    if telegram_id is None:
+        return False
+    user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+    if user is None or getattr(user, "manual_status", None) != "suspended":
+        return False
+    from backend.services.telegram_service import send_message
+
+    await send_message(
+        chat_id,
+        "Tài khoản của bạn đang tạm khóa. Vui lòng liên hệ admin@nuitruc.ai để được hỗ trợ.",
+        parse_mode=None,
+    )
+    return True
+
+
 async def _handle_message(
     db: AsyncSession,
     message: dict,
@@ -188,6 +206,19 @@ async def _handle_message(
     command = _normalize_text_command(text)
     from_user = message.get("from") or {}
     telegram_id = from_user.get("id")
+
+    if await _reject_if_suspended(
+        db,
+        telegram_id=telegram_id,
+        chat_id=chat_id,
+        dashboard_service=dashboard_service,
+    ):
+        resolved_user = (
+            await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            if telegram_id is not None
+            else None
+        )
+        return resolved_user.id if resolved_user else None
 
     if command == "/start":
         if telegram_id is None:
@@ -228,9 +259,7 @@ async def _handle_message(
             created or user.onboarding_step <= int(OnboardingStep.NOT_STARTED)
         )
         if use_v2:
-            await onboarding_v2.handle_start(
-                db, chat_id, user, payload=payload
-            )
+            await onboarding_v2.handle_start(db, chat_id, user, payload=payload)
         else:
             await onboarding_handlers.resume_or_start(db, chat_id, user)
         return user.id
@@ -315,11 +344,13 @@ async def _handle_message(
     # we route them by command name regardless of wizard state.
     if command in ("/link_zalo", "/linkzalo", "/lien_ket_zalo"):
         from backend.bot.handlers.zalo_linking import cmd_link_zalo
+
         await cmd_link_zalo(db, chat_id, resolved_user)
         return resolved_user.id if resolved_user else None
 
     if command in ("/unlink_zalo", "/unlinkzalo", "/huy_lien_ket_zalo"):
         from backend.bot.handlers.zalo_linking import cmd_unlink_zalo
+
         await cmd_unlink_zalo(db, chat_id, resolved_user)
         return resolved_user.id if resolved_user else None
 
@@ -427,15 +458,9 @@ async def _handle_message(
     # any text/wizard branches because photos carry no text payload,
     # and we want OCR to work regardless of wizard state so users can
     # snap a receipt anytime.
-    if (
-        resolved_user is not None
-        and (
-            message.get("photo")
-            or (
-                (message.get("document") or {}).get("mime_type", "")
-                .startswith("image/")
-            )
-        )
+    if resolved_user is not None and (
+        message.get("photo")
+        or ((message.get("document") or {}).get("mime_type", "").startswith("image/"))
     ):
         from backend.bot.handlers.photo_receipt import handle_photo_message
 
@@ -461,11 +486,7 @@ async def _handle_message(
     # Phase 4.1 — V2 onboarding first-asset text input. Same defensive
     # pattern as the legacy name step: catch the amount before the NL
     # expense parser interprets "200tr" as a transaction.
-    if (
-        text
-        and resolved_user is not None
-        and not command.startswith("/")
-    ):
+    if text and resolved_user is not None and not command.startswith("/"):
         from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
 
         consumed = await onboarding_v2_handlers.handle_asset_text_input(
@@ -556,11 +577,21 @@ async def _handle_message(
     # Natural-language message → NL expense parser / report intent / menu fallback.
     if text and resolved_user is not None and not command.startswith("/"):
         from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+
         await onboarding_v2_handlers.maybe_mark_query_next_action(
             db, chat_id, resolved_user
         )
     await handle_text_message(db, message)
     return resolved_user.id if resolved_user else None
+
+
+async def _resolved_user_id_for_telegram(
+    db: AsyncSession, telegram_id: int | None, dashboard_service
+):
+    if telegram_id is None:
+        return None
+    user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+    return user.id if user else None
 
 
 async def _maybe_auto_exit_asset_wizard(
@@ -690,6 +721,14 @@ async def _handle_callback(
     callback_id = callback_query["id"]
     from_user = callback_query.get("from") or {}
     telegram_id = from_user.get("id")
+    chat_id = (callback_query.get("message") or {}).get("chat", {}).get("id")
+    if chat_id is not None and await _reject_if_suspended(
+        db,
+        telegram_id=telegram_id,
+        chat_id=chat_id,
+        dashboard_service=dashboard_service,
+    ):
+        return await _resolved_user_id_for_telegram(db, telegram_id, dashboard_service)
 
     async def _resolved_user_id():
         if telegram_id is None:
@@ -708,7 +747,9 @@ async def _handle_callback(
     )
 
     # Phase 4.2 Epic 3 — Day 7 positioning survey callbacks.
-    if await positioning_survey_handlers.handle_positioning_survey_callback(db, callback_query):
+    if await positioning_survey_handlers.handle_positioning_survey_callback(
+        db, callback_query
+    ):
         return await _resolved_user_id()
 
     # Feedback prompt callbacks own the feedback:* namespace.
@@ -781,6 +822,7 @@ async def _handle_callback(
 
     # Phase 4.2 Epic 2 — Next Best Action shortcut buttons.
     from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+
     if await onboarding_v2_handlers.handle_next_action_callback(db, callback_query):
         return await _resolved_user_id()
 
