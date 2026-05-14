@@ -378,10 +378,12 @@ class TestWealthDashboardPage:
     def test_dashboard_injects_reload_bootstrap_with_current_version(self):
         """Inline reload guard must appear in the served HTML and embed the
         current build hash. Telegram WebView (especially iOS WebKit) can
-        ignore Cache-Control on HTML; this script forces a `?_b=<hash>`
-        reload the moment a fresh HTML reaches the WebView, so a stale
-        WebView state self-heals on the next genuine page-load instead of
-        requiring the user to manually clear Telegram's cache."""
+        ignore Cache-Control on HTML; the live probe forces a `?b=<hash>`
+        reload when the server hash drifts, so a stale WebView state
+        self-heals on the next visibility change without requiring the
+        user to manually clear Telegram's cache. The synchronous
+        localStorage drift reload was removed to fix issue #610 — see
+        the bootstrap docstring."""
         resp = client.get("/miniapp/wealth")
         body = resp.text
         version = miniapp_routes._STATIC_VERSION
@@ -389,7 +391,15 @@ class TestWealthDashboardPage:
         # placed before the telegram-web-app.js include in the template.
         assert body.index(f"'{version}'") < body.index("telegram-web-app.js")
         assert "fa.app.build" in body
-        assert "localStorage.getItem" in body
+        # Diagnostic seed remains (so support can read back the stored
+        # hash) but we never read it back to navigate — see issue #610.
+        assert "localStorage.setItem" in body
+        assert "localStorage.getItem" not in body
+        # Handshake guard: don't navigate while initData is empty.
+        assert "!w.initData" in body
+        # Hash-fragment preservation: keep `#tgWebAppData=...` across the
+        # live-probe reload so the reloaded page still authenticates.
+        assert "u.hash=location.hash" in body
         assert "location.replace" in body
 
     def test_legacy_dashboard_also_has_reload_bootstrap(self):
