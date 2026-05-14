@@ -350,10 +350,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #599 | Pre-Phase | [Story] P4.2.5-6.1: Caddy + HTTPS + CORS + rate limit | [pre-phase/issue-599.md](by-phase/pre-phase/issue-599.md) |
 | #600 | Pre-Phase | [Story] P4.2.5-6.2: PII protection layer | [pre-phase/issue-600.md](by-phase/pre-phase/issue-600.md) |
 | #601 | Pre-Phase | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [pre-phase/issue-601.md](by-phase/pre-phase/issue-601.md) |
+| #602 | Pre-Phase | [Story] P4.2.5-7.1: License data model + placeholder UI section | [pre-phase/issue-602.md](by-phase/pre-phase/issue-602.md) |
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
 
-**Total:** 350 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 333 Pre-Phase)
+**Total:** 351 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 334 Pre-Phase)
