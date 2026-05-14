@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import Any
 
-from backend.analytics import sanitize_properties
+from backend.utils.analytics_sanitizer import sanitize_properties
 from backend.database import get_session_factory
 from backend.models.feature_event import FeatureEvent
 

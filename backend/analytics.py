@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -27,8 +26,11 @@ from typing import Any, Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.database import get_session_factory
 from backend.models.event import Event
+from backend.services.feature_events import feature_key_for_event, record_feature_event
+from backend.utils.analytics_sanitizer import sanitize_properties
 
 logger = logging.getLogger(__name__)
 
@@ -80,49 +82,6 @@ class EventType:
 
     # Phase 4A — Financial Twin weekly batch metrics.
     TWIN_WEEKLY_RUN = "twin_weekly_run"
-
-
-# Property keys that would carry PII if ever accepted — strip unconditionally.
-_PII_KEY_PATTERN = re.compile(
-    r"(?i)(phone|email|address|token|password|secret|message|content|"
-    r"merchant_name|note|raw_text|body|text)"
-)
-_MAX_STR_VALUE_LEN = 200
-
-
-def sanitize_properties(props: dict[str, Any] | None) -> dict[str, Any]:
-    """Strip PII keys and truncate long stringy values.
-
-    Primitive, conservative — when in doubt, drop.
-    """
-    if not props:
-        return {}
-    out: dict[str, Any] = {}
-    for key, value in props.items():
-        if not isinstance(key, str):
-            continue
-        if _PII_KEY_PATTERN.search(key):
-            continue
-        if isinstance(value, str) and len(value) > _MAX_STR_VALUE_LEN:
-            value = value[:_MAX_STR_VALUE_LEN]
-        # Drop values that aren't JSON-friendly scalars/containers
-        if not _is_json_friendly(value):
-            continue
-        out[key] = value
-    return out
-
-
-def _is_json_friendly(value: Any) -> bool:
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return True
-    if isinstance(value, (list, tuple)):
-        return all(_is_json_friendly(v) for v in value)
-    if isinstance(value, dict):
-        return all(
-            isinstance(k, str) and _is_json_friendly(v)
-            for k, v in value.items()
-        )
-    return False
 
 
 @dataclass
@@ -195,8 +154,6 @@ def _mirror_feature_event(
 ) -> None:
     """Best-effort bridge from legacy analytics events to feature-click stream."""
     try:
-        from backend.services.feature_events import feature_key_for_event, record_feature_event
-
         feature_key = feature_key_for_event(event_type, properties)
         if feature_key:
             record_feature_event(
@@ -205,7 +162,18 @@ def _mirror_feature_event(
                 metadata={"source_event_type": event_type, **properties},
             )
     except Exception:
-        logger.debug("analytics: feature event mirror failed for %s", event_type, exc_info=True)
+        if get_settings().environment == "development":
+            logger.warning(
+                "analytics: feature event mirror failed for %s",
+                event_type,
+                exc_info=True,
+            )
+        else:
+            logger.debug(
+                "analytics: feature event mirror failed for %s",
+                event_type,
+                exc_info=True,
+            )
 
 
 async def _persist(event: Event_) -> None:

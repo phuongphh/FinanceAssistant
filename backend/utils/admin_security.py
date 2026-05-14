@@ -118,6 +118,8 @@ def decode_admin_token(token: str) -> dict[str, Any]:
             raise ValueError("Unexpected JWT algorithm")
         expected = hmac.new(_jwt_secret().encode("utf-8"), signing_input.encode("ascii"), hashlib.sha256).digest()
         actual = _b64url_decode(signature_b64)
+        if _b64url_encode(actual) != signature_b64:
+            raise ValueError("Non-canonical JWT signature")
         if not hmac.compare_digest(expected, actual):
             raise ValueError("Invalid JWT signature")
         if int(payload.get("exp", 0)) <= int(datetime.now(timezone.utc).timestamp()):

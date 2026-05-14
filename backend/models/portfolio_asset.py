@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, Numeric, String, Text
+from sqlalchemy import DateTime, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +19,7 @@ class PortfolioAsset(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
+    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     quantity: Mapped[float | None] = mapped_column(Numeric(20, 6))
@@ -35,4 +36,5 @@ class PortfolioAsset(Base):
 
     __table_args__ = (
         Index("idx_portfolio_user_type", "user_id", "asset_type"),
+        Index("idx_portfolio_tenant_user", "tenant_id", "user_id"),
     )

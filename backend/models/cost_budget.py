@@ -75,6 +75,7 @@ class LLMCostLog(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     operation: Mapped[str] = mapped_column(String(64), nullable=False)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

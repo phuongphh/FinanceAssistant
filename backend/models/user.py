@@ -17,6 +17,7 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     telegram_handle: Mapped[str | None] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(255))
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Ho_Chi_Minh")
