@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.expense import Expense
@@ -35,12 +35,59 @@ def current_month_key(today: date | None = None) -> str:
     return (today or date.today()).strftime("%Y-%m")
 
 
+# Key into ``AsyncSession.info`` for the per-session telegram_id → User
+# cache. The worker opens one session per Telegram update, so this gives
+# us a request-scoped cache that's discarded on session close — no
+# cross-request leakage, no manual invalidation. SQLAlchemy's identity
+# map only dedups primary-key lookups, so without this each repeated
+# ``get_user_by_telegram_id`` call (telegram_worker hits it 3-4× per
+# callback) issued a fresh wide SELECT.
+_USER_BY_TELEGRAM_ID_CACHE_KEY = "_user_by_telegram_id_cache"
+_ROLLBACK_LISTENER_INSTALLED_KEY = "_user_cache_rollback_listener"
+
+
+def _get_or_init_user_cache(db: AsyncSession) -> dict:
+    """Return the session-scoped telegram_id→User cache, installing a
+    rollback listener on first use.
+
+    After ``db.rollback()`` SQLAlchemy expires attributes on every ORM
+    instance in the session — accessing ``user.id`` on a previously
+    cached instance would then trigger a lazy refresh, which raises
+    ``MissingGreenlet`` in async code (see degraded paths in
+    ``profile_menu.handle_profile_view``). Dropping our cache on
+    ``after_rollback`` forces the next call to re-query, returning a
+    fresh, non-expired instance.
+    """
+    info = db.info
+    if _ROLLBACK_LISTENER_INSTALLED_KEY not in info:
+        # Mark first so a registration failure (e.g. test doubles whose
+        # ``sync_session`` isn't a real SQLAlchemy Session) doesn't loop.
+        info[_ROLLBACK_LISTENER_INSTALLED_KEY] = True
+        sync_session = getattr(db, "sync_session", None)
+        if sync_session is not None:
+            try:
+                @event.listens_for(sync_session, "after_rollback")
+                def _drop_cache_on_rollback(session):  # pragma: no cover - tiny shim
+                    session.info.pop(_USER_BY_TELEGRAM_ID_CACHE_KEY, None)
+            except Exception:
+                # Event hook is purely defensive — if the underlying
+                # target doesn't accept listeners, the cache still works
+                # correctly within a single non-rollback flow.
+                pass
+    return info.setdefault(_USER_BY_TELEGRAM_ID_CACHE_KEY, {})
+
+
 async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User | None:
+    cache = _get_or_init_user_cache(db)
+    if telegram_id in cache:
+        return cache[telegram_id]
     stmt = select(User).where(
         User.telegram_id == telegram_id,
         User.deleted_at.is_(None),
     )
-    return (await db.execute(stmt)).scalar_one_or_none()
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    cache[telegram_id] = user
+    return user
 
 
 async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
@@ -80,6 +127,9 @@ async def get_or_create_user(
     # flush() populates user.id from the DB default without ending the tx.
     await db.flush()
     await db.refresh(user)
+    # Seed the request-scoped cache so subsequent lookups in this session
+    # (e.g. the worker stamping user_id on telegram_updates) skip the DB.
+    _get_or_init_user_cache(db)[telegram_id] = user
     return user, True
 
 
