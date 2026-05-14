@@ -17,7 +17,9 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    tenant_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
+    tenant_id: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False, index=True
+    )
     telegram_handle: Mapped[str | None] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(255))
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Ho_Chi_Minh")
@@ -46,7 +48,9 @@ class User(Base):
     )
 
     # Phase 3A — Wealth foundation
-    primary_currency: Mapped[str] = mapped_column(String(3), default="VND", nullable=False)
+    primary_currency: Mapped[str] = mapped_column(
+        String(3), default="VND", nullable=False
+    )
     wealth_level: Mapped[str | None] = mapped_column(String(20))
     expense_threshold_micro: Mapped[int] = mapped_column(
         Integer, default=200_000, nullable=False
@@ -54,7 +58,9 @@ class User(Base):
     expense_threshold_major: Mapped[int] = mapped_column(
         Integer, default=2_000_000, nullable=False
     )
-    briefing_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    briefing_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
     briefing_time: Mapped[time] = mapped_column(
         Time, default=time(7, 0), nullable=False
     )
@@ -80,6 +86,10 @@ class User(Base):
     founding_member_sequence: Mapped[int | None] = mapped_column(Integer)
     founding_member_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     acquisition_source: Mapped[str | None] = mapped_column(String(64))
+
+    # Phase 4.2.5 — Admin user management override. NULL means normal
+    # system-derived status; ``suspended`` blocks bot interactions.
+    manual_status: Mapped[str | None] = mapped_column(String(50), index=True)
 
     @property
     def is_onboarded(self) -> bool:
