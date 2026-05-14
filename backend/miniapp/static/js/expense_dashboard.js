@@ -39,6 +39,7 @@
         categoryFilter: document.getElementById('category-filter'),
         expensesList: document.getElementById('expenses-list'),
         moneyInList: document.getElementById('money-in-list'),
+        moneyInTotal: document.getElementById('money-in-total'),
         addExpenseBtn: document.getElementById('add-expense-btn'),
         addMoneyInBtn: document.getElementById('add-money-in-btn'),
         addFirstExpenseBtn: document.getElementById('add-first-expense-btn'),
@@ -440,6 +441,9 @@
 
     function renderMoneyInSection() {
         if (!els.moneyInList) return;
+        if (els.moneyInTotal) {
+            els.moneyInTotal.textContent = `+${formatMoneyShort((lastOverview && lastOverview.money_in_total) || 0)}`;
+        }
         const items = ((lastOverview && lastOverview.money_in) || []).slice().sort(
             (a, b) => (b.expense_date || '').localeCompare(a.expense_date || '') || (b.id || '').localeCompare(a.id || '')
         );
@@ -510,12 +514,13 @@
         }
         els.moneyInList.innerHTML = items.map((it) => {
             const title = it.merchant || it.note || 'Tiền vào';
+            const source = sourceLabel(it);
             return `
                 <div class="expense-row money-in-row" data-id="${escapeHtml(it.id)}">
                     <span class="expense-icon">💚</span>
                     <div class="expense-info">
                         <div class="expense-title">${escapeHtml(title)}</div>
-                        <div class="expense-meta">${formatDate(it.expense_date)} · ${escapeHtml(sourceLabel(it))}</div>
+                        <div class="expense-meta">${formatDate(it.expense_date)} · Nguồn: ${escapeHtml(source)}</div>
                     </div>
                     <div class="expense-amount money-in-amount">+${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">

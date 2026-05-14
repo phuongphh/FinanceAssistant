@@ -275,6 +275,21 @@ async def get_or_create_profile(db: AsyncSession, user_id) -> UserProfile:
     return profile
 
 
+async def send_briefing_time_settings(chat_id: int) -> None:
+    """Open the same briefing-time picker used by Profile notifications.
+
+    Morning briefing messages cannot be edited safely because they are a
+    report users often want to keep. Send a fresh picker that uses the
+    existing ``profile:time:briefing:*`` callbacks, so preset/custom time
+    updates stay in one code path.
+    """
+    await send_message(
+        chat_id=chat_id,
+        text=_time_menu_text("briefing"),
+        reply_markup=time_keyboard("briefing"),
+    )
+
+
 async def handle_profile_view(
     db: AsyncSession,
     chat_id: int,

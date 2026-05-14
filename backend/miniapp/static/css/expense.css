@@ -205,6 +205,27 @@
     cursor: not-allowed;
 }
 
+.section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.section-header-row h2 {
+    margin-bottom: 0;
+}
+
+.section-total {
+    flex: 0 0 auto;
+    color: #1f9d55;
+    font-weight: 700;
+    font-size: 14px;
+    background: rgba(46, 204, 113, 0.12);
+    border-radius: 999px;
+    padding: 4px 10px;
+}
+
 .money-in-row {
     border-left: 3px solid #2ecc71;
 }

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,7 +130,8 @@ class QueryMarketHandler(IntentHandler):
         generic stock-style "which ticker?" clarification.
         """
         symbols = ("BTC", "ETH", "BNB", "SOL", "XRP")
-        lines = ["₿ *Giá tiền số phổ biến hôm nay:*"]
+        today_label = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%d/%m/%Y")
+        lines = [f"₿ *Giá tiền số phổ biến — {today_label}:*"]
         had_quote = False
 
         try:
@@ -158,7 +161,7 @@ class QueryMarketHandler(IntentHandler):
             if change is not None:
                 change_pct = Decimal(str(change))
                 sign = "+" if change_pct >= 0 else ""
-                change_text = f" · 24h {sign}{change_pct:.2f}%"
+                change_text = f" · {sign}{change_pct:.2f}%"
             lines.append(f"• {symbol}: {quote.price:,.0f}đ{change_text}{stale}")
 
         if stale_times:
