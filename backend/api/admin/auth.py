@@ -14,6 +14,7 @@ from backend.schemas.admin import AdminUserOut, ChangePasswordRequest, LoginRequ
 from backend.services.admin_audit import log_action
 from backend.services.admin_auth import blacklist_token, check_login_rate_limit, record_login_attempt
 from backend.utils.admin_security import create_admin_token, decode_admin_token, hash_password, verify_password
+from backend.utils.pii import mask_email
 
 router = APIRouter(prefix="/auth", tags=["admin-auth"])
 
@@ -40,7 +41,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
             db,
             None,
             "login_failed",
-            payload={"email": body.email},
+            payload={"email": mask_email(body.email)},
             request=request,
             commit=True,
         )

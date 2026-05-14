@@ -112,3 +112,13 @@ def test_blacklist_falls_back_to_memory_when_redis_unavailable(monkeypatch):
 
     admin_auth._memory_blacklist["jti-1"] = time.time() - 1
     assert not admin_auth.is_token_blacklisted("jti-1")
+
+
+def test_pii_masking_helpers_match_admin_security_contract():
+    from backend.utils.pii import mask_email, mask_name, mask_phone
+
+    assert mask_name("Nguyễn Văn An") == "Nguyễn V. A."
+    assert mask_email("phuongphh@nuitruc.ai") == "p********h@nuitruc.ai"
+    assert mask_phone("0987654321") == "098****321"
+    assert mask_email("not-an-email") == "—"
+    assert mask_phone("12345") == "***"

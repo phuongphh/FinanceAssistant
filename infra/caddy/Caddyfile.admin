@@ -1,0 +1,35 @@
+# Bé Tiền Admin Observability Console — production vhost.
+# Requires a Caddy build with the rate_limit module (e.g. caddy-ratelimit).
+# Validate with: caddy validate --config infra/caddy/Caddyfile.admin
+
+admin.betien.vn {
+    tls phuongphh@nuitruc.ai
+    encode zstd gzip
+
+    # Rate limit admin API to 100 requests/minute per client IP.
+    rate_limit {
+        zone admin_api {
+            key {remote_ip}
+            events 100
+            window 1m
+        }
+    }
+
+    # Security headers for both API and SPA responses.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    handle /api/admin/* {
+        reverse_proxy 127.0.0.1:8001
+    }
+
+    # React SPA is served by FastAPI from backend/static/admin.
+    handle {
+        reverse_proxy 127.0.0.1:8001
+    }
+}

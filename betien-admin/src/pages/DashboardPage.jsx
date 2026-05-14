@@ -504,6 +504,7 @@ function UserDetailModal({ userId, onClose, onStatusChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [suspending, setSuspending] = useState(false);
+  const [revealing, setRevealing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -524,6 +525,19 @@ function UserDetailModal({ userId, onClose, onStatusChanged }) {
       alive = false;
     };
   }, [userId]);
+
+  async function revealPii() {
+    setRevealing(true);
+    setError('');
+    try {
+      const payload = await getUserDetail(userId, true);
+      setDetail(payload);
+    } catch (err) {
+      setError(err.message || 'Không reveal được PII.');
+    } finally {
+      setRevealing(false);
+    }
+  }
 
   async function suspendUser() {
     if (!detail || detail.status === 'suspended') return;
@@ -582,8 +596,11 @@ function UserDetailModal({ userId, onClose, onStatusChanged }) {
               <Breakdown title="Assets" empty="No assets" rows={detail.assets.map((item) => ({ label: item.type, value: `${item.count} · ${formatVnd(item.total_value_vnd)}` }))} />
               <Breakdown title="Cost breakdown" empty="No LLM cost" rows={detail.cost_by_intent.map((item) => ({ label: item.resolved_by, value: `$${Number(item.total_cost_usd || 0).toFixed(4)} · ${item.calls}` }))} />
             </div>
-            <div className="flex justify-end">
-              <button type="button" onClick={suspendUser} disabled={suspending || detail.status === 'suspended'} className="inline-flex items-center gap-2 rounded-full bg-burgundy px-4 py-2 text-sm font-semibold text-white transition hover:bg-burgundy/90 disabled:cursor-not-allowed disabled:opacity-50">
+            <div className="flex flex-col justify-end gap-2 sm:flex-row">
+              <button type="button" onClick={revealPii} disabled={revealing} className="inline-flex items-center justify-center gap-2 rounded-full border border-hairline bg-paper px-4 py-2 text-sm font-semibold text-ink-800 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50">
+                {revealing ? 'Revealing...' : 'Reveal PII'}
+              </button>
+              <button type="button" onClick={suspendUser} disabled={suspending || detail.status === 'suspended'} className="inline-flex items-center justify-center gap-2 rounded-full bg-burgundy px-4 py-2 text-sm font-semibold text-white transition hover:bg-burgundy/90 disabled:cursor-not-allowed disabled:opacity-50">
                 <Ban className="h-4 w-4" />
                 {detail.status === 'suspended' ? 'Already suspended' : suspending ? 'Suspending...' : 'Suspend user'}
               </button>

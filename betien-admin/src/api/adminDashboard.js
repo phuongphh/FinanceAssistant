@@ -33,8 +33,9 @@ export function getUsers(params = {}) {
   return apiFetch(buildAdminDashboardPath('/users', buildUsersQueryParams(params)));
 }
 
-export function getUserDetail(userId) {
-  return apiFetch(`/users/${encodeURIComponent(userId)}`);
+export function getUserDetail(userId, reveal = false) {
+  const suffix = reveal ? '?reveal=true' : '';
+  return apiFetch(`/users/${encodeURIComponent(userId)}${suffix}`);
 }
 
 export function changeUserStatus(userId, status, reason) {

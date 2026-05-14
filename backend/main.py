@@ -1,9 +1,12 @@
 import asyncio
 import logging
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -189,6 +192,45 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.admin_allowed_origin],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+_admin_rate_windows: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+@app.middleware("http")
+async def admin_api_rate_limit(request: Request, call_next):
+    """Memory backstop for /api/admin until traffic reaches Caddy.
+
+    Caddy is the production enforcement point; this lightweight process-local
+    limiter keeps dev/staging safe and avoids adding a runtime dependency.
+    """
+    if request.url.path.startswith("/api/admin/"):
+        now = time.monotonic()
+        window = _admin_rate_windows[_client_ip(request)]
+        cutoff = now - 60
+        while window and window[0] <= cutoff:
+            window.popleft()
+        if len(window) >= settings.admin_api_rate_limit_per_minute:
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={"detail": "Too many admin API requests"},
+            )
+        window.append(now)
+    return await call_next(request)
+
 
 _MINIAPP_STATIC = Path(__file__).parent / "miniapp" / "static"
 if _MINIAPP_STATIC.exists():
@@ -232,3 +274,8 @@ async def health_check():
     return JSONResponse(
         content={"data": {"status": "healthy"}, "error": None}
     )
+
+
+_ADMIN_STATIC = Path(__file__).parent / "static" / "admin"
+if _ADMIN_STATIC.exists():
+    app.mount("/", StaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa")

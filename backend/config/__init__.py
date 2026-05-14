@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     admin_jwt_secret: str = ""
     admin_jwt_expiry_minutes: int = 60
     admin_redis_url: str = "redis://localhost:6379/1"
+    admin_allowed_origin: str = "https://admin.betien.vn"
+    admin_api_rate_limit_per_minute: int = 100
 
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
