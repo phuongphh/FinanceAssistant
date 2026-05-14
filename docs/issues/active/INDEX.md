@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #623 | perf: repeated user lookups cause slow menu navigation callbacks | [issue-623.md](issue-623.md) |
 | #624 | [Epic] Enhance UI/UX 4 — Chat-first guidance, Money-in, crypto date, date format, briefing fix | [issue-624.md](issue-624.md) |
+| #625 | [UI/UX] US1: Chat-first guidance in Asset card | [issue-625.md](issue-625.md) |
 
-**Total active:** 31
+**Total active:** 32
