@@ -33,5 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
+| #635 | bug: KeyError 'vip' in menu_formatter.format_main_menu when wealth_level is 'vip' | [issue-635.md](issue-635.md) |
 
-**Total active:** 29
+**Total active:** 30
