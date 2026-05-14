@@ -36,8 +36,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #623 | perf: repeated user lookups cause slow menu navigation callbacks | [issue-623.md](issue-623.md) |
 | #624 | [Epic] Enhance UI/UX 4 — Chat-first guidance, Money-in, crypto date, date format, briefing fix | [issue-624.md](issue-624.md) |
 | #626 | [UI/UX] US2: Money-in list in Expense Dashboard | [issue-626.md](issue-626.md) |
-| #627 | [UI/UX] US3: Crypto card — add date, remove "24h" | [issue-627.md](issue-627.md) |
 | #628 | [UI/UX] US4: Recurring — fix date format dd/mm/yyyy | [issue-628.md](issue-628.md) |
 | #629 | [Bug] US5: Briefing "Đổi giờ" button not working | [issue-629.md](issue-629.md) |
 
-**Total active:** 35
+**Total active:** 34
