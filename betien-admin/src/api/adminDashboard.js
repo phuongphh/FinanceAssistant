@@ -29,6 +29,10 @@ export function getCohortRetention(weeks = 8) {
   return apiFetch(buildAdminDashboardPath('/charts/cohort-retention', { weeks }));
 }
 
+export function getLicenseSummary() {
+  return apiFetch('/licenses/summary');
+}
+
 export function getUsers(params = {}) {
   return apiFetch(buildAdminDashboardPath('/users', buildUsersQueryParams(params)));
 }

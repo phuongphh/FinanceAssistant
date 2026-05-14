@@ -13,6 +13,7 @@ import {
   MousePointerClick,
   Search,
   ShieldAlert,
+  Sparkles,
   TrendingUp,
   Users,
   WalletCards,
@@ -42,6 +43,7 @@ import {
   getDau,
   getFeatureClicks,
   getIntentBreakdown,
+  getLicenseSummary,
   getOverview,
   getUserDetail,
   getUserGrowth,
@@ -101,6 +103,7 @@ function DashboardContent() {
   const [intentBreakdown, setIntentBreakdown] = useState([]);
   const [userTiers, setUserTiers] = useState([]);
   const [cohorts, setCohorts] = useState([]);
+  const [licenseSummary, setLicenseSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -111,7 +114,7 @@ function DashboardContent() {
       setError('');
       try {
         const days = selectedRange.days;
-        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload] = await Promise.all([
+        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload, licensePayload] = await Promise.all([
           getOverview(range),
           getUserGrowth(days),
           getDau(Math.min(days, 90)),
@@ -119,6 +122,7 @@ function DashboardContent() {
           getIntentBreakdown(days),
           getUserTiers(),
           getCohortRetention(8),
+          getLicenseSummary(),
         ]);
         if (!alive) return;
         setOverview(overviewPayload);
@@ -128,6 +132,7 @@ function DashboardContent() {
         setIntentBreakdown(intentPayload.data || []);
         setUserTiers(tiersPayload.data || []);
         setCohorts(cohortPayload.cohorts || []);
+        setLicenseSummary(licensePayload);
       } catch (err) {
         if (alive) setError(err.message || 'Không tải được dashboard.');
       } finally {
@@ -157,6 +162,7 @@ function DashboardContent() {
           <TierDistributionChart loading={loading} data={userTiers} />
         </section>
         <CohortRetentionTable loading={loading} cohorts={cohorts} />
+        <LicenseFoundationCard loading={loading} summary={licenseSummary} />
         <UserDirectory refreshNonce={refreshNonce} />
       </div>
     </main>
@@ -318,6 +324,81 @@ function DonutChart({ loading, data, nameKey, dataKey }) {
           <Tooltip content={<CustomTooltip />} />
         </PieChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+function LicenseFoundationCard({ loading, summary }) {
+  const plans = summary?.plans || [];
+  const statuses = summary?.statuses || [];
+  const freePlan = plans.find((item) => item.key === 'free');
+  const activeStatus = statuses.find((item) => item.key === 'active');
+  const totalLicenses = Number(summary?.total_licenses || 0);
+  const totalUsers = Number(summary?.total_users || 0);
+  const coveragePct = totalUsers > 0 ? Math.round((totalLicenses / totalUsers) * 1000) / 10 : 0;
+  return (
+    <section className="overflow-hidden rounded-3xl border border-gold/30 bg-ink-900 text-white shadow-sm">
+      <div className="grid gap-6 p-5 md:grid-cols-[1.3fr_1fr] md:p-6">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gold text-ink-900">
+              <Sparkles className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">License foundation</p>
+              <h2 className="font-display text-2xl font-semibold">Monetization-ready data model</h2>
+            </div>
+            <span className="rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-gold">Coming Phase 5</span>
+          </div>
+          <p className="max-w-3xl text-sm leading-6 text-white/70">
+            License management UI chưa mở cho operator. Phase 4.2.5 chỉ theo dõi backfill free license, trạng thái nền tảng, và sẵn sàng bật Pro tier ở Phase 5.7.
+          </p>
+          {loading && !summary ? (
+            <div className="h-24 animate-pulse rounded-2xl bg-white/10" />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <DarkStat label="Coverage" value={`${coveragePct}%`} hint={`${formatNumber(totalLicenses)} / ${formatNumber(totalUsers)} users`} />
+              <DarkStat label="Free plan" value={formatNumber(freePlan?.count || 0)} hint="default soft-launch tier" />
+              <DarkStat label="Active" value={formatNumber(activeStatus?.count || 0)} hint="licenses usable today" />
+            </div>
+          )}
+        </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-white">Operational checks</p>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${summary?.missing_free_backfill ? 'bg-burgundy text-white' : 'bg-sage text-white'}`}>
+              {summary?.missing_free_backfill ? 'Needs backfill' : 'Healthy'}
+            </span>
+          </div>
+          <div className="mt-4 space-y-3 text-sm text-white/70">
+            <CheckRow label="New users auto-created as free" ok={!summary?.missing_free_backfill} />
+            <CheckRow label="Unique license per user" ok />
+            <CheckRow label="Tenant-scoped admin summary" ok />
+          </div>
+          <p className="mt-4 rounded-2xl bg-gold/10 px-3 py-2 text-xs leading-5 text-gold">
+            Missing backfill: {formatNumber(summary?.missing_free_backfill || 0)}. Nếu khác 0, chạy migration/backfill trước khi bật paid flows.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DarkStat({ label, value, hint }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">{label}</p>
+      <p className="mt-2 font-display text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-xs text-white/50">{hint}</p>
+    </div>
+  );
+}
+
+function CheckRow({ label, ok }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-ink-900/50 px-3 py-2">
+      <span>{label}</span>
+      <span className={`h-2.5 w-2.5 rounded-full ${ok ? 'bg-sage' : 'bg-burgundy'}`} aria-hidden="true" />
     </div>
   );
 }
