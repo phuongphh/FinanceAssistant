@@ -355,6 +355,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
+| #625 | Pre-Phase | [UI/UX] US1: Chat-first guidance in Asset card | [pre-phase/issue-625.md](by-phase/pre-phase/issue-625.md) |
 
-**Total:** 351 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 334 Pre-Phase)
+**Total:** 352 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 335 Pre-Phase)
