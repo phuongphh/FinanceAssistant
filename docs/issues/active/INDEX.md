@@ -43,7 +43,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #580 | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [issue-580.md](issue-580.md) |
 | #581 | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [issue-581.md](issue-581.md) |
 | #582 | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [issue-582.md](issue-582.md) |
-| #583 | [Story] P4.2.5-1.4: Audit log infrastructure | [issue-583.md](issue-583.md) |
 | #584 | [Story] P4.2.5-2.1: Overview stats endpoint | [issue-584.md](issue-584.md) |
 | #585 | [Story] P4.2.5-2.2: User growth & DAU chart endpoints | [issue-585.md](issue-585.md) |
 | #586 | [Story] P4.2.5-2.3: Feature events tracking + clicks endpoint | [issue-586.md](issue-586.md) |
@@ -64,4 +63,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
 | #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 59
+**Total active:** 58

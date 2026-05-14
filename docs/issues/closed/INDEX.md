@@ -321,9 +321,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #566 | Pre-Phase | [Story] US4: Menu Chi tiêu — help text & syntax guide | [pre-phase/issue-566.md](by-phase/pre-phase/issue-566.md) |
 | #567 | Pre-Phase | [Story] US5: Daily transaction summary (22:00 cron) | [pre-phase/issue-567.md](by-phase/pre-phase/issue-567.md) |
 | #568 | Pre-Phase | [Story] US6: Expense Dashboard — Money In list + CRUD | [pre-phase/issue-568.md](by-phase/pre-phase/issue-568.md) |
+| #583 | Pre-Phase | [Story] P4.2.5-1.4: Audit log infrastructure | [pre-phase/issue-583.md](by-phase/pre-phase/issue-583.md) |
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 
-**Total:** 320 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 303 Pre-Phase)
+**Total:** 321 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 304 Pre-Phase)
