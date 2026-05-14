@@ -323,6 +323,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #568 | Pre-Phase | [Story] US6: Expense Dashboard — Money In list + CRUD | [pre-phase/issue-568.md](by-phase/pre-phase/issue-568.md) |
 | #603 | Pre-Phase | fix(ocr): wire photo message handler in telegram_worker to call ocr_service | [pre-phase/issue-603.md](by-phase/pre-phase/issue-603.md) |
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
+| #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 
-**Total:** 319 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 302 Pre-Phase)
+**Total:** 320 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 303 Pre-Phase)
