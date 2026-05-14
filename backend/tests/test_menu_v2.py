@@ -191,6 +191,49 @@ class TestFormatMainMenu:
         assert text == default_text
 
 
+# ============================================================
+# _pick_localized fallback helper — Issue #635 regression guard
+# ============================================================
+
+
+class TestPickLocalized:
+    def test_returns_value_when_band_present(self):
+        bucket = {"starter": "S", "young_prof": "Y", "vip": "V"}
+        assert menu_formatter._pick_localized(
+            bucket, "vip", context="t"
+        ) == "V"
+
+    def test_falls_back_to_default_when_band_missing(self):
+        bucket = {DEFAULT_LEVEL: "D", "starter": "S"}
+        assert menu_formatter._pick_localized(
+            bucket, "vip", context="t"
+        ) == "D"
+
+    def test_falls_back_to_first_when_default_also_missing(self):
+        bucket = {"starter": "S", "hnw": "H"}
+        # DEFAULT_LEVEL ("young_prof") absent → use any remaining value.
+        result = menu_formatter._pick_localized(
+            bucket, "vip", context="t"
+        )
+        assert result in {"S", "H"}
+
+    def test_logs_warning_on_fallback(self, caplog):
+        import logging
+
+        bucket = {DEFAULT_LEVEL: "D"}
+        with caplog.at_level(logging.WARNING, logger=menu_formatter.__name__):
+            menu_formatter._pick_localized(bucket, "vip", context="ctx-x")
+        assert any("ctx-x" in rec.message for rec in caplog.records)
+
+    def test_no_warning_when_band_present(self, caplog):
+        import logging
+
+        bucket = {"vip": "V"}
+        with caplog.at_level(logging.WARNING, logger=menu_formatter.__name__):
+            menu_formatter._pick_localized(bucket, "vip", context="ctx-ok")
+        assert not any("ctx-ok" in rec.message for rec in caplog.records)
+
+
 class TestFormatSubmenu:
     @pytest.mark.parametrize(
         "cat", ["assets", "expenses", "cashflow", "goals", "market"]
