@@ -40,7 +40,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #578 | [Epic] Phase 4.2.5 — Epic 6: Security & Deployment | [issue-578.md](issue-578.md) |
 | #579 | [Epic] Phase 4.2.5 — Epic 7: License Foundation | [issue-579.md](issue-579.md) |
 | #584 | [Story] P4.2.5-2.1: Overview stats endpoint | [issue-584.md](issue-584.md) |
-| #587 | [Story] P4.2.5-2.4: Intent breakdown + tier distribution endpoints | [issue-587.md](issue-587.md) |
 | #588 | [Story] P4.2.5-2.5: Cohort retention endpoint | [issue-588.md](issue-588.md) |
 | #589 | [Story] P4.2.5-3.1: User list endpoint voi search/filter/pagination | [issue-589.md](issue-589.md) |
 | #590 | [Story] P4.2.5-3.2: User detail endpoint | [issue-590.md](issue-590.md) |
@@ -57,4 +56,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
 | #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 52
+**Total active:** 51
