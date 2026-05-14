@@ -357,6 +357,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #616 | Pre-Phase | bug(miniapp): cache buster (?b=) in menu button URL prevents Telegram from injecting initData | [pre-phase/issue-616.md](by-phase/pre-phase/issue-616.md) |
 | #625 | Pre-Phase | [UI/UX] US1: Chat-first guidance in Asset card | [pre-phase/issue-625.md](by-phase/pre-phase/issue-625.md) |
 | #627 | Pre-Phase | [UI/UX] US3: Crypto card — add date, remove "24h" | [pre-phase/issue-627.md](by-phase/pre-phase/issue-627.md) |
+| #628 | Pre-Phase | [UI/UX] US4: Recurring — fix date format dd/mm/yyyy | [pre-phase/issue-628.md](by-phase/pre-phase/issue-628.md) |
 
-**Total:** 353 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 336 Pre-Phase)
+**Total:** 354 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 337 Pre-Phase)
