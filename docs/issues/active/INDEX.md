@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #573 | [Epic] Phase 4.2.5 — Epic 1: Backend Foundation & Auth | [issue-573.md](issue-573.md) |
 | #574 | [Epic] Phase 4.2.5 — Epic 2: Analytics APIs | [issue-574.md](issue-574.md) |
 | #575 | [Epic] Phase 4.2.5 — Epic 3: User Management APIs | [issue-575.md](issue-575.md) |
 | #576 | [Epic] Phase 4.2.5 — Epic 4: Frontend Foundation | [issue-576.md](issue-576.md) |
@@ -60,4 +59,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #601 | [Story] P4.2.5-6.3: Production deployment workflow + smoke test | [issue-601.md](issue-601.md) |
 | #602 | [Story] P4.2.5-7.1: License data model + placeholder UI section | [issue-602.md](issue-602.md) |
 
-**Total active:** 55
+**Total active:** 54
