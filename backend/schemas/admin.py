@@ -54,7 +54,9 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, value: str) -> str:
-        if not any(ch.isalpha() for ch in value) or not any(ch.isdigit() for ch in value):
+        if not any(ch.isalpha() for ch in value) or not any(
+            ch.isdigit() for ch in value
+        ):
             raise ValueError("Password must contain at least one letter and one number")
         return value
 
@@ -163,3 +165,17 @@ class CohortRetentionRow(BaseModel):
 
 class CohortRetentionResponse(BaseModel):
     cohorts: list[CohortRetentionRow]
+
+
+class LicenseSummaryBucket(BaseModel):
+    key: str
+    count: int
+
+
+class LicenseSummaryResponse(BaseModel):
+    generated_at: datetime
+    total_users: int
+    total_licenses: int
+    missing_free_backfill: int
+    plans: list[LicenseSummaryBucket]
+    statuses: list[LicenseSummaryBucket]

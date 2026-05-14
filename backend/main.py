@@ -12,7 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from backend.config import get_settings
-from backend.api.admin import analytics as admin_analytics, audit as admin_audit, auth as admin_auth, users as admin_users
+from backend.api.admin import (
+    analytics as admin_analytics,
+    audit as admin_audit,
+    auth as admin_auth,
+    licenses as admin_licenses,
+    users as admin_users,
+)
 from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import (
@@ -49,7 +55,7 @@ SHUTDOWN_TASK_GRACE_SECONDS = 30
 # Max seconds to wait for PostgreSQL before proceeding anyway. Handles the
 # race where launchd starts the backend before Docker containers finish
 # coming up after a reboot.
-_DB_WAIT_INTERVAL = 3   # seconds between retries
+_DB_WAIT_INTERVAL = 3  # seconds between retries
 _DB_WAIT_ATTEMPTS = 20  # 20 × 3s = 60s max
 
 
@@ -67,7 +73,10 @@ async def _wait_for_db() -> None:
             if attempt < _DB_WAIT_ATTEMPTS:
                 logger.warning(
                     "DB not ready (attempt %d/%d): %s — retrying in %ds",
-                    attempt, _DB_WAIT_ATTEMPTS, exc, _DB_WAIT_INTERVAL,
+                    attempt,
+                    _DB_WAIT_ATTEMPTS,
+                    exc,
+                    _DB_WAIT_INTERVAL,
                 )
                 await asyncio.sleep(_DB_WAIT_INTERVAL)
             else:
@@ -124,6 +133,7 @@ async def lifespan(app: FastAPI):
     # silently neutralise the entire cache-bust mechanism.
     try:
         from backend.miniapp.routes import current_build_hash
+
         await setup_chat_menu_button(current_build_hash())
     except Exception:
         logger.exception(
@@ -161,13 +171,15 @@ async def lifespan(app: FastAPI):
     # to finish so we don't leave updates half-processed when uvicorn
     # receives SIGTERM during a deploy.
     pending = [
-        t for t in asyncio.all_tasks()
+        t
+        for t in asyncio.all_tasks()
         if t is not asyncio.current_task() and not t.done()
     ]
     if pending:
         logger.info(
             "Waiting up to %ds for %d background task(s) to finish",
-            SHUTDOWN_TASK_GRACE_SECONDS, len(pending),
+            SHUTDOWN_TASK_GRACE_SECONDS,
+            len(pending),
         )
         done, still_pending = await asyncio.wait(
             pending, timeout=SHUTDOWN_TASK_GRACE_SECONDS
@@ -257,7 +269,9 @@ if settings.zalo_channel_enabled:
     app.include_router(zalo_router.router, prefix="/api/v1")
     logger.info("Zalo channel ENABLED — webhook mounted at /api/v1/zalo/webhook")
 else:
-    logger.info("Zalo channel disabled (ZALO_CHANNEL_ENABLED=false) — webhook not mounted")
+    logger.info(
+        "Zalo channel disabled (ZALO_CHANNEL_ENABLED=false) — webhook not mounted"
+    )
 app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")
@@ -266,16 +280,17 @@ app.include_router(admin_auth.router, prefix="/api/admin")
 app.include_router(admin_analytics.router, prefix="/api/admin")
 app.include_router(admin_audit.router, prefix="/api/admin")
 app.include_router(admin_users.router, prefix="/api/admin")
+app.include_router(admin_licenses.router, prefix="/api/admin")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 
 @app.get("/health")
 async def health_check():
-    return JSONResponse(
-        content={"data": {"status": "healthy"}, "error": None}
-    )
+    return JSONResponse(content={"data": {"status": "healthy"}, "error": None})
 
 
 _ADMIN_STATIC = Path(__file__).parent / "static" / "admin"
 if _ADMIN_STATIC.exists():
-    app.mount("/", StaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa")
+    app.mount(
+        "/", StaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa"
+    )
