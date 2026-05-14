@@ -322,6 +322,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #567 | Pre-Phase | [Story] US5: Daily transaction summary (22:00 cron) | [pre-phase/issue-567.md](by-phase/pre-phase/issue-567.md) |
 | #568 | Pre-Phase | [Story] US6: Expense Dashboard — Money In list + CRUD | [pre-phase/issue-568.md](by-phase/pre-phase/issue-568.md) |
 | #573 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 1: Backend Foundation & Auth | [pre-phase/issue-573.md](by-phase/pre-phase/issue-573.md) |
+| #574 | Pre-Phase | [Epic] Phase 4.2.5 — Epic 2: Analytics APIs | [pre-phase/issue-574.md](by-phase/pre-phase/issue-574.md) |
 | #580 | Pre-Phase | [Story] P4.2.5-1.1: Admin user data model + migration + seed | [pre-phase/issue-580.md](by-phase/pre-phase/issue-580.md) |
 | #581 | Pre-Phase | [Story] P4.2.5-1.2: Login endpoint + force password change flow | [pre-phase/issue-581.md](by-phase/pre-phase/issue-581.md) |
 | #582 | Pre-Phase | [Story] P4.2.5-1.3: Auth dependency + logout endpoint | [pre-phase/issue-582.md](by-phase/pre-phase/issue-582.md) |
@@ -333,5 +334,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #608 | Pre-Phase | fix(miniapp): wealth dashboard returns 302 redirect which Telegram Mini App cannot follow | [pre-phase/issue-608.md](by-phase/pre-phase/issue-608.md) |
 | #610 | Pre-Phase | bug(miniapp): menu button Mini App URL with cache buster (?b=) fails to open in Telegram | [pre-phase/issue-610.md](by-phase/pre-phase/issue-610.md) |
 
-**Total:** 328 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 311 Pre-Phase)
+**Total:** 329 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 312 Pre-Phase)
