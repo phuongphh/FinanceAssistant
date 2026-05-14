@@ -36,6 +36,9 @@ lxml>=5.0.0
 matplotlib>=3.8.0
 numpy>=1.26.0
 
+# Security
+bcrypt>=4.1.0
+
 # Utils
 python-dotenv>=1.0.0
 pydantic-settings>=2.0.0

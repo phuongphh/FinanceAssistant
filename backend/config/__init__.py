@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     port: int = 8001
     internal_api_key: str = ""
 
+    # Admin Observability Console (Phase 4.2.5)
+    admin_jwt_secret: str = ""
+    admin_jwt_expiry_minutes: int = 60
+    admin_redis_url: str = "redis://localhost:6379/1"
+
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
 
