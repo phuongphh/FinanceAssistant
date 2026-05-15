@@ -130,6 +130,21 @@ def build_action_confirmation(intent_result: IntentResult, user: User) -> str:
     )
 
 
+def build_message_from_key(key: str, user: User, **placeholders) -> str:
+    """Render an arbitrary clarification YAML key by name.
+
+    Used by handlers that need a one-off prompt outside the standard
+    intent → key mapping (e.g., the income-detected guard in the quick-
+    transaction handler). Falls back to a generic line when the key is
+    missing so users never see a stack trace.
+    """
+    templates = _load().get(key, [])
+    name = user.display_name or "bạn"
+    if templates:
+        return random.choice(templates).format(name=name, **placeholders)
+    return f"Mình chưa rõ ý {name} ơi 🌱 — bạn nói thêm giúp mình nhé."
+
+
 def build_awaiting_response(user: User) -> str:
     templates = _load().get("awaiting_response", [])
     name = user.display_name or "bạn"
@@ -143,4 +158,5 @@ __all__ = [
     "build_amount_confirmation",
     "build_awaiting_response",
     "build_clarification",
+    "build_message_from_key",
 ]
