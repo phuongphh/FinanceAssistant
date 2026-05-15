@@ -44,5 +44,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
 | #652 | [Epic] Bugs — NLU parsing failures (8 bugs) | [issue-652.md](issue-652.md) |
 | #653 | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [issue-653.md](issue-653.md) |
+| #655 | [Bug] 'Chi tiêu dashboard' → Bé Tiền show báo cáo thay vì mở Dashboard | [issue-655.md](issue-655.md) |
 
-**Total active:** 40
+**Total active:** 41
