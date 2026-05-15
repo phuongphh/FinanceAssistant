@@ -51,5 +51,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #658 | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [issue-658.md](issue-658.md) |
 | #659 | [Bug] 'Thêm mục tiêu' → Bé Tiền show goals report thay vì add goal | [issue-659.md](issue-659.md) |
 | #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
+| #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 47
+**Total active:** 48
