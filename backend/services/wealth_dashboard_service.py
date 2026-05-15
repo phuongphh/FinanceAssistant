@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.wealth.asset_types import (
     get_asset_config,
-    get_subtype_icon,
+    get_asset_display_icon,
     get_subtype_label,
 )
 from backend.wealth.ladder import (
@@ -92,7 +92,16 @@ def _serialize_group(members: list) -> dict:
         "asset_type": asset_type,
         "subtype": subtype,
         "subtype_label": get_subtype_label(subtype),
-        "icon": get_subtype_icon(asset_type, subtype),
+        "icon": (
+            get_asset_display_icon(
+                asset_type,
+                subtype,
+                name=first.name,
+                extra=getattr(first, "extra", None),
+            )
+            if asset_type == "real_estate"
+            else config.get("icon", "📌")
+        ),
         "type_label": config.get("label_vi", asset_type),
         "current_value": float(current),
         "initial_value": float(initial),

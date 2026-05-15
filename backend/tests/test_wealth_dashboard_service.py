@@ -69,6 +69,17 @@ class TestSerializeGroup:
         assert out["type_label"] == "widgets"
         assert out["subtype_label"] is None
 
+    def test_land_real_estate_uses_tree_icon(self):
+        a = _asset("real_estate", "Đất Ba Vì", 1_500_000_000, subtype="land")
+        out = svc._serialize_group([a])
+        assert out["icon"] == "🌳"
+        assert out["subtype_label"] == "Đất"
+
+    def test_legacy_land_name_without_subtype_uses_tree_icon(self):
+        a = _asset("real_estate", "Đất Long An", 1_500_000_000)
+        out = svc._serialize_group([a])
+        assert out["icon"] == "🌳"
+
     def test_zero_initial_value_does_not_divide_by_zero(self):
         a = _asset("other", "Gift", 5_000_000, initial=0)
         out = svc._serialize_group([a])

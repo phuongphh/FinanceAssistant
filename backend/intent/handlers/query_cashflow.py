@@ -96,7 +96,7 @@ class QueryCashflowHandler(IntentHandler):
         style: LevelStyle,
     ) -> str:
         name = user.display_name or "bạn"
-        label_vi = _TIME_LABELS_VI.get(time_range.label, time_range.label)
+        label_vi = _cashflow_period_label(time_range)
         if current.income <= 0 and current.spend <= 0:
             return (
                 f"{name} chưa có dữ liệu thu / chi {label_vi} 🌱\n"
@@ -154,11 +154,8 @@ class QueryCashflowHandler(IntentHandler):
         period: CashflowPeriod,
         streams: list[IncomeStream],
     ) -> str:
-        label_vi = _TIME_LABELS_VI.get(time_range.label, "tháng này")
+        label_vi = _cashflow_period_label(time_range)
         title = f"📅 *Dòng tiền {label_vi}*"
-        if time_range.label == "this_month":
-            today_vi = date.today().strftime("%d/%m/%Y")
-            title = f"📅 *Dòng tiền {label_vi} tính đến hôm nay {today_vi}*"
         sign = "+" if period.net >= 0 else "−"
         lines = [
             title,
@@ -366,6 +363,14 @@ def _format_percent(value: float | None) -> str:
     if value is None:
         return "—"
     return f"{value:+.1f}%"
+
+
+def _cashflow_period_label(time_range: TimeRange) -> str:
+    label_vi = _TIME_LABELS_VI.get(time_range.label, time_range.label)
+    if time_range.label == "this_month":
+        today_vi = date.today().strftime("%d/%m/%Y")
+        return f"{label_vi} tính đến hôm nay {today_vi}"
+    return label_vi
 
 
 def _cashflow_tip(period: CashflowPeriod, saving_rate: float | None) -> str:

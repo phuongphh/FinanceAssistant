@@ -177,6 +177,10 @@ async def test_cashflow_overview_splits_income_and_expense_cards():
     ):
         response = await QueryCashflowHandler().handle(intent, user, db)
 
+    assert (
+        f"Dòng tiền tháng này tính đến hôm nay {date.today().strftime('%d/%m/%Y')}"
+        in response
+    )
     assert "💼 *Thu nhập tháng*" in response
     assert "💸 *Chi tiêu tháng*" in response
     assert "💎 *Tỷ lệ tiết kiệm*" in response

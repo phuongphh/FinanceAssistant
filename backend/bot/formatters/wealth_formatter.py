@@ -4,12 +4,18 @@ Kept thin so handlers stay focused on flow control. Money formatting
 goes through ``backend.bot.formatters.money`` so we have one canonical
 short/full format across the bot.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
 
 from backend.bot.formatters.money import format_money_full, format_money_short
-from backend.wealth.asset_types import get_icon, get_label, get_subtype_icon, get_subtype_label
+from backend.wealth.asset_types import (
+    get_asset_display_icon,
+    get_icon,
+    get_label,
+    get_subtype_label,
+)
 from backend.wealth.models.asset import Asset
 
 
@@ -25,7 +31,9 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
     line so the user sees both the native USD value they typed and the
     estimated VND that's actually stored.
     """
-    icon = get_subtype_icon(asset.asset_type, asset.subtype)
+    icon = get_asset_display_icon(
+        asset.asset_type, asset.subtype, name=asset.name, extra=asset.extra
+    )
     label = get_label(asset.asset_type)
     initial = Decimal(asset.initial_value or 0)
     current = Decimal(asset.current_value or 0)
@@ -40,9 +48,7 @@ def format_asset_added(asset: Asset, net_worth: Decimal) -> str:
         fx_rate = extra.get("fx_rate_vnd")
         if current_usd is not None and fx_rate:
             usd_str = _format_usd_short(Decimal(str(current_usd)))
-            lines.append(
-                f"   ≈ {usd_str} USD (FX {int(fx_rate):,} VND/USD, tạm tính)"
-            )
+            lines.append(f"   ≈ {usd_str} USD (FX {int(fx_rate):,} VND/USD, tạm tính)")
 
     diff = current - initial
     if diff > 0:
@@ -73,7 +79,9 @@ def format_asset_list(assets: list[Asset]) -> str:
     total = sum((a.current_value for a in assets), Decimal(0))
     lines: list[str] = [f"📊 <b>Tài sản của bạn</b> ({len(assets)} mục)\n"]
     for asset in assets:
-        icon = get_subtype_icon(asset.asset_type, asset.subtype)
+        icon = get_asset_display_icon(
+            asset.asset_type, asset.subtype, name=asset.name, extra=asset.extra
+        )
         subtype_label = get_subtype_label(asset.subtype)
         amount = format_money_short(asset.current_value)
         if subtype_label:

@@ -98,6 +98,7 @@ from backend.wealth.amount_parser import (
 from backend.wealth.asset_types import (
     AssetType,
     get_label,
+    get_asset_display_icon,
     get_subtype_icon,
     get_subtypes,
 )
@@ -222,7 +223,9 @@ async def list_assets(db: AsyncSession, chat_id: int, user: User) -> None:
 
 
 def _asset_dashboard_row_label(asset) -> str:
-    icon = get_subtype_icon(asset.asset_type, asset.subtype)
+    icon = get_asset_display_icon(
+        asset.asset_type, asset.subtype, name=asset.name, extra=asset.extra
+    )
     return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
 
 
@@ -553,7 +556,9 @@ async def show_asset_manage_menu(db: AsyncSession, chat_id: int, user: User) -> 
 
 
 def _asset_delete_row_label(asset) -> str:
-    icon = get_subtype_icon(asset.asset_type, asset.subtype)
+    icon = get_asset_display_icon(
+        asset.asset_type, asset.subtype, name=asset.name, extra=asset.extra
+    )
     return f"{icon} {asset.name} — {format_money_short(asset.current_value)}"
 
 
@@ -2409,10 +2414,12 @@ async def start_mark_rental_wizard(db: AsyncSession, chat_id: int, user: User) -
         )
         return
 
-    items = [
-        (a.id, f"{get_subtype_icon(AssetType.REAL_ESTATE.value, a.subtype)} {a.name}")
-        for a in candidates
-    ]
+    items = []
+    for a in candidates:
+        icon = get_asset_display_icon(
+            AssetType.REAL_ESTATE.value, a.subtype, name=a.name, extra=a.extra
+        )
+        items.append((a.id, f"{icon} {a.name}"))
     await send_message(
         chat_id=chat_id,
         text="🏠 <b>Đánh dấu BĐS nào là cho thuê?</b>",
