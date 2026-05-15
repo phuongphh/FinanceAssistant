@@ -301,3 +301,54 @@ async def test_income_verb_with_spending_context_still_records_expense():
         await handler.handle(result, _user(), db)
 
     mock_create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_text,should_record",
+    [
+        # "thường" (often) collides with "thưởng" (bonus) after diacritic
+        # stripping. PR #662 review: ordinary expenses with "thường"
+        # must still record.
+        ("thường ăn sáng 50k", True),
+        ("mình thường mua cà phê 35k", True),
+        # "trả lương" — the income guard must hold even though the
+        # message contains the spending-flavored verb "trả".
+        ("công ty trả lương 20tr", False),
+    ],
+)
+async def test_diacritic_collisions_do_not_break_income_guard(
+    raw_text, should_record
+):
+    """PR #662 review (chatgpt-codex): bare "thuong"/"tra" collide with
+    unrelated words after diacritic stripping. The keyword lists must
+    avoid those collisions.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.85,
+        parameters={"amount": 50_000, "merchant": "ăn sáng"} if should_record else {},
+        raw_text=raw_text,
+    )
+    db = _fake_db()
+    fake_expense = MagicMock(user_id="user-1")
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=fake_expense),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(
+            return_value='{"is_expense": true, "amount": 50000, "merchant": "ăn sáng"}'
+        ),
+    ):
+        await handler.handle(result, _user(), db)
+
+    if should_record:
+        mock_create.assert_awaited_once()
+    else:
+        mock_create.assert_not_called()

@@ -126,8 +126,12 @@ _INCOME_KEYWORDS: tuple[str, ...] = (
     "nhan thuong",
     "nhan tien",
     "luong",
-    "thuong",
+    # NOTE: bare "thuong" is intentionally OMITTED — after diacritic
+    # stripping it collides with the common adverb "thường" (usually,
+    # often), which would swallow ordinary expenses like
+    # "thường ăn sáng 50k". Only phrasal forms are listed.
     "thuong tet",
+    "tien thuong",
     "duoc thuong",
     "duoc tang",
     "duoc cho",
@@ -143,6 +147,10 @@ _INCOME_KEYWORDS: tuple[str, ...] = (
 
 # Verbs that explicitly mean "spend" — used to override the income check
 # in mixed sentences like "lương tháng này tiêu hết 5tr" (expense wins).
+# NOTE: bare "tra" is intentionally OMITTED — it is a substring of
+# "tra luong" / "tra thuong" (paying salary/bonus, which is income from
+# the user's perspective), so including it would break "công ty trả
+# lương 20tr". The phrasal "tra tien" still covers genuine spending.
 _EXPENSE_KEYWORDS: tuple[str, ...] = (
     "tieu",
     "chi tieu",
@@ -150,7 +158,6 @@ _EXPENSE_KEYWORDS: tuple[str, ...] = (
     "mua",
     "thanh toan",
     "bo tien",
-    "tra",
     "het",
 )
 
