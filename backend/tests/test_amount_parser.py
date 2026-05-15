@@ -77,6 +77,22 @@ class TestParseAmount:
     def test_garbage_returns_none(self):
         assert parse_amount("hôm qua trời mưa") is None
 
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            # "25tr320" = 25 triệu + 320 nghìn = 25,320,000 (issue #657).
+            ("25tr320", Decimal("25320000")),
+            ("25tr 320", Decimal("25320000")),
+            ("100tr500", Decimal("100500000")),
+            ("1 tỷ 500", Decimal("1500000000")),
+            ("1ty500", Decimal("1500000000")),
+            ("2 tỉ 300", Decimal("2300000000")),
+            ("3 triệu 250", Decimal("3250000")),
+        ],
+    )
+    def test_sub_amount_after_unit(self, raw, expected):
+        assert parse_amount(raw) == expected
+
 
 class TestParseLabelAndAmount:
     @pytest.mark.parametrize(
@@ -117,6 +133,22 @@ class TestParseLabelAndAmount:
     def test_digits_in_label_are_not_amounts(
         self, raw, expected_label, expected_amount
     ):
+        result = parse_label_and_amount(raw)
+        assert result is not None, f"parser returned None for {raw!r}"
+        label, amount = result
+        assert label == expected_label
+        assert amount == expected_amount
+
+    @pytest.mark.parametrize(
+        "raw,expected_label,expected_amount",
+        [
+            # Sub-amount after unit (issue #657).
+            ("TCB 25tr320", "TCB", Decimal("25320000")),
+            ("VCB 100tr500", "VCB", Decimal("100500000")),
+            ("Nhà 2 tỷ 300", "Nhà", Decimal("2300000000")),
+        ],
+    )
+    def test_sub_amount_with_label(self, raw, expected_label, expected_amount):
         result = parse_label_and_amount(raw)
         assert result is not None, f"parser returned None for {raw!r}"
         label, amount = result
