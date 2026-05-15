@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
 | #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
 | #645 | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [issue-645.md](issue-645.md) |
+| #646 | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [issue-646.md](issue-646.md) |
 
-**Total active:** 34
+**Total active:** 35
