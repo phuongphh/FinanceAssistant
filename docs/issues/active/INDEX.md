@@ -36,6 +36,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #641 | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [issue-641.md](issue-641.md) |
 | #642 | improve: Hide/show total asset amount with eye button | [issue-642.md](issue-642.md) |
 | #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
+| #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
 | #645 | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [issue-645.md](issue-645.md) |
 
-**Total active:** 33
+**Total active:** 34
