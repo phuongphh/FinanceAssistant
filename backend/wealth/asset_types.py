@@ -5,6 +5,7 @@ truth for icons, labels, and per-type required/optional fields. Both
 the wizard keyboards and the Mini App breakdown read from this file,
 so adding an asset type only requires a YAML edit + an enum entry.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -66,6 +67,8 @@ _SUBTYPE_ICONS: dict[str, str] = {
     "fund": "📊",
     "etf": "📊",
     "foreign_stock": "📈",
+    "house_primary": "🏠",
+    "land": "🌳",
 }
 
 _SUBTYPE_SHORT_LABELS: dict[str, str] = {

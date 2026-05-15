@@ -24,7 +24,11 @@ from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.wealth.asset_types import get_asset_config, get_subtype_label
+from backend.wealth.asset_types import (
+    get_asset_config,
+    get_subtype_icon,
+    get_subtype_label,
+)
 from backend.wealth.ladder import (
     WealthLevel,
     detect_level,
@@ -88,7 +92,7 @@ def _serialize_group(members: list) -> dict:
         "asset_type": asset_type,
         "subtype": subtype,
         "subtype_label": get_subtype_label(subtype),
-        "icon": config.get("icon", "📌"),
+        "icon": get_subtype_icon(asset_type, subtype),
         "type_label": config.get("label_vi", asset_type),
         "current_value": float(current),
         "initial_value": float(initial),

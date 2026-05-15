@@ -178,7 +178,7 @@ submenu_assets:
       callback: "menu:assets:manage"
       description: "Hướng dẫn 3 cách quản lý tài sản"
 
-    - label: "🏠 BĐS cho thuê"
+    - label: "🏠 Cho thuê BĐS"
       callback: "menu:assets:mark_rental"
       description: "Đánh dấu BĐS hiện có là cho thuê + tracking yield"
 
@@ -199,8 +199,7 @@ submenu_assets:
 # conflicts when unrelated menus are appended later.
 action_assets_net_worth:
   market_value_note: |-
-    🧾 _Ghi chú từ Bé Tiền:_
-    ✨ Mình đã dùng giá thị trường mới nhất đang có để cập nhật chứng khoán, tiền số và vàng.
+    Tài sản của bạn đã được Bé Tiền cập nhật dựa trên giá trị mới nhất của thị trường chứng khoán, vàng và tiền số
   recalculating_wait: |-
     🔄 _Bé Tiền đang cập nhật theo giá thị trường..._
     Chờ mình một chút nhé ✨
@@ -214,6 +213,8 @@ action_assets_report:
 action_assets_manage:
   title: "✏️ *THÊM / SỬA / XOÁ TÀI SẢN*"
   body: |-
+    Tài sản gồm những gì (Tiền mặt & Tài khoản, Chứng khoán, Bất động sản, Tiền số, Vàng…)
+
     Cứ nói chuyện tự nhiên với mình trước nhé — {name} có thể gõ:
     • "thêm 100tr vào VCB"
     • "thêm 50 triệu tiền mặt"
@@ -305,14 +306,7 @@ action_expenses_report:
 action_expenses_manage:
   title: "✏️ *THÊM / SỬA / XOÁ CHI TIÊU*"
   body: |-
-    Mình có 3 cách để {name} quản lý chi tiêu — chọn cách tiện nhất nhé:
-
-    *1️⃣ Mini App Dashboard* _(khuyên dùng)_
-    • Bấm nút *📊 Báo cáo* ở menu Chi tiêu
-    • Giao diện trực quan: thêm/sửa/xoá nhanh, có biểu đồ theo loại
-
-    *2️⃣ Nói chuyện tự nhiên với Bé Tiền*
-    💡 _Mẹo — thử gõ:_
+    Cứ nói chuyện tự nhiên với mình trước nhé — {name} có thể gõ:
     • "+20k tiền thưởng" → tiền vào
     • "-100k ăn trưa" → chi tiêu
     • "được thưởng 200k", "được bố cho 500k", "được lì xì 50k trên momo"
@@ -321,7 +315,13 @@ action_expenses_manage:
     • "trả tiền điện 1.2tr"
     • "+200k được thưởng" hoặc "+ 50k lì xì" để ghi tiền vào
 
-    *3️⃣ Gửi ảnh hoá đơn*
+    Nếu muốn thao tác bằng nút, mình vẫn giữ đủ 2 cách bên dưới:
+
+    *1️⃣ Mini App Dashboard* _(khuyên dùng)_
+    • Bấm nút *📊 Báo cáo* ở menu Chi tiêu
+    • Giao diện trực quan: thêm/sửa/xoá nhanh, có biểu đồ theo loại
+
+    *2️⃣ Gửi ảnh hoá đơn*
     • Chụp/forward ảnh hoá đơn — mình tự đọc số tiền, merchant và phân loại giúp.
   open_miniapp_button: "Mở Dashboard"
   ocr_button: "📷 Đọc hoá đơn"

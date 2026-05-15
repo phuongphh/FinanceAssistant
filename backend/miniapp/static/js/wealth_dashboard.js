@@ -26,6 +26,7 @@
         trendSection: document.getElementById('trend-section'),
         assetsSection: document.getElementById('assets-section'),
         netWorth: document.getElementById('net-worth'),
+        netWorthToggle: document.getElementById('net-worth-toggle'),
         changeIcon: document.getElementById('change-icon'),
         changeAmount: document.getElementById('change-amount'),
         changePeriod: document.getElementById('change-period'),
@@ -50,6 +51,7 @@
     let trendChart = null;
     let currentPeriod = 90;
     let currentAssetSort = window.sessionStorage.getItem('wealth.asset_sort') || 'value_desc';
+    let isNetWorthVisible = window.sessionStorage.getItem('wealth.net_worth_visible') !== 'false';
     let lastOverview = null;
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
@@ -71,6 +73,7 @@
     els.addAssetBtn.addEventListener('click', closeAndAddAsset);
     els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
     els.assetsList.addEventListener('click', onAssetRowClick);
+    els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
 
     document.querySelectorAll('.period-btn').forEach((btn) => {
         btn.addEventListener('click', () => onPeriodChange(btn));
@@ -184,7 +187,7 @@
     }
 
     function renderHero(data) {
-        els.netWorth.textContent = formatMoneyFull(data.net_worth || 0);
+        renderNetWorthAmount(data.net_worth || 0);
 
         // Show both absolute amount and % vs hôm qua, e.g. "+217 tỷ (3%)".
         // Color + icon tag the .hero-change element via .up / .down / .flat
@@ -217,6 +220,23 @@
 
         els.levelPill.textContent = data.level_label || LEVEL_LABELS[data.level] || data.level || '—';
         els.assetCount.textContent = `${data.asset_count || 0} tài sản`;
+    }
+
+    function renderNetWorthAmount(amount) {
+        els.netWorth.textContent = isNetWorthVisible ? formatMoneyFull(amount) : '********';
+        els.netWorth.classList.toggle('masked', !isNetWorthVisible);
+        els.netWorthToggle.textContent = isNetWorthVisible ? '👁' : '🙈';
+        els.netWorthToggle.setAttribute(
+            'aria-label',
+            isNetWorthVisible ? 'Ẩn tổng tài sản' : 'Hiện tổng tài sản'
+        );
+        els.netWorthToggle.setAttribute('aria-pressed', String(!isNetWorthVisible));
+    }
+
+    function toggleNetWorthVisibility() {
+        isNetWorthVisible = !isNetWorthVisible;
+        window.sessionStorage.setItem('wealth.net_worth_visible', String(isNetWorthVisible));
+        renderNetWorthAmount((lastOverview && lastOverview.net_worth) || 0);
     }
 
     function toggleSections(isEmpty) {

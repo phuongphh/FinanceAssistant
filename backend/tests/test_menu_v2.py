@@ -26,7 +26,6 @@ from backend.bot.formatters.menu_formatter import (
     known_categories,
 )
 
-
 # Telegram's hard limit on callback_data — we mirror this constant
 # rather than importing from another module so this test fails loudly
 # if either side drifts.
@@ -93,9 +92,9 @@ class TestYamlSchema:
         for cat in known_categories():
             copy = menu_formatter._load_copy()
             buttons = copy[f"submenu_{cat}"]["buttons"]
-            assert buttons[-1]["callback"] == "menu:main", (
-                f"Sub-menu {cat} last button must be back-to-main"
-            )
+            assert (
+                buttons[-1]["callback"] == "menu:main"
+            ), f"Sub-menu {cat} last button must be back-to-main"
             assert "Quay về" in buttons[-1]["label"]
 
     def test_every_submenu_has_hint(self):
@@ -115,9 +114,9 @@ class TestTelegramLimits:
         for menu_key, btn in _all_buttons():
             data = btn["callback"]
             n = len(data.encode("utf-8"))
-            assert n <= CALLBACK_DATA_MAX_BYTES, (
-                f"{menu_key}: callback {data!r} = {n} bytes > {CALLBACK_DATA_MAX_BYTES}"
-            )
+            assert (
+                n <= CALLBACK_DATA_MAX_BYTES
+            ), f"{menu_key}: callback {data!r} = {n} bytes > {CALLBACK_DATA_MAX_BYTES}"
 
     def test_button_labels_are_reasonable_length(self):
         # Mobile readability target is ≤16 chars; Vietnamese diacritics
@@ -127,15 +126,15 @@ class TestTelegramLimits:
         MAX = 24
         for menu_key, btn in _all_buttons():
             label = btn["label"]
-            assert len(label) <= MAX, (
-                f"{menu_key}: label {label!r} = {len(label)} chars > {MAX}"
-            )
+            assert (
+                len(label) <= MAX
+            ), f"{menu_key}: label {label!r} = {len(label)} chars > {MAX}"
 
     def test_callback_format_consistency(self):
         for menu_key, btn in _all_buttons():
-            assert btn["callback"].startswith("menu:"), (
-                f"{menu_key}: callback {btn['callback']!r} not under menu: prefix"
-            )
+            assert btn["callback"].startswith(
+                "menu:"
+            ), f"{menu_key}: callback {btn['callback']!r} not under menu: prefix"
 
 
 # ============================================================
@@ -199,22 +198,16 @@ class TestFormatMainMenu:
 class TestPickLocalized:
     def test_returns_value_when_band_present(self):
         bucket = {"starter": "S", "young_prof": "Y", "vip": "V"}
-        assert menu_formatter._pick_localized(
-            bucket, "vip", context="t"
-        ) == "V"
+        assert menu_formatter._pick_localized(bucket, "vip", context="t") == "V"
 
     def test_falls_back_to_default_when_band_missing(self):
         bucket = {DEFAULT_LEVEL: "D", "starter": "S"}
-        assert menu_formatter._pick_localized(
-            bucket, "vip", context="t"
-        ) == "D"
+        assert menu_formatter._pick_localized(bucket, "vip", context="t") == "D"
 
     def test_falls_back_to_first_when_default_also_missing(self):
         bucket = {"starter": "S", "hnw": "H"}
         # DEFAULT_LEVEL ("young_prof") absent → use any remaining value.
-        result = menu_formatter._pick_localized(
-            bucket, "vip", context="t"
-        )
+        result = menu_formatter._pick_localized(bucket, "vip", context="t")
         assert result in {"S", "H"}
 
     def test_logs_warning_on_fallback(self, caplog):
@@ -380,7 +373,8 @@ class TestHandleMenuCallback:
 
     @pytest.mark.asyncio
     async def test_goals_advisor_sends_placeholder_before_response(
-        self, monkeypatch,
+        self,
+        monkeypatch,
     ):
         """Issue #450 §3 — clicking "Gợi ý lộ trình" must show a typing
         indicator + placeholder message immediately, then edit it with
@@ -413,18 +407,25 @@ class TestHandleMenuCallback:
             )
 
         user = SimpleNamespace(
-            id="user-1", wealth_level="young_prof", display_name="Test",
+            id="user-1",
+            wealth_level="young_prof",
+            display_name="Test",
         )
 
         monkeypatch.setattr(menu_handler, "send_chat_action", fake_send_chat_action)
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
         monkeypatch.setattr(
-            menu_handler._dispatcher, "dispatch", fake_dispatch,
+            menu_handler._dispatcher,
+            "dispatch",
+            fake_dispatch,
         )
 
         await menu_handler._action_goals_advisor(
-            db=None, user=user, chat_id=42, message_id=None,
+            db=None,
+            user=user,
+            chat_id=42,
+            message_id=None,
         )
 
         # Order matters — placeholder + typing must arrive before edit.
@@ -435,8 +436,10 @@ class TestHandleMenuCallback:
         assert kinds.index("send_message") < kinds.index("edit_message_text")
 
         edit_call = next(step for step in actions if step[0] == "edit_message_text")
-        assert "lộ trình" in edit_call[1]["text"].lower() or \
-               "Đây là gợi ý" in edit_call[1]["text"]
+        assert (
+            "lộ trình" in edit_call[1]["text"].lower()
+            or "Đây là gợi ý" in edit_call[1]["text"]
+        )
 
     @pytest.mark.asyncio
     async def test_goals_advisor_timeout_fallback(self, monkeypatch):
@@ -461,21 +464,30 @@ class TestHandleMenuCallback:
             await asyncio.sleep(10)  # Way over the timeout.
 
         user = SimpleNamespace(
-            id="user-1", wealth_level="young_prof", display_name="Test",
+            id="user-1",
+            wealth_level="young_prof",
+            display_name="Test",
         )
 
         monkeypatch.setattr(menu_handler, "send_chat_action", fake_send_chat_action)
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
         monkeypatch.setattr(
-            menu_handler, "_GOALS_ADVISOR_TIMEOUT_SECONDS", 0.05,
+            menu_handler,
+            "_GOALS_ADVISOR_TIMEOUT_SECONDS",
+            0.05,
         )
         monkeypatch.setattr(
-            menu_handler._dispatcher, "dispatch", slow_dispatch,
+            menu_handler._dispatcher,
+            "dispatch",
+            slow_dispatch,
         )
 
         await menu_handler._action_goals_advisor(
-            db=None, user=user, chat_id=42, message_id=None,
+            db=None,
+            user=user,
+            chat_id=42,
+            message_id=None,
         )
 
         assert edits, "expected edit_message_text to be called with fallback"
@@ -636,9 +648,9 @@ class TestAdaptiveIntros:
         renders = {lvl: format_main_menu(_user(), level=lvl)[0] for lvl in levels}
         for i, a in enumerate(levels):
             for b in levels[i + 1 :]:
-                assert renders[a] != renders[b], (
-                    f"Levels {a} and {b} render identical main menu text"
-                )
+                assert (
+                    renders[a] != renders[b]
+                ), f"Levels {a} and {b} render identical main menu text"
 
     @pytest.mark.parametrize(
         "category", ["assets", "expenses", "cashflow", "goals", "market"]
@@ -650,9 +662,9 @@ class TestAdaptiveIntros:
         }
         for i, a in enumerate(levels):
             for b in levels[i + 1 :]:
-                assert renders[a] != renders[b], (
-                    f"{category}: levels {a} and {b} render identically"
-                )
+                assert (
+                    renders[a] != renders[b]
+                ), f"{category}: levels {a} and {b} render identically"
 
     def test_buttons_identical_across_levels(self):
         levels = ["starter", "young_prof", "mass_affluent", "hnw", "vip"]
@@ -721,7 +733,9 @@ class TestNavigateCashflow:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_cashflow(
             db=None,
@@ -750,7 +764,9 @@ class TestNavigateCashflow:
 
         monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
         monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_cashflow(
             db=None,
@@ -779,7 +795,9 @@ class TestNavigateCashflow:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_cashflow(
             db=None,
@@ -810,7 +828,9 @@ class TestNavigateCashflow:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_cashflow(
             db=None,
@@ -822,9 +842,7 @@ class TestNavigateCashflow:
 
         assert len(captured_keyboard) == 1
         kb = captured_keyboard[0]
-        all_callbacks = [
-            row[0]["callback_data"] for row in kb["inline_keyboard"]
-        ]
+        all_callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
         # Submenu buttons present
         assert "menu:cashflow:monthly_report" in all_callbacks
         assert "menu:cashflow:expenses" in all_callbacks
@@ -848,7 +866,9 @@ class TestNavigateCashflow:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(menu_handler._dispatcher, "dispatch", fake_dispatch)
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_cashflow(
             db=None,
@@ -873,11 +893,13 @@ class TestNavigateCashflow:
 def _fake_breakdown(total: int = 150_000_000, asset_count: int = 3):
     from decimal import Decimal
     from types import SimpleNamespace
+
     return SimpleNamespace(total=Decimal(total), asset_count=asset_count)
 
 
 def _fake_style(is_starter: bool = False):
     from types import SimpleNamespace
+
     return SimpleNamespace(is_starter=is_starter)
 
 
@@ -902,18 +924,30 @@ class TestNavigateAssets:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(
-            net_worth_calculator, "calculate_stored_current",
+            net_worth_calculator,
+            "calculate_stored_current",
             AsyncMock(return_value=_fake_breakdown()),
         )
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_assets(
-            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
         )
 
         assert sent["chat_id"] == 42
         assert "Tổng tài sản" in sent["text"]
+        assert "👁 *150,000,000đ*" in sent["text"]
         assert "inline_keyboard" in sent["reply_markup"]
+        assert (
+            sent["reply_markup"]["inline_keyboard"][0][0]["callback_data"]
+            == "menu:assets:toggle_total"
+        )
 
     @pytest.mark.asyncio
     async def test_edit_message_text_called_when_message_id_set(self, monkeypatch):
@@ -928,13 +962,20 @@ class TestNavigateAssets:
 
         monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
         monkeypatch.setattr(
-            net_worth_calculator, "calculate_stored_current",
+            net_worth_calculator,
+            "calculate_stored_current",
             AsyncMock(return_value=_fake_breakdown()),
         )
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_assets(
-            db=None, user=_fake_user(), chat_id=42, message_id=99, level="young_prof",
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=99,
+            level="young_prof",
         )
 
         assert edited["chat_id"] == 42
@@ -954,13 +995,20 @@ class TestNavigateAssets:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(
-            net_worth_calculator, "calculate_stored_current",
+            net_worth_calculator,
+            "calculate_stored_current",
             AsyncMock(return_value=_fake_breakdown(total=0, asset_count=0)),
         )
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_assets(
-            db=None, user=_fake_user(), chat_id=42, message_id=None, level="starter",
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="starter",
         )
 
         assert "chưa có tài sản" in sent["text"]
@@ -979,13 +1027,20 @@ class TestNavigateAssets:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(
-            net_worth_calculator, "calculate_stored_current",
+            net_worth_calculator,
+            "calculate_stored_current",
             AsyncMock(return_value=_fake_breakdown()),
         )
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_assets(
-            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
         )
 
         assert len(captured) == 1
@@ -1004,13 +1059,20 @@ class TestNavigateAssets:
 
         monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
         monkeypatch.setattr(
-            net_worth_calculator, "calculate_stored_current",
+            net_worth_calculator,
+            "calculate_stored_current",
             AsyncMock(return_value=_fake_breakdown()),
         )
-        monkeypatch.setattr(menu_handler, "message_kwargs_for_animation", lambda t, c: {})
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
 
         await menu_handler._navigate_assets(
-            db=None, user=_fake_user(), chat_id=42, message_id=None, level="young_prof",
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
         )
 
         all_callbacks = [
@@ -1019,6 +1081,36 @@ class TestNavigateAssets:
         assert "menu:assets:net_worth" not in all_callbacks
         assert "menu:assets:report" in all_callbacks
         assert "menu:main" in all_callbacks
+
+    @pytest.mark.asyncio
+    async def test_assets_total_toggle_masks_amount_for_session(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        user = _fake_user()
+        sent: dict = {}
+
+        async def fake_edit_message_text(**kwargs):
+            sent.update(kwargs)
+
+        menu_handler._ASSET_TOTAL_VISIBLE_BY_USER.clear()
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(
+            net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
+
+        await menu_handler._action_assets_toggle_total(
+            db=None, user=user, chat_id=42, message_id=99
+        )
+
+        assert "********" in sent["text"]
+        assert "150,000,000đ" not in sent["text"]
+        assert sent["reply_markup"]["inline_keyboard"][0][0]["text"] == "👁 Hiện số tiền"
 
 
 # ============================================================
@@ -1199,10 +1291,9 @@ class TestNetWorthFastPath:
         assert sent["chat_id"] == 42
         assert "Tổng tài sản của An" in sent["text"]
         assert "500,000,000" in sent["text"]
-        assert "🧾 _Ghi chú từ Bé Tiền:_" in sent["text"]
         assert (
-            "Mình đã dùng giá thị trường mới nhất đang có để cập nhật "
-            "chứng khoán, tiền số và vàng."
+            "Tài sản của bạn đã được Bé Tiền cập nhật dựa trên giá trị mới nhất "
+            "của thị trường chứng khoán, vàng và tiền số"
         ) in sent["text"]
         assert "Đây là ảnh" not in sent["text"]
         assert "tháng trước" not in sent["text"]
@@ -1287,9 +1378,9 @@ class TestActionCoverage:
         # built (per phase-3.6-issues.md S6). We only fail the test if
         # a *recognised* action key is unwired without that intent.
         # The current Epic 1 wiring covers all 22 actions.
-        assert coming_soon == [], (
-            f"Unwired actions (coming-soon stub will fire): {coming_soon}"
-        )
+        assert (
+            coming_soon == []
+        ), f"Unwired actions (coming-soon stub will fire): {coming_soon}"
 
     def test_assets_net_worth_and_report_routes_are_not_swapped(self):
         """User feedback caught these inverted: ``📊 Tổng tài sản``
@@ -1298,9 +1389,13 @@ class TestActionCoverage:
         """
         from backend.bot.handlers.menu_handler import _DIRECT_HANDLERS
 
-        assert ("assets", "net_worth") in _DIRECT_HANDLERS, (
+        assert (
+            "assets",
+            "net_worth",
+        ) in _DIRECT_HANDLERS, (
             "📊 Tổng tài sản must use the fast short net-worth summary"
         )
-        assert ("assets", "report") in _DIRECT_HANDLERS, (
-            "📈 Báo cáo must list every asset with edit callbacks"
-        )
+        assert (
+            "assets",
+            "report",
+        ) in _DIRECT_HANDLERS, "📈 Báo cáo must list every asset with edit callbacks"

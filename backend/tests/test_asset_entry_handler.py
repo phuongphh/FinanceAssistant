@@ -1525,7 +1525,7 @@ async def test_callback_cancel_clears_state():
         ),
         patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
         patch.object(asset_entry, "answer_callback", AsyncMock()),
-        patch.object(asset_entry, "send_message", AsyncMock()),
+        patch("backend.bot.handlers.menu_handler._navigate", AsyncMock()) as navigate,
     ):
         consumed = await asset_entry.handle_asset_callback(
             db,
@@ -1537,7 +1537,34 @@ async def test_callback_cancel_clears_state():
             },
         )
     assert consumed is True
-    clear.assert_awaited_once()
+    clear.assert_awaited_once_with(db, user.id)
+    navigate.assert_awaited_once_with(
+        db=db, user=user, chat_id=100, message_id=1, target="main"
+    )
+
+
+def test_asset_add_cancel_buttons_return_to_menu():
+    kb = asset_entry.asset_type_picker_keyboard()
+    footer = kb["inline_keyboard"][-1][0]
+
+    assert footer["text"] == "◀️ Quay về menu"
+    assert footer["callback_data"] == "asset_add:cancel"
+
+
+def test_mark_rental_picker_uses_tree_icon_for_land():
+    land = _asset(asset_type="real_estate")
+    land.name = "Đất Long An"
+    land.subtype = "land"
+    house = _asset(asset_type="real_estate")
+    house.name = "Nhà Oceanpark"
+    house.subtype = "house_primary"
+
+    labels = [
+        f"{asset_entry.get_subtype_icon(asset_entry.AssetType.REAL_ESTATE.value, a.subtype)} {a.name}"
+        for a in [land, house]
+    ]
+
+    assert labels == ["🌳 Đất Long An", "🏠 Nhà Oceanpark"]
 
 
 @pytest.mark.asyncio
