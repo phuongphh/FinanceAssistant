@@ -39,5 +39,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
 | #645 | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [issue-645.md](issue-645.md) |
 | #646 | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [issue-646.md](issue-646.md) |
+| #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
 
-**Total active:** 35
+**Total active:** 36
