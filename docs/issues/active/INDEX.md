@@ -42,5 +42,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
 | #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
+| #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
 
-**Total active:** 38
+**Total active:** 39
