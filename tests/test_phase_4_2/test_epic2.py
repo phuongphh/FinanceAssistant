@@ -70,3 +70,17 @@ def test_briefing_quality_templates_have_editorial_hook_and_short_copy():
         assert text.startswith("Bé Tiền nhận thấy")
         assert len(text) < 200
         assert item["suggested_query"]
+
+
+def test_first_briefing_insight_render_text_is_plain_text_for_entities_send():
+    from backend.services.briefing.briefing_content_quality_service import BriefingInsight
+
+    insight = BriefingInsight(
+        template_key="starter_first_asset",
+        insight_text="Bé Tiền nhận thấy bạn đang ở bước xây nền.",
+        suggested_query="bắt đầu quản lý tài chính",
+    )
+
+    assert "Hỏi thử: bắt đầu quản lý tài chính" in insight.render_text
+    assert "<code>" not in insight.render_text
+    assert "</code>" not in insight.render_text
