@@ -41,7 +41,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
 | #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
-| #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
 | #652 | [Epic] Bugs — NLU parsing failures (8 bugs) | [issue-652.md](issue-652.md) |
 | #653 | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [issue-653.md](issue-653.md) |
 | #654 | [Bug] 'Thêm bất động sản' → Bé Tiền show báo cáo thay vì add asset | [issue-654.md](issue-654.md) |
@@ -53,4 +52,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
 | #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 48
+**Total active:** 47

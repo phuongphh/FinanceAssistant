@@ -365,6 +365,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #635 | Pre-Phase | bug: KeyError 'vip' in menu_formatter.format_main_menu when wealth_level is 'vip' | [pre-phase/issue-635.md](by-phase/pre-phase/issue-635.md) |
 | #638 | Pre-Phase | Bug: KeyError 'vip' in menu_formatter.py khi user VIP nhấn /menu | [pre-phase/issue-638.md](by-phase/pre-phase/issue-638.md) |
 | #641 | Pre-Phase | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [pre-phase/issue-641.md](by-phase/pre-phase/issue-641.md) |
+| #650 | Pre-Phase | fix: Fix recurring income calculation in cashflow view | [pre-phase/issue-650.md](by-phase/pre-phase/issue-650.md) |
 
-**Total:** 361 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 344 Pre-Phase)
+**Total:** 362 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 345 Pre-Phase)
