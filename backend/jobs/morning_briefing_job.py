@@ -99,7 +99,7 @@ async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
 
     Eligible = opted-in user (active, has telegram_id) AND any one of:
     - non-deleted expense in the last 30 days (active expense tracker), OR
-    - any active portfolio asset (asset-only user, no daily expenses), OR
+    - any confirmed, non-placeholder portfolio asset (asset-only user), OR
     - account created in the last 30 days (new user — first briefing is
       the UPS welcome flow, decorated by ``first_briefing_service``).
 
@@ -116,9 +116,16 @@ async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
         Expense.created_at >= expense_cutoff,
         Expense.deleted_at.is_(None),
     )
-    active_asset = exists().where(
+    # Mirror ``asset_service.get_user_assets`` real-asset filter: demo
+    # placeholders (Story onboarding) and unconfirmed drafts must NOT
+    # qualify a user as asset-only, otherwise a demo-only signup keeps
+    # receiving briefings forever after the new-user window closes.
+    # Uses the ``idx_assets_real`` covering index.
+    real_asset = exists().where(
         Asset.user_id == User.id,
         Asset.is_active.is_(True),
+        Asset.is_placeholder_asset.is_(False),
+        Asset.is_confirmed.is_(True),
     )
 
     stmt = (
@@ -137,7 +144,7 @@ async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
             ),
             or_(
                 recent_expense,
-                active_asset,
+                real_asset,
                 User.created_at >= new_user_cutoff,
             ),
         )

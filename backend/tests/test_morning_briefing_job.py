@@ -320,3 +320,86 @@ async def test_one_user_failure_does_not_halt_others():
 
     assert sent == 1
     assert notifier.send_message.await_count == 1
+
+
+# ── _get_briefing_candidates SQL composition ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_briefing_candidates_query_includes_new_user_and_real_asset_branches():
+    """The candidate query must accept new users (no expense yet) and
+    asset-only users (real assets), in addition to expense-active users.
+
+    We inspect the compiled SQL because spinning up a real DB in this
+    test suite is out of scope. The branches are what unblocks the
+    welcome-briefing UPS for fresh sign-ups and the demo-asset trap
+    (placeholder/unconfirmed assets must not count) flagged in
+    PR #640 review.
+    """
+    captured: dict = {}
+
+    async def fake_execute(stmt):
+        captured["sql"] = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        result = MagicMock()
+        result.all = MagicMock(return_value=[])
+        return result
+
+    db = MagicMock()
+    db.execute = fake_execute  # type: ignore[assignment]
+    out = await job._get_briefing_candidates(db)
+    assert out == []
+
+    sql = captured["sql"].lower()
+    # Three OR branches in the activity gate
+    assert "expenses" in sql and "expenses.deleted_at is null" in sql
+    assert "assets" in sql and "assets.is_active" in sql
+    # Placeholder/unconfirmed assets must be excluded
+    assert "is_placeholder_asset" in sql
+    assert "is_confirmed" in sql
+    # New-user branch: users.created_at >= cutoff
+    assert "users.created_at >=" in sql
+    # Opt-in is still enforced
+    assert "briefing_enabled" in sql
+    # Tombstoned users are filtered
+    assert "users.deleted_at is null" in sql
+    assert "telegram_id is not null" in sql
+
+
+@pytest.mark.asyncio
+async def test_get_briefing_candidates_attaches_profile_briefing_time():
+    """When a UserProfile row exists, its briefing_time overrides the
+    legacy ``User.briefing_time`` column for that user.
+    """
+    user = _make_user(briefing_time=time(7, 0))
+    profile = MagicMock()
+    profile.briefing_time = time(9, 30)
+
+    async def fake_execute(_stmt):
+        result = MagicMock()
+        result.all = MagicMock(return_value=[(user, profile)])
+        return result
+
+    db = MagicMock()
+    db.execute = fake_execute  # type: ignore[assignment]
+    candidates = await job._get_briefing_candidates(db)
+
+    assert len(candidates) == 1
+    assert candidates[0]._profile_briefing_time == time(9, 30)
+
+
+@pytest.mark.asyncio
+async def test_get_briefing_candidates_falls_back_to_user_briefing_time_without_profile():
+    """No ``UserProfile`` row → fall back to ``User.briefing_time``."""
+    user = _make_user(briefing_time=time(6, 45))
+
+    async def fake_execute(_stmt):
+        result = MagicMock()
+        result.all = MagicMock(return_value=[(user, None)])
+        return result
+
+    db = MagicMock()
+    db.execute = fake_execute  # type: ignore[assignment]
+    candidates = await job._get_briefing_candidates(db)
+
+    assert len(candidates) == 1
+    assert candidates[0]._profile_briefing_time == time(6, 45)
