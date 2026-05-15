@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #641 | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [issue-641.md](issue-641.md) |
 | #642 | improve: Hide/show total asset amount with eye button | [issue-642.md](issue-642.md) |
+| #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
 
-**Total active:** 31
+**Total active:** 32
