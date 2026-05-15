@@ -139,3 +139,19 @@ confirmation_action_quick_transaction:
     Mình hiểu bạn muốn ghi *{amount}đ* cho *{merchant}* — đúng chưa {name}?
 
     [✅ Đúng] [❌ Không phải]
+
+income_detected_in_expense_flow:
+  # Bé Tiền nhận diện đây là thu nhập, không phải chi tiêu. Hướng dẫn
+  # nhẹ nhàng sang flow đúng thay vì ghi sai (xem issue #656, #661).
+  # Placeholders: {name}
+  - |
+    Câu này nghe giống *thu nhập* hơn chi tiêu {name} ạ 💰
+
+    Mình chưa ghi nhầm vào chi tiêu đâu — bạn dùng:
+    [💵 Ghi thu nhập]
+    [📊 Xem thu nhập]
+  - |
+    Nhận lương / thưởng phải không {name}? Mình giúp ghi đúng cột thu nhập nhé:
+
+    [💵 Ghi thu nhập]
+    [🏦 Cộng vào tài sản]

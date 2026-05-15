@@ -56,6 +56,21 @@ WRITE_INTENTS = frozenset(
     {
         IntentType.ACTION_RECORD_SAVING,
         IntentType.ACTION_QUICK_TRANSACTION,
+        IntentType.ACTION_ADD_ASSET,
+        IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_ADD_GOAL,
+    }
+)
+
+# Wizard-launching action intents and navigation intents send their own
+# Telegram messages (rich keyboards, WebApp buttons). Returning "" tells
+# the dispatcher to skip the personality wrap + duplicate send.
+_WIZARD_LAUNCHING_INTENTS = frozenset(
+    {
+        IntentType.ACTION_ADD_ASSET,
+        IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_ADD_GOAL,
+        IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
 
@@ -71,6 +86,10 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.HELP,
         IntentType.ACTION_RECORD_SAVING,
         IntentType.ACTION_QUICK_TRANSACTION,
+        IntentType.ACTION_ADD_ASSET,
+        IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_ADD_GOAL,
+        IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
 
@@ -153,9 +172,11 @@ class IntentDispatcher:
             if (
                 result.intent in WRITE_INTENTS
                 and result.intent != IntentType.ACTION_QUICK_TRANSACTION
+                and result.intent not in _WIZARD_LAUNCHING_INTENTS
             ):
                 return await self._build_confirmation(result, user, db)
-            # Read intents (and ACTION_QUICK_TRANSACTION) fall through.
+            # Read intents, ACTION_QUICK_TRANSACTION, and wizard-launching
+            # intents fall through — wizards collect their own confirmation.
 
         # Execute.
         return await self._execute(result, user, db)
@@ -383,6 +404,30 @@ class IntentDispatcher:
             from backend.intent.handlers.advisory import AdvisoryHandler
 
             return AdvisoryHandler()
+        if intent == IntentType.ACTION_ADD_ASSET:
+            from backend.intent.handlers.action_add_asset import (
+                ActionAddAssetHandler,
+            )
+
+            return ActionAddAssetHandler()
+        if intent == IntentType.ACTION_EDIT_ASSET:
+            from backend.intent.handlers.action_edit_asset import (
+                ActionEditAssetHandler,
+            )
+
+            return ActionEditAssetHandler()
+        if intent == IntentType.ACTION_ADD_GOAL:
+            from backend.intent.handlers.action_add_goal import (
+                ActionAddGoalHandler,
+            )
+
+            return ActionAddGoalHandler()
+        if intent == IntentType.NAV_EXPENSE_DASHBOARD:
+            from backend.intent.handlers.nav_expense_dashboard import (
+                NavExpenseDashboardHandler,
+            )
+
+            return NavExpenseDashboardHandler()
         return None
 
     def _not_implemented(self, result: IntentResult) -> str:

@@ -30,6 +30,7 @@ from backend.bot.handlers.transaction import (
     send_transaction_batch_confirmation,
     send_transaction_confirmation,
 )
+from backend.intent.clarifier import build_message_from_key
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.models.user import User
@@ -116,10 +117,96 @@ _FALLBACK_REPLY = (
 )
 
 
+# Verbs that indicate the user is receiving money (income), NOT spending.
+# Detected on the diacritic-stripped lowercased text to be tolerant of
+# typos. If any of these match, the handler bails before recording an
+# expense — see issues #656, #661.
+_INCOME_KEYWORDS: tuple[str, ...] = (
+    "nhan luong",
+    "nhan thuong",
+    "nhan tien",
+    "luong",
+    # NOTE: bare "thuong" is intentionally OMITTED — after diacritic
+    # stripping it collides with the common adverb "thường" (usually,
+    # often), which would swallow ordinary expenses like
+    # "thường ăn sáng 50k". Only phrasal forms are listed.
+    "thuong tet",
+    "tien thuong",
+    "duoc thuong",
+    "duoc tang",
+    "duoc cho",
+    "thu nhap",
+    "kiem duoc",
+    "ban duoc",
+    "hoan tien",
+    "lai ngan hang",
+    "co tuc",
+    "freelance",
+    "lam them",
+)
+
+# Verbs that explicitly mean "spend" — used to override the income check
+# in mixed sentences like "lương tháng này tiêu hết 5tr" (expense wins).
+# NOTE: bare "tra" is intentionally OMITTED — it is a substring of
+# "tra luong" / "tra thuong" (paying salary/bonus, which is income from
+# the user's perspective), so including it would break "công ty trả
+# lương 20tr". The phrasal "tra tien" still covers genuine spending.
+_EXPENSE_KEYWORDS: tuple[str, ...] = (
+    "tieu",
+    "chi tieu",
+    "tra tien",
+    "mua",
+    "thanh toan",
+    "bo tien",
+    "het",
+)
+
+
+def _strip_diacritics(text: str) -> str:
+    import unicodedata
+
+    return "".join(
+        ch
+        for ch in unicodedata.normalize("NFD", text)
+        if unicodedata.category(ch) != "Mn"
+    ).replace("đ", "d").replace("Đ", "D")
+
+
+def _looks_like_income(text: str) -> bool:
+    """True if the message reads as income rather than expense.
+
+    Used as a pre-check in the expense handler to avoid mis-recording
+    "nhận lương 20tr vào tiền mặt" as an expense (#656). If the message
+    contains BOTH income and expense verbs, expense wins — the user is
+    describing what they did with the money, not the receipt itself.
+    """
+    if not text:
+        return False
+    norm = _strip_diacritics(text.lower())
+    has_income = any(kw in norm for kw in _INCOME_KEYWORDS)
+    if not has_income:
+        return False
+    has_expense = any(kw in norm for kw in _EXPENSE_KEYWORDS)
+    return not has_expense
+
+
 class ActionQuickTransactionHandler(IntentHandler):
     async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
         text = (intent.raw_text or "").strip()
         params = intent.parameters or {}
+
+        # Guardrail: if the message reads as income (nhận lương, thưởng,
+        # cổ tức…), refuse to record it as an expense and route the user
+        # to the proper income flow (#656, #661). Better a soft handoff
+        # than a silent wrong write.
+        if _looks_like_income(text):
+            logger.info(
+                "Quick-transaction handler skipped — income semantics detected: %r",
+                text,
+            )
+            return build_message_from_key(
+                "income_detected_in_expense_flow", user
+            )
 
         items = await self._extract_items(text, params, db, user)
         if not items:

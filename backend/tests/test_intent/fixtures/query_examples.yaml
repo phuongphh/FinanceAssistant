@@ -108,6 +108,15 @@ canonical:
       category: "gold"
     notes: "Gold-category alternative phrasing."
 
+  # Regression for #658: "Giá vàng hôm nay" used to return
+  # "Mình chưa biết câu trả lời này". Now must route to query_market
+  # with category=gold so the handler returns today's gold prices.
+  - text: "Giá vàng hôm nay"
+    expected_intent: query_market
+    expected_parameters:
+      category: "gold"
+    notes: "Gold-category query with explicit hôm nay (issue #658)."
+
   - text: "giá crypto"
     expected_intent: query_market
     expected_parameters:
@@ -235,3 +244,57 @@ edge_cases:
   - text: "nên đầu tư cổ phiếu nào"
     expected_intent: advisory
     notes: "Stock-pick advisory."
+
+  # ----- NLU Bugs Epic #652 regression fixtures -----
+
+  - text: "thêm bất động sản"
+    expected_intent: action_add_asset
+    expected_parameters:
+      asset_type: "real_estate"
+    notes: "Add-asset wizard, real estate (#654)."
+
+  - text: "thêm cổ phiếu"
+    expected_intent: action_add_asset
+    expected_parameters:
+      asset_type: "stock"
+    notes: "Add-asset wizard, stock (#654)."
+
+  - text: "thêm crypto"
+    expected_intent: action_add_asset
+    expected_parameters:
+      asset_type: "crypto"
+    notes: "Add-asset wizard, crypto (#654)."
+
+  - text: "sửa cổ phiếu FPT thành 200 cổ"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "stock"
+    notes: "Edit-asset wizard, stock volume (#660)."
+
+  - text: "sửa đất ba tư"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "real_estate"
+    notes: "Edit-asset by subtype + name (#653)."
+
+  - text: "sửa bất động sản"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "real_estate"
+    notes: "Edit-asset wizard, real estate (#653)."
+
+  - text: "thêm mục tiêu"
+    expected_intent: action_add_goal
+    notes: "Add-goal wizard (#659)."
+
+  - text: "tạo mục tiêu mới"
+    expected_intent: action_add_goal
+    notes: "Add-goal wizard alt form (#659)."
+
+  - text: "chi tiêu dashboard"
+    expected_intent: nav_expense_dashboard
+    notes: "Expense dashboard miniapp link (#655)."
+
+  - text: "dashboard chi tiêu"
+    expected_intent: nav_expense_dashboard
+    notes: "Expense dashboard, inverted word order (#655)."

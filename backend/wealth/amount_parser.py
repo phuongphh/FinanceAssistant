@@ -36,6 +36,7 @@ _AMOUNT_RE = re.compile(
     (?:[.,](?P<frac>\d+))?                        # optional .5 or ,5
     \s*
     (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:\s*(?P<sub>\d+))?                          # "25tr320" or "1 tỷ 500" sub-amount
     (?:\s*(?P<half>rưỡi|ruoi))?                   # "rưỡi" → +0.5 of unit
     \s*
     (?P<tail>.*)                                  # any trailing crumbs
@@ -81,6 +82,19 @@ _UNIT_MULTIPLIERS = {
     "vnd": Decimal("1"),
 }
 
+# Sub-amount multipliers: a bare number trailing a unit refers to the
+# next scale down — "25tr320" means 25 triệu + 320 nghìn = 25,320,000;
+# "1 tỷ 500" means 1 tỷ + 500 triệu = 1,500,000,000. Only defined for
+# units where a "next scale down" exists in Vietnamese usage.
+_SUB_MULTIPLIERS = {
+    "tỷ": Decimal("1_000_000"),
+    "ty": Decimal("1_000_000"),
+    "tỉ": Decimal("1_000_000"),
+    "triệu": Decimal("1_000"),
+    "trieu": Decimal("1_000"),
+    "tr": Decimal("1_000"),
+}
+
 
 def parse_amount(text: str) -> Decimal | None:
     """Parse the first number-with-unit in ``text`` to a VND ``Decimal``.
@@ -123,6 +137,13 @@ def parse_amount(text: str) -> Decimal | None:
     multiplier = _UNIT_MULTIPLIERS.get(unit, Decimal("1"))
 
     amount = base * multiplier
+    # Sub-amount: "25tr320" → 25_000_000 + 320 × 1_000.
+    sub = m.group("sub")
+    if sub and unit in _SUB_MULTIPLIERS:
+        try:
+            amount += Decimal(sub) * _SUB_MULTIPLIERS[unit]
+        except (InvalidOperation, ValueError):
+            return None
     # "rưỡi" after a unit means "and a half of that unit": "2 tỷ rưỡi" =
     # 2.5 tỷ. Only meaningful when the unit has a real multiplier — for
     # đồng (multiplier 1) "rưỡi" would imply half a đồng, which doesn't
@@ -145,6 +166,7 @@ _LABELED_AMOUNT_RE = re.compile(
     (?P<num>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)
     \s*
     (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:\s*(?P<sub>\d+))?
     (?:\s*(?P<half>rưỡi|ruoi))?
     """,
     re.IGNORECASE | re.VERBOSE,

@@ -37,6 +37,12 @@ class IntentType(str, Enum):
     # ----- Action intents (write) -----
     ACTION_RECORD_SAVING = "action_record_saving"
     ACTION_QUICK_TRANSACTION = "action_quick_transaction"
+    ACTION_ADD_ASSET = "action_add_asset"
+    ACTION_EDIT_ASSET = "action_edit_asset"
+    ACTION_ADD_GOAL = "action_add_goal"
+
+    # ----- Navigation intents -----
+    NAV_EXPENSE_DASHBOARD = "nav_expense_dashboard"
 
     # ----- Advanced (LLM-routed) -----
     ADVISORY = "advisory"

@@ -225,3 +225,130 @@ async def test_keeps_single_total_message_as_one_expense():
     expense_data = mock_create.call_args.args[2]
     assert expense_data.amount == 400_000.0
     assert expense_data.merchant == "ăn tối và trà sữa"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_text",
+    [
+        "Hôm nay nhận lương 20tr vào tiền mặt",
+        "Nhận thưởng tết 50tr",
+        "Được thưởng 5tr",
+        "Lãi ngân hàng 200k tháng này",
+        "Freelance 3tr về tài khoản",
+        "Cổ tức 1tr",
+    ],
+)
+async def test_income_messages_are_not_recorded_as_expense(raw_text):
+    """Issues #656, #661: messages with income verbs must NOT create an
+    expense row. The handler returns a clarification pointing to the
+    income flow instead.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.85,
+        parameters={},
+        raw_text=raw_text,
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ) as mock_send, patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(),
+    ) as mock_llm:
+        text = await handler.handle(result, _user(), db)
+
+    mock_create.assert_not_called()
+    mock_send.assert_not_called()
+    mock_llm.assert_not_called()
+    assert text
+    # The reply should mention income (thu nhập / lương / thưởng) so the
+    # user understands why nothing was recorded.
+    lowered = text.lower()
+    assert any(kw in lowered for kw in ("thu nhập", "lương", "thưởng", "income"))
+
+
+@pytest.mark.asyncio
+async def test_income_verb_with_spending_context_still_records_expense():
+    """Mixed sentence: "lương tháng này tiêu hết 5tr" — the expense verb
+    "tiêu" wins, so we DO record an expense. Guards the income check
+    from being too greedy.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.85,
+        parameters={"amount": 5_000_000, "merchant": "tiêu hết"},
+        raw_text="lương tháng này tiêu hết 5tr",
+    )
+    db = _fake_db()
+    fake_expense = MagicMock(user_id="user-1")
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=fake_expense),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ):
+        await handler.handle(result, _user(), db)
+
+    mock_create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_text,should_record",
+    [
+        # "thường" (often) collides with "thưởng" (bonus) after diacritic
+        # stripping. PR #662 review: ordinary expenses with "thường"
+        # must still record.
+        ("thường ăn sáng 50k", True),
+        ("mình thường mua cà phê 35k", True),
+        # "trả lương" — the income guard must hold even though the
+        # message contains the spending-flavored verb "trả".
+        ("công ty trả lương 20tr", False),
+    ],
+)
+async def test_diacritic_collisions_do_not_break_income_guard(
+    raw_text, should_record
+):
+    """PR #662 review (chatgpt-codex): bare "thuong"/"tra" collide with
+    unrelated words after diacritic stripping. The keyword lists must
+    avoid those collisions.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.85,
+        parameters={"amount": 50_000, "merchant": "ăn sáng"} if should_record else {},
+        raw_text=raw_text,
+    )
+    db = _fake_db()
+    fake_expense = MagicMock(user_id="user-1")
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=fake_expense),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(
+            return_value='{"is_expense": true, "amount": 50000, "merchant": "ăn sáng"}'
+        ),
+    ):
+        await handler.handle(result, _user(), db)
+
+    if should_record:
+        mock_create.assert_awaited_once()
+    else:
+        mock_create.assert_not_called()

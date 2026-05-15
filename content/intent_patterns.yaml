@@ -262,6 +262,84 @@ action_record_saving:
     amount:
       use_extractor: amount
 
+action_add_asset:
+  description: "User wants to add a new asset (real estate, stock, crypto, gold, cash)."
+  # High confidence so it beats query_assets / query_portfolio / query_market
+  # when the user is initiating an add (e.g. "thêm bất động sản").
+  patterns:
+    # "thêm bất động sản" / "them bds" / "them nha dat"
+    - pattern: '^(?:them|tao|nhap|ghi)\s+(?:moi\s+)?(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b'
+      confidence: 0.95
+    # "thêm cổ phiếu" / "thêm chứng khoán"
+    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:co\s*phieu|chung\s*khoan|stocks?)\b'
+      confidence: 0.95
+    # "thêm crypto" / "thêm tiền số" / "thêm btc"
+    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b'
+      confidence: 0.95
+    # "thêm vàng" / "mua vàng"
+    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:vang|gold)\b'
+      confidence: 0.93
+    # "thêm tiền mặt" / "thêm tài khoản tiền gửi"
+    - pattern: '^(?:them|tao|nhap)\s+(?:moi\s+)?(?:tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem)\b'
+      confidence: 0.93
+    # "thêm tài sản" — generic
+    - pattern: '^(?:them|tao|nhap|ghi)\s+(?:moi\s+)?tai\s*san\b'
+      confidence: 0.92
+    # "/themtaisan" already routed by worker, but cover free-text alias
+    - pattern: '^them\s*tai\s*san\b'
+      confidence: 0.92
+  parameter_extractors:
+    asset_type:
+      patterns:
+        - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
+        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
+        - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
+        - { match: 'vang|gold', value: gold }
+        - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
+
+action_edit_asset:
+  description: "User wants to edit an existing asset."
+  patterns:
+    # "sửa bất động sản" / "sửa cổ phiếu FPT" / "sửa đất ba tư"
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)\b'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:vang|gold)\b'
+      confidence: 0.93
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem)\b'
+      confidence: 0.93
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+tai\s*san\b'
+      confidence: 0.92
+  parameter_extractors:
+    asset_type:
+      patterns:
+        - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
+        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
+        - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
+        - { match: 'vang|gold', value: gold }
+        - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
+
+action_add_goal:
+  description: "User wants to add a new financial goal."
+  patterns:
+    # "thêm mục tiêu" / "tạo mục tiêu mới" / "đặt mục tiêu"
+    - pattern: '^(?:them|tao|dat|nhap|moi)\s+(?:moi\s+)?(?:muc\s*tieu|goals?)\b'
+      confidence: 0.95
+    - pattern: '^(?:muc\s*tieu|goals?)\s+moi\b'
+      confidence: 0.92
+
+nav_expense_dashboard:
+  description: "User wants to open the Expense Dashboard miniapp."
+  patterns:
+    # "chi tiêu dashboard" / "dashboard chi tiêu" / "mở dashboard chi tiêu"
+    - pattern: '\b(?:mo\s+)?(?:dashboard|bang\s*dieu\s*khien)\s+chi\s*(?:tieu|phi)\b'
+      confidence: 0.95
+    - pattern: '\bchi\s*(?:tieu|phi)\s+(?:dashboard|bang\s*dieu\s*khien)\b'
+      confidence: 0.95
+
 advisory:
   description: "User asks for investment / financial advice."
   patterns:
