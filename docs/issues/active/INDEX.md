@@ -43,5 +43,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
 | #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
 | #652 | [Epic] Bugs — NLU parsing failures (8 bugs) | [issue-652.md](issue-652.md) |
+| #653 | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [issue-653.md](issue-653.md) |
 
-**Total active:** 39
+**Total active:** 40
