@@ -47,6 +47,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #654 | [Bug] 'Thêm bất động sản' → Bé Tiền show báo cáo thay vì add asset | [issue-654.md](issue-654.md) |
 | #655 | [Bug] 'Chi tiêu dashboard' → Bé Tiền show báo cáo thay vì mở Dashboard | [issue-655.md](issue-655.md) |
 | #656 | [Bug] 'Nhận lương 20tr vào tiền mặt' → ghi expense sai thay vì add income | [issue-656.md](issue-656.md) |
+| #657 | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [issue-657.md](issue-657.md) |
 | #658 | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [issue-658.md](issue-658.md) |
 
-**Total active:** 44
+**Total active:** 45
