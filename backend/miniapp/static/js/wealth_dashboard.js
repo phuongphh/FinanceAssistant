@@ -51,7 +51,7 @@
     let trendChart = null;
     let currentPeriod = 90;
     let currentAssetSort = window.sessionStorage.getItem('wealth.asset_sort') || 'value_desc';
-    let isNetWorthVisible = window.sessionStorage.getItem('wealth.net_worth_visible') !== 'false';
+    let isNetWorthVisible = window.sessionStorage.getItem('wealth.net_worth_visible') === 'true';
     let lastOverview = null;
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;

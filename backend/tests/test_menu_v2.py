@@ -942,7 +942,8 @@ class TestNavigateAssets:
 
         assert sent["chat_id"] == 42
         assert "Tổng tài sản" in sent["text"]
-        assert "👁 *150,000,000đ*" in sent["text"]
+        assert "🙈 " in sent["text"]
+        assert "150,000,000đ" not in sent["text"]
         assert "inline_keyboard" in sent["reply_markup"]
         assert (
             sent["reply_markup"]["inline_keyboard"][0][0]["callback_data"]
@@ -1083,7 +1084,41 @@ class TestNavigateAssets:
         assert "menu:main" in all_callbacks
 
     @pytest.mark.asyncio
-    async def test_assets_total_toggle_masks_amount_for_session(self, monkeypatch):
+    async def test_assets_total_is_masked_by_default(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+        from backend.wealth.services import net_worth_calculator
+
+        user = _fake_user()
+        sent: dict = {}
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        menu_handler._ASSET_TOTAL_VISIBLE_BY_USER.clear()
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            net_worth_calculator,
+            "calculate_stored_current",
+            AsyncMock(return_value=_fake_breakdown()),
+        )
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
+
+        await menu_handler._navigate_assets(
+            db=None,
+            user=user,
+            chat_id=42,
+            message_id=None,
+            level="young_prof",
+        )
+
+        assert "********" in sent["text"]
+        assert "150,000,000đ" not in sent["text"]
+        assert sent["reply_markup"]["inline_keyboard"][0][0]["text"] == "👁 Hiện số tiền"
+
+    @pytest.mark.asyncio
+    async def test_assets_total_toggle_reveals_amount_for_session(self, monkeypatch):
         from backend.bot.handlers import menu_handler
         from backend.wealth.services import net_worth_calculator
 
@@ -1108,9 +1143,9 @@ class TestNavigateAssets:
             db=None, user=user, chat_id=42, message_id=99
         )
 
-        assert "********" in sent["text"]
-        assert "150,000,000đ" not in sent["text"]
-        assert sent["reply_markup"]["inline_keyboard"][0][0]["text"] == "👁 Hiện số tiền"
+        assert "150,000,000đ" in sent["text"]
+        assert "********" not in sent["text"]
+        assert sent["reply_markup"]["inline_keyboard"][0][0]["text"] == "🙈 Ẩn số tiền"
 
 
 # ============================================================

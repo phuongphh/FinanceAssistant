@@ -199,7 +199,7 @@ submenu_assets:
 # conflicts when unrelated menus are appended later.
 action_assets_net_worth:
   market_value_note: |-
-    Tài sản của bạn đã được Bé Tiền cập nhật dựa trên giá trị mới nhất của thị trường chứng khoán, vàng và tiền số
+    Bé Tiền đã cập nhật tài sản của bạn theo giá mới nhất mình có từ chứng khoán, vàng và tiền số rồi nhé ✨
   recalculating_wait: |-
     🔄 _Bé Tiền đang cập nhật theo giá thị trường..._
     Chờ mình một chút nhé ✨
@@ -213,7 +213,7 @@ action_assets_report:
 action_assets_manage:
   title: "✏️ *THÊM / SỬA / XOÁ TÀI SẢN*"
   body: |-
-    Tài sản gồm những gì (Tiền mặt & Tài khoản, Chứng khoán, Bất động sản, Tiền số, Vàng…)
+    Ghi chú nhỏ của Bé Tiền: tài sản có thể gồm Tiền mặt & Tài khoản, Chứng khoán, Bất động sản, Tiền số, Vàng… và cả những món giá trị khác bạn muốn theo dõi nhé ✨
 
     Cứ nói chuyện tự nhiên với mình trước nhé — {name} có thể gõ:
     • "thêm 100tr vào VCB"

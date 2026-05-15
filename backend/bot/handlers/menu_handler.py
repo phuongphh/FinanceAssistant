@@ -210,7 +210,7 @@ _ASSET_TOTAL_MASK = "********"
 
 
 def _asset_total_visible(user: User) -> bool:
-    return _ASSET_TOTAL_VISIBLE_BY_USER.get(user.id, True)
+    return _ASSET_TOTAL_VISIBLE_BY_USER.get(user.id, False)
 
 
 def _asset_total_keyboard(keyboard: dict, *, visible: bool) -> dict:

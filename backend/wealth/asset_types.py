@@ -103,6 +103,41 @@ def get_subtype_icon(asset_type: str, subtype: str | None) -> str:
     return get_icon(asset_type)
 
 
+def get_asset_display_icon(
+    asset_type: str,
+    subtype: str | None,
+    *,
+    name: str | None = None,
+    extra: dict | None = None,
+) -> str:
+    """Return the best UI icon for an asset card/list row.
+
+    Land historically appeared with a few loose subtype/property fields,
+    so we normalize those variants here instead of letting old rows fall
+    back to the generic real-estate house icon.
+    """
+    if subtype and subtype in _SUBTYPE_ICONS:
+        return _SUBTYPE_ICONS[subtype]
+
+    if asset_type == AssetType.REAL_ESTATE.value:
+        extra = extra or {}
+        candidates = (
+            subtype,
+            extra.get("property_type"),
+            extra.get("real_estate_type"),
+            extra.get("type"),
+            name,
+        )
+        for value in candidates:
+            normalized = str(value or "").strip().casefold()
+            if normalized in {"land", "dat", "đất"} or normalized.startswith(
+                ("đất ", "dat ")
+            ):
+                return _SUBTYPE_ICONS["land"]
+
+    return get_icon(asset_type)
+
+
 def get_subtype_label(subtype: str | None) -> str | None:
     """Return a short Vietnamese label for the subtype, or None if unknown."""
     if not subtype:
