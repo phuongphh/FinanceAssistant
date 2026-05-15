@@ -33,7 +33,7 @@ import logging
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, distinct, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
@@ -46,12 +46,14 @@ from backend.models.expense import Expense
 from backend.models.user import User
 from backend.profile.models.user_profile import UserProfile
 from backend.ports.notifier import get_notifier
+from backend.wealth.models.asset import Asset
 
 logger = logging.getLogger(__name__)
 
 WINDOW_MINUTES = 15
 INTER_USER_DELAY_SECONDS = 1.0
 ACTIVE_WINDOW_DAYS = 30
+NEW_USER_WINDOW_DAYS = 30
 BRIEFING_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
@@ -93,26 +95,36 @@ async def already_sent_today(
 
 
 async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
-    """Active, briefing-enabled users that we'd consider sending to.
+    """Briefing-enabled users that we'd consider sending to.
 
-    Active = at least one non-deleted expense in the last 30 days.
-    Mirrors ``backend.jobs._active_users.get_active_users`` but with
-    extra ``briefing_enabled`` and ``telegram_id`` predicates.
+    Eligible = opted-in user (active, has telegram_id) AND any one of:
+    - non-deleted expense in the last 30 days (active expense tracker), OR
+    - any active portfolio asset (asset-only user, no daily expenses), OR
+    - account created in the last 30 days (new user — first briefing is
+      the UPS welcome flow, decorated by ``first_briefing_service``).
+
+    The new-user clause is what unblocks the "Bé Tiền tự giới thiệu mình"
+    onboarding: a fresh sign-up gets the empty-state briefing the next
+    morning even before logging any expense.
     """
-    since = datetime.now(timezone.utc) - timedelta(days=ACTIVE_WINDOW_DAYS)
-    active_ids_stmt = select(distinct(Expense.user_id)).where(
-        Expense.created_at >= since,
+    now_utc = datetime.now(timezone.utc)
+    expense_cutoff = now_utc - timedelta(days=ACTIVE_WINDOW_DAYS)
+    new_user_cutoff = now_utc - timedelta(days=NEW_USER_WINDOW_DAYS)
+
+    recent_expense = exists().where(
+        Expense.user_id == User.id,
+        Expense.created_at >= expense_cutoff,
         Expense.deleted_at.is_(None),
     )
-    user_ids = [r[0] for r in (await db.execute(active_ids_stmt)).all()]
-    if not user_ids:
-        return []
+    active_asset = exists().where(
+        Asset.user_id == User.id,
+        Asset.is_active.is_(True),
+    )
 
     stmt = (
         select(User, UserProfile)
         .outerjoin(UserProfile, UserProfile.user_id == User.id)
         .where(
-            User.id.in_(user_ids),
             User.is_active.is_(True),
             User.deleted_at.is_(None),
             User.telegram_id.isnot(None),
@@ -122,6 +134,11 @@ async def _get_briefing_candidates(db: AsyncSession) -> list[User]:
                     User.briefing_enabled.is_(True),
                 ),
                 UserProfile.briefing_enabled.is_(True),
+            ),
+            or_(
+                recent_expense,
+                active_asset,
+                User.created_at >= new_user_cutoff,
             ),
         )
     )
