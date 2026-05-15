@@ -364,6 +364,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #629 | Pre-Phase | [Bug] US5: Briefing "Đổi giờ" button not working | [pre-phase/issue-629.md](by-phase/pre-phase/issue-629.md) |
 | #635 | Pre-Phase | bug: KeyError 'vip' in menu_formatter.format_main_menu when wealth_level is 'vip' | [pre-phase/issue-635.md](by-phase/pre-phase/issue-635.md) |
 | #638 | Pre-Phase | Bug: KeyError 'vip' in menu_formatter.py khi user VIP nhấn /menu | [pre-phase/issue-638.md](by-phase/pre-phase/issue-638.md) |
+| #641 | Pre-Phase | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [pre-phase/issue-641.md](by-phase/pre-phase/issue-641.md) |
 
-**Total:** 360 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 343 Pre-Phase)
+**Total:** 361 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 344 Pre-Phase)

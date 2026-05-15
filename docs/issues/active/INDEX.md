@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #641 | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [issue-641.md](issue-641.md) |
 | #642 | improve: Hide/show total asset amount with eye button | [issue-642.md](issue-642.md) |
 | #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
 | #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
@@ -44,4 +43,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
 | #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
 
-**Total active:** 39
+**Total active:** 38
