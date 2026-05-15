@@ -49,5 +49,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #656 | [Bug] 'Nhận lương 20tr vào tiền mặt' → ghi expense sai thay vì add income | [issue-656.md](issue-656.md) |
 | #657 | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [issue-657.md](issue-657.md) |
 | #658 | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [issue-658.md](issue-658.md) |
+| #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
 
-**Total active:** 45
+**Total active:** 46
