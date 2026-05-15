@@ -1,4 +1,5 @@
 """Tests for the cashflow handler (#126 wealth-aware composition)."""
+
 from __future__ import annotations
 
 import uuid
@@ -11,6 +12,7 @@ import pytest
 from backend.intent.extractors.time_range import TimeRange
 from backend.intent.handlers.query_cashflow import (
     QueryCashflowHandler,
+    _income_for_period_from_streams,
     _strip_legacy_prefix,
     _top_income_sources,
 )
@@ -18,11 +20,12 @@ from backend.intent.intents import IntentResult, IntentType
 from backend.intent.wealth_adapt import style_for_level
 from backend.wealth.ladder import WealthLevel
 
-
 # 30-day window so ``amount * days / 30`` equals ``monthly_equivalent``
 # exactly — keeps the assertions in TestTopIncomeSources easy to read.
 _THIRTY_DAYS = TimeRange(
-    start=date(2026, 4, 13), end=date(2026, 5, 12), label="this_month",
+    start=date(2026, 4, 13),
+    end=date(2026, 5, 12),
+    label="this_month",
 )
 
 
@@ -147,6 +150,7 @@ async def test_no_data_message():
 
     assert "chưa có dữ liệu" in response.lower()
 
+
 @pytest.mark.asyncio
 async def test_cashflow_overview_splits_income_and_expense_cards():
     user = _user()
@@ -215,7 +219,10 @@ async def test_cashflow_current_month_detail_report():
     ):
         response = await QueryCashflowHandler().handle(intent, user, db)
 
-    assert "📅 *Dòng tiền tháng này*" in response
+    assert (
+        f"📅 *Dòng tiền tháng này tính đến hôm nay {date.today().strftime('%d/%m/%Y')}*"
+        in response
+    )
     assert "Dư / thiếu" in response
     assert "Net flow" not in response
     assert "💼 *Top nguồn thu*" in response
@@ -225,20 +232,41 @@ async def test_cashflow_current_month_detail_report():
     assert "Tiền nhà" in response
 
 
+class TestIncomeForPeriodFromStreams:
+    def test_monthly_fixed_income_uses_exact_amount_without_prorating(self):
+        salary = _stream(Decimal("50000000"))
+        salary.schedule_type = "monthly"
+        rent = _stream(Decimal("10000000"))
+        rent.schedule_type = "monthly"
+        partial_month = TimeRange(
+            start=date(2026, 5, 1), end=date(2026, 5, 15), label="this_month"
+        )
+
+        total = _income_for_period_from_streams(_user(), partial_month, [salary, rent])
+
+        assert total == Decimal("60000000")
+
+    def test_variable_non_monthly_income_keeps_existing_prorated_logic(self):
+        bonus = _stream(Decimal("9000000"))
+        bonus.schedule_type = "ad_hoc"
+        ten_days = TimeRange(
+            start=date(2026, 5, 1), end=date(2026, 5, 10), label="custom"
+        )
+
+        total = _income_for_period_from_streams(_user(), ten_days, [bonus])
+
+        assert total == Decimal("3000000")
+
+
 class TestStripLegacyPrefix:
     """``_strip_legacy_prefix`` removes the historical type prefix that
     ``rental_service`` baked into ``income_streams.name`` pre-PR #460."""
 
     def test_strips_legacy_thue_bds_prefix(self):
-        assert (
-            _strip_legacy_prefix("Thuê BĐS — Nhà Mỹ Đình") == "Nhà Mỹ Đình"
-        )
+        assert _strip_legacy_prefix("Thuê BĐS — Nhà Mỹ Đình") == "Nhà Mỹ Đình"
 
     def test_strips_current_bds_cho_thue_prefix(self):
-        assert (
-            _strip_legacy_prefix("BĐS cho thuê — Nhà Cầu Giấy")
-            == "Nhà Cầu Giấy"
-        )
+        assert _strip_legacy_prefix("BĐS cho thuê — Nhà Cầu Giấy") == "Nhà Cầu Giấy"
 
     def test_leaves_clean_name_untouched(self):
         assert _strip_legacy_prefix("Nhà Mỹ Đình") == "Nhà Mỹ Đình"
@@ -267,7 +295,9 @@ class TestTopIncomeSources:
     def test_rental_renders_type_label_and_asset_name_from_yaml(self):
         stream = _income_stream("rental", "Nhà Mỹ Đình", Decimal("7_600_000"))
         result = _top_income_sources(
-            [stream], time_range=_THIRTY_DAYS, limit=5,
+            [stream],
+            time_range=_THIRTY_DAYS,
+            limit=5,
         )
         assert len(result) == 1
         label, amount = result[0]
@@ -278,10 +308,14 @@ class TestTopIncomeSources:
     def test_rental_with_legacy_prefix_is_normalised(self):
         # Pre-migration row still carries the historical prefix in DB.
         stream = _income_stream(
-            "rental", "Thuê BĐS — Nhà Mỹ Đình", Decimal("7_600_000"),
+            "rental",
+            "Thuê BĐS — Nhà Mỹ Đình",
+            Decimal("7_600_000"),
         )
         result = _top_income_sources(
-            [stream], time_range=_THIRTY_DAYS, limit=5,
+            [stream],
+            time_range=_THIRTY_DAYS,
+            limit=5,
         )
         label, _ = result[0]
         # The legacy prefix is stripped before YAML prefix is re-applied.
@@ -290,10 +324,14 @@ class TestTopIncomeSources:
 
     def test_salary_keeps_user_supplied_name(self):
         stream = _income_stream(
-            "salary", "Lương công ty ABC", Decimal("30_000_000"),
+            "salary",
+            "Lương công ty ABC",
+            Decimal("30_000_000"),
         )
         result = _top_income_sources(
-            [stream], time_range=_THIRTY_DAYS, limit=5,
+            [stream],
+            time_range=_THIRTY_DAYS,
+            limit=5,
         )
         label, _ = result[0]
         # Non-auto-linked: user's raw name wins, type label is implicit.
@@ -303,7 +341,9 @@ class TestTopIncomeSources:
     def test_rental_missing_asset_name_falls_back_to_type_label(self):
         stream = _income_stream("rental", "", Decimal("5_000_000"))
         result = _top_income_sources(
-            [stream], time_range=_THIRTY_DAYS, limit=5,
+            [stream],
+            time_range=_THIRTY_DAYS,
+            limit=5,
         )
         label, _ = result[0]
         # Empty asset name: render just the type label, no trailing " — ".

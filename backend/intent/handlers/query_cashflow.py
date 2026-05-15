@@ -5,6 +5,7 @@ sees breakdown + savings rate. Income side reads from the IncomeStream
 table (Phase 3A) and falls back to ``user.monthly_income`` when no
 streams are configured.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -36,7 +37,6 @@ from backend.models.expense import Expense
 from backend.models.user import User
 from backend.wealth.models.income_stream import IncomeStream
 
-
 # Legacy prefixes ever written into ``income_streams.name`` by
 # ``rental_service``. The post-fix invariant is ``name == asset.name``; this
 # strip is belt-and-braces so old rows render correctly even before the
@@ -50,7 +50,7 @@ _LEGACY_NAME_PREFIXES: tuple[str, ...] = (
 def _strip_legacy_prefix(name: str) -> str:
     for prefix in _LEGACY_NAME_PREFIXES:
         if name.startswith(prefix):
-            return name[len(prefix):].strip()
+            return name[len(prefix) :].strip()
     return name
 
 
@@ -63,9 +63,7 @@ class CashflowPeriod:
 
 
 class QueryCashflowHandler(IntentHandler):
-    async def handle(
-        self, intent: IntentResult, user: User, db: AsyncSession
-    ) -> str:
+    async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
         time_range = _resolve_time_range(intent)
         streams = await _fetch_income_streams(db, user)
         current = await _build_period(db, user, time_range, streams=streams)
@@ -140,9 +138,7 @@ class QueryCashflowHandler(IntentHandler):
         ]
         return "\n".join(lines)
 
-    def _expense_card(
-        self, current: CashflowPeriod, previous: CashflowPeriod
-    ) -> str:
+    def _expense_card(self, current: CashflowPeriod, previous: CashflowPeriod) -> str:
         spend_delta = _delta_text(current.spend, previous.spend)
         lines = [
             "💸 *Chi tiêu tháng*",
@@ -159,9 +155,13 @@ class QueryCashflowHandler(IntentHandler):
         streams: list[IncomeStream],
     ) -> str:
         label_vi = _TIME_LABELS_VI.get(time_range.label, "tháng này")
+        title = f"📅 *Dòng tiền {label_vi}*"
+        if time_range.label == "this_month":
+            today_vi = date.today().strftime("%d/%m/%Y")
+            title = f"📅 *Dòng tiền {label_vi} tính đến hôm nay {today_vi}*"
         sign = "+" if period.net >= 0 else "−"
         lines = [
-            f"📅 *Dòng tiền {label_vi}*",
+            title,
             f"Thu: *{format_money_full(period.income)}*",
             f"Chi: *{format_money_full(period.spend)}*",
             f"Dư / thiếu: *{sign}{format_money_full(abs(period.net))}*",
@@ -237,12 +237,34 @@ def _income_for_period_from_streams(
     user: User, time_range: TimeRange, streams: list[IncomeStream]
 ) -> Decimal:
     if streams:
-        monthly = sum((s.monthly_equivalent for s in streams), Decimal(0))
-    elif user.monthly_income:
-        monthly = Decimal(user.monthly_income)
-    else:
-        return Decimal(0)
+        return sum(
+            (
+                _income_stream_amount_for_period(stream, time_range)
+                for stream in streams
+            ),
+            Decimal(0),
+        ).quantize(Decimal("1"))
+    if user.monthly_income:
+        return Decimal(user.monthly_income).quantize(Decimal("1"))
+    return Decimal(0)
 
+
+def _income_stream_amount_for_period(
+    stream: IncomeStream, time_range: TimeRange
+) -> Decimal:
+    """Return the amount shown for one stream in a cashflow period.
+
+    Fixed monthly streams (salary, rent, other recurring monthly income)
+    represent the user's expected monthly amount, so the monthly cashflow
+    view must show that exact figure instead of prorating it by elapsed days.
+    Variable/non-monthly schedules keep the previous day-based normalisation.
+    """
+    monthly = Decimal(getattr(stream, "monthly_equivalent", 0) or 0)
+    schedule_type = getattr(stream, "schedule_type", None)
+    if not isinstance(schedule_type, str) or not schedule_type:
+        schedule_type = "monthly"
+    if schedule_type == "monthly":
+        return monthly
     days = (time_range.end - time_range.start).days + 1
     return (monthly * Decimal(days) / Decimal(30)).quantize(Decimal("1"))
 
@@ -274,10 +296,8 @@ def _top_income_sources(
 ) -> list[tuple[str, Decimal]]:
     totals: dict[str, Decimal] = defaultdict(Decimal)
     labels: dict[str, str] = {}
-    days = (time_range.end - time_range.start).days + 1
     for stream in streams:
-        monthly = Decimal(stream.monthly_equivalent or 0)
-        amount = (monthly * Decimal(days) / Decimal(30)).quantize(Decimal("1"))
+        amount = _income_stream_amount_for_period(stream, time_range)
         key = getattr(stream, "stream_type", None)
         if not isinstance(key, str) or not key:
             key = "other"
@@ -308,7 +328,8 @@ def _top_income_sources(
 
 
 def _top_expense_categories(
-    expenses: Iterable[Expense], *, limit: int) -> list[tuple[str, Decimal]]:
+    expenses: Iterable[Expense], *, limit: int
+) -> list[tuple[str, Decimal]]:
     totals: dict[str, Decimal] = defaultdict(Decimal)
     for tx in expenses:
         category = get_category(getattr(tx, "category", None) or "other")
@@ -353,7 +374,9 @@ def _cashflow_tip(period: CashflowPeriod, saving_rate: float | None) -> str:
     if period.net < 0:
         return "💡 Mẹo: xem lại 1–2 nhóm chi lớn nhất trước khi thêm khoản mới."
     if saving_rate is not None and saving_rate >= 20:
-        return "💡 Mẹo: dòng tiền đang ổn — cân nhắc chuyển phần dư vào mục tiêu ưu tiên."
+        return (
+            "💡 Mẹo: dòng tiền đang ổn — cân nhắc chuyển phần dư vào mục tiêu ưu tiên."
+        )
     return "💡 Mẹo: thử đặt mục tiêu tiết kiệm 20% thu nhập để có vùng đệm an toàn."
 
 

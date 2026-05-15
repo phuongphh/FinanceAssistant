@@ -65,6 +65,7 @@ CB_ASSET_ADD = "asset_add"
 # so the dispatcher can route by prefix without inspecting the action.
 CB_ASSET_RENTAL = "asset_rental"
 CB_ASSET_MANAGE = "asset_manage"
+ASSET_ADD_CANCEL_LABEL = "◀️ Quay về menu"
 CB_DASHBOARD = "dashboard"
 CB_ASSET_ROW = "asset"
 
@@ -73,7 +74,9 @@ CB_ASSET_ROW = "asset"
 ASSET_LIST_PAGE_SIZE = 8
 
 
-def clamp_page(page: int, total_items: int, page_size: int = ASSET_LIST_PAGE_SIZE) -> int:
+def clamp_page(
+    page: int, total_items: int, page_size: int = ASSET_LIST_PAGE_SIZE
+) -> int:
     """Return ``page`` clamped to [0, last_page]. Empty lists return 0."""
     if total_items <= 0:
         return 0
@@ -85,7 +88,9 @@ def clamp_page(page: int, total_items: int, page_size: int = ASSET_LIST_PAGE_SIZ
     return page
 
 
-def _page_slice(items: list, page: int, page_size: int = ASSET_LIST_PAGE_SIZE) -> tuple[list, int, int]:
+def _page_slice(
+    items: list, page: int, page_size: int = ASSET_LIST_PAGE_SIZE
+) -> tuple[list, int, int]:
     """Return ``(slice, clamped_page, total_pages)`` for a 0-indexed page."""
     total = len(items)
     if total == 0:
@@ -166,7 +171,7 @@ def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
+                    "text": ASSET_ADD_CANCEL_LABEL,
                     "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
                 },
             ],
@@ -207,7 +212,12 @@ def cash_subtype_keyboard() -> InlineKeyboardMarkup:
                 ),
             }
         ],
-        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        [
+            {
+                "text": ASSET_ADD_CANCEL_LABEL,
+                "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+            }
+        ],
     ]
     return {"inline_keyboard": rows}
 
@@ -243,7 +253,12 @@ def stock_subtype_keyboard() -> InlineKeyboardMarkup:
                 ),
             }
         ],
-        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        [
+            {
+                "text": ASSET_ADD_CANCEL_LABEL,
+                "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+            }
+        ],
     ]
     return {"inline_keyboard": rows}
 
@@ -283,7 +298,12 @@ def crypto_subtype_keyboard() -> InlineKeyboardMarkup:
                 ),
             }
         ],
-        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        [
+            {
+                "text": ASSET_ADD_CANCEL_LABEL,
+                "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+            }
+        ],
     ]
     return {"inline_keyboard": rows}
 
@@ -317,7 +337,12 @@ def gold_subtype_keyboard() -> InlineKeyboardMarkup:
                 ),
             }
         ],
-        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        [
+            {
+                "text": ASSET_ADD_CANCEL_LABEL,
+                "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+            }
+        ],
     ]
     return {"inline_keyboard": rows}
 
@@ -339,7 +364,12 @@ def real_estate_subtype_keyboard() -> InlineKeyboardMarkup:
                 "callback_data": build_callback(CB_ASSET_ADD, "re_subtype", "land"),
             }
         ],
-        [{"text": "❌ Hủy", "callback_data": build_callback(CB_ASSET_ADD, "cancel")}],
+        [
+            {
+                "text": ASSET_ADD_CANCEL_LABEL,
+                "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
+            }
+        ],
     ]
     return {"inline_keyboard": rows}
 
@@ -364,7 +394,7 @@ def stock_current_price_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
+                    "text": ASSET_ADD_CANCEL_LABEL,
                     "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
                 }
             ],
@@ -394,7 +424,7 @@ def crypto_current_price_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
+                    "text": ASSET_ADD_CANCEL_LABEL,
                     "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
                 }
             ],
@@ -420,7 +450,7 @@ def gold_current_price_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 {
-                    "text": "❌ Hủy",
+                    "text": ASSET_ADD_CANCEL_LABEL,
                     "callback_data": build_callback(CB_ASSET_ADD, "cancel"),
                 }
             ],

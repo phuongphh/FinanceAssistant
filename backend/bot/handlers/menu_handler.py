@@ -202,6 +202,31 @@ LEGACY_REDIRECT_TEXT = (
     "Gõ /menu để xem giao diện mới nhé!"
 )
 
+# Session-scoped privacy toggle for the asset total in the Telegram menu.
+# In-memory state deliberately lasts only for the current bot process/session;
+# it avoids persisting a sensitive UI preference while keeping repeated taps fast.
+_ASSET_TOTAL_VISIBLE_BY_USER: dict[object, bool] = {}
+_ASSET_TOTAL_MASK = "********"
+
+
+def _asset_total_visible(user: User) -> bool:
+    return _ASSET_TOTAL_VISIBLE_BY_USER.get(user.id, True)
+
+
+def _asset_total_keyboard(keyboard: dict, *, visible: bool) -> dict:
+    """Return a shallow-copied submenu keyboard with a privacy toggle row."""
+    rows = [list(row) for row in keyboard.get("inline_keyboard", [])]
+    toggle_row = [
+        {
+            "text": "🙈 Ẩn số tiền" if visible else "👁 Hiện số tiền",
+            "callback_data": "menu:assets:toggle_total",
+        }
+    ]
+    # Keep the toggle close to the hero amount while preserving all existing
+    # submenu buttons and their callbacks.
+    rows.insert(0, toggle_row)
+    return {"inline_keyboard": rows}
+
 
 async def handle_menu_callback(
     db: AsyncSession, callback_query: dict[str, Any]
@@ -455,7 +480,9 @@ async def _navigate_assets(
     from backend.wealth.services import net_worth_calculator
 
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
+    visible = _asset_total_visible(user)
     _, keyboard = format_submenu(user, "assets", level=level)
+    keyboard = _asset_total_keyboard(keyboard, visible=visible)
     hint = get_submenu_hint("assets")
     name = user.display_name or "bạn"
 
@@ -467,9 +494,13 @@ async def _navigate_assets(
     else:
         asset_level = detect_level(breakdown.total)
         style = style_for_level(asset_level, breakdown.total)
+        amount_text = (
+            format_money_full(breakdown.total) if visible else _ASSET_TOTAL_MASK
+        )
+        eye = "👁" if visible else "🙈"
         lines = [
             f"💰 Tổng tài sản của {name}:",
-            f"*{format_money_full(breakdown.total)}*",
+            f"{eye} *{amount_text}*",
             "",
             get_action_copy("action_assets_net_worth", "market_value_note"),
         ]
@@ -720,8 +751,6 @@ async def _action_assets_net_worth(
     language. If the stored-current calculation takes at least 700ms, the
     user gets an explicit waiting sentence before the final total.
     """
-    from backend.bot.formatters.money import format_money_short
-    from backend.bot.formatters.movers import format_movers_block
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
     from backend.wealth.services import net_worth_calculator
@@ -744,26 +773,10 @@ async def _action_assets_net_worth(
     level = detect_level(breakdown.total)
     style = style_for_level(level, breakdown.total)
 
-    # Day-over-day total + per-asset movers — reuses asset_snapshots
-    # written by the 02:00 EOD revaluation job. ``calculate_change_from_current``
-    # is cheap (one indexed query) and ``get_daily_movers`` is one more.
-    change_day = await net_worth_calculator.calculate_change_from_current(
-        db, user.id, breakdown.total, period=net_worth_calculator.PERIOD_DAY
-    )
-    movers = await net_worth_calculator.get_daily_movers(db, user.id)
-
     lines = [
         f"💰 Tổng tài sản của {name}:",
         f"*{format_money_full(breakdown.total)}*",
     ]
-    movers_block = format_movers_block(
-        total_pct=change_day.change_percentage if change_day.previous > 0 else None,
-        movers=movers,
-        total_amount=change_day.change_absolute if change_day.previous > 0 else None,
-        amount_formatter=format_money_short,
-    )
-    if movers_block:
-        lines.extend(["", movers_block])
     lines.extend(["", get_action_copy("action_assets_net_worth", "market_value_note")])
     if breakdown.asset_count and not style.is_starter:
         lines.append("")
@@ -774,6 +787,20 @@ async def _action_assets_net_worth(
         text=decorate("\n".join(lines), style),
         parse_mode="Markdown",
         reply_markup=back_to_main_keyboard(),
+    )
+
+
+async def _action_assets_toggle_total(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Toggle masked/visible total asset amount for the current session."""
+    _ASSET_TOTAL_VISIBLE_BY_USER[user.id] = not _asset_total_visible(user)
+    await _navigate_assets(
+        db=db,
+        user=user,
+        chat_id=chat_id,
+        message_id=message_id,
+        level=user.wealth_level,
     )
 
 
@@ -803,8 +830,14 @@ async def _action_assets_report(
         text=get_action_copy("action_assets_report", "open_dashboard"),
         reply_markup={
             "inline_keyboard": [
-                [{"text": get_action_copy("action_assets_report", "miniapp_button"),
-                  "web_app": {"url": url}}],
+                [
+                    {
+                        "text": get_action_copy(
+                            "action_assets_report", "miniapp_button"
+                        ),
+                        "web_app": {"url": url},
+                    }
+                ],
                 [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
             ],
         },
@@ -834,14 +867,24 @@ async def _action_assets_manage(
     keyboard_rows: list[list[dict[str, Any]]] = []
     url = wealth_dashboard_url(source="menu_assets_manage")
     if url is not None:
-        keyboard_rows.append([
-            {"text": get_action_copy("action_assets_manage", "open_miniapp_button"),
-             "web_app": {"url": url}},
-        ])
-    keyboard_rows.append([
-        {"text": get_action_copy("action_assets_manage", "back_button"),
-         "callback_data": "menu:main"},
-    ])
+        keyboard_rows.append(
+            [
+                {
+                    "text": get_action_copy(
+                        "action_assets_manage", "open_miniapp_button"
+                    ),
+                    "web_app": {"url": url},
+                },
+            ]
+        )
+    keyboard_rows.append(
+        [
+            {
+                "text": get_action_copy("action_assets_manage", "back_button"),
+                "callback_data": "menu:main",
+            },
+        ]
+    )
 
     await send_message(
         chat_id=chat_id,
@@ -881,8 +924,14 @@ async def _action_expenses_report(
         text=get_action_copy("action_expenses_report", "open_dashboard"),
         reply_markup={
             "inline_keyboard": [
-                [{"text": get_action_copy("action_expenses_report", "miniapp_button"),
-                  "web_app": {"url": url}}],
+                [
+                    {
+                        "text": get_action_copy(
+                            "action_expenses_report", "miniapp_button"
+                        ),
+                        "web_app": {"url": url},
+                    }
+                ],
                 [{"text": "◀️ Quay về menu", "callback_data": "menu:main"}],
             ],
         },
@@ -911,18 +960,32 @@ async def _action_expenses_manage(
     keyboard_rows: list[list[dict[str, Any]]] = []
     url = expense_dashboard_url(source="menu_expenses_manage")
     if url is not None:
-        keyboard_rows.append([
-            {"text": get_action_copy("action_expenses_manage", "open_miniapp_button"),
-             "web_app": {"url": url}},
-        ])
-    keyboard_rows.append([
-        {"text": get_action_copy("action_expenses_manage", "ocr_button"),
-         "callback_data": "menu:expenses:ocr_prompt"},
-    ])
-    keyboard_rows.append([
-        {"text": get_action_copy("action_expenses_manage", "back_button"),
-         "callback_data": "menu:main"},
-    ])
+        keyboard_rows.append(
+            [
+                {
+                    "text": get_action_copy(
+                        "action_expenses_manage", "open_miniapp_button"
+                    ),
+                    "web_app": {"url": url},
+                },
+            ]
+        )
+    keyboard_rows.append(
+        [
+            {
+                "text": get_action_copy("action_expenses_manage", "ocr_button"),
+                "callback_data": "menu:expenses:ocr_prompt",
+            },
+        ]
+    )
+    keyboard_rows.append(
+        [
+            {
+                "text": get_action_copy("action_expenses_manage", "back_button"),
+                "callback_data": "menu:main",
+            },
+        ]
+    )
 
     await send_message(
         chat_id=chat_id,
@@ -1100,8 +1163,9 @@ async def _action_goals_advisor(
         )
         body = outcome.text or _GOALS_ADVISOR_TIMEOUT_FALLBACK
     except asyncio.TimeoutError:
-        logger.warning("goals advisor LLM timed out after %ss",
-                       _GOALS_ADVISOR_TIMEOUT_SECONDS)
+        logger.warning(
+            "goals advisor LLM timed out after %ss", _GOALS_ADVISOR_TIMEOUT_SECONDS
+        )
         body = _GOALS_ADVISOR_TIMEOUT_FALLBACK
     except Exception:
         logger.exception("goals advisor dispatch crashed")
@@ -1122,7 +1186,9 @@ async def _action_goals_advisor(
         await send_message(chat_id=chat_id, text=body)
 
 
-def _market_portfolio_keyboard(asset_type: str, *, include_search: bool = False) -> dict:
+def _market_portfolio_keyboard(
+    asset_type: str, *, include_search: bool = False
+) -> dict:
     """Action keyboard for Phase 3.9.5 market portfolio surfaces."""
     rows = [
         [
@@ -1139,21 +1205,57 @@ def _market_portfolio_keyboard(asset_type: str, *, include_search: bool = False)
         ],
     ]
     if include_search:
-        rows.insert(1, [{"text": "🔍 Tìm CK theo mã", "callback_data": "menu:market:stock_search"}])
+        rows.insert(
+            1,
+            [
+                {
+                    "text": "🔍 Tìm CK theo mã",
+                    "callback_data": "menu:market:stock_search",
+                }
+            ],
+        )
     rows.append([{"text": "◀️ Quay về Thị trường", "callback_data": "menu:market"}])
     return {"inline_keyboard": rows}
 
 
-
 VN30_SYMBOLS = [
-    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
-    "LPB", "MBB", "MSN", "MWG", "PLX", "SAB", "SHB", "SSB", "SSI", "STB",
-    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+    "ACB",
+    "BCM",
+    "BID",
+    "BVH",
+    "CTG",
+    "FPT",
+    "GAS",
+    "GVR",
+    "HDB",
+    "HPG",
+    "LPB",
+    "MBB",
+    "MSN",
+    "MWG",
+    "PLX",
+    "SAB",
+    "SHB",
+    "SSB",
+    "SSI",
+    "STB",
+    "TCB",
+    "TPB",
+    "VCB",
+    "VHM",
+    "VIB",
+    "VIC",
+    "VJC",
+    "VNM",
+    "VPB",
+    "VRE",
 ]
 
 
 def _market_back_keyboard() -> dict:
-    return {"inline_keyboard": [[{"text": "◀️ Quay về", "callback_data": "menu:market"}]]}
+    return {
+        "inline_keyboard": [[{"text": "◀️ Quay về", "callback_data": "menu:market"}]]
+    }
 
 
 VNINDEX_SCREEN_CACHE_KEY = "menu:vnindex:v1"
@@ -1216,7 +1318,9 @@ async def _action_market_vnindex(
     except Exception:
         cached = None
     if cached:
-        text = cached.decode("utf-8") if isinstance(cached, (bytes, bytearray)) else cached
+        text = (
+            cached.decode("utf-8") if isinstance(cached, (bytes, bytearray)) else cached
+        )
         await send_message(
             chat_id=chat_id,
             text=text,
@@ -1335,11 +1439,13 @@ async def _action_market_vnindex(
         pct = index_data["pct"]
         change = index_data["change"]
         sign = "+" if pct >= 0 else ""
-        lines.extend([
-            f"Điểm: *{index_data['price']:,.2f}*",
-            f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){index_data['stale_note']}",
-            f"Cập nhật: {index_data['updated']}",
-        ])
+        lines.extend(
+            [
+                f"Điểm: *{index_data['price']:,.2f}*",
+                f"Thay đổi: {sign}{change:,.2f} điểm ({sign}{pct:.2f}%){index_data['stale_note']}",
+                f"Cập nhật: {index_data['updated']}",
+            ]
+        )
     lines.append("")
     if not rows:
         lines.append("VN30 chưa có dữ liệu để xếp hạng.")
@@ -1350,7 +1456,9 @@ async def _action_market_vnindex(
         lines.append("🏦 *Top 5 VN30 theo GTGD*")
         for item in top_value:
             sign = "+" if item["pct"] >= 0 else ""
-            lines.append(f"• {item['symbol']}: {item['price']:,.0f}đ · {sign}{item['pct']:.2f}% · GTGD {money(item['trading_value'])}")
+            lines.append(
+                f"• {item['symbol']}: {item['price']:,.0f}đ · {sign}{item['pct']:.2f}% · GTGD {money(item['trading_value'])}"
+            )
         lines.extend(["", "📈 *Tăng mạnh nhất*"])
         for item in gainers:
             sign = "+" if item["pct"] >= 0 else ""
@@ -1377,6 +1485,7 @@ async def _action_market_vnindex(
         parse_mode="Markdown",
         reply_markup=_market_back_keyboard(),
     )
+
 
 async def _action_market_stock_board(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
@@ -1486,7 +1595,12 @@ async def _action_market_gold_prices(
 
 
 async def _action_market_portfolio(
-    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None, asset_type: str
+    *,
+    db: AsyncSession,
+    user: User,
+    chat_id: int,
+    message_id: int | None,
+    asset_type: str,
 ) -> None:
     from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
 
@@ -1505,7 +1619,9 @@ async def _action_market_portfolio(
         chat_id=chat_id,
         text=text,
         parse_mode="Markdown",
-        reply_markup=_market_portfolio_keyboard(asset_type, include_search=asset_type == "stock"),
+        reply_markup=_market_portfolio_keyboard(
+            asset_type, include_search=asset_type == "stock"
+        ),
     )
 
 
@@ -1546,7 +1662,6 @@ async def _action_market_stock_search(
         parse_mode="Markdown",
         reply_markup=_market_portfolio_keyboard("stock", include_search=False),
     )
-
 
 
 async def _action_twin_view_current(
@@ -1598,10 +1713,12 @@ async def _action_twin_life_events(
 
     await cmd_life_events(db, chat_id, user)
 
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
     ("assets", "manage"): _action_assets_manage,
+    ("assets", "toggle_total"): _action_assets_toggle_total,
     # Legacy callbacks kept so stale chat-history bubbles (before the
     # add/edit → manage merge) don't dead-end. Both route to the new
     # combined "Thêm/Sửa/Xoá" help surface.

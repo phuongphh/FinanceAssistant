@@ -442,6 +442,20 @@ async def start_asset_edit_wizard(
     )
 
 
+async def _enqueue_twin_recompute_safe(
+    db: AsyncSession, user_id: uuid.UUID, delta_net_worth: Decimal
+) -> None:
+    """Queue Twin recompute without blocking the asset-entry UX.
+
+    Recompute is a follow-up optimisation; asset creation/edit must not fail
+    if the projection side is temporarily unavailable or mocked in tests.
+    """
+    try:
+        await enqueue_recompute_if_needed(db, user_id, delta_net_worth)
+    except Exception:  # pragma: no cover - defensive UX guard
+        logger.exception("twin recompute enqueue failed after asset change")
+
+
 async def _handle_edit_current_value_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict
 ) -> None:
@@ -470,7 +484,7 @@ async def _handle_edit_current_value_input(
     )
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user.id, breakdown.total)
-    await enqueue_recompute_if_needed(db, user.id, Decimal(new_value))
+    await _enqueue_twin_recompute_safe(db, user.id, Decimal(new_value))
     await wizard_service.clear(db, user.id)
 
     from backend.miniapp.routes import invalidate_wealth_cache_for_user
@@ -794,9 +808,7 @@ async def _soft_delete_dashboard_asset(
         return
 
     await asset_service.soft_delete(db, user.id, asset_uuid)
-    await rental_service.pause_streams_for_asset(
-        db, user.id, asset_uuid
-    )
+    await rental_service.pause_streams_for_asset(db, user.id, asset_uuid)
     breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user.id, breakdown.total)
 
@@ -2397,7 +2409,10 @@ async def start_mark_rental_wizard(db: AsyncSession, chat_id: int, user: User) -
         )
         return
 
-    items = [(a.id, f"🏠 {a.name}") for a in candidates]
+    items = [
+        (a.id, f"{get_subtype_icon(AssetType.REAL_ESTATE.value, a.subtype)} {a.name}")
+        for a in candidates
+    ]
     await send_message(
         chat_id=chat_id,
         text="🏠 <b>Đánh dấu BĐS nào là cho thuê?</b>",
@@ -2504,7 +2519,7 @@ async def _post_save(db: AsyncSession, chat_id: int, user: User, asset) -> None:
     new_level = await update_user_level(db, user.id, breakdown.total)
 
     asset_value = Decimal(str(asset.current_value or 0))
-    await enqueue_recompute_if_needed(db, user.id, asset_value)
+    await _enqueue_twin_recompute_safe(db, user.id, asset_value)
 
     analytics.track(
         AssetEvent.ASSET_ADDED,
@@ -2706,9 +2721,19 @@ async def _dispatch_asset_action(
 
     if action == "cancel":
         await wizard_service.clear(db, user.id)
-        analytics.track(AssetEvent.WIZARD_CANCELED, user_id=user.id)
-        await send_message(
-            chat_id=chat_id, text="Đã huỷ. Quay lại lúc nào cũng được 👋"
+        analytics.track(
+            AssetEvent.WIZARD_CANCELED,
+            user_id=user.id,
+            properties={"destination": "menu_main"},
+        )
+        from backend.bot.handlers.menu_handler import _navigate
+
+        await _navigate(
+            db=db,
+            user=user,
+            chat_id=chat_id,
+            message_id=message_id,
+            target="main",
         )
         return
 
