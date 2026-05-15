@@ -11,21 +11,21 @@ Bé Tiền frequently fails to correctly parse user intents — either returning
 ## Issues
 
 ### Asset NLU Failures
-- [#652](https://github.com/phuongphh/FinanceAssistant/issues/652) [Bug] "Sửa đất ba tư" → Bé Tiền không hiểu là edit asset, trả lời "chưa biết"
-- [#653](https://github.com/phuongphh/FinanceAssistant/issues/653) [Bug] "Thêm bất động sản" → Bé Tiền show báo cáo thay vì add asset
-- [#658](https://github.com/phuongphh/FinanceAssistant/issues/658) [Bug] "Sửa cổ phiếu FPT thành 200 cổ" → ghi expense sai thay vì edit asset
-- [#656](https://github.com/phuongphh/FinanceAssistant/issues/656) [Bug] "TCB 25tr320" → không bắt được số lẻ amount
-- [#657](https://github.com/phuongphh/FinanceAssistant/issues/657) [Bug] "Giá vàng hôm nay" → Bé Tiền không query gold price
+- [#653](https://github.com/phuongphh/FinanceAssistant/issues/653) [Bug] "Sửa đất ba tư" → Bé Tiền không hiểu là edit asset, trả lời "chưa biết"
+- [#654](https://github.com/phuongphh/FinanceAssistant/issues/654) [Bug] "Thêm bất động sản" → Bé Tiền show báo cáo thay vì add asset
+- [#659](https://github.com/phuongphh/FinanceAssistant/issues/659) [Bug] "Sửa cổ phiếu FPT thành 200 cổ" → ghi expense sai thay vì edit asset
+- [#657](https://github.com/phuongphh/FinanceAssistant/issues/657) [Bug] "TCB 25tr320" → không bắt được số lẻ amount
+- [#658](https://github.com/phuongphh/FinanceAssistant/issues/658) [Bug] "Giá vàng hôm nay" → Bé Tiền không query gold price
 
 ### Expense/Income NLU Failures
-- [#654](https://github.com/phuongphh/FinanceAssistant/issues/654) [Bug] "Chi tiêu dashboard" → show báo cáo thay vì mở Expense Dashboard
-- [#655](https://github.com/phuongphh/FinanceAssistant/issues/655) [Bug] "Hôm nay nhận lương 20tr vào tiền mặt" → ghi expense sai thay vì add income to asset
+- [#655](https://github.com/phuongphh/FinanceAssistant/issues/655) [Bug] "Chi tiêu dashboard" → show báo cáo thay vì mở Expense Dashboard
+- [#656](https://github.com/phuongphh/FinanceAssistant/issues/656) [Bug] "Hôm nay nhận lương 20tr vào tiền mặt" → ghi expense sai thay vì add income to asset
 
 ### Goal NLU Failures
-- [#659](https://github.com/phuongphh/FinanceAssistant/issues/659) [Bug] "Thêm mục tiêu" → show goals report thay vì add goal
+- [#660](https://github.com/phuongphh/FinanceAssistant/issues/660) [Bug] "Thêm mục tiêu" → show goals report thay vì add goal
 
 ### Enhancement
-- [#660](https://github.com/phuongphh/FinanceAssistant/issues/660) [Improve] Expand expense keyword mapping for better NLU
+- [#661](https://github.com/phuongphh/FinanceAssistant/issues/661) [Improve] Expand expense keyword mapping for better NLU
 
 ## Acceptance Criteria
 - [ ] All 8 bugs are fixed and verified
@@ -45,7 +45,7 @@ Bé Tiền frequently fails to correctly parse user intents — either returning
 
 ## Claude Code Implementation Prompt
 ```
-Read GitHub Epic #651 "Bugs — NLU parsing failures" and ALL sub-issues (#652–#660) in phuongphh/FinanceAssistant.
+Read GitHub Epic #652 "Bugs — NLU parsing failures" and ALL sub-issues (#653–#661) in phuongphh/FinanceAssistant.
 
 Fix all NLU bugs where Bé Tiền fails to understand user intents. This is critical for the chat-first experience.
 
@@ -61,6 +61,6 @@ Guidelines:
 - Focus on the NLU/intent parsing layer
 - Write tests for each bug case
 - Conventional commits (fix:, improve:)
-- Create draft PR linking to epic #651
+- Create draft PR linking to epic #652
 ```
 
