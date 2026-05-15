@@ -108,6 +108,15 @@ canonical:
       category: "gold"
     notes: "Gold-category alternative phrasing."
 
+  # Regression for #658: "Giá vàng hôm nay" used to return
+  # "Mình chưa biết câu trả lời này". Now must route to query_market
+  # with category=gold so the handler returns today's gold prices.
+  - text: "Giá vàng hôm nay"
+    expected_intent: query_market
+    expected_parameters:
+      category: "gold"
+    notes: "Gold-category query with explicit hôm nay (issue #658)."
+
   - text: "giá crypto"
     expected_intent: query_market
     expected_parameters:
