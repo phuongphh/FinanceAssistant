@@ -371,6 +371,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #645 | Pre-Phase | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [pre-phase/issue-645.md](by-phase/pre-phase/issue-645.md) |
 | #646 | Pre-Phase | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [pre-phase/issue-646.md](by-phase/pre-phase/issue-646.md) |
 | #647 | Pre-Phase | improve: Change land asset icon from house to tree in rental real estate | [pre-phase/issue-647.md](by-phase/pre-phase/issue-647.md) |
+| #648 | Pre-Phase | improve: Reorder guidance in Expense Management — chat-first | [pre-phase/issue-648.md](by-phase/pre-phase/issue-648.md) |
 | #649 | Pre-Phase | improve: Add today's date to cashflow title | [pre-phase/issue-649.md](by-phase/pre-phase/issue-649.md) |
 | #650 | Pre-Phase | fix: Fix recurring income calculation in cashflow view | [pre-phase/issue-650.md](by-phase/pre-phase/issue-650.md) |
 | #652 | Pre-Phase | [Epic] Bugs — NLU parsing failures (8 bugs) | [pre-phase/issue-652.md](by-phase/pre-phase/issue-652.md) |
@@ -384,5 +385,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #660 | Pre-Phase | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [pre-phase/issue-660.md](by-phase/pre-phase/issue-660.md) |
 | #661 | Pre-Phase | [Improve] Expand expense keyword mapping for better NLU | [pre-phase/issue-661.md](by-phase/pre-phase/issue-661.md) |
 
-**Total:** 379 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 362 Pre-Phase)
+**Total:** 380 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 363 Pre-Phase)
