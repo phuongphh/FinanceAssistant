@@ -366,6 +366,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #638 | Pre-Phase | Bug: KeyError 'vip' in menu_formatter.py khi user VIP nhấn /menu | [pre-phase/issue-638.md](by-phase/pre-phase/issue-638.md) |
 | #641 | Pre-Phase | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [pre-phase/issue-641.md](by-phase/pre-phase/issue-641.md) |
 | #642 | Pre-Phase | improve: Hide/show total asset amount with eye button | [pre-phase/issue-642.md](by-phase/pre-phase/issue-642.md) |
+| #643 | Pre-Phase | improve: Reword Bé Tiền note in Asset menu with natural tone | [pre-phase/issue-643.md](by-phase/pre-phase/issue-643.md) |
 | #650 | Pre-Phase | fix: Fix recurring income calculation in cashflow view | [pre-phase/issue-650.md](by-phase/pre-phase/issue-650.md) |
 | #652 | Pre-Phase | [Epic] Bugs — NLU parsing failures (8 bugs) | [pre-phase/issue-652.md](by-phase/pre-phase/issue-652.md) |
 | #653 | Pre-Phase | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [pre-phase/issue-653.md](by-phase/pre-phase/issue-653.md) |
@@ -375,5 +376,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #657 | Pre-Phase | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [pre-phase/issue-657.md](by-phase/pre-phase/issue-657.md) |
 | #658 | Pre-Phase | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [pre-phase/issue-658.md](by-phase/pre-phase/issue-658.md) |
 
-**Total:** 370 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 353 Pre-Phase)
+**Total:** 371 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 354 Pre-Phase)

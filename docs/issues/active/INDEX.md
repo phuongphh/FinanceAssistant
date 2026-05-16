@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
 | #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
 | #645 | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [issue-645.md](issue-645.md) |
 | #646 | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [issue-646.md](issue-646.md) |
@@ -44,4 +43,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
 | #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 39
+**Total active:** 38
