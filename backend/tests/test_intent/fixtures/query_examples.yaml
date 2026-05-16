@@ -338,3 +338,42 @@ edge_cases:
     expected_intent: action_quick_transaction
     expected_min_confidence: 0.8
     notes: "Salary income credited to a cash account (#656)."
+
+  # Inline-edit shapes — these used to fall through the picker even
+  # though the user had already named both the asset and the new
+  # value. The handler now reads asset_name + new_value and applies
+  # the update inline.
+  - text: "sửa cổ phiếu FPT thành 200 cổ"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "stock"
+      asset_name: "fpt"
+      new_value: "200 cổ"
+    notes: "Inline stock-quantity edit (#659)."
+
+  - text: "sửa ACB thành 50tr"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_name: "acb"
+      new_value: "50tr"
+    notes: "Inline cash-balance edit by name."
+
+  - text: "cập nhật vàng SJC thành 5 chỉ"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "gold"
+      asset_name: "sjc"
+      new_value: "5 chỉ"
+    notes: "Inline gold-quantity edit."
+
+  - text: "sửa BĐS nhà số 1 thành 3 tỷ 2"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "real_estate"
+      new_value: "3 tỷ 2"
+    notes: "Inline real-estate revaluation with VN decimal shortcut."
+
+  - text: "dashboard"
+    expected_intent: nav_expense_dashboard
+    expected_min_confidence: 0.9
+    notes: "Bare 'dashboard' should open the miniapp, not produce a report."

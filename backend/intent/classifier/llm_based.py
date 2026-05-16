@@ -70,7 +70,7 @@ INTENTS:
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Muốn ghi giao dịch nhanh
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"
-- action_edit_asset: Muốn sửa / cập nhật tài sản đã có. Ví dụ: "sửa đất Ba Tư", "sửa cổ phiếu FPT thành 200 cổ", "cập nhật bất động sản"
+- action_edit_asset: Muốn sửa / cập nhật tài sản đã có. Ví dụ: "sửa đất Ba Tư", "sửa cổ phiếu FPT thành 200 cổ", "cập nhật bất động sản". Khi user nói "thành <giá trị>" / "= <giá trị>" thì capture vào new_value để handler áp dụng update inline.
 - action_delete_asset: Muốn xoá / bỏ tài sản đã có. Ví dụ: "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT", "huỷ bất động sản"
 - action_add_goal: Muốn thêm mục tiêu tài chính mới. Ví dụ: "thêm mục tiêu", "tạo mục tiêu mới", "đặt goal"
 - nav_expense_dashboard: Muốn mở dashboard / bảng điều khiển chi tiêu. Ví dụ: "chi tiêu dashboard", "mở dashboard chi tiêu", "bảng điều khiển chi phí"
@@ -87,6 +87,7 @@ PARAMETERS (extract nếu có, không có thì bỏ qua):
   Ví dụ: "giá vàng" → category=gold; "giá crypto"/"giá tiền số" → category=crypto; "giá cổ phiếu" → category=stock
 - asset_type (cho query_assets / action_add_asset / action_edit_asset / action_delete_asset): "cash" | "stock" | "real_estate" | "crypto" | "gold"
 - asset_name (cho action_edit_asset / action_delete_asset): tên / nhãn tài sản nếu user nêu rõ. Ví dụ: "ACB", "MoMo", "FPT", "đất Ba Tư"
+- new_value (cho action_edit_asset khi user dùng "thành <X>" / "= <X>"): chuỗi giá trị mới user nêu, nguyên văn. Ví dụ: "200 cổ", "50tr", "1.2 tỷ", "5 chỉ"
 - ticker (cho query_market khi user hỏi 1 mã cụ thể): viết hoa, ví dụ "VNM", "BTC", "VNINDEX"
 - amount: số nguyên VND
 - goal_name: tên mục tiêu

@@ -56,12 +56,21 @@ def is_report_query(text: str) -> bool:
     Phrases like "báo cáo giao dịch hôm qua" should go through the
     intent pipeline as ``query_expenses`` so the time range (including
     daily ranges) is respected instead of generating the monthly CFO
-    report.
+    report. Likewise dashboard / miniapp asks bypass this fast path —
+    the NLU layer owns ``nav_expense_dashboard`` and the user expects
+    the interactive miniapp, not a pre-rendered text report.
     """
     lower = text.lower()
     normalized = strip_diacritics(lower)
 
     if "giao dich" in normalized:
+        return False
+    if (
+        "dashboard" in normalized
+        or "bang dieu khien" in normalized
+        or "mini app" in normalized
+        or "miniapp" in normalized
+    ):
         return False
 
     return any(kw in lower for kw in _REPORT_KEYWORDS)
