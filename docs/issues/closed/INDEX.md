@@ -376,6 +376,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #657 | Pre-Phase | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [pre-phase/issue-657.md](by-phase/pre-phase/issue-657.md) |
 | #658 | Pre-Phase | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [pre-phase/issue-658.md](by-phase/pre-phase/issue-658.md) |
 | #660 | Pre-Phase | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [pre-phase/issue-660.md](by-phase/pre-phase/issue-660.md) |
+| #661 | Pre-Phase | [Improve] Expand expense keyword mapping for better NLU | [pre-phase/issue-661.md](by-phase/pre-phase/issue-661.md) |
 
-**Total:** 372 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 355 Pre-Phase)
+**Total:** 373 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 356 Pre-Phase)
