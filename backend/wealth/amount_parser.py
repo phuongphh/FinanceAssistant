@@ -4,6 +4,9 @@ Accepts the way Vietnamese users actually type amounts:
 
     "100 triệu", "100tr", "100tr5"      → 100_000_000 / 100_500_000
     "1.5 tỷ", "1,5 tỷ", "1.5ty"         → 1_500_000_000
+    "1tỷ2", "1 tỉ 2"                    → 1_200_000_000
+    "510tr215"                          → 510_215_000
+    "25tr320"                           → 25_320_000
     "2 tỷ rưỡi", "2 ty ruoi"            → 2_500_000_000
     "3 triệu rưỡi"                      → 3_500_000
     "500k", "500 nghìn", "500 ngàn"     → 500_000
@@ -12,6 +15,12 @@ Accepts the way Vietnamese users actually type amounts:
     "MoMo 2tr"                          → ("MoMo", 2_000_000)
     "5 triệu"                           → ("", 5_000_000)
     "45000"                             → 45_000
+
+The digits trailing a unit (``20tr5``, ``1tỷ2``, ``510tr215``) are
+interpreted as the **decimal fraction** of that unit, padded right —
+so ``20tr5`` is ``20.5 triệu`` (= 20,500,000), and ``510tr215`` is
+``510.215 triệu`` (= 510,215,000). This matches how Vietnamese users
+read these shortcuts aloud ("hai chục triệu rưỡi").
 
 Returns ``Decimal`` for the amount and the leftover label as a stripped
 string. Designed for the asset-entry wizards — failures return ``None``
@@ -82,18 +91,14 @@ _UNIT_MULTIPLIERS = {
     "vnd": Decimal("1"),
 }
 
-# Sub-amount multipliers: a bare number trailing a unit refers to the
-# next scale down — "25tr320" means 25 triệu + 320 nghìn = 25,320,000;
-# "1 tỷ 500" means 1 tỷ + 500 triệu = 1,500,000,000. Only defined for
-# units where a "next scale down" exists in Vietnamese usage.
-_SUB_MULTIPLIERS = {
-    "tỷ": Decimal("1_000_000"),
-    "ty": Decimal("1_000_000"),
-    "tỉ": Decimal("1_000_000"),
-    "triệu": Decimal("1_000"),
-    "trieu": Decimal("1_000"),
-    "tr": Decimal("1_000"),
-}
+# Units where a trailing bare number is the decimal fraction of the
+# unit. "20tr5" = 20.5 triệu, "1tỷ2" = 1.2 tỷ, "510tr215" = 510.215
+# triệu. The digit string is interpreted right-padded as the fractional
+# part (one digit → tenths, two → hundredths, three → thousandths), so
+# "1tỷ2" (= 1.2 tỷ = 1,200,000,000) and "1tỷ200" (= 1.200 tỷ =
+# 1,200,000,000) collapse to the same VND value. Only defined for units
+# where a "next scale down" is meaningful in Vietnamese usage.
+_SUB_DECIMAL_UNITS = {"tỷ", "ty", "tỉ", "triệu", "trieu", "tr"}
 
 
 def parse_amount(text: str) -> Decimal | None:
@@ -137,11 +142,15 @@ def parse_amount(text: str) -> Decimal | None:
     multiplier = _UNIT_MULTIPLIERS.get(unit, Decimal("1"))
 
     amount = base * multiplier
-    # Sub-amount: "25tr320" → 25_000_000 + 320 × 1_000.
+    # Sub-amount: interpret the trailing digits as the decimal fraction
+    # of the unit. "20tr5" → 20.5 triệu, "510tr215" → 510.215 triệu,
+    # "1tỷ2" → 1.2 tỷ. The unified rule is "right-pad as fractional
+    # digits", so the literal-thousands interpretation ("25tr320" =
+    # 25 triệu + 320 nghìn) still collapses to the same VND value.
     sub = m.group("sub")
-    if sub and unit in _SUB_MULTIPLIERS:
+    if sub and unit in _SUB_DECIMAL_UNITS:
         try:
-            amount += Decimal(sub) * _SUB_MULTIPLIERS[unit]
+            amount += Decimal(f"0.{sub}") * multiplier
         except (InvalidOperation, ValueError):
             return None
     # "rưỡi" after a unit means "and a half of that unit": "2 tỷ rưỡi" =

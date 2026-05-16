@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +39,7 @@ from backend.models.onboarding_session import (
     STEP_TWIN_SHOWN,
 )
 from backend.services.onboarding.wealth_inference_service import infer_segment
+from backend.wealth.amount_parser import parse_amount as _parse_amount_canonical
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +62,12 @@ def load_copy() -> dict[str, Any]:
 
 # ---------- Amount parsing -------------------------------------------
 
-# Common VN money shortcuts. Order matters: longer tokens first so
-# "triệu" matches before "tr" inside the same string. Patterns deliberately
-# don't use ``\b`` because "200tr" has no word boundary between the
-# digit and the letter (both are word chars).
-_AMOUNT_PATTERNS: list[tuple[re.Pattern[str], Decimal]] = [
-    (re.compile(r"(?i)(?:tỷ|tỉ|ty)\b"), Decimal("1_000_000_000")),
-    (re.compile(r"(?i)(?:triệu|trieu|tr|m)\b"), Decimal("1_000_000")),
-    (re.compile(r"(?i)(?:nghìn|nghin|k)\b"), Decimal("1_000")),
-]
+# Onboarding free-text amount parsing delegates to the canonical
+# wealth/amount_parser so "510tr215", "20tr5", "1tỷ2" and other
+# decimal-fraction shortcuts behave consistently with the rest of the
+# app. The local copy used to fail on "Xtr<digits>" inputs because the
+# trailing digit and the unit letter share a word boundary, dropping
+# the user into the "Bé Tiền chưa hiểu con số đó" reprompt.
 
 # Minimum sane first-asset value (1 triệu). Anything smaller is more
 # likely a typo than a wealth signal.
@@ -94,49 +91,21 @@ def is_trust_card_enabled() -> bool:
 def parse_asset_amount(raw: str) -> Decimal | None:
     """Parse a Vietnamese free-text money input into VND Decimal.
 
-    Accepts:
-      • "200tr" → 200_000_000
-      • "1.5 tỷ" → 1_500_000_000
-      • "500k" → 500_000
-      • "200,000,000" / "200.000.000" / "200000000" → 200_000_000
-
-    Returns None for unparseable input. Callers handle the
-    invalid / too_small / too_large branches separately.
+    Accepts every shortcut the post-onboarding asset wizard accepts
+    (``200tr``, ``1.5 tỷ``, ``500k``, ``1tỷ2``, ``510tr215``,
+    ``200,000,000``, raw integers). Returns ``None`` for unparseable
+    input; callers handle the invalid / too_small / too_large
+    branches separately.
     """
     if not raw:
         return None
-    text = raw.strip().lower()
-
-    multiplier = Decimal("1")
-    for pattern, factor in _AMOUNT_PATTERNS:
-        if pattern.search(text):
-            multiplier = factor
-            text = pattern.sub("", text)
-            break
-
-    # Strip thousand separators (both . and ,) and whitespace. We rely
-    # on a single decimal separator at most for shortcut values like
-    # "1.5 tỷ"; treat the LAST . or , as decimal if there's exactly
-    # one of either, otherwise as thousand separator.
-    cleaned = text.strip()
-    if "," in cleaned and "." in cleaned:
-        # Mixed — drop both (assume thousand separators only).
-        cleaned = cleaned.replace(",", "").replace(".", "")
-    elif cleaned.count(",") == 1 and multiplier != Decimal("1"):
-        cleaned = cleaned.replace(",", ".")
-    elif cleaned.count(".") == 1 and multiplier != Decimal("1"):
-        pass  # already decimal-formatted
-    else:
-        cleaned = cleaned.replace(",", "").replace(".", "")
-
-    cleaned = cleaned.replace(" ", "")
-    if not cleaned:
+    value = _parse_amount_canonical(raw)
+    if value is None:
         return None
-
-    try:
-        return (Decimal(cleaned) * multiplier).quantize(Decimal("1"))
-    except (InvalidOperation, ValueError):
-        return None
+    # Canonical parser returns positive amounts only. Onboarding wants
+    # an integer VND value — quantize away any sub-đồng noise from
+    # decimal-fraction shortcuts like "1.5 tỷ".
+    return value.quantize(Decimal("1"))
 
 
 # ---------- Session CRUD ----------------------------------------------

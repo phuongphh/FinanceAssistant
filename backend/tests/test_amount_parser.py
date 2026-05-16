@@ -80,7 +80,10 @@ class TestParseAmount:
     @pytest.mark.parametrize(
         "raw,expected",
         [
-            # "25tr320" = 25 triệu + 320 nghìn = 25,320,000 (issue #657).
+            # Decimal-fraction interpretation (issue #657 + the bare-digit
+            # variants from the post-onboarding asset-entry screenshots):
+            # the trailing digits are right-padded as fractional part of
+            # the unit, so "20tr5" = 20.5 triệu = 20,500,000.
             ("25tr320", Decimal("25320000")),
             ("25tr 320", Decimal("25320000")),
             ("100tr500", Decimal("100500000")),
@@ -88,6 +91,17 @@ class TestParseAmount:
             ("1ty500", Decimal("1500000000")),
             ("2 tỉ 300", Decimal("2300000000")),
             ("3 triệu 250", Decimal("3250000")),
+            # Single- and double-digit shortcuts — the bugs reported in
+            # the issue screenshots. Before the fix these collapsed to
+            # the literal "next scale down" (20tr5 → 20,005,000).
+            ("20tr5", Decimal("20500000")),
+            ("1tỉ2", Decimal("1200000000")),
+            ("1ty2", Decimal("1200000000")),
+            ("1tỷ2", Decimal("1200000000")),
+            ("3 tỉ 2", Decimal("3200000000")),
+            ("3tỉ25", Decimal("3250000000")),
+            ("510tr215", Decimal("510215000")),
+            ("510 tr 215", Decimal("510215000")),
         ],
     )
     def test_sub_amount_after_unit(self, raw, expected):

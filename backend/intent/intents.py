@@ -39,6 +39,7 @@ class IntentType(str, Enum):
     ACTION_QUICK_TRANSACTION = "action_quick_transaction"
     ACTION_ADD_ASSET = "action_add_asset"
     ACTION_EDIT_ASSET = "action_edit_asset"
+    ACTION_DELETE_ASSET = "action_delete_asset"
     ACTION_ADD_GOAL = "action_add_goal"
 
     # ----- Navigation intents -----

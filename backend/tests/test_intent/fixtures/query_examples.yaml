@@ -298,3 +298,43 @@ edge_cases:
   - text: "dashboard chi tiêu"
     expected_intent: nav_expense_dashboard
     notes: "Expense dashboard, inverted word order (#655)."
+
+  # Delete-asset intent — added after the chat screenshot showed
+  # "xoá tài sản ACB" / "xoá tài sản ví zalopay" falling through to
+  # UNCLEAR because no rule pattern covered the delete shape.
+  - text: "xoá tài sản"
+    expected_intent: action_delete_asset
+    notes: "Delete wizard — generic form."
+
+  - text: "xoá tài sản ACB"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_name: "acb"
+    notes: "Delete by exact name — handler should jump to confirm card."
+
+  - text: "xoá ví zalopay"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_type: "cash"
+      asset_name: "zalopay"
+    notes: "Delete a cash wallet by its label."
+
+  - text: "xoá cổ phiếu FPT"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_type: "stock"
+      asset_name: "fpt"
+    notes: "Delete stock holding by ticker."
+
+  # Income-to-wallet — anchored shapes that previously hit the LLM
+  # tier (or worse, fell through entirely) when the user expected the
+  # quick-transaction card.
+  - text: "thêm 3tr vào ví momo"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.8
+    notes: "Add income to a named wallet — rule tier saves an LLM call."
+
+  - text: "nhận lương 20tr vào tiền mặt"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.8
+    notes: "Salary income credited to a cash account (#656)."

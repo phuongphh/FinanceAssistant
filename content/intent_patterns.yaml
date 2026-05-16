@@ -249,6 +249,25 @@ query_goals:
     - pattern: '(?:liet\s*ke|xem|list)\s+(?:muc\s*tieu|goals?)'
       confidence: 0.9
 
+action_quick_transaction:
+  description: "User logs a quick income or expense in natural language."
+  # Anchored phrasing that the LLM tier would otherwise have to handle:
+  # "thêm 3tr vào ví momo", "nhận 5tr vào tiền mặt", "cộng 2tr vào tài
+  # khoản VCB". We let the rule tier catch the high-signal shapes so
+  # latency stays sub-200ms and the LLM budget stays trim. The
+  # canonical parser inside the handler re-extracts amount + merchant
+  # from the raw text, so we don't need named groups here.
+  patterns:
+    # "thêm 3tr vào ví momo" / "them 200k vao vi zalopay"
+    - pattern: '^(?:them|cong|nap|nhan|cho|gui|bo)\s+[\d.,]+.*(?:vao|into)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+    # "nhận lương 20tr vào tiền mặt"
+    - pattern: '^(?:nhan|duoc|thuong|luong)\s+(?:luong\s+)?[\d.,]+.*(?:vao|tai|o|trong)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+    # "trừ 50k khỏi ví momo" — explicit expense from named asset.
+    - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+
 action_record_saving:
   description: "User wants to record a saving."
   patterns:
@@ -321,6 +340,34 @@ action_edit_asset:
         - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
         - { match: 'vang|gold', value: gold }
         - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
+
+action_delete_asset:
+  description: "User wants to remove an existing asset."
+  # "xoá tài sản", "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT".
+  # Diacritic-stripped: "xoa" / "xoa tai san". The trailing capture
+  # (?P<asset_name>...) lets the handler skip straight to the
+  # confirm-delete card when the name matches exactly one active asset.
+  patterns:
+    - pattern: '^(?:xoa|xo|huy|remove|delete|del)\s+tai\s*san(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.95
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:vang|gold)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.9
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+  parameter_extractors:
+    asset_type:
+      patterns:
+        - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
+        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
+        - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
+        - { match: 'vang|gold', value: gold }
+        - { match: 'tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi', value: cash }
 
 action_add_goal:
   description: "User wants to add a new financial goal."
