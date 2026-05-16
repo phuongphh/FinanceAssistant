@@ -59,8 +59,14 @@ Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
+# Quick-syntax for manual transactions. Description is OPTIONAL so the
+# explicit-sign forms ("+200k" / "-200k") still match — they're the
+# user's most direct signal about direction. We accept the match only
+# when at least one of {sign, unit, description} is present; a bare
+# bareword number like "200" is too ambiguous and is left to the intent
+# pipeline.
 _AMOUNT_RE = re.compile(
-    r"^\s*(?P<sign>[+-])?\s*(?P<num>\d+(?:[\.,]\d+)?)\s*(?P<unit>k|nghìn|tr|triệu|m)?\s+(?P<desc>.+)$",
+    r"^\s*(?P<sign>[+-])?\s*(?P<num>\d+(?:[\.,]\d+)?)\s*(?P<unit>k|nghìn|tr|triệu|m)?(?:\s+(?P<desc>.+?))?\s*$",
     re.IGNORECASE,
 )
 
@@ -69,20 +75,25 @@ def _parse_signed_transaction(text: str) -> dict | None:
     match = _AMOUNT_RE.match(text)
     if not match:
         return None
+    sign = match.group("sign")
+    unit = (match.group("unit") or "").lower()
+    desc = (match.group("desc") or "").strip()[:500]
+    # Reject bare numbers ("200") — let the intent pipeline decide.
+    if not sign and not unit and not desc:
+        return None
     raw_num = match.group("num").replace(",", ".")
     try:
         amount = float(raw_num)
     except ValueError:
         return None
-    unit = (match.group("unit") or "").lower()
     if unit in {"k", "nghìn"}:
         amount *= 1_000
     elif unit in {"tr", "triệu", "m"}:
         amount *= 1_000_000
     if amount <= 0:
         return None
-    sign = match.group("sign") or "-"
-    desc = match.group("desc").strip()[:500]
+    # Sign is the source of truth for direction. Absent sign defaults to
+    # expense, matching the convention "không dấu = chi".
     return {
         "amount": amount,
         "merchant": desc,
@@ -103,11 +114,15 @@ async def _start_source_prompt(
         draft=parsed,
     )
     prompt = (
-        "Tiền này vào nguồn nào?" if tx_type == "money_in" else "Trừ tiền từ nguồn nào?"
+        "Tiền vào nguồn nào?" if tx_type == "money_in" else "Tiền chi từ nguồn nào?"
     )
+    merchant = (parsed.get("merchant") or "").strip()
+    sign = "+" if tx_type == "money_in" else "-"
+    amount_line = f"{sign}{parsed['amount']:,.0f}đ"
+    detail = f"{merchant} · {amount_line}" if merchant else amount_line
     await send_message(
         chat_id,
-        f"{prompt}\n{parsed['merchant']} · {parsed['amount']:,.0f}đ",
+        f"{prompt}\n{detail}",
         reply_markup=transaction_source_keyboard(tx_type),
     )
     return True

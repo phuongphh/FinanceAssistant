@@ -51,7 +51,9 @@ Trả về JSON với format:
 {{"amount": <số>, "merchant": "<tên hoặc mô tả ngắn>", "is_expense": <true|false>}}
 
 Quy tắc:
-- Nếu có số tiền và mô tả → is_expense: true
+- Nếu text bắt đầu bằng "+" trước số → đây là TIỀN VÀO (income), is_expense: false
+- Nếu text bắt đầu bằng "-" trước số → là chi tiêu, is_expense: true
+- Nếu có số tiền và mô tả (không có dấu +/-) → is_expense: true
 - Nếu là câu hỏi, tin nhắn thông thường, không phải chi tiêu → is_expense: false, amount: 0
 - "k" hoặc "K" cuối số = × 1000: 50k = 50000, 150k = 150000
 - merchant = nơi mua hoặc mô tả ngắn gọn nhất
@@ -71,6 +73,8 @@ Trả về JSON với format:
 }}
 
 Quy tắc:
+- Nếu text bắt đầu bằng "+" trước số → đây là TIỀN VÀO (income), is_expense: false.
+- Nếu text bắt đầu bằng "-" trước số → là chi tiêu, is_expense: true.
 - Nếu có nhiều cụm mô tả + số tiền, hãy tách thành nhiều items.
 - Ví dụ: "tiền xăng 50k, ăn trưa 50k" → 2 items.
 - Nếu chỉ có một số tiền tổng cho nhiều món, ví dụ "ăn tối và trà sữa 400k" → 1 item.
@@ -172,6 +176,18 @@ def _strip_diacritics(text: str) -> str:
     ).replace("đ", "d").replace("Đ", "D")
 
 
+def _has_leading_plus_sign(text: str) -> bool:
+    """True if the message starts with an explicit ``+`` before a number.
+
+    Convention: a leading ``+`` is the user's most direct signal that
+    this is money-in, not expense. The fast-path in ``message.py``
+    normally catches these before they reach the intent classifier; this
+    is a belt-and-suspenders check so signed input is never silently
+    recorded as expense even if routing changes.
+    """
+    return bool(re.match(r"^\s*\+\s*\d", text or ""))
+
+
 def _looks_like_income(text: str) -> bool:
     """True if the message reads as income rather than expense.
 
@@ -179,9 +195,14 @@ def _looks_like_income(text: str) -> bool:
     "nhận lương 20tr vào tiền mặt" as an expense (#656). If the message
     contains BOTH income and expense verbs, expense wins — the user is
     describing what they did with the money, not the receipt itself.
+
+    Also fires when the message starts with an explicit ``+`` sign so
+    "+200k" never gets recorded as an expense.
     """
     if not text:
         return False
+    if _has_leading_plus_sign(text):
+        return True
     norm = _strip_diacritics(text.lower())
     has_income = any(kw in norm for kw in _INCOME_KEYWORDS)
     if not has_income:
