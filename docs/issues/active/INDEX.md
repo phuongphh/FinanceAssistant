@@ -41,7 +41,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
 | #653 | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [issue-653.md](issue-653.md) |
-| #654 | [Bug] 'Thêm bất động sản' → Bé Tiền show báo cáo thay vì add asset | [issue-654.md](issue-654.md) |
 | #655 | [Bug] 'Chi tiêu dashboard' → Bé Tiền show báo cáo thay vì mở Dashboard | [issue-655.md](issue-655.md) |
 | #656 | [Bug] 'Nhận lương 20tr vào tiền mặt' → ghi expense sai thay vì add income | [issue-656.md](issue-656.md) |
 | #657 | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [issue-657.md](issue-657.md) |
@@ -50,4 +49,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
 | #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 45
+**Total active:** 44
