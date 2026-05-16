@@ -37,13 +37,19 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.bot.formatters.money import format_money_short
+from backend.bot.formatters.templates import format_receipt_confirmation
+from backend.bot.handlers.transaction import _normalize_category
+from backend.bot.keyboards.transaction_keyboard import transaction_actions_keyboard
 from backend.models.user import User
+from backend.schemas.expense import VALID_CATEGORIES, ExpenseCreate
+from backend.services import expense_service
 from backend.services.ocr_service import parse_receipt_image
 from backend.services.telegram_service import (
     download_file,
@@ -69,6 +75,36 @@ _MAX_IMAGE_BYTES = 10 * 1024 * 1024
 EVENT_RECEIPT_PHOTO_RECEIVED = "receipt_photo_received"
 EVENT_RECEIPT_PHOTO_PARSED = "receipt_photo_parsed"
 EVENT_RECEIPT_PHOTO_FAILED = "receipt_photo_failed"
+EVENT_RECEIPT_EXPENSE_AUTOSAVED = "receipt_expense_autosaved"
+
+
+def _parse_iso_date(value: Any) -> date | None:
+    """Parse OCR's ``YYYY-MM-DD`` date string. Returns ``None`` on bad input.
+
+    Rejects future dates (clock skew or hallucination) by falling back to
+    ``None`` so the caller defaults to today instead of recording a
+    plausible-but-wrong receipt date.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.strptime(value.strip(), "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    if parsed > date.today():
+        return None
+    return parsed
+
+
+def _resolve_ocr_category(suggestion: Any) -> str:
+    """Map OCR ``category_suggestion`` to a valid expense category code.
+
+    Unknown / missing values fall through to ``needs_review`` so
+    ``create_expense`` triggers its LLM categorizer fallback.
+    """
+    if isinstance(suggestion, str) and suggestion in VALID_CATEGORIES:
+        return suggestion
+    return "needs_review"
 
 
 def _select_photo(photos: list[dict]) -> dict | None:
@@ -120,11 +156,17 @@ async def _keep_chat_action_alive(chat_id: int) -> None:
 
 
 def _format_receipt(result: dict[str, Any]) -> str:
-    """Render the OCR result as a Telegram-HTML reply."""
+    """Render the OCR result as a Telegram-HTML reply.
+
+    Used as a fallback when we *can't* auto-save the expense (e.g.
+    missing/zero total amount) — the regular happy path uses
+    `format_receipt_confirmation` + an inline action keyboard.
+    """
     total = result.get("total_amount") or 0
     currency = (result.get("currency") or "VND").upper()
     merchant = result.get("merchant_name")
-    date = result.get("date")
+    raw_date = result.get("date")
+    parsed_date = _parse_iso_date(raw_date)
     items = result.get("items") or []
     confidence = (result.get("confidence") or "medium").lower()
 
@@ -137,8 +179,11 @@ def _format_receipt(result: dict[str, Any]) -> str:
     if merchant:
         lines.append(f"🏪 <b>{html.escape(str(merchant))}</b>")
     lines.append(f"💸 Tổng: <b>{total_str}</b>")
-    if date:
-        lines.append(f"📅 {html.escape(str(date))}")
+    if parsed_date:
+        lines.append(f"📅 {parsed_date.strftime('%d/%m/%Y')}")
+    elif raw_date:
+        # Couldn't parse — still surface the raw string rather than dropping it.
+        lines.append(f"📅 {html.escape(str(raw_date))}")
 
     if items:
         lines.append("")
@@ -166,6 +211,143 @@ def _format_receipt(result: dict[str, Any]) -> str:
         )
 
     return "\n".join(lines)
+
+
+async def _autosave_and_confirm(
+    *,
+    db: AsyncSession,
+    user: User,
+    result: dict[str, Any],
+    chat_id: int,
+    ack_id: int | None,
+    finish,
+) -> None:
+    """Auto-create an expense from the OCR result and edit-in the confirmation.
+
+    Falls back to the read-only `_format_receipt` view (no DB write) when
+    the receipt is missing a usable total — the user can re-snap or type
+    the amount manually instead of us persisting a zero-amount expense.
+    """
+    raw_total = result.get("total_amount")
+    try:
+        amount = float(raw_total) if raw_total is not None else 0.0
+    except (TypeError, ValueError):
+        amount = 0.0
+    currency = (result.get("currency") or "VND").upper()
+    merchant = (result.get("merchant_name") or "").strip() or None
+    parsed_date = _parse_iso_date(result.get("date")) or date.today()
+    confidence = (result.get("confidence") or "medium").lower()
+    items = result.get("items") or []
+    category = _resolve_ocr_category(result.get("category_suggestion"))
+
+    if amount <= 0:
+        # Can't auto-save without a total. Keep the legacy read-only view
+        # and nudge the user to add the amount manually.
+        await finish(
+            _format_receipt(result)
+            + "\n\n<i>Mình chưa thấy số tiền trên hoá đơn — bạn gõ tay giúp,"
+            " ví dụ \"150k cà phê\" nhé.</i>"
+        )
+        return
+
+    note_bits: list[str] = []
+    if items:
+        names = [
+            str(it.get("name") or "").strip()
+            for it in items
+            if isinstance(it, dict) and (it.get("name") or "").strip()
+        ]
+        if names:
+            preview = ", ".join(names[:3])
+            if len(names) > 3:
+                preview += f" +{len(names) - 3}"
+            note_bits.append(preview)
+    note = " · ".join(note_bits) or None
+
+    try:
+        expense = await expense_service.create_expense(
+            db,
+            user.id,
+            ExpenseCreate(
+                amount=amount,
+                currency=currency,
+                merchant=merchant,
+                category=category,
+                source="ocr",
+                expense_date=parsed_date,
+                note=note,
+                raw_data={
+                    "ocr": {
+                        "confidence": confidence,
+                        "category_suggestion": result.get("category_suggestion"),
+                        "items": items[:20],
+                    }
+                },
+            ),
+        )
+    except Exception:
+        logger.exception("Auto-creating expense from OCR failed")
+        # Don't punish the user — show the parsed view as a graceful fallback.
+        await finish(
+            _format_receipt(result)
+            + "\n\n<i>Mình chưa ghi được vào sổ chi — bạn thử lại sau giúp nhé.</i>"
+        )
+        analytics.track(
+            EVENT_RECEIPT_PHOTO_FAILED,
+            user_id=user.id,
+            properties={"reason": "expense_create_error"},
+        )
+        return
+
+    text = format_receipt_confirmation(
+        merchant=merchant or expense.note or "Hoá đơn",
+        amount=float(expense.amount),
+        category_code=_normalize_category(expense.category),
+        receipt_date=expense.expense_date,
+        items=[
+            (str(it.get("name") or ""), it.get("price"))
+            for it in items
+            if isinstance(it, dict)
+        ],
+        confidence=confidence,
+        auto_categorized=True,
+    )
+
+    keyboard = transaction_actions_keyboard(str(expense.id))
+
+    edited = False
+    if ack_id:
+        try:
+            await edit_message_text(
+                chat_id=chat_id,
+                message_id=ack_id,
+                text=text,
+                parse_mode=None,
+                reply_markup=keyboard,
+            )
+            edited = True
+        except Exception:
+            logger.debug("edit ack with receipt confirmation failed", exc_info=True)
+    if not edited:
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=None,
+            reply_markup=keyboard,
+        )
+
+    analytics.track(
+        EVENT_RECEIPT_EXPENSE_AUTOSAVED,
+        user_id=user.id,
+        properties={
+            "expense_id": str(expense.id),
+            "amount": float(expense.amount),
+            "category": expense.category,
+            "auto_categorized": (result.get("category_suggestion") or "") not in VALID_CATEGORIES,
+            "confidence": confidence,
+            "has_date": bool(result.get("date")),
+        },
+    )
 
 
 async def handle_photo_message(
@@ -309,7 +491,6 @@ async def handle_photo_message(
             )
             return True
 
-        await _finish(_format_receipt(result))
         analytics.track(
             EVENT_RECEIPT_PHOTO_PARSED,
             user_id=user.id,
@@ -320,6 +501,15 @@ async def handle_photo_message(
                 "has_merchant": bool(result.get("merchant_name")),
                 "item_count": len(result.get("items") or []),
             },
+        )
+
+        await _autosave_and_confirm(
+            db=db,
+            user=user,
+            result=result,
+            chat_id=chat_id,
+            ack_id=ack_id,
+            finish=_finish,
         )
         return True
     finally:
