@@ -40,9 +40,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
 | #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
 | #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
-| #657 | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [issue-657.md](issue-657.md) |
 | #659 | [Bug] 'Thêm mục tiêu' → Bé Tiền show goals report thay vì add goal | [issue-659.md](issue-659.md) |
 | #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
 | #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 40
+**Total active:** 39
