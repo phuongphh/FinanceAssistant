@@ -367,6 +367,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #641 | Pre-Phase | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [pre-phase/issue-641.md](by-phase/pre-phase/issue-641.md) |
 | #642 | Pre-Phase | improve: Hide/show total asset amount with eye button | [pre-phase/issue-642.md](by-phase/pre-phase/issue-642.md) |
 | #650 | Pre-Phase | fix: Fix recurring income calculation in cashflow view | [pre-phase/issue-650.md](by-phase/pre-phase/issue-650.md) |
+| #652 | Pre-Phase | [Epic] Bugs — NLU parsing failures (8 bugs) | [pre-phase/issue-652.md](by-phase/pre-phase/issue-652.md) |
 
-**Total:** 363 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 346 Pre-Phase)
+**Total:** 364 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 347 Pre-Phase)
