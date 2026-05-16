@@ -3,7 +3,7 @@
 Nguyên tắc: Một function = một loại tin nhắn.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.bot.formatters.progress_bar import make_category_bar, make_progress_bar
@@ -64,6 +64,59 @@ def format_transaction_confirmation(
             lines.append(
                 f"Vượt ngân sách {format_money_short(-remaining)} — cần chú ý 😅"
             )
+
+    return "\n".join(lines)
+
+
+def format_receipt_confirmation(
+    merchant: str,
+    amount: float,
+    category_code: str,
+    receipt_date: date | None = None,
+    items: list[tuple[str, float | None]] | None = None,
+    confidence: str = "high",
+    auto_categorized: bool = True,
+) -> str:
+    """Confirmation message sent after auto-saving an OCR receipt.
+
+    Mirrors `format_transaction_confirmation` aesthetic but adds the
+    receipt-specific date (dd/mm/yyyy) and a compact item list. Pairs
+    with `transaction_actions_keyboard` so the user can re-categorize,
+    edit, or undo within the 5s window.
+    """
+    cat = get_category(category_code)
+
+    lines: list[str] = ["🧾 Đã ghi hoá đơn!", ""]
+    lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
+
+    if receipt_date:
+        lines.append(f"📅 {receipt_date.strftime('%d/%m/%Y')}")
+
+    lines.append(f"🏷 Danh mục: {cat.name_vi}")
+
+    if items:
+        lines.append("")
+        lines.append("Chi tiết:")
+        for name, price in items[:5]:
+            name = (name or "").strip()
+            if not name:
+                continue
+            if price:
+                lines.append(f"• {name}  —  {format_money_short(float(price))}")
+            else:
+                lines.append(f"• {name}")
+        if len(items) > 5:
+            lines.append(f"… và {len(items) - 5} món khác")
+
+    if confidence == "low":
+        lines.append("")
+        lines.append("⚠️ Mình đọc chưa chắc — bạn rà lại số tiền giúp nhé.")
+
+    lines.append("")
+    if auto_categorized:
+        lines.append("Tap 🏷 nếu cần đổi danh mục, hoặc ↶ để hủy.")
+    else:
+        lines.append("Tap ↶ trong 5s nếu bạn muốn hủy nhé.")
 
     return "\n".join(lines)
 
