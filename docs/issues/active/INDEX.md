@@ -38,6 +38,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #646 | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [issue-646.md](issue-646.md) |
 | #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
 | #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
-| #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
 
-**Total active:** 35
+**Total active:** 34
