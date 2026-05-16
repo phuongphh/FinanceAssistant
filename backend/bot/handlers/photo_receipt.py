@@ -265,27 +265,32 @@ async def _autosave_and_confirm(
     note = " · ".join(note_bits) or None
 
     try:
-        expense = await expense_service.create_expense(
-            db,
-            user.id,
-            ExpenseCreate(
-                amount=amount,
-                currency=currency,
-                merchant=merchant,
-                category=category,
-                source="ocr",
-                expense_date=parsed_date,
-                note=note,
-                raw_data={
-                    "ocr": {
-                        "confidence": confidence,
-                        "category_suggestion": result.get("category_suggestion"),
-                        "items": items[:20],
-                    }
-                },
-            ),
-        )
+        async with db.begin_nested():
+            expense = await expense_service.create_expense(
+                db,
+                user.id,
+                ExpenseCreate(
+                    amount=amount,
+                    currency=currency,
+                    merchant=merchant,
+                    category=category,
+                    source="ocr",
+                    expense_date=parsed_date,
+                    note=note,
+                    raw_data={
+                        "ocr": {
+                            "confidence": confidence,
+                            "category_suggestion": result.get("category_suggestion"),
+                            "items": items[:20],
+                        }
+                    },
+                ),
+            )
     except Exception:
+        # SAVEPOINT rolls back any partial writes so the outer transaction
+        # (committed by the worker after we return) stays clean — without
+        # this isolation a flush-error inside create_expense would poison
+        # the session and the worker's final commit would raise.
         logger.exception("Auto-creating expense from OCR failed")
         # Don't punish the user — show the parsed view as a graceful fallback.
         await finish(
