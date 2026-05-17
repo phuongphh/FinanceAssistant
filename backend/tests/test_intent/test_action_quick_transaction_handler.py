@@ -237,6 +237,15 @@ async def test_keeps_single_total_message_as_one_expense():
         "Lãi ngân hàng 200k tháng này",
         "Freelance 3tr về tài khoản",
         "Cổ tức 1tr",
+        # Wallet top-up shapes — caught by code review on PR #669. Used
+        # to silently route to expense because verbs (thêm/cộng/nạp)
+        # aren't in _INCOME_KEYWORDS. The wallet/account preposition
+        # ("vào ví/tài khoản") plus the named destination is the
+        # disambiguating signal.
+        "thêm 3tr vào ví momo",
+        "cộng 2tr vào tài khoản VCB",
+        "nạp 500k vào cash",
+        "nhận 5tr vào ví zalopay",
     ],
 )
 async def test_income_messages_are_not_recorded_as_expense(raw_text):

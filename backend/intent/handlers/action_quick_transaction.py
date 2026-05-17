@@ -121,6 +121,33 @@ _FALLBACK_REPLY = (
 )
 
 
+# Wallet top-up shape: "thêm/cộng/nạp/nhận X vào ví|tài khoản Y" —
+# the user is explicitly moving money INTO a wallet/account, which is
+# income from the cash-flow perspective. Without this guard the
+# verbs (thêm, cộng, nạp) flow through the expense recorder because
+# they're not in _INCOME_KEYWORDS — silently corrupting expense
+# history (caught by code review on PR #669).
+_WALLET_TOPUP_RE = re.compile(
+    r"^\s*(?:them|cong|nap|nhan|cho|gui|bo|duoc|nop)\s+[+\-]?\s*[\d.,]+"
+    r".*?\b(?:vao|into|toi|den)\s+"
+    r"(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|"
+    r"vcb|acb|tcb|mb|tpb|techcom|sacombank|bidv|vietinbank)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_wallet_topup(text: str) -> bool:
+    """True when the message reads as a wallet/account top-up.
+
+    Distinct from generic income (no salary verb) but still income from
+    the expense-recorder's perspective — recording these as expenses
+    inverts cash flow on the user's books.
+    """
+    if not text:
+        return False
+    return bool(_WALLET_TOPUP_RE.search(_strip_diacritics(text.lower())))
+
+
 # Verbs that indicate the user is receiving money (income), NOT spending.
 # Detected on the diacritic-stripped lowercased text to be tolerant of
 # typos. If any of these match, the handler bails before recording an
@@ -202,6 +229,13 @@ def _looks_like_income(text: str) -> bool:
     if not text:
         return False
     if _has_leading_plus_sign(text):
+        return True
+    # Explicit wallet top-ups ("thêm 3tr vào ví momo") are always
+    # income, regardless of which verb leads. Check before the
+    # keyword/expense balancing because the topup phrasing is
+    # unambiguous — there is no "thêm 3tr vào ví momo để tiêu" reading
+    # that makes the money flow OUT.
+    if _looks_like_wallet_topup(text):
         return True
     norm = _strip_diacritics(text.lower())
     has_income = any(kw in norm for kw in _INCOME_KEYWORDS)
