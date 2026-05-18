@@ -226,7 +226,7 @@
         if (els.growthRate) els.growthRate.textContent = anchor.growth_rate_label || 'Đang theo dõi nhịp';
         if (els.breakdownPanel) {
             const entries = Object.entries(anchor.breakdown || {});
-            els.breakdownPanel.innerHTML = entries.length ? entries.map(([key, value]) => `<div><span>${labelAsset(key)}</span><strong>${value}</strong></div>`).join('') : '<p>Chưa có breakdown tài sản.</p>';
+            els.breakdownPanel.innerHTML = entries.length ? entries.map(([key, value]) => `<div><span>${escapeHtml(labelAsset(key))}</span><strong>${escapeHtml(value)}</strong></div>`).join('') : '<p>Chưa có phân tích tài sản.</p>';
             els.breakdownPanel.dataset.maintained = anchor.projected_if_maintained_label || '';
         }
         els.deltaPill.classList.toggle('amber', anchor.tone === 'amber');
@@ -245,6 +245,11 @@
     }
 
     function renderChart(cone) {
+        if (!els.coneChart || typeof Chart === 'undefined') {
+            if (els.technicalDetail) els.technicalDetail.hidden = true;
+            if (els.openTechnicalBtn) els.openTechnicalBtn.hidden = true;
+            return;
+        }
         if (chart) chart.destroy();
         const labels = cone.map((p) => `Năm ${p.year}`);
         chart = new Chart(els.coneChart, {
@@ -286,7 +291,7 @@
         const point = byYear[10] || cone[cone.length - 1] || {};
         els.kpiGrid.innerHTML = ['p10', 'p50', 'p90'].map((key) => `
             <article class="kpi-card">
-                <div class="kpi-label">${(labels[key] && labels[key].label) || key.toUpperCase()}</div>
+                <div class="kpi-label">${escapeHtml((labels[key] && labels[key].label) || key.toUpperCase())}</div>
                 <div class="kpi-value">${formatMoneyShort(Number(point[key] || 0))}</div>
                 <div class="kpi-year">năm ${point.year || '—'}</div>
             </article>
@@ -301,7 +306,7 @@
         }
         els.allocationList.innerHTML = entries.map(([name, value]) => {
             const pct = Math.round(Number(value) * 1000) / 10;
-            return `<div class="allocation-row"><div><strong>${labelAsset(name)}</strong><div class="allocation-bar"><div class="allocation-fill" style="width:${Math.min(100, pct)}%"></div></div></div><span>${pct.toFixed(1)}%</span></div>`;
+            return `<div class="allocation-row"><div><strong>${escapeHtml(labelAsset(name))}</strong><div class="allocation-bar"><div class="allocation-fill" style="width:${Math.min(100, pct)}%"></div></div></div><span>${pct.toFixed(1)}%</span></div>`;
         }).join('');
     }
 
@@ -343,7 +348,7 @@
         els.uncertaintyList.innerHTML = contributors.map((c) => {
             const pct = c.contribution_pct;
             return `<div class="uncertainty-row">
-                <span class="uncertainty-label">${labelAsset(c.asset_class)}</span>
+                <span class="uncertainty-label">${escapeHtml(labelAsset(c.asset_class))}</span>
                 <div class="uncertainty-bar-wrap">
                     <div class="uncertainty-bar" style="width:${Math.min(100, pct)}%"></div>
                 </div>
@@ -360,7 +365,7 @@
             els.ctaBtn.textContent = 'Quay lại Hiện tại';
             els.ctaBtn.onclick = () => switchScenario('current');
         } else {
-            els.ctaBtn.textContent = 'Thay đổi để đạt Optimal';
+            els.ctaBtn.textContent = 'Thay đổi để đạt Tối ưu';
             els.ctaBtn.onclick = () => switchScenario('optimal');
         }
     }
@@ -448,6 +453,18 @@
     function escapeAttr(value) { return escapeHtml(value); }
 
     function labelAsset(name) {
-        return ({ stocks_vn: 'Cổ phiếu VN', stocks_global: 'Cổ phiếu quốc tế', crypto: 'Crypto', gold: 'Vàng', cash_savings: 'Tiền mặt', real_estate_vn: 'Bất động sản', bonds_vn: 'Trái phiếu' })[name] || name;
+        const normalized = String(name || '').trim().toLowerCase();
+        return ({
+            cash: 'Tiền mặt',
+            cash_savings: 'Tiền mặt',
+            crypto: 'Tiền mã hóa',
+            gold: 'Vàng',
+            real_estate: 'Bất động sản',
+            real_estate_vn: 'Bất động sản',
+            stock: 'Cổ phiếu VN',
+            stocks_vn: 'Cổ phiếu VN',
+            stocks_global: 'Cổ phiếu quốc tế',
+            bonds_vn: 'Trái phiếu',
+        })[normalized] || name;
     }
 }());
