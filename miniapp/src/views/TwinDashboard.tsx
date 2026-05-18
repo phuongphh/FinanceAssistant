@@ -69,7 +69,7 @@ export function TwinDashboard({ telegramInitData }: Props) {
       </section>
       <section class="card">
         <h2>Phân bổ</h2>
-        {Object.entries(payload.allocation).map(([key, value]) => <p key={key}>{key}: {(value * 100).toFixed(1)}%</p>)}
+        {Object.entries(payload.allocation).map(([key, value]) => <p key={key}>{labelAsset(key)}: {(value * 100).toFixed(1)}%</p>)}
       </section>
     </main>
   );
@@ -81,4 +81,20 @@ function Kpi({ label, value }: { label: string; value?: string }) {
 
 function money(raw: string) {
   return `${Number(raw).toLocaleString('vi-VN')}đ`;
+}
+
+function labelAsset(name: string) {
+  const labels: Record<string, string> = {
+    cash: 'Tiền mặt',
+    cash_savings: 'Tiền mặt',
+    crypto: 'Tiền mã hóa',
+    gold: 'Vàng',
+    real_estate: 'Bất động sản',
+    real_estate_vn: 'Bất động sản',
+    stock: 'Cổ phiếu VN',
+    stocks_vn: 'Cổ phiếu VN',
+    stocks_global: 'Cổ phiếu quốc tế',
+    bonds_vn: 'Trái phiếu',
+  };
+  return labels[name.trim().toLowerCase()] ?? name;
 }
