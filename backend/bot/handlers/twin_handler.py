@@ -177,9 +177,6 @@ async def send_twin_current(
 
     cone = snapshot.latest_cone or []
     point = _target_point(cone)
-    optimal_projection = await twin_query_service.get_latest_projection(
-        db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
-    )
     narrative = await build_twin_narrative(
         db, user, cone, cone_age_days=snapshot.cone_age_days
     )
@@ -269,7 +266,7 @@ async def send_twin_current(
             p90=Decimal(str(point.get("p90", 0))),
             age_text=_age_text(snapshot.cone_age_days),
             cone=cone,
-            optimal_cone=optimal_projection.cone_data if optimal_projection else None,
+            optimal_cone=None,
             narrative=narrative,
             present_anchor=present_anchor,
             life_outcome=life_outcome,
@@ -480,9 +477,7 @@ async def send_twin_compare_optimal(
     # anchor no longer matches the wallet, recompute before drawing the
     # comparison — otherwise we render "Current vs Optimal" against a
     # base that doesn't exist anymore.
-    needs_recompute = (
-        current is None or optimal is None or snapshot.is_value_stale
-    )
+    needs_recompute = current is None or optimal is None or snapshot.is_value_stale
     if needs_recompute:
         await notifier.send_message(chat_id, copy["recomputing"], parse_mode=None)
         try:

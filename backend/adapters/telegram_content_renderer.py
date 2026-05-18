@@ -101,13 +101,21 @@ class TelegramContentRenderer(ContentRenderer):
         """
         if not cards:
             return ""
-        lines = ["3 phiên bản Bé Tiền:"]
+        personality = {
+            "p10": "áo mưa sẵn sàng, ưu tiên giữ an toàn",
+            "p50": "cầm dù vừa đủ, đi đều và cân bằng",
+            "p90": "đeo kính nắng, tận dụng nhịp thuận lợi",
+        }
+        lines = ["Ba sắc thái Bé Tiền trong vùng dự phóng:"]
         for card in cards[:3]:
-            mascot = card.get("mascot") or {}
+            p_code = str(card.get("p_code") or "").lower()
             label = card.get("label") or card.get("p_code") or ""
             amount = format_money_short(card.get("amount") or 0)
-            mood = mascot.get("mood") or ""
-            lines.append(f"• {label}: {amount}" + (f" — {mood}" if mood else ""))
+            detail = personality.get(p_code)
+            if not detail:
+                mascot = card.get("mascot") or {}
+                detail = mascot.get("mood") or "giữ nhịp phù hợp"
+            lines.append(f"• {label} — khoảng {amount}: {detail}.")
         return "\n".join(lines)
 
     def render_twin_comparison(
