@@ -47,5 +47,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #682 | [Story 3.4] Negative Delta Handling — Phase 4.3 | [issue-682.md](issue-682.md) |
 | #683 | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [issue-683.md](issue-683.md) |
 | #684 | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [issue-684.md](issue-684.md) |
+| #685 | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [issue-685.md](issue-685.md) |
 
-**Total active:** 43
+**Total active:** 44
