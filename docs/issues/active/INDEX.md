@@ -41,5 +41,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #676 | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [issue-676.md](issue-676.md) |
 | #677 | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [issue-677.md](issue-677.md) |
 | #678 | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [issue-678.md](issue-678.md) |
+| #679 | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [issue-679.md](issue-679.md) |
 
-**Total active:** 37
+**Total active:** 38
