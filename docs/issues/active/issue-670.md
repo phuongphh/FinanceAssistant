@@ -18,7 +18,15 @@ Mass affluent VN không có background statistics → P10/P50/P90 = jargon. Epic
 - [ ] 0 P0 regression: math output Twin viz vẫn match Phase 4A Monte Carlo within tolerance 0.5%
 
 ### Stories
-- **1.1** Rename P10/P50/P90 → Weather Vocabulary (1d, P0)
-- **1.2** Life Outcome Translation via LLM (2d, P0, depends on 1.1)
-- **1.3** Present Anchor + Delta + Growth Rate Display (2d, P0, depends on 1.1)
+| # | Title | Issue | Estimate | Depends |
+|---|-------|-------|----------|---------|
+| 1.1 | Rename P10/P50/P90 → Weather Vocabulary | [#674](https://github.com/phuongphh/FinanceAssistant/issues/674) | 1d | None |
+| 1.2 | Life Outcome Translation via LLM | [#675](https://github.com/phuongphh/FinanceAssistant/issues/675) | 2d | #674 |
+| 1.3 | Present Anchor + Delta + Growth Rate Display | [#676](https://github.com/phuongphh/FinanceAssistant/issues/676) | 2d | #674 |
+
+### Claude Code Prompt
+```
+Implement Epic 1 (Phase 4.3) — all 3 stories (#674, #675, #676).
+Branch: phase-4.3/epic-1-twin-comprehension
+```
 
