@@ -37,5 +37,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #671 | [Epic 2] Twin Storytelling — Phase 4.3 | [issue-671.md](issue-671.md) |
 | #672 | [Epic 3] Twin Habit Loop — Phase 4.3 | [issue-672.md](issue-672.md) |
 | #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
+| #676 | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [issue-676.md](issue-676.md) |
 
-**Total active:** 33
+**Total active:** 34
