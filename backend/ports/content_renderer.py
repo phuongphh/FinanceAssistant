@@ -47,6 +47,7 @@ class TwinViewSnapshot:
     present_anchor: str = ""
     life_outcome: str = ""
     scenario_labels: dict[str, str] = field(default_factory=dict)
+    scenario_cards: list[dict[str, Any]] = field(default_factory=list)
     is_stale: bool = False
     filename: str = "be-tien-twin.png"
 

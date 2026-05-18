@@ -103,6 +103,13 @@ async def test_twin_handler_sends_photo_with_cone_caption(monkeypatch):
     caption = notifier.photos[0][2]["caption"]
     assert "có thể nằm trong khoảng 150tr — 350tr" in caption
     assert "cập nhật 2 ngày trước" in caption
+    assert "3 phiên bản Bé Tiền:" in caption
+    assert "🌧️ Khiêm tốn" in caption
+    assert "⛅ Bình thường" in caption
+    assert "☀️ Lạc quan" in caption
+    assert "P10" not in caption
+    assert "P50" not in caption
+    assert "P90" not in caption
 
 
 @pytest.mark.asyncio

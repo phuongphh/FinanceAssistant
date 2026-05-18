@@ -73,6 +73,9 @@ class TelegramContentRenderer(ContentRenderer):
             p90_label=labels.get("p90", "☀️ Lạc quan"),
             age_text=snapshot.age_text,
         )
+        card_lines = self._scenario_card_lines(snapshot.scenario_cards)
+        if card_lines:
+            caption = f"{caption}\n\n{card_lines}"
         if snapshot.present_anchor:
             caption = f"{snapshot.present_anchor}\n\n{caption}"
         if snapshot.life_outcome:
@@ -87,6 +90,25 @@ class TelegramContentRenderer(ContentRenderer):
             buttons=twin_view_buttons(),
             filename=snapshot.filename,
         )
+
+    @staticmethod
+    def _scenario_card_lines(cards: list[dict[str, Any]]) -> str:
+        """Render the three weather cards as Telegram-safe text.
+
+        Telegram captions cannot embed three independent image cards next to the
+        chart, so this keeps the card semantics visible and relies on each
+        card's emoji fallback when mascot images are unavailable.
+        """
+        if not cards:
+            return ""
+        lines = ["3 phiên bản Bé Tiền:"]
+        for card in cards[:3]:
+            mascot = card.get("mascot") or {}
+            label = card.get("label") or card.get("p_code") or ""
+            amount = format_money_short(card.get("amount") or 0)
+            mood = mascot.get("mood") or ""
+            lines.append(f"• {label}: {amount}" + (f" — {mood}" if mood else ""))
+        return "\n".join(lines)
 
     def render_twin_comparison(
         self, snapshot: TwinComparisonSnapshot
