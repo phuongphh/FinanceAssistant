@@ -116,28 +116,53 @@ async def _process_once(pending: PendingRecompute, *, attempt: int) -> TwinRecom
     skip_reason: str | None = None
     notified = False
     notify_ms = 0
-    compute_start = time.perf_counter()
+    compute_ms = 0
+    delta_abs = Decimal("0")
+    delta_pct = Decimal("0")
     session_factory = get_session_factory()
     async with session_factory() as db:
-        previous_base = await _latest_base_net_worth(db, pending.user_id)
-        await compute_and_store(db, pending.user_id, scenario="both")
-        await db.flush()
-        current_base = await _latest_base_net_worth(db, pending.user_id)
-        compute_ms = int((time.perf_counter() - compute_start) * 1000)
-        delta_abs = (current_base or Decimal("0")) - (previous_base or Decimal("0"))
-        delta_pct = Decimal("0") if not previous_base else (delta_abs / previous_base * Decimal("100")).quantize(Decimal("0.01"))
         user = await db.get(User, pending.user_id)
         segment = getattr(user, "wealth_level", None) or getattr(user, "wealth_segment", None)
         cfg = await threshold_service.get_threshold_config(db, segment)
-        noticeable = threshold_service.is_noticeable(segment, delta_pct, delta_abs, config=cfg)
-        if len(_pending) > BACKPRESSURE_PENDING_LIMIT:
+
+        # Cheap segment-aware short-circuit BEFORE Monte Carlo: a sub-trigger
+        # expense on an HNW wallet would otherwise burn ~hundreds of ms of
+        # simulation just to be dropped at notify time. Aggregated amount
+        # from the 30s debounce window is what counts, so a Starter who
+        # spent 50k five times still trips the 100k floor.
+        if (
+            pending.event_type == "expense.added"
+            and not threshold_service.should_recompute_for_expense(
+                segment, pending.amount_vnd, config=cfg
+            )
+        ):
+            skip_reason = "below_expense_recompute_trigger"
+        elif len(_pending) > BACKPRESSURE_PENDING_LIMIT:
             skip_reason = "backpressure"
-        elif not noticeable:
-            skip_reason = "below_threshold"
-        elif not _idempotency_allows(pending.user_id):
-            skip_reason = "idempotent_window"
-        elif delta_abs < 0 and not await can_notify_negative(db, pending.user_id):
-            skip_reason = "negative_frequency_cap"
+
+        if skip_reason is None:
+            compute_start = time.perf_counter()
+            previous_base = await _latest_base_net_worth(db, pending.user_id)
+            await compute_and_store(db, pending.user_id, scenario="both")
+            await db.flush()
+            current_base = await _latest_base_net_worth(db, pending.user_id)
+            compute_ms = int((time.perf_counter() - compute_start) * 1000)
+            delta_abs = (current_base or Decimal("0")) - (previous_base or Decimal("0"))
+            delta_pct = (
+                Decimal("0")
+                if not previous_base
+                else (delta_abs / previous_base * Decimal("100")).quantize(Decimal("0.01"))
+            )
+            noticeable = threshold_service.is_noticeable(
+                segment, delta_pct, delta_abs, config=cfg
+            )
+            if not noticeable:
+                skip_reason = "below_threshold"
+            elif not _idempotency_allows(pending.user_id):
+                skip_reason = "idempotent_window"
+            elif delta_abs < 0 and not await can_notify_negative(db, pending.user_id):
+                skip_reason = "negative_frequency_cap"
+
         if skip_reason is None and user and user.telegram_id:
             notify_start = time.perf_counter()
             await _notify(user.telegram_id, delta_abs=delta_abs, delta_pct=delta_pct)

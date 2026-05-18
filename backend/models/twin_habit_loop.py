@@ -49,5 +49,8 @@ class TwinDeltaThresholdConfig(Base):
     positive_threshold_absolute_vnd: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
     negative_threshold_pct: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
     negative_threshold_absolute_vnd: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    expense_recompute_trigger_vnd: Mapped[Decimal] = mapped_column(
+        Numeric(20, 2), server_default=text("100000"), nullable=False
+    )
     updated_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)

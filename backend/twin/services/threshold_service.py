@@ -17,13 +17,29 @@ class ThresholdConfig:
     positive_absolute_vnd: Decimal
     negative_pct: Decimal
     negative_absolute_vnd: Decimal
+    # Per-segment recompute trigger: an expense below this is silent — Twin
+    # does not recompute. Distinct from notification thresholds (above), which
+    # gate whether we tell the user about a recomputed delta.
+    expense_recompute_trigger_vnd: Decimal = Decimal("100000")
 
 
 DEFAULT_THRESHOLDS: dict[str, ThresholdConfig] = {
-    "starter": ThresholdConfig("starter", Decimal("1.0"), Decimal("1000000"), Decimal("1.0"), Decimal("1000000")),
-    "young_pro": ThresholdConfig("young_pro", Decimal("1.0"), Decimal("3000000"), Decimal("1.0"), Decimal("3000000")),
-    "mass_affluent": ThresholdConfig("mass_affluent", Decimal("1.0"), Decimal("10000000"), Decimal("1.0"), Decimal("10000000")),
-    "hnw": ThresholdConfig("hnw", Decimal("0.5"), Decimal("50000000"), Decimal("0.5"), Decimal("50000000")),
+    "starter": ThresholdConfig(
+        "starter", Decimal("1.0"), Decimal("1000000"), Decimal("1.0"), Decimal("1000000"),
+        expense_recompute_trigger_vnd=Decimal("100000"),
+    ),
+    "young_pro": ThresholdConfig(
+        "young_pro", Decimal("1.0"), Decimal("3000000"), Decimal("1.0"), Decimal("3000000"),
+        expense_recompute_trigger_vnd=Decimal("500000"),
+    ),
+    "mass_affluent": ThresholdConfig(
+        "mass_affluent", Decimal("1.0"), Decimal("10000000"), Decimal("1.0"), Decimal("10000000"),
+        expense_recompute_trigger_vnd=Decimal("2000000"),
+    ),
+    "hnw": ThresholdConfig(
+        "hnw", Decimal("0.5"), Decimal("50000000"), Decimal("0.5"), Decimal("50000000"),
+        expense_recompute_trigger_vnd=Decimal("10000000"),
+    ),
 }
 
 
@@ -67,7 +83,25 @@ async def get_threshold_config(db: AsyncSession, segment: str | None) -> Thresho
         positive_absolute_vnd=row.positive_threshold_absolute_vnd,
         negative_pct=row.negative_threshold_pct,
         negative_absolute_vnd=row.negative_threshold_absolute_vnd,
+        expense_recompute_trigger_vnd=row.expense_recompute_trigger_vnd,
     )
+
+
+def should_recompute_for_expense(
+    user_segment: str | None,
+    expense_amount_vnd: Decimal | int | float,
+    *,
+    config: ThresholdConfig | None = None,
+) -> bool:
+    """Whether an expense is large enough to trigger Twin recompute.
+
+    Inclusive (``>=``) so a Starter spending exactly 100k still triggers.
+    HNW spending under 10tr is silently absorbed — recomputing Twin for a
+    50k coffee on a multi-tỷ portfolio is noise.
+    """
+    segment = normalize_segment(user_segment)
+    cfg = config or DEFAULT_THRESHOLDS[segment]
+    return abs(Decimal(str(expense_amount_vnd))) >= cfg.expense_recompute_trigger_vnd
 
 
 async def tune_threshold(
@@ -97,6 +131,7 @@ async def tune_threshold(
         cfg.positive_threshold_absolute_vnd,
         cfg.negative_threshold_pct,
         cfg.negative_threshold_absolute_vnd,
+        expense_recompute_trigger_vnd=cfg.expense_recompute_trigger_vnd,
     )
 
 
