@@ -43,10 +43,24 @@ DEFAULT_THRESHOLDS: dict[str, ThresholdConfig] = {
 }
 
 
+# ``User.wealth_level`` stores ``WealthLevel.value`` from
+# ``backend.wealth.ladder`` ("young_prof", "vip"…) but the threshold matrix
+# above uses the doc/spec names ("young_pro"). Without aliasing every
+# Young Professional silently inherits Mass Affluent thresholds — they'd
+# need a 10tr swing to get a notification instead of 3tr.
+_SEGMENT_ALIASES = {
+    "young_prof": "young_pro",
+    "young_professional": "young_pro",
+    "high_net_worth": "hnw",
+    "vip": "hnw",  # VIP is a stretch tier above HNW; reuse the strictest config.
+}
+
+
 def normalize_segment(segment: str | None) -> str:
     if not segment:
         return "mass_affluent"
-    return segment if segment in DEFAULT_THRESHOLDS else "mass_affluent"
+    aliased = _SEGMENT_ALIASES.get(segment, segment)
+    return aliased if aliased in DEFAULT_THRESHOLDS else "mass_affluent"
 
 
 def is_noticeable(

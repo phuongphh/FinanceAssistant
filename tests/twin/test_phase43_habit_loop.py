@@ -56,6 +56,23 @@ def test_expense_recompute_trigger_is_segment_aware():
     assert should_recompute_for_expense(None, Decimal("1000000")) is False
 
 
+def test_segment_alias_maps_db_value_to_threshold_key():
+    # ``User.wealth_level`` is stored as ``WealthLevel.value`` from
+    # ``backend.wealth.ladder`` ("young_prof"/"vip"), which doesn't match
+    # the threshold table keys ("young_pro"/"hnw"). Without the alias,
+    # every Young Professional would silently inherit Mass Affluent (3tr
+    # → 10tr) thresholds.
+    assert should_recompute_for_expense("young_prof", Decimal("500000")) is True
+    assert should_recompute_for_expense("young_prof", Decimal("499000")) is False
+    # VIP reuses HNW (strictest) — sub-10tr expenses stay silent.
+    assert should_recompute_for_expense("vip", Decimal("9000000")) is False
+    assert should_recompute_for_expense("vip", Decimal("10000000")) is True
+    # Notification threshold respects alias too.
+    assert is_noticeable("young_prof", Decimal("0.5"), Decimal("3000000")) is True
+    assert is_noticeable("young_prof", Decimal("0.5"), Decimal("2000000")) is False
+    assert is_noticeable("vip", Decimal("0.5"), Decimal("1")) is True
+
+
 def test_causality_weights_top_factors_and_other_bucket():
     factors = build_weighted_factors(
         [

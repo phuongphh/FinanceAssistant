@@ -820,6 +820,25 @@ async def _handle_callback(
         if await handle_first_briefing_callback(db, callback_query):
             return await _resolved_user_id()
 
+    # Phase 4.3 Story 3.1-3.6 — Twin habit-loop callbacks own the
+    # ``twin:causality``, ``twin:action``, ``twin:action_done:*`` and
+    # ``action_suggestion:dismiss:*`` namespaces fired from on-demand
+    # recompute notifications. Distinct from the menu router which owns
+    # ``menu:twin:*`` (category=twin under the menu prefix).
+    if callback_data == "twin:causality" or callback_data == "twin:action" or callback_data.startswith("twin:action_done:"):
+        from backend.bot.handlers.twin_callback_handler import handle_twin_callback
+
+        if await handle_twin_callback(db, callback_query):
+            return await _resolved_user_id()
+
+    if callback_data.startswith("action_suggestion:dismiss:"):
+        from backend.bot.handlers.twin_callback_handler import (
+            handle_action_suggestion_callback,
+        )
+
+        if await handle_action_suggestion_callback(db, callback_query):
+            return await _resolved_user_id()
+
     # Phase 4.2 Epic 2 — Next Best Action shortcut buttons.
     from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
 
