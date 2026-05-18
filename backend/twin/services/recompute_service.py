@@ -27,7 +27,17 @@ from backend.wealth.services import net_worth_calculator as wealth_service
 logger = logging.getLogger(__name__)
 
 RECOMPUTE_THRESHOLD = Decimal("0.05")
+# Long debounce protects the engine against compute storms when the wallet
+# is barely changing. Onboarding adds 4+ assets in <2 minutes and each one
+# can swing the portfolio by 30%+, so the 30-minute hard block produced
+# Twin projections stuck at the first asset's value. We now layer two
+# windows: a short hard rate-limit + a long soft window that we only
+# enforce while ``base_net_worth`` is close to ``current``. A divergent
+# base bypasses the long window so the user's freshly-added 1.5 tỷ shows
+# up in their Twin the next time they tap it.
 DEBOUNCE_WINDOW = timedelta(minutes=30)
+HARD_THROTTLE_WINDOW = timedelta(seconds=60)
+BASE_DIVERGENCE_THRESHOLD = Decimal("0.05")
 _pending_user_ids: set[uuid.UUID] = set()
 _pending_tasks: set[asyncio.Task] = set()
 
@@ -47,25 +57,58 @@ async def should_recompute(
     *,
     now: datetime | None = None,
 ) -> bool:
-    """Return true when an asset edit is large enough and not debounced."""
+    """Return true when an asset edit is large enough and not debounced.
+
+    Layered gating:
+    1. Skip if a recompute is already in flight for this user (concurrency).
+    2. Skip if the last projection is younger than
+       :data:`HARD_THROTTLE_WINDOW` — protects against compute storms on
+       rapid edits.
+    3. Skip if inside :data:`DEBOUNCE_WINDOW` **and** the last projection's
+       ``base_net_worth`` is still within
+       :data:`BASE_DIVERGENCE_THRESHOLD` of the current wallet. Onboarding
+       used to add four 100tr+ assets back-to-back and the second through
+       fourth were dropped here — the result was a Twin that anchored on
+       a 50tr base while the user actually had 2.6 tỷ.
+    4. Otherwise gate on edit size (``delta_net_worth >= 5% of current``).
+    """
     now = now or datetime.now(timezone.utc)
     if user_id in _pending_user_ids:
         return False
 
     latest = await get_latest_projection(db, user_id)
+    current = (await wealth_service.calculate_stored_current(db, user_id)).total
     if latest is not None:
         computed_at = latest.computed_at
         if computed_at.tzinfo is None:
             computed_at = computed_at.replace(tzinfo=timezone.utc)
-        if now - computed_at < DEBOUNCE_WINDOW:
+        elapsed = now - computed_at
+        if elapsed < HARD_THROTTLE_WINDOW:
+            return False
+        if elapsed < DEBOUNCE_WINDOW and not _base_diverged(
+            getattr(latest, "base_net_worth", None), current
+        ):
             return False
 
-    current = (await wealth_service.calculate_stored_current(db, user_id)).total
     baseline = max(current - Decimal(delta_net_worth), Decimal(0))
     ratio_base = current if current > 0 else baseline
     if ratio_base <= 0:
         return False
     return abs(Decimal(delta_net_worth)) / ratio_base >= RECOMPUTE_THRESHOLD
+
+
+def _base_diverged(stored_base: Decimal | None, current: Decimal) -> bool:
+    """True when the stored projection's base no longer matches the wallet.
+
+    Symmetric ratio (anchored to the larger side) so a 10x drop and a 10x
+    rise both register as divergent without one side blowing past 100%.
+    """
+    base = abs(Decimal(stored_base or 0))
+    actual = abs(Decimal(current or 0))
+    denom = max(base, actual)
+    if denom <= 0:
+        return False
+    return (abs(base - actual) / denom) > BASE_DIVERGENCE_THRESHOLD
 
 
 async def enqueue_recompute_if_needed(

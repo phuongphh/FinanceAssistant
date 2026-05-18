@@ -126,11 +126,27 @@ async def test_compare_optimal_handler_sends_dual_cone_caption_with_actions():
     async def fake_latest(db, user_id, scenario=None):
         return current if scenario == "current" else optimal
 
+    async def fake_snapshot(db, user_id):
+        return SimpleNamespace(
+            actual_nw=Decimal("500000000"),
+            actual_breakdown={},
+            projection=current,
+            latest_cone=current.cone_data,
+            cone_age_days=0,
+            is_stale=False,
+            is_value_stale=False,
+            delta_vs_p50=Decimal("0"),
+        )
+
     notifier = FakeNotifier()
     with (
         patch(
             "backend.bot.handlers.twin_handler.twin_query_service.get_latest_projection",
             fake_latest,
+        ),
+        patch(
+            "backend.bot.handlers.twin_handler.twin_query_service.get_twin_snapshot",
+            fake_snapshot,
         ),
         patch(
             "backend.bot.handlers.twin_handler.render_projection_chart",
