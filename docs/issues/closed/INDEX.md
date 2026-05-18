@@ -393,7 +393,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #677 | Pre-Phase | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [pre-phase/issue-677.md](by-phase/pre-phase/issue-677.md) |
 | #678 | Pre-Phase | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [pre-phase/issue-678.md](by-phase/pre-phase/issue-678.md) |
 | #679 | Pre-Phase | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [pre-phase/issue-679.md](by-phase/pre-phase/issue-679.md) |
+| #680 | Pre-Phase | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [pre-phase/issue-680.md](by-phase/pre-phase/issue-680.md) |
 | #681 | Pre-Phase | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [pre-phase/issue-681.md](by-phase/pre-phase/issue-681.md) |
 
-**Total:** 390 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 373 Pre-Phase)
+**Total:** 391 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 374 Pre-Phase)
