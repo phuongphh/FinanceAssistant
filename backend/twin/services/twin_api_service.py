@@ -33,6 +33,8 @@ from backend.twin.views.present_anchor import (
     build_present_anchor_view,
     present_anchor_to_payload,
 )
+from backend.twin.views.scenario_card import scenario_cards_for_point
+from backend.twin.flows.first_time_view import build_story_flow, should_show_full_story
 
 _ALLOWED_SCENARIOS = {
     twin_projection_service.SCENARIO_CURRENT,
@@ -90,6 +92,7 @@ async def build_twin_payload(
             "empty_state": _EMPTY_COPY,
             "scenario_labels": labels,
             "show_technical_terms": show_technical_terms,
+            "story_flow": {"mode": "empty", "screens": []},
         }
 
     # For comparison deltas: always load both scenarios regardless of view scenario
@@ -151,8 +154,9 @@ async def build_twin_payload(
         target_year=target_year,
         user_context=outcome_context,
     )
+    scenario_cards = scenario_cards_for_point(target_point, labels)
 
-    return {
+    payload = {
         "has_projection": True,
         "scenario": projection.scenario,
         "base_net_worth": _money(projection.base_net_worth),
@@ -182,8 +186,13 @@ async def build_twin_payload(
         "uncertainty_contributors": _uncertainty_to_json(
             projection.allocation_snapshot or {}
         ),
+        "scenario_cards": scenario_cards,
         "excluded_event_count": excluded_count,
     }
+    payload["story_flow"] = build_story_flow(
+        payload, full_flow=await should_show_full_story(db, user_id)
+    )
+    return payload
 
 
 def _target_point(cone: list[dict[str, Any]]) -> dict[str, Any]:
@@ -213,6 +222,7 @@ def etag_for_payload(payload: dict[str, Any]) -> str:
             "actual_net_worth",
             "engine_version",
             "excluded_event_count",
+            "story_flow",
         )
     )
     digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]

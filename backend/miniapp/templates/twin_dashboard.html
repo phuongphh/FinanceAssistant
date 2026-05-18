@@ -32,6 +32,15 @@
         </section>
 
         <section id="content" hidden>
+            <section id="story-flow" class="story-flow section" aria-label="Câu chuyện Bé Tiền tương lai" hidden>
+                <div class="story-progress"><span id="story-step">1/5</span><button id="story-skip" class="text-btn" type="button">Bỏ qua, xem nhanh</button></div>
+                <article id="story-card" class="story-card"></article>
+                <div class="story-nav">
+                    <button id="story-prev" class="secondary-btn" type="button">← Lùi</button>
+                    <button id="story-next" class="primary-btn" type="button">Tiếp →</button>
+                </div>
+            </section>
+
             <header class="twin-hero" aria-label="Tổng quan Twin">
                 <div class="eyebrow">🔮 Bé Tiền tương lai</div>
                 <div class="hero-row">
@@ -55,7 +64,7 @@
                 </div>
             </section>
 
-            <section class="section chart-section">
+            <section class="section chart-section" id="technical-detail" hidden>
                 <div class="section-heading">
                     <h2>Vùng xác suất 10 năm</h2>
                     <span id="computed-at" class="muted">—</span>
@@ -97,6 +106,7 @@
                 <p class="section-hint" id="uncertainty-hint"></p>
             </section>
 
+            <button class="primary-btn full-width" id="open-technical-btn" type="button">Xem chi tiết kỹ thuật</button>
             <button class="primary-btn full-width" id="cta-btn" type="button">Thay đổi để đạt Optimal</button>
             <!-- APP_VERSION_MARKER -->
         </section>

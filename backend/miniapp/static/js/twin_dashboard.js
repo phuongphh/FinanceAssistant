@@ -39,10 +39,21 @@
         uncertaintySection: document.getElementById('uncertainty-section'),
         uncertaintyList: document.getElementById('uncertainty-list'),
         uncertaintyHint: document.getElementById('uncertainty-hint'),
+        storyFlow: document.getElementById('story-flow'),
+        storyStep: document.getElementById('story-step'),
+        storySkip: document.getElementById('story-skip'),
+        storyCard: document.getElementById('story-card'),
+        storyPrev: document.getElementById('story-prev'),
+        storyNext: document.getElementById('story-next'),
+        technicalDetail: document.getElementById('technical-detail'),
+        openTechnicalBtn: document.getElementById('open-technical-btn'),
     };
 
     let currentScenario = new URLSearchParams(window.location.search).get('scenario') || 'current';
     let chart = null;
+    let storyScreens = [];
+    let storyIndex = 0;
+    let storyMode = "compact";
     const etags = Object.create(null);
     const cache = Object.create(null);
 
@@ -54,6 +65,10 @@
     if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
     if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
     if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
+    if (els.storyPrev) els.storyPrev.addEventListener('click', () => moveStory(-1));
+    if (els.storyNext) els.storyNext.addEventListener('click', () => moveStory(1));
+    if (els.storySkip) els.storySkip.addEventListener('click', skipStory);
+    if (els.openTechnicalBtn) els.openTechnicalBtn.addEventListener('click', openTechnicalDetail);
 
     switchScenario(currentScenario);
 
@@ -104,6 +119,7 @@
             showState('empty');
             return;
         }
+        renderStoryFlow(data);
         renderPresentAnchor(data);
         renderDelta(data.delta_vs_p50);
         els.computedAt.textContent = data.computed_at ? `cập nhật ${formatDate(data.computed_at)}` : '—';
@@ -116,6 +132,84 @@
         renderCtaBtn(data);
         showState('content');
         reportLoaded();
+    }
+
+
+    function renderStoryFlow(data) {
+        const flow = data.story_flow || {};
+        storyScreens = flow.screens || [];
+        storyMode = flow.mode || 'compact';
+        storyIndex = 0;
+        if (!els.storyFlow || !storyScreens.length) return;
+        els.storySkip.textContent = flow.skip_label || 'Bỏ qua, xem nhanh';
+        els.technicalDetail.hidden = true;
+        els.openTechnicalBtn.hidden = false;
+        els.storyFlow.hidden = false;
+        renderStoryScreen();
+        postTwinEvent('story_opened', storyScreens[0] && storyScreens[0].id);
+    }
+
+    function renderStoryScreen() {
+        const screen = storyScreens[storyIndex] || {};
+        const cards = (screen.cards || []).map(renderScenarioStoryCard).join('');
+        els.storyStep.textContent = `${storyIndex + 1}/${storyScreens.length}`;
+        els.storyCard.innerHTML = `
+            <div class="story-emoji">${escapeHtml(screen.emoji || '🔮')}</div>
+            <h2>${escapeHtml(screen.title || '')}</h2>
+            <p>${escapeHtml(screen.body || '')}</p>
+            ${cards ? `<div class="story-scenario-grid">${cards}</div>` : ''}
+            ${screen.hint ? `<p class="section-hint">${escapeHtml(screen.hint)}</p>` : ''}
+        `;
+        els.storyPrev.disabled = storyIndex === 0;
+        els.storyNext.textContent = storyIndex === storyScreens.length - 1 ? 'Hoàn tất' : 'Tiếp →';
+        postTwinEvent('screen_viewed', screen.id);
+    }
+
+    function renderScenarioStoryCard(card) {
+        const mascot = card.mascot || {};
+        return `<article class="story-scenario-card">
+            <div>
+                <strong>${escapeHtml(card.label || card.p_code || '')}</strong>
+                <span>${formatMoneyShort(Number(card.amount || 0))}</span>
+            </div>
+            <img src="${escapeAttr(mascot.asset_url || '')}" alt="${escapeAttr(mascot.alt || '')}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${escapeAttr(mascot.fallback || '🔮')}'))">
+        </article>`;
+    }
+
+    function moveStory(delta) {
+        if (!storyScreens.length) return;
+        if (delta > 0 && storyIndex === storyScreens.length - 1) {
+            els.storyFlow.hidden = true;
+            postTwinEvent('story_completed', storyScreens[storyIndex].id);
+            return;
+        }
+        storyIndex = Math.max(0, Math.min(storyScreens.length - 1, storyIndex + delta));
+        renderStoryScreen();
+    }
+
+    function skipStory() {
+        if (!storyScreens.length) return;
+        storyIndex = storyScreens.length - 1;
+        renderStoryScreen();
+        postTwinEvent('story_skipped', storyScreens[storyIndex].id);
+    }
+
+    function openTechnicalDetail() {
+        els.technicalDetail.hidden = false;
+        els.openTechnicalBtn.hidden = true;
+        postTwinEvent('chart_opened', 'technical_detail');
+        setTimeout(() => { if (chart) chart.resize(); }, 0);
+    }
+
+    function postTwinEvent(eventType, screenId) {
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        fetch('/api/twin/events', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ event_type: eventType, screen_id: screenId || null, flow_mode: storyMode }),
+            keepalive: true,
+        }).catch(() => {});
     }
 
     function renderPresentAnchor(data) {
@@ -339,6 +433,12 @@
     function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('vi-VN')}đ`; }
     function trim(value) { return value.toFixed(value >= 10 ? 0 : 1).replace('.0', ''); }
     function formatDate(value) { return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); }
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function escapeAttr(value) { return escapeHtml(value); }
+
     function labelAsset(name) {
         return ({ stocks_vn: 'Cổ phiếu VN', stocks_global: 'Cổ phiếu quốc tế', crypto: 'Crypto', gold: 'Vàng', cash_savings: 'Tiền mặt', real_estate_vn: 'Bất động sản', bonds_vn: 'Trái phiếu' })[name] || name;
     }
