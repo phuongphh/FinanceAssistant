@@ -44,5 +44,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #679 | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [issue-679.md](issue-679.md) |
 | #680 | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [issue-680.md](issue-680.md) |
 | #681 | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [issue-681.md](issue-681.md) |
+| #683 | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [issue-683.md](issue-683.md) |
 
-**Total active:** 40
+**Total active:** 41
