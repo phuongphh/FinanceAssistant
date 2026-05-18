@@ -34,7 +34,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #685 | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [issue-685.md](issue-685.md) |
-| #686 | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [issue-686.md](issue-686.md) |
 | #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
 
-**Total active:** 32
+**Total active:** 31
