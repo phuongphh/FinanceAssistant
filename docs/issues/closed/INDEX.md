@@ -389,6 +389,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #674 | Pre-Phase | [Story 1.1] Rename P10/P50/P90 → Weather Vocabulary — Phase 4.3 | [pre-phase/issue-674.md](by-phase/pre-phase/issue-674.md) |
 | #675 | Pre-Phase | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [pre-phase/issue-675.md](by-phase/pre-phase/issue-675.md) |
 | #676 | Pre-Phase | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [pre-phase/issue-676.md](by-phase/pre-phase/issue-676.md) |
+| #678 | Pre-Phase | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [pre-phase/issue-678.md](by-phase/pre-phase/issue-678.md) |
 
-**Total:** 385 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 368 Pre-Phase)
+**Total:** 386 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 369 Pre-Phase)
