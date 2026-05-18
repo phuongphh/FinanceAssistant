@@ -1,5 +1,13 @@
 # Phase 4.3 — Manual Test Cases (Telegram)
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Scope:** Manual test cases for Phase 4.3 features, executed **on Telegram bot only**.
 > **Out of scope của file này:** Admin dashboard (Epic 4) testing — handled in separate admin test approach (operator manual smoke test on web UI).
 > **Coverage:** Epic 1 (Comprehension Foundation) + Epic 2 (Storytelling) + Epic 3 (Habit Loop).
