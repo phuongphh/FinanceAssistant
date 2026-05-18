@@ -13,7 +13,11 @@ TWIN_RECOMPUTE_EVENT_TYPES = {
     "income.added",
     "goal.milestone_reached",
 }
-EXPENSE_MINIMUM_VND = Decimal("200000")
+# Global publish-time floor — protects pub/sub from sub-cent noise. Per-segment
+# gating (100k / 500k / 2tr / 10tr) happens inside the worker once user segment
+# is known. Matches the lowest segment floor so Starters still get every
+# qualifying event through.
+EXPENSE_MINIMUM_VND = Decimal("100000")
 
 
 @dataclass(frozen=True, slots=True)

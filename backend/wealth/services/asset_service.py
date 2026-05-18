@@ -18,6 +18,7 @@ router can map it to a 404.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -28,10 +29,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.wealth.models.asset import Asset
 from backend.wealth.models.asset_snapshot import AssetSnapshot
 
+logger = logging.getLogger(__name__)
+
 SOURCE_USER_INPUT = "user_input"
 SOURCE_MARKET_API = "market_api"
 SOURCE_AUTO_DAILY = "auto_daily"
 SOURCE_INTERPOLATED = "interpolated"
+
+
+async def _publish_twin_event(
+    event_type: str, user_id: uuid.UUID, amount_vnd: Decimal, **metadata: object
+) -> None:
+    """Fire-and-forget Twin recompute trigger (Phase 4.3 Story 3.1).
+
+    Auto-daily / market-api updates intentionally skip this — those run on
+    every snapshot and would flood the event bus with sub-threshold noise.
+    User-driven changes (and the matching tests) keep the loop tight.
+    """
+    try:
+        from infra.event_bus.twin_events import TwinEvent, publish
+
+        await publish(
+            TwinEvent(
+                event_type=event_type,
+                user_id=user_id,
+                amount_vnd=amount_vnd,
+                metadata=metadata or None,
+            )
+        )
+    except Exception:
+        logger.warning("twin event publish failed for %s", event_type, exc_info=True)
 
 
 async def create_asset(
@@ -97,6 +124,16 @@ async def create_asset(
     db.add(snapshot)
     # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
     await db.flush()
+
+    if source == SOURCE_USER_INPUT:
+        await _publish_twin_event(
+            "asset.created",
+            user_id,
+            Decimal(effective_current),
+            asset_type=asset_type,
+            subtype=subtype or "",
+        )
+
     return asset
 
 
@@ -154,6 +191,7 @@ async def update_current_value(
     if asset is None:
         raise ValueError(f"Asset {asset_id} not found for user {user_id}")
 
+    previous_value = Decimal(asset.current_value or 0)
     asset.current_value = Decimal(new_value)
     asset.last_valued_at = datetime.utcnow()
 
@@ -179,6 +217,15 @@ async def update_current_value(
 
     # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
     await db.flush()
+
+    if source == SOURCE_USER_INPUT:
+        await _publish_twin_event(
+            "asset.updated",
+            user_id,
+            abs(Decimal(new_value) - previous_value),
+            asset_id=str(asset_id),
+        )
+
     return asset
 
 

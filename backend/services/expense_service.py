@@ -248,6 +248,26 @@ async def create_expense(
         },
     )
 
+    # Phase 4.3 Story 3.1 — fire-and-forget Twin recompute trigger. Only
+    # outflows matter for Twin (money_in is captured via income.added).
+    # Publish-time floor is 100k (Starter); the worker re-checks segment.
+    if data.transaction_type == TRANSACTION_TYPE_EXPENSE:
+        try:
+            from decimal import Decimal as _D
+
+            from infra.event_bus.twin_events import TwinEvent, publish
+
+            await publish(
+                TwinEvent(
+                    event_type="expense.added",
+                    user_id=user_id,
+                    amount_vnd=_D(str(data.amount)),
+                    metadata={"category": category, "source": data.source},
+                )
+            )
+        except Exception:
+            logger.warning("twin event publish failed for expense", exc_info=True)
+
     # Phase 2 — streak tracking. Wrapped in a SAVEPOINT so a DB error
     # inside the streak path (missing table, transient failure) doesn't
     # leave the outer transaction in an errored state — if the savepoint

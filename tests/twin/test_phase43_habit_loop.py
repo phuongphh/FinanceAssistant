@@ -11,7 +11,10 @@ from backend.twin.services.action_suggestion_service import ActionSuggestion, re
 from backend.twin.services.causality_service import CausalityBreakdown, build_weighted_factors
 from backend.twin.services.negative_delta_service import build_negative_delta_message, validate_respectful_copy
 from backend.twin.services.return_tease_service import next_briefing_time
-from backend.twin.services.threshold_service import is_noticeable
+from backend.twin.services.threshold_service import (
+    is_noticeable,
+    should_recompute_for_expense,
+)
 from infra.event_bus.twin_events import TwinEvent, should_trigger_recompute
 
 
@@ -22,7 +25,10 @@ def test_twin_event_filter_matches_epic_sources():
     assert should_trigger_recompute(TwinEvent("asset.updated", user_id)) is True
     assert should_trigger_recompute(TwinEvent("income.added", user_id)) is True
     assert should_trigger_recompute(TwinEvent("goal.milestone_reached", user_id)) is True
-    assert should_trigger_recompute(TwinEvent("expense.added", user_id, amount_vnd=Decimal("199000"))) is False
+    # Publish-time floor is the lowest segment trigger (100k) — sub-floor
+    # noise never reaches the bus. Per-segment gating is the worker's job.
+    assert should_trigger_recompute(TwinEvent("expense.added", user_id, amount_vnd=Decimal("99000"))) is False
+    assert should_trigger_recompute(TwinEvent("expense.added", user_id, amount_vnd=Decimal("100000"))) is True
     assert should_trigger_recompute(TwinEvent("expense.added", user_id, amount_vnd=Decimal("200000"))) is True
 
 
@@ -32,6 +38,39 @@ def test_threshold_inclusive_and_segment_adjusted():
     assert is_noticeable("mass_affluent", Decimal("1.0"), Decimal("1")) is True
     assert is_noticeable("hnw", Decimal("0.5"), Decimal("1")) is True
     assert is_noticeable("hnw", Decimal("0.1"), Decimal("50000000")) is True
+
+
+def test_expense_recompute_trigger_is_segment_aware():
+    # Starter floor 100k inclusive; Mass Affluent 2tr; HNW 10tr.
+    assert should_recompute_for_expense("starter", Decimal("100000")) is True
+    assert should_recompute_for_expense("starter", Decimal("99999")) is False
+    assert should_recompute_for_expense("young_pro", Decimal("499000")) is False
+    assert should_recompute_for_expense("young_pro", Decimal("500000")) is True
+    assert should_recompute_for_expense("mass_affluent", Decimal("1500000")) is False
+    assert should_recompute_for_expense("mass_affluent", Decimal("2000000")) is True
+    assert should_recompute_for_expense("hnw", Decimal("9000000")) is False
+    assert should_recompute_for_expense("hnw", Decimal("10000000")) is True
+    # Unknown / missing segment falls back to mass_affluent (most common
+    # cohort) instead of erroring out.
+    assert should_recompute_for_expense(None, Decimal("2000000")) is True
+    assert should_recompute_for_expense(None, Decimal("1000000")) is False
+
+
+def test_segment_alias_maps_db_value_to_threshold_key():
+    # ``User.wealth_level`` is stored as ``WealthLevel.value`` from
+    # ``backend.wealth.ladder`` ("young_prof"/"vip"), which doesn't match
+    # the threshold table keys ("young_pro"/"hnw"). Without the alias,
+    # every Young Professional would silently inherit Mass Affluent (3tr
+    # → 10tr) thresholds.
+    assert should_recompute_for_expense("young_prof", Decimal("500000")) is True
+    assert should_recompute_for_expense("young_prof", Decimal("499000")) is False
+    # VIP reuses HNW (strictest) — sub-10tr expenses stay silent.
+    assert should_recompute_for_expense("vip", Decimal("9000000")) is False
+    assert should_recompute_for_expense("vip", Decimal("10000000")) is True
+    # Notification threshold respects alias too.
+    assert is_noticeable("young_prof", Decimal("0.5"), Decimal("3000000")) is True
+    assert is_noticeable("young_prof", Decimal("0.5"), Decimal("2000000")) is False
+    assert is_noticeable("vip", Decimal("0.5"), Decimal("1")) is True
 
 
 def test_causality_weights_top_factors_and_other_bucket():
