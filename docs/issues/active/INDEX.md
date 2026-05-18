@@ -49,6 +49,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #683 | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [issue-683.md](issue-683.md) |
 | #684 | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [issue-684.md](issue-684.md) |
 | #685 | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [issue-685.md](issue-685.md) |
+| #686 | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [issue-686.md](issue-686.md) |
 | #688 | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [issue-688.md](issue-688.md) |
 
-**Total active:** 46
+**Total active:** 47
