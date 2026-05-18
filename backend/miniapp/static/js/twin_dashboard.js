@@ -19,6 +19,12 @@
         content: document.getElementById('content'),
         netWorth: document.getElementById('net-worth'),
         deltaPill: document.getElementById('delta-pill'),
+        presentAnchorBtn: document.getElementById('present-anchor-btn'),
+        growthRate: document.getElementById('growth-rate'),
+        breakdownPanel: document.getElementById('net-worth-breakdown'),
+        lifeOutcomeSection: document.getElementById('life-outcome-section'),
+        lifeOutcomeCopy: document.getElementById('life-outcome-copy'),
+        lifeOutcomeRefresh: document.getElementById('life-outcome-refresh'),
         computedAt: document.getElementById('computed-at'),
         coneChart: document.getElementById('cone-chart'),
         kpiGrid: document.getElementById('kpi-grid'),
@@ -44,6 +50,10 @@
     els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
     els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
     if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
+    if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
+    if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
+    if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
+    if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
 
     switchScenario(currentScenario);
 
@@ -94,11 +104,12 @@
             showState('empty');
             return;
         }
-        els.netWorth.textContent = formatMoneyFull(Number(data.actual_net_worth || data.base_net_worth || 0));
+        renderPresentAnchor(data);
         renderDelta(data.delta_vs_p50);
         els.computedAt.textContent = data.computed_at ? `cập nhật ${formatDate(data.computed_at)}` : '—';
         renderChart(data.cone || []);
-        renderKpis(data.cone || []);
+        renderLifeOutcome(data);
+        renderKpis(data.cone || [], data.scenario_labels || {});
         renderAllocation(data.allocation || {});
         renderComparisonDeltas(data);
         renderUncertaintyBreakdown(data);
@@ -107,14 +118,28 @@
         reportLoaded();
     }
 
+    function renderPresentAnchor(data) {
+        const anchor = data.present_anchor || {};
+        els.netWorth.textContent = anchor.present_label ? anchor.present_label.replace('Hiện tại: ', '') : formatMoneyFull(Number(data.actual_net_worth || data.base_net_worth || 0));
+        if (els.growthRate) els.growthRate.textContent = anchor.growth_rate_label || 'Đang theo dõi nhịp';
+        if (els.breakdownPanel) {
+            const entries = Object.entries(anchor.breakdown || {});
+            els.breakdownPanel.innerHTML = entries.length ? entries.map(([key, value]) => `<div><span>${labelAsset(key)}</span><strong>${value}</strong></div>`).join('') : '<p>Chưa có breakdown tài sản.</p>';
+            els.breakdownPanel.dataset.maintained = anchor.projected_if_maintained_label || '';
+        }
+        els.deltaPill.classList.toggle('amber', anchor.tone === 'amber');
+        els.deltaPill.classList.toggle('positive', anchor.tone === 'positive');
+    }
+
     function renderDelta(raw) {
         if (raw === null || raw === undefined) {
-            els.deltaPill.textContent = 'đang theo dõi';
+            els.deltaPill.textContent = 'Ổn định';
             return;
         }
         const value = Number(raw || 0);
-        const sign = value >= 0 ? '+' : '−';
-        els.deltaPill.textContent = `${sign}${formatMoneyShort(Math.abs(value))} vs P50`;
+        if (Math.abs(value) < 100000) { els.deltaPill.textContent = 'Ổn định'; return; }
+        const arrow = value >= 0 ? '↑ Tăng' : '↓ Giảm';
+        els.deltaPill.textContent = `${arrow} ${formatMoneyShort(Math.abs(value))}`;
     }
 
     function renderChart(cone) {
@@ -125,9 +150,9 @@
             data: {
                 labels,
                 datasets: [
-                    series('P90', cone.map((p) => Number(p.p90)), 'rgba(20,184,166,0.20)', '#14B8A6', '+1'),
-                    series('P50', cone.map((p) => Number(p.p50)), 'transparent', '#6D5DFB', false),
-                    series('P10', cone.map((p) => Number(p.p10)), 'rgba(239,68,68,0.12)', '#EF4444', '-1'),
+                    series(labelFor('p90'), cone.map((p) => Number(p.p90)), 'rgba(20,184,166,0.20)', '#14B8A6', '+1'),
+                    series(labelFor('p50'), cone.map((p) => Number(p.p50)), 'transparent', '#6D5DFB', false),
+                    series(labelFor('p10'), cone.map((p) => Number(p.p10)), 'rgba(59,130,246,0.12)', '#3B82F6', '-1'),
                 ],
             },
             options: {
@@ -144,15 +169,22 @@
     }
 
     function series(label, data, backgroundColor, borderColor, fill) {
-        return { label, data, borderColor, backgroundColor, borderWidth: label === 'P50' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
+        return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'P50' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
     }
 
-    function renderKpis(cone) {
+    function renderLifeOutcome(data) {
+        if (!els.lifeOutcomeSection) return;
+        if (!data.life_outcome) { els.lifeOutcomeSection.hidden = true; return; }
+        els.lifeOutcomeCopy.textContent = data.life_outcome;
+        els.lifeOutcomeSection.hidden = false;
+    }
+
+    function renderKpis(cone, labels) {
         const byYear = Object.fromEntries(cone.map((p) => [p.year, p]));
         const point = byYear[10] || cone[cone.length - 1] || {};
         els.kpiGrid.innerHTML = ['p10', 'p50', 'p90'].map((key) => `
             <article class="kpi-card">
-                <div class="kpi-label">${key.toUpperCase()}</div>
+                <div class="kpi-label">${(labels[key] && labels[key].label) || key.toUpperCase()}</div>
                 <div class="kpi-value">${formatMoneyShort(Number(point[key] || 0))}</div>
                 <div class="kpi-year">năm ${point.year || '—'}</div>
             </article>
@@ -217,7 +249,7 @@
             </div>`;
         }).join('');
         const total = contributors.reduce((s, c) => s + c.contribution_pct, 0);
-        els.uncertaintyHint.textContent = `Hai nhóm này tạo ra ~${Math.round(total)}% độ rộng vùng P10–P90.`;
+        els.uncertaintyHint.textContent = `Hai nhóm này tạo ra ~${Math.round(total)}% độ rộng vùng 🌧️–☀️.`;
         els.uncertaintySection.hidden = false;
     }
 
@@ -229,6 +261,41 @@
             els.ctaBtn.textContent = 'Thay đổi để đạt Optimal';
             els.ctaBtn.onclick = () => switchScenario('optimal');
         }
+    }
+
+    function labelFor(key) {
+        const data = cache[currentScenario] || {};
+        const labels = data.scenario_labels || {};
+        return (labels[key] && labels[key].label) || key.toUpperCase();
+    }
+
+    function toggleBreakdown() {
+        if (!els.breakdownPanel) return;
+        const next = els.breakdownPanel.hidden;
+        els.breakdownPanel.hidden = !next;
+        els.presentAnchorBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
+    }
+
+    function showCausalityPlaceholder() {
+        const msg = 'Bé Tiền sẽ giải thích nguyên nhân thay đổi ở Story 3.2.';
+        if (tg && tg.showAlert) tg.showAlert(msg); else alert(msg);
+    }
+
+    function showMaintainedProjection() {
+        const msg = (els.breakdownPanel && els.breakdownPanel.dataset.maintained) || 'Bé Tiền cần thêm dữ liệu để ước tính nhịp duy trì.';
+        if (tg && tg.showAlert) tg.showAlert(msg); else alert(msg);
+    }
+
+    function refreshLifeOutcome() {
+        const key = `lifeOutcomeRefresh:${new Date().toISOString().slice(0, 10)}`;
+        const used = Number(localStorage.getItem(key) || 0);
+        if (used >= 3) {
+            const msg = 'Hôm nay bạn đã đổi ví dụ 3 lần rồi nhé.';
+            if (tg && tg.showAlert) tg.showAlert(msg); else alert(msg);
+            return;
+        }
+        localStorage.setItem(key, String(used + 1));
+        load(currentScenario, { force: true });
     }
 
     function showOptimalTooltip() {

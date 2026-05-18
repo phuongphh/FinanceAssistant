@@ -76,11 +76,10 @@ class ProfileUserSnapshot:
     telegram_handle: str | None = None
     briefing_enabled: bool = True
     briefing_time: time | None = None
+    twin_show_technical_terms: bool = False
 
 
-def profile_keyboard(
-    *, editable: bool = True
-) -> dict[str, list[list[dict[str, str]]]]:
+def profile_keyboard(*, editable: bool = True) -> dict[str, list[list[dict[str, str]]]]:
     rows = []
     if editable:
         rows.extend(
@@ -126,12 +125,24 @@ def age_keyboard() -> dict[str, list[list[dict[str, str]]]]:
     return {
         "inline_keyboard": [
             [
-                {"text": AGE_RANGES[0], "callback_data": f"profile:age:{AGE_RANGES[0]}"},
-                {"text": AGE_RANGES[1], "callback_data": f"profile:age:{AGE_RANGES[1]}"},
+                {
+                    "text": AGE_RANGES[0],
+                    "callback_data": f"profile:age:{AGE_RANGES[0]}",
+                },
+                {
+                    "text": AGE_RANGES[1],
+                    "callback_data": f"profile:age:{AGE_RANGES[1]}",
+                },
             ],
             [
-                {"text": AGE_RANGES[2], "callback_data": f"profile:age:{AGE_RANGES[2]}"},
-                {"text": AGE_RANGES[3], "callback_data": f"profile:age:{AGE_RANGES[3]}"},
+                {
+                    "text": AGE_RANGES[2],
+                    "callback_data": f"profile:age:{AGE_RANGES[2]}",
+                },
+                {
+                    "text": AGE_RANGES[3],
+                    "callback_data": f"profile:age:{AGE_RANGES[3]}",
+                },
             ],
             [
                 {
@@ -158,9 +169,9 @@ def notification_keyboard(
         "inline_keyboard": [
             [
                 {
-                    "text": _copy("keyboards", "notifications", "toggle_briefing").format(
-                        state=briefing_status
-                    ),
+                    "text": _copy(
+                        "keyboards", "notifications", "toggle_briefing"
+                    ).format(state=briefing_status),
                     "callback_data": "profile:toggle:briefing",
                 }
             ],
@@ -174,9 +185,9 @@ def notification_keyboard(
             ],
             [
                 {
-                    "text": _copy("keyboards", "notifications", "toggle_reminder").format(
-                        state=reminder_status
-                    ),
+                    "text": _copy(
+                        "keyboards", "notifications", "toggle_reminder"
+                    ).format(state=reminder_status),
                     "callback_data": "profile:toggle:reminder",
                 }
             ],
@@ -186,6 +197,12 @@ def notification_keyboard(
                         time=_fmt_time(profile.reminder_time)
                     ),
                     "callback_data": "profile:time_menu:reminder",
+                }
+            ],
+            [
+                {
+                    "text": _copy("keyboards", "notifications", "twin_terms"),
+                    "callback_data": "profile:toggle_twin_terms",
                 }
             ],
             [
@@ -303,12 +320,16 @@ async def handle_profile_view(
         try:
             stats = await ProfileStatsAggregator().aggregate(db, user_snapshot.id)
         except SQLAlchemyError:
-            logger.exception("profile stats aggregation failed; rendering fallback stats")
+            logger.exception(
+                "profile stats aggregation failed; rendering fallback stats"
+            )
             await db.rollback()
             stats = _fallback_stats()
             notice = PROFILE_DEGRADED_NOTICE
         except Exception:
-            logger.exception("profile stats aggregation failed; rendering fallback stats")
+            logger.exception(
+                "profile stats aggregation failed; rendering fallback stats"
+            )
             stats = _fallback_stats()
             notice = PROFILE_DEGRADED_NOTICE
     else:
@@ -400,6 +421,14 @@ async def handle_profile_callback(
 
     if action == "glossary":
         await _render_glossary(chat_id, message_id)
+        return True
+
+    if action == "toggle_twin_terms":
+        user.twin_show_technical_terms = not bool(
+            getattr(user, "twin_show_technical_terms", False)
+        )
+        await db.flush()
+        await handle_profile_view(db, chat_id, user, message_id=message_id)
         return True
 
     if action == "toggle" and len(parts) >= 3:
@@ -528,6 +557,7 @@ def _zalo_status_line(user: User) -> str:
     """
     try:
         from backend.bot.handlers.zalo_linking import profile_status_line
+
         return profile_status_line(user)
     except Exception:  # pragma: no cover — defensive
         return ""
@@ -569,6 +599,13 @@ def render_profile(
         # "/profile shows 'Zalo: đã liên kết' when linked"). Sourced
         # from content/zalo.yaml so the string isn't hardcoded.
         _zalo_status_line(user),
+        pv["field_twin_terms"].format(
+            state=(
+                pv["state_on"]
+                if getattr(user, "twin_show_technical_terms", False)
+                else pv["state_off"]
+            )
+        ),
         "",
         pv["section_overview"],
         pv["field_account_age"].format(days=stats["account_age_days"]),
@@ -586,22 +623,24 @@ def render_profile(
     if notice:
         lines.extend(["", notice])
 
-    lines.extend([
-        "",
-        pv["section_activity"],
-        pv["field_asset_types"].format(count=stats["asset_types_count"]),
-        pv["field_expense_this_month"].format(
-            count=stats["transaction_count_this_month"]
-        ),
-        pv["field_expense_total"].format(count=stats["transaction_count_total"]),
-        pv["field_goals"].format(
-            active=stats["goals_active"], completed=stats["goals_completed"]
-        ),
-        pv["field_streak"].format(days=stats["current_streak"]),
-        pv["field_briefing_read"].format(count=stats["briefing_read_count"]),
-        "",
-        pv["footer"],
-    ])
+    lines.extend(
+        [
+            "",
+            pv["section_activity"],
+            pv["field_asset_types"].format(count=stats["asset_types_count"]),
+            pv["field_expense_this_month"].format(
+                count=stats["transaction_count_this_month"]
+            ),
+            pv["field_expense_total"].format(count=stats["transaction_count_total"]),
+            pv["field_goals"].format(
+                active=stats["goals_active"], completed=stats["goals_completed"]
+            ),
+            pv["field_streak"].format(days=stats["current_streak"]),
+            pv["field_briefing_read"].format(count=stats["briefing_read_count"]),
+            "",
+            pv["footer"],
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -753,6 +792,9 @@ def _snapshot_user(user: User) -> ProfileUserSnapshot:
         telegram_handle=getattr(user, "telegram_handle", None),
         briefing_enabled=bool(getattr(user, "briefing_enabled", True)),
         briefing_time=getattr(user, "briefing_time", None),
+        twin_show_technical_terms=bool(
+            getattr(user, "twin_show_technical_terms", False)
+        ),
     )
 
 

@@ -91,6 +91,11 @@ class User(Base):
     # system-derived status; ``suspended`` blocks bot interactions.
     manual_status: Mapped[str | None] = mapped_column(String(50), index=True)
 
+    # Phase 4.3 — advanced users can opt into raw P10/P50/P90 labels.
+    twin_show_technical_terms: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""

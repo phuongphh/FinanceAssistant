@@ -1,0 +1,21 @@
+# Phase 4.3 — user-facing labels for Twin probability bands.
+# Internal math/logging keeps p10/p50/p90; only presentation resolves these labels.
+labels:
+  p10:
+    internal_code: "P10"
+    vi_label: "Khiêm tốn"
+    emoji: "🌧️"
+    en_fallback: "Conservative"
+    description: "Kịch bản thận trọng nhất"
+  p50:
+    internal_code: "P50"
+    vi_label: "Bình thường"
+    emoji: "⛅"
+    en_fallback: "Expected"
+    description: "Kịch bản trung tính Bé Tiền tin tưởng nhất"
+  p90:
+    internal_code: "P90"
+    vi_label: "Lạc quan"
+    emoji: "☀️"
+    en_fallback: "Optimistic"
+    description: "Kịch bản tốt nhất"

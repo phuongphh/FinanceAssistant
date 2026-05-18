@@ -17,7 +17,7 @@ menu:
       Financial Twin mô phỏng nhiều kịch bản thị trường cho danh mục hiện tại của bạn.
       Dùng để tham khảo chiến lược, không thay thế tư vấn đầu tư cá nhân.
   hint: |-
-    💡 Twin dùng P10/P50/P90: 80% kịch bản có thể nằm giữa P10 và P90.
+    💡 Twin dùng 3 kiểu thời tiết: 🌧️ Khiêm tốn, ⛅ Bình thường, ☀️ Lạc quan. Thuật ngữ P10/P50/P90 vẫn nằm trong phần kỹ thuật.
   buttons:
     - label: "📈 Lộ trình"
       callback: "menu:twin:view_current"
@@ -31,12 +31,12 @@ menu:
       callback: "menu:main"
 
 chart:
-  title: "Bé Tiền tương lai — vùng xác suất"
+  title: "Bé Tiền tương lai — vùng thời tiết"
   current_label: "Hiện tại"
-  p50_label: "P50 — đường giữa"
-  optimal_label: "P50 — tối ưu"
-  optimal_cone_label: "Vùng tối ưu P10–P90"
-  cone_label: "Vùng P10–P90"
+  p50_label: "⛅ Bình thường"
+  optimal_label: "⛅ Tối ưu"
+  optimal_cone_label: "Vùng tối ưu 🌧️–☀️"
+  cone_label: "Vùng 🌧️–☀️"
   x_label: "Năm"
   y_label: "Giá trị tài sản"
   watermark: "Bé Tiền — dự phóng xác suất, không phải lời hứa"
@@ -57,7 +57,7 @@ trajectory:
     🔮 Bé Tiền tương lai của {name}
 
     Năm {target_year}, tài sản có thể nằm trong khoảng {p10} — {p90}.
-    Đường giữa P50: {p50}.
+    {p10_label}: {p10} · {p50_label}: {p50} · {p90_label}: {p90}.
 
     Dữ liệu dự phóng: {age_text}. Đây là mô phỏng xác suất, không phải cam kết lợi nhuận.
   age_today: "vừa cập nhật hôm nay"
@@ -79,7 +79,7 @@ how_it_works: |-
 
   • Mình lấy tổng tài sản, phân bổ danh mục và dòng tiền gần đây.
   • Sau đó mô phỏng 1.000 kịch bản thị trường trong 10 năm.
-  • Kết quả là vùng P10/P50/P90: không phải một con số cố định, mà là “có thể nằm trong khoảng”.
+  • Kết quả được mặc định viết bằng thời tiết: 🌧️ Khiêm tốn, ⛅ Bình thường, ☀️ Lạc quan. Nếu bật thuật ngữ kỹ thuật, bạn sẽ thấy P10/P50/P90.
 
   Mục tiêu là giúp bạn thấy xu hướng và rủi ro trong vùng khả năng, không khẳng định tương lai.
 

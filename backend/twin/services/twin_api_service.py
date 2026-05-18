@@ -3,6 +3,7 @@
 Routes own authentication and HTTP caching. This module owns only the stable
 JSON shape so Telegram WebApp today and future Zalo surfaces can reuse it.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -11,6 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.life_events import service as life_event_service
@@ -18,8 +20,19 @@ from backend.life_events.impact import (
     adjust_cone_with_events,
     base_year_from_computed_at,
 )
+from backend.models.user import User
+from backend.twin import label_resolver
 from backend.twin.engine.uncertainty import compute_uncertainty_breakdown
-from backend.twin.services import twin_projection_service, twin_query_service
+from backend.twin.services import (
+    life_outcome_translator,
+    twin_projection_service,
+    twin_query_service,
+)
+from backend.twin.services.growth_rate_calculator import calculate_growth_snapshot
+from backend.twin.views.present_anchor import (
+    build_present_anchor_view,
+    present_anchor_to_payload,
+)
 
 _ALLOWED_SCENARIOS = {
     twin_projection_service.SCENARIO_CURRENT,
@@ -51,6 +64,13 @@ async def build_twin_payload(
         raise ValueError(f"Unsupported Twin scenario: {scenario}")
 
     snapshot = await twin_query_service.get_twin_snapshot(db, user_id)
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    show_technical_terms = bool(getattr(user, "twin_show_technical_terms", False))
+    labels = label_resolver.labels_for_payload(
+        show_technical_terms=show_technical_terms
+    )
     projection = await twin_query_service.get_latest_projection(
         db, user_id, scenario=scenario
     )
@@ -68,6 +88,8 @@ async def build_twin_payload(
             "is_stale": True,
             "engine_version": twin_projection_service.DEFAULT_ENGINE_VERSION,
             "empty_state": _EMPTY_COPY,
+            "scenario_labels": labels,
+            "show_technical_terms": show_technical_terms,
         }
 
     # For comparison deltas: always load both scenarios regardless of view scenario
@@ -100,17 +122,51 @@ async def build_twin_payload(
         )
         excluded_count = len(exclude_event_ids)
 
+    target_point = _target_point(cone_payload)
+    target_year = _calendar_year(
+        projection.computed_at, int(target_point.get("year", 0))
+    )
+    target_p50 = Decimal(str(target_point.get("p50") or 0))
+    growth = await calculate_growth_snapshot(
+        db, user_id, current_net_worth=snapshot.actual_nw
+    )
+    present_anchor = build_present_anchor_view(
+        growth,
+        target_year=target_year,
+        target_p50=target_p50,
+        breakdown=getattr(snapshot, "actual_breakdown", {}) or {},
+    )
+    outcome_context = {
+        "location": "TP.HCM",
+        "known_goals": (
+            [getattr(user, "primary_goal", None)]
+            if getattr(user, "primary_goal", None)
+            else []
+        ),
+        "user_segment": getattr(user, "wealth_level", None) or "mass_affluent",
+    }
+    life_outcome = await life_outcome_translator.translate(
+        db,
+        amount_vnd=target_p50,
+        target_year=target_year,
+        user_context=outcome_context,
+    )
+
     return {
         "has_projection": True,
         "scenario": projection.scenario,
         "base_net_worth": _money(projection.base_net_worth),
         "actual_net_worth": _money(snapshot.actual_nw),
-        "delta_vs_p50": _money(snapshot.delta_vs_p50)
-        if snapshot.delta_vs_p50 is not None
-        else None,
+        "delta_vs_p50": (
+            _money(snapshot.delta_vs_p50) if snapshot.delta_vs_p50 is not None else None
+        ),
         "monthly_savings": _money(projection.monthly_savings),
         "allocation": _allocation_to_json(projection.allocation_snapshot or {}),
         "cone": _cone_to_json(cone_payload),
+        "scenario_labels": labels,
+        "show_technical_terms": show_technical_terms,
+        "present_anchor": present_anchor_to_payload(present_anchor),
+        "life_outcome": life_outcome,
         "computed_at": _isoformat(projection.computed_at),
         "cone_age_days": snapshot.cone_age_days,
         "is_stale": snapshot.is_stale,
@@ -118,14 +174,27 @@ async def build_twin_payload(
         "sim_paths": projection.sim_paths,
         "engine_version": projection.engine_version,
         "comparison_deltas": comparison_deltas,
-        "monthly_savings_needed": _money(monthly_savings_needed)
-        if monthly_savings_needed is not None
-        else None,
+        "monthly_savings_needed": (
+            _money(monthly_savings_needed)
+            if monthly_savings_needed is not None
+            else None
+        ),
         "uncertainty_contributors": _uncertainty_to_json(
             projection.allocation_snapshot or {}
         ),
         "excluded_event_count": excluded_count,
     }
+
+
+def _target_point(cone: list[dict[str, Any]]) -> dict[str, Any]:
+    if not cone:
+        return {"year": 0, "p50": 0}
+    return max(cone, key=lambda point: int(point.get("year", 0)))
+
+
+def _calendar_year(computed_at: datetime | None, year_offset: int) -> int:
+    base = computed_at or datetime.now(timezone.utc)
+    return int(base.year) + int(year_offset)
 
 
 def etag_for_payload(payload: dict[str, Any]) -> str:
@@ -190,14 +259,8 @@ def _compute_comparison_deltas(
         return []
 
     base_year = computed_at.year if computed_at else datetime.now(timezone.utc).year
-    current_by_idx = {
-        int(p.get("year", -1)): p
-        for p in (current_proj.cone_data or [])
-    }
-    optimal_by_idx = {
-        int(p.get("year", -1)): p
-        for p in (optimal_proj.cone_data or [])
-    }
+    current_by_idx = {int(p.get("year", -1)): p for p in (current_proj.cone_data or [])}
+    optimal_by_idx = {int(p.get("year", -1)): p for p in (optimal_proj.cone_data or [])}
 
     deltas = []
     for cal_year in _MILESTONE_CALENDAR_YEARS:

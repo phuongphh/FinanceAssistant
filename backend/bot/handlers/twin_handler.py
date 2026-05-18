@@ -26,7 +26,17 @@ from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
     top_rebalance_deltas,
 )
-from backend.twin.services import twin_projection_service, twin_query_service
+from backend.twin import label_resolver
+from backend.twin.services import (
+    life_outcome_translator,
+    twin_projection_service,
+    twin_query_service,
+)
+from backend.twin.services.growth_rate_calculator import (
+    GrowthRateSnapshot,
+    calculate_growth_snapshot,
+)
+from backend.twin.views.present_anchor import build_present_anchor_view
 from backend.twin.services.twin_narrative_service import build_twin_narrative
 from backend.twin.services.twin_chart_service import render_projection_chart
 
@@ -155,6 +165,55 @@ async def send_twin_current(
     narrative = await build_twin_narrative(
         db, user, cone, cone_age_days=snapshot.cone_age_days
     )
+    target_year = point_year = point.get("year", 0)
+    if snapshot.projection is not None and getattr(
+        snapshot.projection, "computed_at", None
+    ):
+        target_year = snapshot.projection.computed_at.year + int(point_year)
+    try:
+        growth = await calculate_growth_snapshot(
+            db, user.id, current_net_worth=snapshot.actual_nw
+        )
+    except Exception:
+        growth = GrowthRateSnapshot(
+            current_net_worth=snapshot.actual_nw,
+            weekly_delta=None,
+            monthly_growth_rate=None,
+            days_observed=0,
+            has_enough_data=False,
+        )
+    anchor_view = build_present_anchor_view(
+        growth,
+        target_year=target_year,
+        target_p50=Decimal(str(point.get("p50") or 0)),
+        breakdown=getattr(snapshot, "actual_breakdown", {}) or {},
+    )
+    present_anchor = " • ".join(
+        [
+            anchor_view.present_label,
+            anchor_view.weekly_delta_label,
+            anchor_view.growth_rate_label,
+        ]
+    )
+    life_outcome = await life_outcome_translator.translate(
+        db,
+        amount_vnd=Decimal(str(point.get("p50") or 0)),
+        target_year=target_year,
+        user_context={
+            "user_segment": getattr(user, "wealth_level", None) or "mass_affluent",
+            "known_goals": (
+                [getattr(user, "primary_goal", None)]
+                if getattr(user, "primary_goal", None)
+                else []
+            ),
+        },
+    )
+    scenario_labels = {
+        key: value["label"]
+        for key, value in label_resolver.labels_for_payload(
+            show_technical_terms=bool(getattr(user, "twin_show_technical_terms", False))
+        ).items()
+    }
 
     # Phase 4.1 Story B.2 — log snapshot per Twin open and (if enabled
     # + enough completed) append the honest hit-rate section to the
@@ -167,15 +226,15 @@ async def send_twin_current(
             db, user_id=user.id, projection=snapshot.projection
         )
     if twin_calibration_service.is_display_enabled():
-        hit = await twin_calibration_service.get_hit_rate(db, user.id)
+        try:
+            hit = await twin_calibration_service.get_hit_rate(db, user.id)
+        except Exception:
+            hit = None
         if hit is not None:
             calib_copy = _copy().get("calibration", {})
-            extra = (
-                f"\n\n{calib_copy.get('section_title', '')}\n"
-                + calib_copy.get("hit_line", "").format(
-                    correct=hit.correct, total=hit.total, pct=hit.pct
-                )
-            )
+            extra = f"\n\n{calib_copy.get('section_title', '')}\n" + calib_copy.get(
+                "hit_line", ""
+            ).format(correct=hit.correct, total=hit.total, pct=hit.pct)
             if hit.is_low_confidence:
                 extra += "\n" + calib_copy.get("learning_note", "")
             narrative = (narrative or "") + extra
@@ -183,7 +242,7 @@ async def send_twin_current(
     content = renderer.render_twin_view(
         TwinViewSnapshot(
             user_name=_name(user),
-            target_year=int(point.get("year", 0)),
+            target_year=target_year,
             p10=Decimal(str(point.get("p10", 0))),
             p50=Decimal(str(point.get("p50", 0))),
             p90=Decimal(str(point.get("p90", 0))),
@@ -191,12 +250,18 @@ async def send_twin_current(
             cone=cone,
             optimal_cone=optimal_projection.cone_data if optimal_projection else None,
             narrative=narrative,
+            present_anchor=present_anchor,
+            life_outcome=life_outcome,
+            scenario_labels=scenario_labels,
             is_stale=snapshot.is_stale,
             filename="be-tien-twin.png",
         )
     )
     await _send_channel_content(notifier, chat_id, content)
-    await _maybe_send_next_action(db, chat_id, user, notifier)
+    try:
+        await _maybe_send_next_action(db, chat_id, user, notifier)
+    except Exception:
+        pass
 
 
 async def _maybe_send_next_action(
@@ -240,7 +305,9 @@ async def send_twin_share(
     if not twin_share_service.is_share_enabled():
         await notifier.send_message(
             chat_id,
-            _copy().get("share", {}).get(
+            _copy()
+            .get("share", {})
+            .get(
                 "disabled",
                 "📸 Tính năng tạm tắt — quay lại sau bạn nhé.",
             ),
