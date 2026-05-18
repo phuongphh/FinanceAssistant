@@ -20,10 +20,18 @@ Convert Twin từ static viewer thành habit loop: user action → Twin recomput
 - [ ] Loop close rate (trigger → view → action → return) ≥ 20% trong 7 ngày
 
 ### Stories
-- **3.1** On-Demand Twin Recompute (1.5d, P0, no deps)
-- **3.2** Causality Breakdown with Contribution Weights (1d, P0, depends on 3.1)
-- **3.3** Action Suggestion Embedded in Twin Flow (1d, P0, depends on 3.2)
-- **3.4** Negative Delta Handling (1d, P0, depends on 3.2, 3.5)
-- **3.5** Delta Threshold for Noticeable Change (0.5d, P0, depends on 3.1)
-- **3.6** Return Tease + Loop Closure (1d, P1, depends on 3.3)
+| # | Title | Issue | Estimate | Depends |
+|---|-------|-------|----------|---------|
+| 3.1 | On-Demand Twin Recompute | [#679](https://github.com/phuongphh/FinanceAssistant/issues/679) | 1.5d | None |
+| 3.2 | Causality Breakdown with Contribution Weights | [#680](https://github.com/phuongphh/FinanceAssistant/issues/680) | 1d | #679 |
+| 3.3 | Action Suggestion Embedded in Twin Flow | [#681](https://github.com/phuongphh/FinanceAssistant/issues/681) | 1d | #680 |
+| 3.4 | Negative Delta Handling | [#682](https://github.com/phuongphh/FinanceAssistant/issues/682) | 1d | #680, #683 |
+| 3.5 | Delta Threshold for Noticeable Change | [#683](https://github.com/phuongphh/FinanceAssistant/issues/683) | 0.5d | #679 |
+| 3.6 | Return Tease + Loop Closure | [#684](https://github.com/phuongphh/FinanceAssistant/issues/684) | 1d (P1) | #681 |
+
+### Claude Code Prompt
+```
+Implement Epic 3 (Phase 4.3) — all 6 stories (#679–#684).
+Branch: phase-4.3/epic-3-twin-habit-loop
+```
 
