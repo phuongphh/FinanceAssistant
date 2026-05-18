@@ -122,7 +122,15 @@
         renderStoryFlow(data);
         renderPresentAnchor(data);
         renderDelta(data.delta_vs_p50);
-        els.computedAt.textContent = data.computed_at ? `cập nhật ${formatDate(data.computed_at)}` : '—';
+        const computedLabel = data.computed_at ? `cập nhật ${formatDate(data.computed_at)}` : '—';
+        // ``is_value_stale`` fires when the cone's anchor no longer matches
+        // the wallet (e.g. user added 2.5 tỷ since the projection was
+        // computed). The backend has already enqueued a background
+        // recompute — surface the situation so the user doesn't try to
+        // reason about the obviously-wrong numbers below.
+        els.computedAt.textContent = data.is_value_stale
+            ? `${computedLabel} • đang cập nhật lại theo tài sản mới`
+            : computedLabel;
         renderChart(data.cone || []);
         renderLifeOutcome(data);
         renderKpis(data.cone || [], data.scenario_labels || {});

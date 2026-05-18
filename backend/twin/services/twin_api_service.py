@@ -76,6 +76,25 @@ async def build_twin_payload(
     projection = await twin_query_service.get_latest_projection(
         db, user_id, scenario=scenario
     )
+
+    # Fire-and-forget background recompute when the stored cone no longer
+    # matches the wallet. The GET path stays read-only — we do not block
+    # the response — but the next view shows the fresh cone. Failure here
+    # is swallowed because the stale cone is still useful with a banner.
+    if snapshot.is_value_stale and snapshot.actual_nw > 0:
+        try:
+            from backend.twin.services import recompute_service
+
+            delta_for_signal = snapshot.actual_nw - Decimal(
+                str(projection.base_net_worth or 0)
+            ) if projection else snapshot.actual_nw
+            await recompute_service.enqueue_recompute_if_needed(
+                db, user_id, delta_for_signal
+            )
+        except Exception:
+            # Never let recompute scheduling break the read path.
+            pass
+
     if projection is None:
         return {
             "has_projection": False,
@@ -88,6 +107,7 @@ async def build_twin_payload(
             "computed_at": None,
             "cone_age_days": snapshot.cone_age_days,
             "is_stale": True,
+            "is_value_stale": True,
             "engine_version": twin_projection_service.DEFAULT_ENGINE_VERSION,
             "empty_state": _EMPTY_COPY,
             "scenario_labels": labels,
@@ -174,6 +194,7 @@ async def build_twin_payload(
         "computed_at": _isoformat(projection.computed_at),
         "cone_age_days": snapshot.cone_age_days,
         "is_stale": snapshot.is_stale,
+        "is_value_stale": snapshot.is_value_stale,
         "horizon_years": projection.horizon_years,
         "sim_paths": projection.sim_paths,
         "engine_version": projection.engine_version,
@@ -220,8 +241,10 @@ def etag_for_payload(payload: dict[str, Any]) -> str:
             "scenario",
             "computed_at",
             "actual_net_worth",
+            "base_net_worth",
             "engine_version",
             "excluded_event_count",
+            "is_value_stale",
             "story_flow",
         )
     )

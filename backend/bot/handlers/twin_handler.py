@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from backend.bot.formatters.menu_formatter import back_to_main_keyboard
 from backend.bot.formatters.money import format_money_short
@@ -139,7 +142,15 @@ async def send_twin_current(
         )
         return
 
-    if snapshot.projection is None:
+    # Recompute synchronously when the stored cone is missing OR no longer
+    # reflects the user's wallet. ``is_value_stale`` catches the case where
+    # we computed the cone with 50tr of assets and the user has since added
+    # 2.6 tỷ — the time-staleness check alone would call this "fresh today"
+    # while the chart starts from a wrong anchor. Telegram users are tapping
+    # and waiting, so a ~500ms Monte Carlo is acceptable here; the Mini App
+    # GET path stays read-only.
+    needs_recompute = snapshot.projection is None or snapshot.is_value_stale
+    if needs_recompute:
         await notifier.send_message(
             chat_id, copy["trajectory"]["recomputing"], parse_mode=None
         )
@@ -149,13 +160,19 @@ async def send_twin_current(
             )
             snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
         except Exception:
-            await notifier.send_message(
-                chat_id,
-                copy["trajectory"]["no_projection"],
-                parse_mode=None,
-                reply_markup=back_to_main_keyboard(),
+            logger.exception(
+                "twin_handler: synchronous recompute failed user=%s", user.id
             )
-            return
+            # If the user had a (stale) cone to fall back on, render it with
+            # a warning rather than the empty state. Better than a blank screen.
+            if snapshot.projection is None:
+                await notifier.send_message(
+                    chat_id,
+                    copy["trajectory"]["no_projection"],
+                    parse_mode=None,
+                    reply_markup=back_to_main_keyboard(),
+                )
+                return
 
     cone = snapshot.latest_cone or []
     point = _target_point(cone)
@@ -239,6 +256,10 @@ async def send_twin_current(
                 extra += "\n" + calib_copy.get("learning_note", "")
             narrative = (narrative or "") + extra
 
+    # Surface BOTH time-staleness and value-staleness through the existing
+    # ``is_stale`` flag so the renderer's "⚠️ Dự phóng hơi cũ" banner fires
+    # when an on-demand recompute failed and we are falling back to a cone
+    # whose anchor no longer matches the wallet.
     content = renderer.render_twin_view(
         TwinViewSnapshot(
             user_name=_name(user),
@@ -253,7 +274,7 @@ async def send_twin_current(
             present_anchor=present_anchor,
             life_outcome=life_outcome,
             scenario_labels=scenario_labels,
-            is_stale=snapshot.is_stale,
+            is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
         )
     )
@@ -447,13 +468,21 @@ async def send_twin_compare_optimal(
         chart_renderer=render_projection_chart
     )
     copy = _copy()["comparison"]
+    snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
     current = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_CURRENT
     )
     optimal = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
     )
-    if current is None or optimal is None:
+    # Same value-staleness gate as ``send_twin_current``: if the cone's
+    # anchor no longer matches the wallet, recompute before drawing the
+    # comparison — otherwise we render "Current vs Optimal" against a
+    # base that doesn't exist anymore.
+    needs_recompute = (
+        current is None or optimal is None or snapshot.is_value_stale
+    )
+    if needs_recompute:
         await notifier.send_message(chat_id, copy["recomputing"], parse_mode=None)
         try:
             await twin_projection_service.compute_and_store(
@@ -466,13 +495,17 @@ async def send_twin_compare_optimal(
                 db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
             )
         except Exception:
-            await notifier.send_message(
-                chat_id,
-                copy["no_projection"],
-                parse_mode=None,
-                reply_markup=back_to_main_keyboard(),
+            logger.exception(
+                "twin_handler: comparison recompute failed user=%s", user.id
             )
-            return
+            if current is None or optimal is None:
+                await notifier.send_message(
+                    chat_id,
+                    copy["no_projection"],
+                    parse_mode=None,
+                    reply_markup=back_to_main_keyboard(),
+                )
+                return
 
     if (
         current is None
