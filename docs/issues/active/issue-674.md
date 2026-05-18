@@ -24,11 +24,9 @@
 - `apps/twin_renderer/views/scenario_card.py` (modify)
 - `db/migrations/4.3.01_twin_label_mapping.sql` (new)
 
-### Claude Code Implementation Prompt
-```
-Implement Story 1.1 of Epic #670 (Phase 4.3):
-Rename P10/P50/P90 → Weather Vocabulary (🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan)
-
-PR should close #[ISSUE_NUMBER]
-```
+### Definition of Done
+- [ ] All AC met
+- [ ] Tested on Telegram iOS + Android + Web
+- [ ] Content reviewer approved
+- [ ] PR closes #674
 
