@@ -35,5 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #670 | [Epic 1] Twin Comprehension Foundation — Phase 4.3 | [issue-670.md](issue-670.md) |
 | #671 | [Epic 2] Twin Storytelling — Phase 4.3 | [issue-671.md](issue-671.md) |
+| #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
 
-**Total active:** 31
+**Total active:** 32
