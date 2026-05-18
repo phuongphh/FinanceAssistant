@@ -5,6 +5,10 @@ const FORCE_PASSWORD_KEY = 'betien_admin_force_password_change';
 
 let onUnauthorized = null;
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler;
 }

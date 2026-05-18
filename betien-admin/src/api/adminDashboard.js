@@ -48,3 +48,27 @@ export function changeUserStatus(userId, status, reason) {
     body: buildStatusChangeBody(status, reason),
   });
 }
+
+export function getTwinEngagementFunnel(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/twin-metrics/engagement-funnel', params));
+}
+
+export function getTwinEngagementUsers(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/twin-metrics/engagement-funnel/users', params));
+}
+
+export function getTwinLoopHealth(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/twin-metrics/loop-health', params));
+}
+
+export function getTwinComprehension(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/twin-metrics/comprehension', params));
+}
+
+export function getTwinDeltaDistribution(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/twin-metrics/delta-distribution', params));
+}
+
+export function getTwinDeltaCsvUrl(params = {}) {
+  return buildAdminDashboardPath('/twin-metrics/delta-distribution.csv', params);
+}

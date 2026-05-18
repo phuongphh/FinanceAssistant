@@ -37,6 +37,7 @@ import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
 import MetricShell from '../components/MetricShell';
 import SkeletonCard from '../components/SkeletonCard';
+import TwinDashboard from './TwinDashboard/TwinDashboard';
 import {
   changeUserStatus,
   getCohortRetention,
@@ -152,6 +153,7 @@ function DashboardContent() {
         <HeroSection />
         {error ? <ErrorBanner message={error} /> : null}
         <KPIGrid loading={loading} metrics={overview?.metrics || {}} />
+        <TwinDashboard period={range} days={selectedRange.days} refreshNonce={refreshNonce} />
         <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <UserGrowthChart loading={loading} growth={growth} />
           <DAUChart loading={loading} dau={latestDauWindow(dau)} />
