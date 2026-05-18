@@ -22,6 +22,7 @@ STALE_AFTER_DAYS = 14
 class TwinSnapshot:
     latest_cone: list[dict[str, Any]] | None
     actual_nw: Decimal
+    actual_breakdown: dict[str, Decimal]
     delta_vs_p50: Decimal | None
     cone_age_days: int | None
     is_stale: bool
@@ -34,11 +35,13 @@ async def get_twin_snapshot(db: AsyncSession, user_id: uuid.UUID) -> TwinSnapsho
     This is intentionally read-only. It performs no writes and never flushes.
     """
     projection = await get_latest_projection(db, user_id, scenario=SCENARIO_CURRENT)
-    actual = (await wealth_service.calculate_stored_current(db, user_id)).total
+    actual_breakdown = await wealth_service.calculate_stored_current(db, user_id)
+    actual = actual_breakdown.total
     if projection is None:
         return TwinSnapshot(
             latest_cone=None,
             actual_nw=actual,
+            actual_breakdown=actual_breakdown.by_type,
             delta_vs_p50=None,
             cone_age_days=None,
             is_stale=True,
@@ -56,6 +59,7 @@ async def get_twin_snapshot(db: AsyncSession, user_id: uuid.UUID) -> TwinSnapsho
     return TwinSnapshot(
         latest_cone=projection.cone_data,
         actual_nw=actual,
+        actual_breakdown=actual_breakdown.by_type,
         delta_vs_p50=None if reference_p50 is None else actual - reference_p50,
         cone_age_days=age_days,
         is_stale=age_days > STALE_AFTER_DAYS,

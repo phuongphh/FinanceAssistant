@@ -1,4 +1,5 @@
 """Financial Twin public API routes for Mini App clients."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
@@ -37,9 +38,14 @@ async def get_twin(
     user = await _resolve_user(auth, db)
     excluded = parse_event_ids(exclude_event_ids)
     try:
-        payload = await twin_api_service.build_twin_payload(
-            db, user.id, scenario=scenario, exclude_event_ids=excluded
-        )
+        if excluded:
+            payload = await twin_api_service.build_twin_payload(
+                db, user.id, scenario=scenario, exclude_event_ids=excluded
+            )
+        else:
+            payload = await twin_api_service.build_twin_payload(
+                db, user.id, scenario=scenario
+            )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

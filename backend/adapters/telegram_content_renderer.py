@@ -61,14 +61,22 @@ class TelegramContentRenderer(ContentRenderer):
     def render_twin_view(self, snapshot: TwinViewSnapshot) -> ChannelContent:
         copy = _copy()["trajectory"]
         png = self._chart_renderer(snapshot.cone, optimal=snapshot.optimal_cone)
+        labels = snapshot.scenario_labels or {}
         caption = copy["caption"].format(
             name=snapshot.user_name,
             target_year=snapshot.target_year,
             p10=format_money_short(snapshot.p10),
             p50=format_money_short(snapshot.p50),
             p90=format_money_short(snapshot.p90),
+            p10_label=labels.get("p10", "🌧️ Khiêm tốn"),
+            p50_label=labels.get("p50", "⛅ Bình thường"),
+            p90_label=labels.get("p90", "☀️ Lạc quan"),
             age_text=snapshot.age_text,
         )
+        if snapshot.present_anchor:
+            caption = f"{snapshot.present_anchor}\n\n{caption}"
+        if snapshot.life_outcome:
+            caption += f"\n\n⛅ Ví dụ dễ hình dung: {snapshot.life_outcome}"
         if snapshot.is_stale:
             caption += copy["stale_note"]
         if snapshot.narrative:
