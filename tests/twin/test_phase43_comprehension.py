@@ -8,6 +8,7 @@ import pytest
 from backend.twin import label_resolver
 from backend.twin.services import life_outcome_translator
 from backend.twin.services.growth_rate_calculator import GrowthRateSnapshot
+from backend.twin.services.twin_narrative_service import _clean_output
 from backend.twin.views.present_anchor import build_present_anchor_view
 from infra.cache.life_outcome_cache import bucket_amount
 
@@ -26,6 +27,15 @@ def test_label_resolver_can_show_technical_terms():
     assert labels["p10"]["label"] == "P10"
     assert labels["p50"]["label"] == "P50"
     assert labels["p90"]["label"] == "P90"
+
+
+def test_narrative_clean_output_replaces_technical_terms_with_plain_fallback():
+    text = "Nếu giữ nhịp hiện tại, P50 năm 10 có thể đạt 316.7 tỷ. Mình theo dõi cùng bạn nhé."
+
+    cleaned = _clean_output(text, "316.7 tỷ", 10)
+
+    assert "P50" not in cleaned
+    assert "vùng bình thường" in cleaned
 
 
 def test_present_anchor_formats_delta_and_growth_rate():

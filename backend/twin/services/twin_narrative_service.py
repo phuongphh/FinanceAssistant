@@ -1,4 +1,5 @@
 """Short Financial Twin narrative generation with conservative fallback."""
+
 from __future__ import annotations
 
 import hashlib
@@ -39,7 +40,10 @@ def cone_hash(cone: list[dict[str, Any]]) -> str:
 
 def _clean_output(text: str, fallback_p50: str, fallback_year: int) -> str:
     cleaned = " ".join(text.replace("*", "").replace("_", "").split())
-    if 50 <= len(cleaned) <= 200:
+    technical_terms = ("P10", "P50", "P90")
+    if 50 <= len(cleaned) <= 200 and not any(
+        term in cleaned.upper() for term in technical_terms
+    ):
         return cleaned
     return _copy()["fallback"].format(target_year=fallback_year, p50=fallback_p50)
 
@@ -55,10 +59,7 @@ async def _get_top_asset_changes(
     today = date.today()
     cutoff = today - timedelta(days=days)
 
-    stmt = (
-        select(Asset)
-        .where(Asset.user_id == user_id, Asset.is_active.is_(True))
-    )
+    stmt = select(Asset).where(Asset.user_id == user_id, Asset.is_active.is_(True))
     assets = list((await db.execute(stmt)).scalars().all())
     if not assets:
         return "không có thay đổi đáng kể"

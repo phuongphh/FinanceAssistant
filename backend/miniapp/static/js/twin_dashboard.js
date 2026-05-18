@@ -276,7 +276,7 @@
     }
 
     function series(label, data, backgroundColor, borderColor, fill) {
-        return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'P50' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
+        return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'Đường bình thường' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
     }
 
     function renderLifeOutcome(data) {
@@ -330,7 +330,7 @@
             </div>`;
         }).join('');
         if (data.monthly_savings_needed && Number(data.monthly_savings_needed) > 0) {
-            els.savingsCta.textContent = `Để đạt P50 tối ưu, bạn cần tiết kiệm thêm ~${formatMoneyShort(Number(data.monthly_savings_needed))}/tháng`;
+            els.savingsCta.textContent = `Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~${formatMoneyShort(Number(data.monthly_savings_needed))}/tháng`;
         } else {
             els.savingsCta.textContent = 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
         }
