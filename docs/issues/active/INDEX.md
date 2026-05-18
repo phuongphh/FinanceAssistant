@@ -46,5 +46,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #681 | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [issue-681.md](issue-681.md) |
 | #682 | [Story 3.4] Negative Delta Handling — Phase 4.3 | [issue-682.md](issue-682.md) |
 | #683 | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [issue-683.md](issue-683.md) |
+| #684 | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [issue-684.md](issue-684.md) |
 
-**Total active:** 42
+**Total active:** 43
