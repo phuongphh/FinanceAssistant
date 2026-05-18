@@ -2,33 +2,28 @@
 
 [Story 3.4] Negative Delta Handling — Phase 4.3
 
-## Story 3.4 — Negative Delta Handling
+## Story 2.2 — Story Narrative Flow (Swipe-Through Screens)
 
-**Parent Epic:** #672 | **Estimate:** 1 day | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Stories 3.2, 3.5
+**Parent Epic:** #671 | **Estimate:** 1.5 days | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Stories 1.1 (#674), 1.2 (#675), 2.1 (#677)
 
 ### User Story
-> Là một mass affluent user vừa có tuần xấu, tôi cần Twin nói tin xấu với tôi một cách tôn trọng + có giải pháp — không né tránh, không guilt-inducing.
+> Là một mass affluent user xem Twin lần đầu, tôi muốn được dẫn dắt qua một câu chuyện: "đây là hiện tại → tương lai có thể → vì sao → anh có thể làm gì". Sau đó nếu muốn, tôi mới xem chart.
 
 ### Requirements
-- [ ] Copy file `negative_delta_copy.yaml` với 5-7 variants cho different scenarios (mild/moderate/significant/severe)
-- [ ] Causality breakdown: focus 1 factor largest, KHÔNG chia weight nhỏ lẻ
-- [ ] Action suggestion: "Review 3 khoản chi lớn nhất tháng" — concrete, không vague
-- [ ] Banned words (auto-check): "lỗi", "sai", "không nên", "đáng tiếc", "tiếc rằng", "rủi ro", "nguy cơ"
-- [ ] Required phrases: "Bé Tiền cùng anh xem lại", "Việc nên làm tiếp"
-- [ ] Frequency cap: max 1 negative notification/tuần
-- [ ] Visual: "🌧️ Tuần Mưa Của Twin" thay vì "📉 Giảm"
-- [ ] Operator approval: 5 sample messages reviewed before production
+- [ ] 5 screens với Telegram inline keyboard navigate forward/back
+- [ ] Skip: "Bỏ qua, xem nhanh" → jump to Screen 5
+- [ ] Subsequent views: compact (Screen 2 + 5 condensed)
+- [ ] Full flow re-show: nếu user request hoặc sau 30 ngày
+- [ ] Migration 4.3.02: `twin_view_events` table
 
 ### Files Touched
-- `content/twin/negative_delta_copy.yaml` (new)
-- `apps/twin_renderer/services/negative_delta_handler.py` (new)
-- `apps/twin_renderer/guards/banned_words_check.py` (new)
+- `apps/twin_renderer/flows/first_time_view.py` (new)
+- `apps/twin_renderer/views/narrative_screen_*.py` (new)
+- `apps/twin_renderer/views/twin_viewer.py` (modify)
+- `db/migrations/4.3.02_twin_view_events.sql` (new)
 
-### Claude Code Implementation Prompt
-```
-Implement Story 3.4 of Epic #672 (Phase 4.3):
-Negative Delta Handling
-
-PR should close #[ISSUE_NUMBER]
-```
+### Definition of Done
+- [ ] All AC met
+- [ ] Analytics logging verified
+- [ ] PR closes #678
 
