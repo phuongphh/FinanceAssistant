@@ -37,6 +37,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #685 | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [issue-685.md](issue-685.md) |
 | #686 | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [issue-686.md](issue-686.md) |
 | #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
-| #688 | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [issue-688.md](issue-688.md) |
 
-**Total active:** 34
+**Total active:** 33
