@@ -11,8 +11,6 @@ from typing import Any
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from backend.bot.formatters.menu_formatter import back_to_main_keyboard
 from backend.bot.formatters.money import format_money_short
 from backend.ports.content_renderer import (
@@ -40,8 +38,11 @@ from backend.twin.services.growth_rate_calculator import (
     calculate_growth_snapshot,
 )
 from backend.twin.views.present_anchor import build_present_anchor_view
+from backend.twin.views.scenario_card import scenario_cards_for_point
 from backend.twin.services.twin_narrative_service import build_twin_narrative
 from backend.twin.services.twin_chart_service import render_projection_chart
+
+logger = logging.getLogger(__name__)
 
 _COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "twin_copy.yaml"
 _MIN_TWIN_NET_WORTH = Decimal("10000000")
@@ -225,12 +226,11 @@ async def send_twin_current(
             ),
         },
     )
-    scenario_labels = {
-        key: value["label"]
-        for key, value in label_resolver.labels_for_payload(
-            show_technical_terms=bool(getattr(user, "twin_show_technical_terms", False))
-        ).items()
-    }
+    label_payload = label_resolver.labels_for_payload(
+        show_technical_terms=bool(getattr(user, "twin_show_technical_terms", False))
+    )
+    scenario_labels = {key: value["label"] for key, value in label_payload.items()}
+    scenario_cards = scenario_cards_for_point(point, label_payload)
 
     # Phase 4.1 Story B.2 — log snapshot per Twin open and (if enabled
     # + enough completed) append the honest hit-rate section to the
@@ -274,6 +274,7 @@ async def send_twin_current(
             present_anchor=present_anchor,
             life_outcome=life_outcome,
             scenario_labels=scenario_labels,
+            scenario_cards=scenario_cards,
             is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
         )

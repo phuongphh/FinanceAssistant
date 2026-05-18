@@ -7,6 +7,8 @@ from uuid import uuid4
 import pytest
 
 from backend.twin.flows.first_time_view import build_story_flow, should_show_full_story
+from backend.adapters.chart_renderer import _load_copy as load_chart_copy
+from backend.bot.formatters.menu_formatter import format_submenu
 from backend.twin.views.scenario_card import mascot_for, scenario_cards_for_point
 
 
@@ -34,6 +36,31 @@ def test_scenario_cards_include_mascot_fallback_payload():
     assert cards[0]["label"] == "🌧️ Khiêm tốn"
     assert cards[0]["mascot"]["fallback"] == "🌧️"
     assert cards[1]["mascot"]["asset_url"]
+
+
+def test_twin_menu_uses_weather_cards_without_technical_jargon():
+    user = SimpleNamespace(wealth_level="mass_affluent", get_greeting_name=lambda: "An")
+
+    text, _keyboard = format_submenu(user, "twin", level="mass_affluent")
+
+    assert "🌧️ Khiêm tốn" in text
+    assert "⛅ Bình thường" in text
+    assert "☀️ Lạc quan" in text
+    assert "P10" not in text
+    assert "P50" not in text
+    assert "P90" not in text
+
+
+def test_chart_copy_is_emoji_free_to_avoid_matplotlib_tofu_boxes():
+    chart = load_chart_copy()
+
+    visible_labels = " ".join(
+        str(chart[key])
+        for key in ("p50_label", "optimal_label", "optimal_cone_label", "cone_label")
+    )
+    assert "🌧" not in visible_labels
+    assert "⛅" not in visible_labels
+    assert "☀" not in visible_labels
 
 
 def test_story_flow_full_has_five_screens_and_compact_has_two():

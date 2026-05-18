@@ -131,7 +131,10 @@ submenu_twin:
       callback: "menu:main"
 
   hint: |-
-    💡 Twin dùng P10/P50/P90: 80% kịch bản có thể nằm giữa P10 và P90.
+    💡 Twin dùng 3 kiểu thời tiết:
+    🌧️ Khiêm tốn — kịch bản thận trọng.
+    ⛅ Bình thường — đường giữa Bé Tiền theo dõi.
+    ☀️ Lạc quan — kịch bản thuận lợi hơn.
 
 # ============================================================
 # SUB-MENU: TÀI SẢN (Level 2)
