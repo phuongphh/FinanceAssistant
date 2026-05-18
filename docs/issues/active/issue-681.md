@@ -2,34 +2,31 @@
 
 [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3
 
-## Story 3.3 — Action Suggestion Embedded in Twin Flow
+## Story 1.1 — Rename P10/P50/P90 → Weather Vocabulary
 
-**Parent Epic:** #672 | **Estimate:** 1 day | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Story 3.2
+**Parent Epic:** #670 | **Estimate:** 1 day | **Priority:** P0 | **Surface:** Telegram
 
 ### User Story
-> Là một mass affluent user vừa hiểu vì sao Twin thay đổi, tôi muốn 1 gợi ý cụ thể, doable trong 5 phút — không phải lời khuyên chung chung.
+> Là một mass affluent user mới dùng Bé Tiền lần đầu, tôi muốn thấy 3 kịch bản tương lai của mình bằng từ ngữ thân thuộc (thời tiết) thay vì jargon kỹ thuật, để tôi hiểu Twin trong vài giây mà không cần học khái niệm mới.
 
 ### Requirements
-- [ ] Action library `action_suggestion.yaml` với key (state_segment, delta_direction, has_goal)
-- [ ] Service `twin_action_suggestion_service.suggest(user_context, delta_info)` → ActionSuggestion
-- [ ] Each suggestion ≤ 5 phút với deep_link
-- [ ] Card format: title, description ≤ 2 câu, time_estimate, buttons
-- [ ] Logged vào `twin_action_suggestions` (Migration 4.3.04)
-- [ ] "Đặt mục tiêu ngay" → execute inline
-- [ ] "Để tôi suy nghĩ thêm" → reminder 48h
-- [ ] Repeat suppression: cùng type dismissed 3 lần → skip 30 ngày
-- [ ] Variety: không suggest cùng type 2 lần liên tiếp trong 7 ngày
+- [ ] P10 → "🌧️ Khiêm tốn" (kịch bản thận trọng nhất)
+- [ ] P50 → "⛅ Bình thường" (kịch bản trung tính, được Bé Tiền tin tưởng nhất)
+- [ ] P90 → "☀️ Lạc quan" (kịch bản tốt nhất)
+- [ ] Mapping table `twin_label_mapping` với Vietnamese label, emoji, English fallback, internal P-code
+- [ ] Power user toggle in Settings: "Hiển thị thuật ngữ kỹ thuật (P10/P50/P90)" — OFF by default
+- [ ] Backend response/log vẫn dùng P10/P50/P90 (chỉ presentation layer thay)
+- [ ] Migration 4.3.01: tạo `twin_label_mapping` table
 
 ### Files Touched
-- `apps/twin_renderer/services/action_suggestion_service.py` (new)
-- `content/twin/action_suggestion.yaml` (new, ~30-50 templates)
-- `db/migrations/4.3.04_twin_action_suggestions.sql` (new)
+- `content/twin/twin_label_mapping.yaml` (new)
+- `apps/twin_renderer/label_resolver.py` (new)
+- `apps/twin_renderer/views/scenario_card.py` (modify)
+- `db/migrations/4.3.01_twin_label_mapping.sql` (new)
 
-### Claude Code Implementation Prompt
-```
-Implement Story 3.3 of Epic #672 (Phase 4.3):
-Action Suggestion Embedded in Twin Flow
-
-PR should close #[ISSUE_NUMBER]
-```
+### Definition of Done
+- [ ] All AC met
+- [ ] Tested on Telegram iOS + Android + Web
+- [ ] Content reviewer approved
+- [ ] PR closes #674
 
