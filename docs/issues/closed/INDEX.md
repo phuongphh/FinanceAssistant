@@ -399,8 +399,9 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #682 | Pre-Phase | [Story 3.4] Negative Delta Handling — Phase 4.3 | [pre-phase/issue-682.md](by-phase/pre-phase/issue-682.md) |
 | #683 | Pre-Phase | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [pre-phase/issue-683.md](by-phase/pre-phase/issue-683.md) |
 | #684 | Pre-Phase | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [pre-phase/issue-684.md](by-phase/pre-phase/issue-684.md) |
+| #685 | Pre-Phase | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [pre-phase/issue-685.md](by-phase/pre-phase/issue-685.md) |
 | #686 | Pre-Phase | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [pre-phase/issue-686.md](by-phase/pre-phase/issue-686.md) |
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
 
-**Total:** 397 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 380 Pre-Phase)
+**Total:** 398 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 381 Pre-Phase)
