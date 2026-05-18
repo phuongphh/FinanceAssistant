@@ -384,7 +384,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #659 | Pre-Phase | [Bug] 'Thêm mục tiêu' → Bé Tiền show goals report thay vì add goal | [pre-phase/issue-659.md](by-phase/pre-phase/issue-659.md) |
 | #660 | Pre-Phase | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [pre-phase/issue-660.md](by-phase/pre-phase/issue-660.md) |
 | #661 | Pre-Phase | [Improve] Expand expense keyword mapping for better NLU | [pre-phase/issue-661.md](by-phase/pre-phase/issue-661.md) |
+| #675 | Pre-Phase | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [pre-phase/issue-675.md](by-phase/pre-phase/issue-675.md) |
 | #676 | Pre-Phase | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [pre-phase/issue-676.md](by-phase/pre-phase/issue-676.md) |
 
-**Total:** 381 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 364 Pre-Phase)
+**Total:** 382 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 365 Pre-Phase)

@@ -38,7 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #672 | [Epic 3] Twin Habit Loop — Phase 4.3 | [issue-672.md](issue-672.md) |
 | #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
 | #674 | [Story 1.1] Rename P10/P50/P90 → Weather Vocabulary — Phase 4.3 | [issue-674.md](issue-674.md) |
-| #675 | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [issue-675.md](issue-675.md) |
 | #677 | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [issue-677.md](issue-677.md) |
 | #678 | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [issue-678.md](issue-678.md) |
 | #679 | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [issue-679.md](issue-679.md) |
@@ -52,4 +51,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
 | #688 | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [issue-688.md](issue-688.md) |
 
-**Total active:** 47
+**Total active:** 46
