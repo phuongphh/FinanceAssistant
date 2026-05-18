@@ -395,6 +395,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #679 | Pre-Phase | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [pre-phase/issue-679.md](by-phase/pre-phase/issue-679.md) |
 | #680 | Pre-Phase | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [pre-phase/issue-680.md](by-phase/pre-phase/issue-680.md) |
 | #681 | Pre-Phase | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [pre-phase/issue-681.md](by-phase/pre-phase/issue-681.md) |
+| #683 | Pre-Phase | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [pre-phase/issue-683.md](by-phase/pre-phase/issue-683.md) |
 
-**Total:** 391 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 374 Pre-Phase)
+**Total:** 392 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 375 Pre-Phase)
