@@ -33,6 +33,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
 
-**Total active:** 30
+**Total active:** 29
