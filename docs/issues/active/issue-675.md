@@ -4,7 +4,7 @@
 
 ## Story 1.2 — Life Outcome Translation via LLM
 
-**Parent Epic:** #670 | **Estimate:** 2 days | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Story 1.1
+**Parent Epic:** #670 | **Estimate:** 2 days | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Story 1.1 (#674)
 
 ### User Story
 > Là một mass affluent user, khi tôi thấy "5.2 tỷ năm 2030", con số đó không gợi cho tôi cảm xúc gì. Tôi muốn thấy "5.2 tỷ = đủ căn 2PN tại Q.7 + 1 tỷ tiết kiệm" để hình dung được tương lai.
@@ -26,11 +26,9 @@
 - `content/reference/vn_housing_price_q2_2026.yaml` (new)
 - `infra/cache/life_outcome_cache.py` (new)
 
-### Claude Code Implementation Prompt
-```
-Implement Story 1.2 of Epic #670 (Phase 4.3):
-Life Outcome Translation via LLM
-
-PR should close #[ISSUE_NUMBER]
-```
+### Definition of Done
+- [ ] All AC met
+- [ ] 50-sample audit passed
+- [ ] LLM cost within budget
+- [ ] PR closes #675
 
