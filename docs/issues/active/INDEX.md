@@ -33,7 +33,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #670 | [Epic 1] Twin Comprehension Foundation — Phase 4.3 | [issue-670.md](issue-670.md) |
 | #671 | [Epic 2] Twin Storytelling — Phase 4.3 | [issue-671.md](issue-671.md) |
 | #672 | [Epic 3] Twin Habit Loop — Phase 4.3 | [issue-672.md](issue-672.md) |
 | #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
@@ -50,4 +49,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
 | #688 | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [issue-688.md](issue-688.md) |
 
-**Total active:** 45
+**Total active:** 44
