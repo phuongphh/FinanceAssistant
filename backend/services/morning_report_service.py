@@ -220,6 +220,15 @@ async def send_morning_report(
         return True
 
     greeting = _build_greeting()
+    try:
+        from backend.twin.services.return_tease_service import briefing_prefix_for_user
+
+        twin_prefix = await briefing_prefix_for_user(db, user.id)
+    except Exception:
+        logger.exception("morning_report: failed to load Twin return tease prefix")
+        twin_prefix = None
+    if twin_prefix:
+        greeting = f"{greeting}\n\n{twin_prefix}"
 
     if chart_bytes is None:
         # Chart failed — send text-only fallback

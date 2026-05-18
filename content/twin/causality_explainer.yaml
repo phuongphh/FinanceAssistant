@@ -1,0 +1,16 @@
+headline:
+  positive:
+    - "Vì sao Twin nhích lên?"
+    - "Điều gì giúp Twin sáng hơn tuần này?"
+  stable:
+    - "Twin của anh ổn định tuần này"
+forward:
+  positive:
+    - "Nếu duy trì nhịp này, Bình thường {target_year} có thể đạt {amount}."
+    - "Giữ đều nhịp này, kịch bản ⛅ {target_year} có thể tiến tới {amount}."
+  negative:
+    - "Mình xem nhẹ nhàng 1 điểm chính để kéo Twin ổn lại nhé."
+zero_delta: "Twin của anh ổn định tuần này — chưa có thay đổi đủ lớn để phân tích."
+other_label: "Khác"
+buttons:
+  next_action: "Việc nên làm tiếp →"

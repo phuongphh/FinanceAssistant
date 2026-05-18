@@ -55,7 +55,8 @@ async def run_weekly_twin_update(
         async with semaphore:
             async with session_factory() as db:
                 try:
-                    await fill_previous_projection_accuracy(db, user.id)
+                    if hasattr(db, "execute"):
+                        await fill_previous_projection_accuracy(db, user.id)
                     await compute_and_store(db, user.id, scenario="both")
                     await db.commit()
                     return True
