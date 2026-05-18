@@ -18,8 +18,16 @@ Phase 4.2.5 admin dashboard có generic KPI (DAU/MAU/cost). Twin là USP nên x�
 - [ ] Operator có thể identify Twin engagement drop trong 1 ngày
 
 ### Stories
-- **4.1** Twin Engagement Funnel Section (0.75d, P0, depends on 3.1)
-- **4.2** Twin Loop Health Section (1d, P0, depends on 3.3, 3.6)
-- **4.3** Twin Comprehension Signals Section (0.5d, P1, depends on 1.1, 1.2)
-- **4.4** Twin Delta Distribution Section (0.75d, P0, depends on 3.5)
+| # | Title | Issue | Estimate | Depends |
+|---|-------|-------|----------|---------|
+| 4.1 | Twin Engagement Funnel Section | [#685](https://github.com/phuongphh/FinanceAssistant/issues/685) | 0.75d | #679 |
+| 4.2 | Twin Loop Health Section | [#686](https://github.com/phuongphh/FinanceAssistant/issues/686) | 1d | #681, #684 |
+| 4.3 | Twin Comprehension Signals Section | [#687](https://github.com/phuongphh/FinanceAssistant/issues/687) | 0.5d (P1) | #674, #675 |
+| 4.4 | Twin Delta Distribution Section | [#688](https://github.com/phuongphh/FinanceAssistant/issues/688) | 0.75d | #683 |
+
+### Claude Code Prompt
+```
+Implement Epic 4 (Phase 4.3) — all 4 stories (#685–#688).
+Branch: phase-4.3/epic-4-twin-admin-dashboard
+```
 
