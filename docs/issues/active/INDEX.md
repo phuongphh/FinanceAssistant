@@ -39,5 +39,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
 | #675 | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [issue-675.md](issue-675.md) |
 | #676 | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [issue-676.md](issue-676.md) |
+| #677 | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [issue-677.md](issue-677.md) |
 
-**Total active:** 35
+**Total active:** 36
