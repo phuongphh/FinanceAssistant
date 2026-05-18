@@ -42,6 +42,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #677 | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [issue-677.md](issue-677.md) |
 | #678 | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [issue-678.md](issue-678.md) |
 | #679 | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [issue-679.md](issue-679.md) |
+| #680 | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [issue-680.md](issue-680.md) |
 | #681 | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [issue-681.md](issue-681.md) |
 
-**Total active:** 39
+**Total active:** 40
