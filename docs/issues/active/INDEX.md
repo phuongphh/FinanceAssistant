@@ -35,7 +35,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #672 | [Epic 3] Twin Habit Loop — Phase 4.3 | [issue-672.md](issue-672.md) |
 | #673 | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [issue-673.md](issue-673.md) |
-| #677 | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [issue-677.md](issue-677.md) |
 | #679 | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [issue-679.md](issue-679.md) |
 | #680 | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [issue-680.md](issue-680.md) |
 | #681 | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [issue-681.md](issue-681.md) |
@@ -47,4 +46,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #687 | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [issue-687.md](issue-687.md) |
 | #688 | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [issue-688.md](issue-688.md) |
 
-**Total active:** 42
+**Total active:** 41
