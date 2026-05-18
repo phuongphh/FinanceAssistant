@@ -391,6 +391,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #676 | Pre-Phase | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [pre-phase/issue-676.md](by-phase/pre-phase/issue-676.md) |
 | #677 | Pre-Phase | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [pre-phase/issue-677.md](by-phase/pre-phase/issue-677.md) |
 | #678 | Pre-Phase | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [pre-phase/issue-678.md](by-phase/pre-phase/issue-678.md) |
+| #679 | Pre-Phase | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [pre-phase/issue-679.md](by-phase/pre-phase/issue-679.md) |
 
-**Total:** 387 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 370 Pre-Phase)
+**Total:** 388 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 371 Pre-Phase)
