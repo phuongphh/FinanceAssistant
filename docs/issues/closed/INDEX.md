@@ -387,6 +387,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #670 | Pre-Phase | [Epic 1] Twin Comprehension Foundation — Phase 4.3 | [pre-phase/issue-670.md](by-phase/pre-phase/issue-670.md) |
 | #671 | Pre-Phase | [Epic 2] Twin Storytelling — Phase 4.3 | [pre-phase/issue-671.md](by-phase/pre-phase/issue-671.md) |
 | #672 | Pre-Phase | [Epic 3] Twin Habit Loop — Phase 4.3 | [pre-phase/issue-672.md](by-phase/pre-phase/issue-672.md) |
+| #673 | Pre-Phase | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [pre-phase/issue-673.md](by-phase/pre-phase/issue-673.md) |
 | #674 | Pre-Phase | [Story 1.1] Rename P10/P50/P90 → Weather Vocabulary — Phase 4.3 | [pre-phase/issue-674.md](by-phase/pre-phase/issue-674.md) |
 | #675 | Pre-Phase | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [pre-phase/issue-675.md](by-phase/pre-phase/issue-675.md) |
 | #676 | Pre-Phase | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [pre-phase/issue-676.md](by-phase/pre-phase/issue-676.md) |
@@ -400,5 +401,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #684 | Pre-Phase | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [pre-phase/issue-684.md](by-phase/pre-phase/issue-684.md) |
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
 
-**Total:** 395 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 378 Pre-Phase)
+**Total:** 396 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 379 Pre-Phase)
