@@ -4,7 +4,7 @@
 
 ## Story 2.1 — Bé Tiền Mascot Personification (3 Versions)
 
-**Parent Epic:** #671 | **Estimate:** 1.5 days | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Story 1.1
+**Parent Epic:** #671 | **Estimate:** 1.5 days | **Priority:** P0 | **Surface:** Telegram | **Depends on:** Story 1.1 (#674)
 
 ### User Story
 > Là một mass affluent user, khi tôi nhìn 3 kịch bản tương lai, tôi muốn thấy Bé Tiền mascot phản ánh trạng thái của mỗi kịch bản — để tôi có visual cue cảm xúc, không chỉ con số.
@@ -23,11 +23,9 @@
 - `assets/mascot/betien_2030_p10_v1.png`, `_p50_v1.png`, `_p90_v1.png` (new)
 - `apps/twin_renderer/views/scenario_card.py` (modify)
 
-### Claude Code Implementation Prompt
-```
-Implement Story 2.1 of Epic #671 (Phase 4.3):
-Bé Tiền Mascot Personification (3 Versions)
-
-PR should close #[ISSUE_NUMBER]
-```
+### Definition of Done
+- [ ] All AC met
+- [ ] Founder + reviewer approved mascot images
+- [ ] Tested on Telegram iOS + Android + Web
+- [ ] PR closes #677
 
