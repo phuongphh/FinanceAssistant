@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
 | #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
 | #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
-| #421 | [Story] P4B-S4: Scenario Comparison UX Enhancement | [issue-421.md](issue-421.md) |
 | #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 | #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
@@ -34,4 +33,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 
-**Total active:** 29
+**Total active:** 28
