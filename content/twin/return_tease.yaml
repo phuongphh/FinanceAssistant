@@ -1,0 +1,14 @@
+confirmation_variants:
+  - "Xong rồi anh 💚 Bé Tiền đã ghi nhận việc này cho Twin."
+  - "Đã lưu lại nhé. Twin sẽ dùng tín hiệu này trong lần cập nhật tới."
+  - "Ổn rồi anh — một bước nhỏ nhưng có tác động thật."
+tease_variants:
+  - "Sáng mai check lại xem Twin nhích thế nào nhé 💚"
+  - "Bé Tiền sẽ nhắc nhẹ trong briefing sáng mai."
+  - "Mai mình xem Twin phản ứng ra sao nhé."
+  - "Sáng mai mở lại Twin là có ý nghĩa đó anh."
+  - "Bé Tiền sẽ theo dõi mục tiêu này tới briefing kế tiếp."
+  - "Mai mình xem kết quả sau quyết định hôm nay nhé."
+  - "Tối nay Twin cập nhật, sáng mai mình xem nhẹ nhàng."
+continuation_prompt: "Trong khi chờ — anh muốn ghi nhận khoản tiết kiệm/chi tiêu nào khác không?"
+briefing_prefix: "Hôm qua anh đã đặt mục tiêu {action}. Twin đã cập nhật — đây là kết quả mới."

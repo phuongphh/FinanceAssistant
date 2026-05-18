@@ -1,0 +1,15 @@
+headline_variants:
+  - "🌧️ Twin Mưa Cuối Tuần"
+  - "🌧️ Twin hơi trầm xuống một chút"
+  - "🌧️ Bé Tiền thấy một điểm cần xem nhẹ nhàng"
+body_variants:
+  - "Tuần này Twin của anh nhích xuống một chút. Lý do chính: {factor}."
+  - "Twin giảm nhẹ chủ yếu vì {factor}. Mình xử lý từng bước, không cần vội."
+  - "Có một biến động nhỏ làm Twin thấp hơn: {factor}. Bé Tiền gợi ý bước kiểm tra nhanh."
+forbidden_words:
+  - "lỗi"
+  - "sai"
+  - "không nên"
+  - "đáng tiếc"
+frequency_cap_days: 7
+pause_after_dismissals_days: 14

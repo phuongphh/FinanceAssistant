@@ -37,11 +37,12 @@ async def get_twin_snapshot(db: AsyncSession, user_id: uuid.UUID) -> TwinSnapsho
     projection = await get_latest_projection(db, user_id, scenario=SCENARIO_CURRENT)
     actual_breakdown = await wealth_service.calculate_stored_current(db, user_id)
     actual = actual_breakdown.total
+    by_type = getattr(actual_breakdown, "by_type", {})
     if projection is None:
         return TwinSnapshot(
             latest_cone=None,
             actual_nw=actual,
-            actual_breakdown=actual_breakdown.by_type,
+            actual_breakdown=by_type,
             delta_vs_p50=None,
             cone_age_days=None,
             is_stale=True,
@@ -59,7 +60,7 @@ async def get_twin_snapshot(db: AsyncSession, user_id: uuid.UUID) -> TwinSnapsho
     return TwinSnapshot(
         latest_cone=projection.cone_data,
         actual_nw=actual,
-        actual_breakdown=actual_breakdown.by_type,
+        actual_breakdown=by_type,
         delta_vs_p50=None if reference_p50 is None else actual - reference_p50,
         cone_age_days=age_days,
         is_stale=age_days > STALE_AFTER_DAYS,

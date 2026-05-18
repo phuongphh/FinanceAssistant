@@ -1,0 +1,246 @@
+fallback:
+  title: "Giữ nhịp tuần này"
+  description: "Ghi nhận một khoản tiết kiệm hoặc cập nhật mục tiêu gần nhất."
+  time_estimate_minutes: 3
+  deep_link: "betien://twin/action/quick-update"
+suggestions:
+  - state_segment: starter
+    delta_direction: positive
+    has_goal: true
+    type: positive_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/progress"
+  - state_segment: starter
+    delta_direction: positive
+    has_goal: false
+    type: positive_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/create"
+  - state_segment: starter
+    delta_direction: negative
+    has_goal: true
+    type: negative_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: starter
+    delta_direction: negative
+    has_goal: false
+    type: negative_no_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: starter
+    delta_direction: stable
+    has_goal: true
+    type: stable_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/progress"
+  - state_segment: starter
+    delta_direction: stable
+    has_goal: false
+    type: stable_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/create"
+  - state_segment: young_pro
+    delta_direction: positive
+    has_goal: true
+    type: positive_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/progress"
+  - state_segment: young_pro
+    delta_direction: positive
+    has_goal: false
+    type: positive_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/create"
+  - state_segment: young_pro
+    delta_direction: negative
+    has_goal: true
+    type: negative_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: young_pro
+    delta_direction: negative
+    has_goal: false
+    type: negative_no_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: young_pro
+    delta_direction: stable
+    has_goal: true
+    type: stable_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/progress"
+  - state_segment: young_pro
+    delta_direction: stable
+    has_goal: false
+    type: stable_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/create"
+  - state_segment: mass_affluent
+    delta_direction: positive
+    has_goal: true
+    type: positive_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/progress"
+  - state_segment: mass_affluent
+    delta_direction: positive
+    has_goal: false
+    type: positive_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/create"
+  - state_segment: mass_affluent
+    delta_direction: negative
+    has_goal: true
+    type: negative_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: mass_affluent
+    delta_direction: negative
+    has_goal: false
+    type: negative_no_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: mass_affluent
+    delta_direction: stable
+    has_goal: true
+    type: stable_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/progress"
+  - state_segment: mass_affluent
+    delta_direction: stable
+    has_goal: false
+    type: stable_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/create"
+  - state_segment: hnw
+    delta_direction: positive
+    has_goal: true
+    type: positive_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/progress"
+  - state_segment: hnw
+    delta_direction: positive
+    has_goal: false
+    type: positive_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/create"
+  - state_segment: hnw
+    delta_direction: negative
+    has_goal: true
+    type: negative_goal
+    title: "Review biến động danh mục lớn nhất"
+    description: "Xem tài sản nào làm Twin giảm và đánh dấu để theo dõi tuần này."
+    time_estimate_minutes: 5
+    deep_link: "betien://portfolio/review-drift"
+  - state_segment: hnw
+    delta_direction: negative
+    has_goal: false
+    type: negative_no_goal
+    title: "Review biến động danh mục lớn nhất"
+    description: "Xem tài sản nào làm Twin giảm và đánh dấu để theo dõi tuần này."
+    time_estimate_minutes: 5
+    deep_link: "betien://portfolio/review-drift"
+  - state_segment: hnw
+    delta_direction: stable
+    has_goal: true
+    type: stable_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/progress"
+  - state_segment: hnw
+    delta_direction: stable
+    has_goal: false
+    type: stable_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/create"
+  - state_segment: default
+    delta_direction: positive
+    has_goal: true
+    type: positive_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/progress"
+  - state_segment: default
+    delta_direction: positive
+    has_goal: false
+    type: positive_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 5
+    deep_link: "betien://goals/create"
+  - state_segment: default
+    delta_direction: negative
+    has_goal: true
+    type: negative_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: default
+    delta_direction: negative
+    has_goal: false
+    type: negative_no_goal
+    title: "Review 3 khoản chi lớn nhất tháng"
+    description: "Mở lại 3 khoản chi lớn để kiểm tra khoản nào cần điều chỉnh nhẹ."
+    time_estimate_minutes: 5
+    deep_link: "betien://expense/review-top3"
+  - state_segment: default
+    delta_direction: stable
+    has_goal: true
+    type: stable_goal
+    title: "Cập nhật tiến độ mục tiêu"
+    description: "Thêm một mốc tiến độ nhỏ để Twin tính lại đường đi tới mục tiêu."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/progress"
+  - state_segment: default
+    delta_direction: stable
+    has_goal: false
+    type: stable_no_goal
+    title: "Đặt một mục tiêu 5 phút"
+    description: "Chọn một mục tiêu gần nhất để Bé Tiền đo Twin theo hướng rõ hơn."
+    time_estimate_minutes: 2
+    deep_link: "betien://goals/create"

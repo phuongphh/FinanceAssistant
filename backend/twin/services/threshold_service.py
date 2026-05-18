@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Mapping
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models.twin_habit_loop import TwinDeltaThresholdConfig
+
+
+@dataclass(frozen=True, slots=True)
+class ThresholdConfig:
+    wealth_segment: str
+    positive_pct: Decimal
+    positive_absolute_vnd: Decimal
+    negative_pct: Decimal
+    negative_absolute_vnd: Decimal
+
+
+DEFAULT_THRESHOLDS: dict[str, ThresholdConfig] = {
+    "starter": ThresholdConfig("starter", Decimal("1.0"), Decimal("1000000"), Decimal("1.0"), Decimal("1000000")),
+    "young_pro": ThresholdConfig("young_pro", Decimal("1.0"), Decimal("3000000"), Decimal("1.0"), Decimal("3000000")),
+    "mass_affluent": ThresholdConfig("mass_affluent", Decimal("1.0"), Decimal("10000000"), Decimal("1.0"), Decimal("10000000")),
+    "hnw": ThresholdConfig("hnw", Decimal("0.5"), Decimal("50000000"), Decimal("0.5"), Decimal("50000000")),
+}
+
+
+def normalize_segment(segment: str | None) -> str:
+    if not segment:
+        return "mass_affluent"
+    return segment if segment in DEFAULT_THRESHOLDS else "mass_affluent"
+
+
+def is_noticeable(
+    user_segment: str | None,
+    delta_pct: Decimal | int | float,
+    delta_absolute_vnd: Decimal | int | float,
+    *,
+    config: ThresholdConfig | None = None,
+) -> bool:
+    """Return true when pct OR absolute delta reaches the inclusive segment threshold."""
+    segment = normalize_segment(user_segment)
+    cfg = config or DEFAULT_THRESHOLDS[segment]
+    pct = abs(Decimal(str(delta_pct)))
+    absolute = abs(Decimal(str(delta_absolute_vnd)))
+    is_negative = Decimal(str(delta_absolute_vnd)) < 0 or Decimal(str(delta_pct)) < 0
+    pct_threshold = cfg.negative_pct if is_negative else cfg.positive_pct
+    absolute_threshold = cfg.negative_absolute_vnd if is_negative else cfg.positive_absolute_vnd
+    return pct >= pct_threshold or absolute >= absolute_threshold
+
+
+async def get_threshold_config(db: AsyncSession, segment: str | None) -> ThresholdConfig:
+    normalized = normalize_segment(segment)
+    result = await db.execute(
+        select(TwinDeltaThresholdConfig).where(
+            TwinDeltaThresholdConfig.wealth_segment == normalized
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return DEFAULT_THRESHOLDS[normalized]
+    return ThresholdConfig(
+        wealth_segment=row.wealth_segment,
+        positive_pct=row.positive_threshold_pct,
+        positive_absolute_vnd=row.positive_threshold_absolute_vnd,
+        negative_pct=row.negative_threshold_pct,
+        negative_absolute_vnd=row.negative_threshold_absolute_vnd,
+    )
+
+
+async def tune_threshold(
+    db: AsyncSession,
+    segment: str,
+    pct: Decimal | int | float,
+    absolute_vnd: Decimal | int | float,
+    *,
+    updated_by: str = "operator",
+    negative_pct: Decimal | int | float | None = None,
+    negative_absolute_vnd: Decimal | int | float | None = None,
+) -> ThresholdConfig:
+    normalized = normalize_segment(segment)
+    cfg = await db.get(TwinDeltaThresholdConfig, normalized)
+    if cfg is None:
+        cfg = TwinDeltaThresholdConfig(wealth_segment=normalized)
+        db.add(cfg)
+    cfg.positive_threshold_pct = Decimal(str(pct))
+    cfg.positive_threshold_absolute_vnd = Decimal(str(absolute_vnd))
+    cfg.negative_threshold_pct = Decimal(str(negative_pct if negative_pct is not None else pct))
+    cfg.negative_threshold_absolute_vnd = Decimal(str(negative_absolute_vnd if negative_absolute_vnd is not None else absolute_vnd))
+    cfg.updated_by = updated_by
+    await db.flush()
+    return ThresholdConfig(
+        normalized,
+        cfg.positive_threshold_pct,
+        cfg.positive_threshold_absolute_vnd,
+        cfg.negative_threshold_pct,
+        cfg.negative_threshold_absolute_vnd,
+    )
+
+
+def histogram_overlay_config() -> Mapping[str, ThresholdConfig]:
+    """Small read model for the Epic 4 dashboard histogram overlay."""
+    return DEFAULT_THRESHOLDS
