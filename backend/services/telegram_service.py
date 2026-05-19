@@ -157,6 +157,12 @@ async def send_telegram(method: str, payload: dict) -> dict | None:
     if resp.status_code == 200:
         return resp.json()
 
+    if resp.status_code == 400 and "message is not modified" in resp.text:
+        # Benign no-op: user re-tapped a callback that re-renders identical
+        # text+markup. Return the original response so callers that rely on
+        # a non-None return (menu fallback path) don't resend a duplicate.
+        return resp.json()
+
     if (
         resp.status_code == 400
         and "can't parse entities" in resp.text
