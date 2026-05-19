@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.models.expense import Expense
+from backend.models.transaction import Transaction
 from backend.wealth.models.asset import Asset
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 
@@ -238,6 +239,31 @@ async def resolve_source_asset_for_payload(
     )
 
 
+
+
+def _source_label(source_type: str | None) -> str:
+    return {"cash": "Tiền mặt", "bank_account": "Tài khoản", "e_wallet": "Ví điện tử"}.get(source_type or "", "Nguồn khác")
+
+
+async def _create_transaction_record(db: AsyncSession, user_id: uuid.UUID, expense: Expense, *, status: str = "active", original_transaction_id: uuid.UUID | None = None, edited_at: datetime | None = None, reversed_at: datetime | None = None) -> Transaction:
+    tx = Transaction(
+        user_id=user_id,
+        source_asset_id=expense.source_asset_id,
+        source_type=expense.source_type or "expense_category",
+        source_label=_source_label(expense.source_type),
+        amount=int(Decimal(str(expense.amount or 0))),
+        direction="inflow" if expense.transaction_type == TRANSACTION_TYPE_MONEY_IN else "outflow",
+        note=expense.note or expense.merchant,
+        category=expense.category,
+        status=status,
+        expense_id=expense.id,
+        original_transaction_id=original_transaction_id,
+        edited_at=edited_at,
+        reversed_at=reversed_at,
+    )
+    db.add(tx)
+    await db.flush()
+    return tx
 async def create_expense(
     db: AsyncSession, user_id: uuid.UUID, data: ExpenseCreate
 ) -> Expense:
@@ -347,6 +373,7 @@ async def create_expense(
                 properties={"streak": result.current},
             )
 
+    await _create_transaction_record(db, user_id, expense)
     return expense
 
 
@@ -452,6 +479,13 @@ async def update_expense(
         expense.month_key = expense.expense_date.strftime("%Y-%m")
     await db.flush()
     await _adjust_source_asset(db, expense, multiplier=1)
+
+    existing_tx = await _latest_active_transaction(db, expense.id)
+    if existing_tx and existing_tx.status == "active":
+        existing_tx.status = "edited"
+        existing_tx.edited_at = datetime.utcnow()
+    await _create_transaction_record(db, user_id, expense, original_transaction_id=(existing_tx.id if existing_tx else None), edited_at=datetime.utcnow())
+
     await db.refresh(expense)
     return expense
 
@@ -464,6 +498,10 @@ async def delete_expense(
         return False
     expense.deleted_at = datetime.utcnow()
     await _adjust_source_asset(db, expense, multiplier=-1)
+    active_tx = await _latest_active_transaction(db, expense.id)
+    if active_tx:
+        active_tx.status = "reversed"
+        active_tx.reversed_at = datetime.utcnow()
     await db.flush()
     analytics.track(
         analytics.EventType.TRANSACTION_DELETED,
