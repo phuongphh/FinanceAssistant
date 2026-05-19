@@ -105,11 +105,17 @@ class ActionDeleteAssetHandler(IntentHandler):
                     db, chat_id, user, str(matches[0].id)
                 )
                 return ""
-            if len(matches) > 1 and asset_type:
-                await asset_entry_handlers.show_asset_delete_list(
-                    db, chat_id, user, asset_type, subtype=asset_subtype
-                )
-                return ""
+            if len(matches) > 1:
+                inferred_asset_type = asset_type
+                if inferred_asset_type is None:
+                    match_types = {str(a.asset_type) for a in matches}
+                    if len(match_types) == 1:
+                        inferred_asset_type = match_types.pop()
+                if inferred_asset_type:
+                    await asset_entry_handlers.show_asset_delete_list(
+                        db, chat_id, user, inferred_asset_type, subtype=asset_subtype
+                    )
+                    return ""
 
         if asset_type:
             await asset_entry_handlers.show_asset_delete_list(
