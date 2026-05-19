@@ -406,7 +406,6 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
 | #706 | Pre-Phase | Stock market data: VNDIRECT 403 (missing User-Agent), SSI 502 | [pre-phase/issue-706.md](by-phase/pre-phase/issue-706.md) |
 | #711 | Pre-Phase | Delete asset: multiple matches with no asset_type shows wrong screen | [pre-phase/issue-711.md](by-phase/pre-phase/issue-711.md) |
-| #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
 
-**Total:** 403 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 386 Pre-Phase)
+**Total:** 402 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 385 Pre-Phase)
