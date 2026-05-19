@@ -576,6 +576,8 @@ async def show_asset_edit_list(
         await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
         _dashboard_sort_for_user(user),
     )
+    if subtype:
+        assets = [a for a in assets if str(getattr(a, "subtype", "")) == subtype]
     label = get_label(asset_type)
     if not assets:
         await send_message(
@@ -632,17 +634,21 @@ async def show_asset_delete_list(
     *,
     page: int = 0,
     message_id: int | None = None,
+    subtype: str | None = None,
 ) -> None:
     """List only active assets of one type for deletion."""
     assets = _sort_assets_for_dashboard(
         await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
         _dashboard_sort_for_user(user),
     )
+    if subtype:
+        assets = [a for a in assets if str(getattr(a, "subtype", "")) == subtype]
     label = get_label(asset_type)
     if not assets:
+        subtype_note = " quỹ" if subtype == "fund" else ""
         await send_message(
             chat_id=chat_id,
-            text=f"Không có tài sản loại {label}.",
+            text=f"Không có tài sản {label}{subtype_note}.",
             parse_mode="HTML",
             reply_markup=asset_delete_type_keyboard(),
         )

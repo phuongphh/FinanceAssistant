@@ -85,6 +85,15 @@ def test_crypto_my_assets_extracts_crypto_filter(classifier):
     assert result.parameters["asset_type"] == "crypto"
 
 
+def test_delete_asset_fund_extracts_subtype(classifier):
+    result = classifier.classify("xóa tài sản quỹ")
+
+    assert result is not None
+    assert result.intent == IntentType.ACTION_DELETE_ASSET
+    assert result.parameters["asset_type"] == "stock"
+    assert result.parameters["asset_subtype"] == "fund"
+
+
 # ---------------------- correctness invariants ----------------------
 
 

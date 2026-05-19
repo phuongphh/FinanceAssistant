@@ -13,7 +13,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.adapters.telegram_service import send_message
+from backend.services.telegram_service import send_message
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.miniapp.urls import expense_dashboard_url
