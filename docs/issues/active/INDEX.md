@@ -38,5 +38,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
 | #723 | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [issue-723.md](issue-723.md) |
 | #725 | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [issue-725.md](issue-725.md) |
+| #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 
-**Total active:** 34
+**Total active:** 35
