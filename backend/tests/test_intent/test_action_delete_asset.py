@@ -30,6 +30,7 @@ def delete_handler_module():
     fake_asset_entry.show_asset_delete_list = AsyncMock()
     fake_asset_entry.show_asset_delete_type_picker = AsyncMock()
     fake_asset_entry._confirm_asset_delete = AsyncMock()
+    fake_asset_entry.show_asset_delete_matches_list = AsyncMock()
 
     with patch.dict(sys.modules, {"backend.bot.handlers.asset_entry": fake_asset_entry}):
         mod = importlib.import_module("backend.intent.handlers.action_delete_asset")
@@ -201,7 +202,8 @@ async def test_delete_asset_multi_matches_without_type_infers_and_shows_list(del
         out = await delete_handler_module.ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
 
     assert out == ""
-    delete_handler_module.asset_entry_handlers.show_asset_delete_list.assert_awaited_once()
-    _, _, _, asset_type = delete_handler_module.asset_entry_handlers.show_asset_delete_list.await_args.args
-    assert asset_type == "stock"
+    delete_handler_module.asset_entry_handlers.show_asset_delete_matches_list.assert_awaited_once()
+    called_chat_id, called_matches = delete_handler_module.asset_entry_handlers.show_asset_delete_matches_list.await_args.args
+    assert called_chat_id == 12345
+    assert [m.id for m in called_matches] == [m1.id, m2.id]
     delete_handler_module.asset_entry_handlers.show_asset_delete_type_picker.assert_not_called()
