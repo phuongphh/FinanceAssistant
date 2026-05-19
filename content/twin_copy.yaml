@@ -42,6 +42,29 @@ chart:
   y_label: "Giá trị tài sản"
   watermark: "Bé Tiền — dự phóng xác suất, không phải lời hứa"
 
+habit_loop:
+  # Two-button reward+trust loop attached under every Twin view.
+  # ``twin:causality`` opens the "Vì sao Twin thay đổi?" explanation
+  # (trust loop); ``twin:action`` surfaces the next small step
+  # (action loop closure).
+  prompt: "Bé Tiền có thể giải thích vì sao Twin trông như vậy, hoặc gợi ý một bước nhỏ tiếp theo nhé."
+  button_causality: "🧭 Vì sao Twin thay đổi?"
+  button_action: "✨ Việc nên làm tiếp →"
+  # Push sent from on-demand recompute after a noticeable Twin change.
+  # ``direction_up`` / ``direction_down`` are inlined into ``push_text``
+  # so the punctuation/spacing stays consistent across both signs.
+  push_direction_up: "nhích lên"
+  push_direction_down: "nhích xuống"
+  push_text: "🔮 Twin vừa {direction} {pct}%. Bấm '{causality}' để xem chi tiết."
+  # First-time Twin preamble: a single warm orientation line sent BEFORE
+  # the chart on the user's first ever Twin view (or once per 30 days
+  # — see ``RESHOW_AFTER_DAYS``). Keeps the carousel-style screens of
+  # the Mini App out of Telegram while still giving the chart context.
+  first_time_intro: |-
+    🌱 Đây là Bé Tiền tương lai của bạn.
+
+    Mình mô phỏng 1.000 kịch bản và vẽ vùng từ khiêm tốn → lạc quan để bạn hình dung. Không phải lời hứa — chỉ là một bức tranh để cùng nhau lái tới.
+
 recompute:
   done: "🔮 Bé Tiền vừa cập nhật xong dự phóng tương lai cho bạn. Mở Twin để xem nhé!"
 
@@ -71,6 +94,7 @@ briefing:
   ahead: "🚀 Twin: tài sản đang cao hơn đường bình thường khoảng {delta_pct}% — nhịp này ổn đó."
   on_track: "🎯 Twin: bạn đang đi khá sát đường bình thường — cứ đều tay nhé."
   behind: "🌱 Twin: đang thấp hơn đường bình thường khoảng {delta_pct}%, không sao — mình đi chậm mà chắc."
+  open_twin_button: "🔮 Mở Twin →"
   accuracy_neutral: "📊 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} ({error_pct}%)."
   accuracy_celebrate: "🎉 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} — bạn vượt kỳ vọng rồi!"
   accuracy_reassure: "💪 Tuần trước dự báo P50 = {predicted}, thực tế = {actual} — chưa sao, mình điều chỉnh dần nhé."

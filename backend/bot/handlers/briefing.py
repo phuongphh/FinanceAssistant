@@ -31,6 +31,7 @@ from backend import analytics
 from backend.bot.keyboards.briefing_keyboard import (
     BRIEFING_ACTION_ADD_ASSET,
     BRIEFING_ACTION_DASHBOARD,
+    BRIEFING_ACTION_OPEN_TWIN,
     BRIEFING_ACTION_SETTINGS,
     BRIEFING_ACTION_STORY,
     CB_BRIEFING,
@@ -52,6 +53,7 @@ _ACTION_TO_EVENT = {
     BRIEFING_ACTION_STORY: analytics.EventType.BRIEFING_STORY_CLICKED,
     BRIEFING_ACTION_ADD_ASSET: analytics.EventType.BRIEFING_ADD_ASSET_CLICKED,
     BRIEFING_ACTION_SETTINGS: analytics.EventType.BRIEFING_SETTINGS_CLICKED,
+    BRIEFING_ACTION_OPEN_TWIN: analytics.EventType.BRIEFING_OPEN_TWIN_CLICKED,
 }
 
 # User-facing text per action — kept short, follows tone guide. The
@@ -163,6 +165,15 @@ async def handle_briefing_callback(
     event_type = _ACTION_TO_EVENT.get(action)
     if event_type:
         analytics.track(event_type, user_id=user.id)
+
+    if action == BRIEFING_ACTION_OPEN_TWIN:
+        # Trigger moment of the Twin habit loop: briefing → Twin view.
+        # Local import keeps the import graph free of cycles between
+        # briefing and twin handlers.
+        from backend.bot.handlers.twin_handler import send_twin_current
+
+        await send_twin_current(db, chat_id=chat_id, user=user)
+        return True
 
     if action == BRIEFING_ACTION_ADD_ASSET:
         # Forward into the asset wizard. Local import so a circular

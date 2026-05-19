@@ -41,7 +41,9 @@ async def send_morning_briefing_now(
         chat_id=chat_id,
         text=result.text,
         parse_mode=None,
-        reply_markup=briefing_actions_keyboard(),
+        reply_markup=briefing_actions_keyboard(
+            include_twin=bool(result.sections.get("twin"))
+        ),
         **message_kwargs_for_animation(result.text, "briefing"),
     )
     if response is None:
