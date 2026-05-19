@@ -25,7 +25,7 @@ def life_events_menu_keyboard() -> dict:
             [{"text": "📋 Xem danh sách", "callback_data": build_callback(CB_LIFE_EVENT, "list")}],
             [{"text": "➕ Thêm mốc", "callback_data": build_callback(CB_LIFE_EVENT, "add")}],
             [{"text": "🗑 Xóa mốc", "callback_data": build_callback(CB_LIFE_EVENT, "delete_menu")}],
-            [{"text": "◀️ Quay về", "callback_data": "menu:main"}],
+            [{"text": "◀️ Quay về Twin", "callback_data": "menu:twin"}],
         ]
     }
 
