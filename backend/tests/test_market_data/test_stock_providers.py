@@ -73,3 +73,55 @@ async def test_dispatcher_falls_back_to_vndirect_when_ssi_fails():
 
     assert quote.source == "vndirect"
     assert quote.price == Decimal("88000")
+
+
+@pytest.mark.asyncio
+async def test_ssi_default_client_sets_browser_user_agent(monkeypatch):
+    captured = {}
+
+    class _FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path, params=None):
+            request = httpx.Request("GET", f"https://example.test{path}")
+            return httpx.Response(200, json={"data": [{"stockSymbol": "VNM", "matchedPrice": 86.4}]}, request=request)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    quote = await SSIStockProvider(base_url="https://example.test").fetch_quote("VNM")
+
+    assert quote.symbol == "VNM"
+    assert "Mozilla" in captured["headers"]["User-Agent"]
+
+
+@pytest.mark.asyncio
+async def test_vndirect_default_client_sets_browser_user_agent(monkeypatch):
+    captured = {}
+
+    class _FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path, params=None):
+            request = httpx.Request("GET", f"https://example.test{path}")
+            return httpx.Response(200, json={"data": [{"code": "FPT", "close": 123.5}]}, request=request)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    quote = await VNDIRECTStockProvider(base_url="https://example.test").fetch_quote("FPT")
+
+    assert quote.symbol == "FPT"
+    assert "Mozilla" in captured["headers"]["User-Agent"]
