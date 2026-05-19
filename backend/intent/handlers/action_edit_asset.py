@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.adapters.telegram_service import send_message
+from backend.services.telegram_service import send_message
 from backend.bot.formatters.money import format_money_short
 from backend.bot.handlers import asset_entry as asset_entry_handlers
 from backend.intent.extractors._normalize import strip_diacritics
