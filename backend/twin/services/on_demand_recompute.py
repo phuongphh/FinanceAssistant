@@ -87,7 +87,12 @@ async def _debounced_process(user_id: uuid.UUID) -> None:
 
 async def process_pending(pending: PendingRecompute) -> TwinRecomputeLog | None:
     if pending.user_id in _locks:
+        # Another recompute is in flight. Re-queue and schedule a fresh debounce
+        # so we don't rely on a future event to drain `_pending`.
         _pending[pending.user_id] = pending
+        task = asyncio.create_task(_debounced_process(pending.user_id))
+        _tasks.add(task)
+        task.add_done_callback(_tasks.discard)
         return None
     _locks.add(pending.user_id)
     try:
