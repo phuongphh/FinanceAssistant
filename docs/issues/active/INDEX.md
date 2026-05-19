@@ -42,5 +42,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #727 | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [issue-727.md](issue-727.md) |
 | #728 | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [issue-728.md](issue-728.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
+| #730 | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [issue-730.md](issue-730.md) |
 
-**Total active:** 38
+**Total active:** 39
