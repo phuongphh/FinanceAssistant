@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import random
 import anthropic
 import requests
 
@@ -50,15 +51,38 @@ anywhere except on the final VERDICT line. If a check raised a concern but
 your re-evaluation cleared it, that is a PASS.
 """
 
-def request_review_with_retry(max_attempts: int = 5):
-    """Call Anthropic with retry for transient overloaded errors (HTTP 529)."""
-    delay_seconds = 2
+DEFAULT_MAX_ATTEMPTS = int(os.environ.get("CODE_REVIEW_MAX_ATTEMPTS", "5"))
+DEFAULT_BASE_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_BASE_DELAY_SECONDS", "1.0"))
+DEFAULT_MAX_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_MAX_DELAY_SECONDS", "8.0"))
+DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CODE_REVIEW_REQUEST_TIMEOUT_SECONDS", "30"))
+
+
+def _is_retryable_error(error: Exception) -> bool:
+    """Retry only transient upstream/service transport failures."""
+    return isinstance(
+        error,
+        (
+            anthropic.OverloadedError,
+            anthropic.RateLimitError,
+            anthropic.APIConnectionError,
+            anthropic.APITimeoutError,
+        ),
+    )
+
+
+def request_review_with_retry(
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    base_delay_seconds: float = DEFAULT_BASE_DELAY_SECONDS,
+    max_delay_seconds: float = DEFAULT_MAX_DELAY_SECONDS,
+):
+    """Call Anthropic with bounded exponential backoff + jitter."""
     for attempt in range(1, max_attempts + 1):
         try:
             return client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1500,
                 temperature=0,
+                timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS,
                 system=SYSTEM_PROMPT,
                 messages=[
                     {
@@ -67,16 +91,21 @@ def request_review_with_retry(max_attempts: int = 5):
                     }
                 ]
             )
-        except anthropic.OverloadedError as e:
-            if attempt == max_attempts:
-                print(f"ERROR: Anthropic overloaded after {max_attempts} attempts: {e}")
+        except Exception as e:
+            if not _is_retryable_error(e):
                 raise
+            if attempt == max_attempts:
+                print(f"ERROR: Anthropic transient failure after {max_attempts} attempts: {e}")
+                raise
+            backoff = min(max_delay_seconds, base_delay_seconds * (2 ** (attempt - 1)))
+            jitter = random.uniform(0, min(0.5, backoff / 2))
+            sleep_seconds = backoff + jitter
             print(
-                f"Anthropic overloaded (attempt {attempt}/{max_attempts}). "
-                f"Retrying in {delay_seconds}s..."
+                f"Anthropic transient error {type(e).__name__} "
+                f"(attempt {attempt}/{max_attempts}). "
+                f"Retrying in {sleep_seconds:.2f}s..."
             )
-            time.sleep(delay_seconds)
-            delay_seconds *= 2
+            time.sleep(sleep_seconds)
 
 
 response = request_review_with_retry()
