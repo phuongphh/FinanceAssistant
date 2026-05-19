@@ -29,6 +29,8 @@ from backend.intent.handlers.action_quick_transaction import (
         ("+200k lương", "money_in", 200_000, "lương"),
         ("-50k cà phê", "expense", 50_000, "cà phê"),
         ("+5tr thưởng tết", "money_in", 5_000_000, "thưởng tết"),
+        ("+20tr5", "money_in", 20_500_000, ""),
+        ("+510tr215", "money_in", 510_215_000, ""),
         ("200k cà phê", "expense", 200_000, "cà phê"),  # no sign → expense
         ("+ 200k", "money_in", 200_000, ""),  # space after sign
         (" -50k taxi ", "expense", 50_000, "taxi"),  # leading/trailing space

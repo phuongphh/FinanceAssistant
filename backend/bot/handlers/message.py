@@ -40,6 +40,7 @@ from backend.services import expense_service, report_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message
+from backend.wealth.amount_parser import parse_amount
 
 logger = logging.getLogger(__name__)
 
@@ -65,38 +66,45 @@ _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 # when at least one of {sign, unit, description} is present; a bare
 # bareword number like "200" is too ambiguous and is left to the intent
 # pipeline.
-_AMOUNT_RE = re.compile(
-    r"^\s*(?P<sign>[+-])?\s*(?P<num>\d+(?:[\.,]\d+)?)\s*(?P<unit>k|nghìn|tr|triệu|m)?(?:\s+(?P<desc>.+?))?\s*$",
+_SIGNED_TX_RE = re.compile(
+    r"^\s*(?P<sign>[+-])?\s*(?P<body>.+?)\s*$",
+    re.IGNORECASE,
+)
+
+_AMOUNT_TOKEN_RE = re.compile(
+    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?)",
     re.IGNORECASE,
 )
 
 
 def _parse_signed_transaction(text: str) -> dict | None:
-    match = _AMOUNT_RE.match(text)
+    match = _SIGNED_TX_RE.match(text)
     if not match:
         return None
+
     sign = match.group("sign")
-    unit = (match.group("unit") or "").lower()
-    desc = (match.group("desc") or "").strip()[:500]
-    # Reject bare numbers ("200") — let the intent pipeline decide.
-    if not sign and not unit and not desc:
+    body = (match.group("body") or "").strip()
+    # Keep legacy behaviour: unsigned input is accepted when it has a
+    # clear amount pattern with unit and/or description; a bare integer
+    # like "200" remains ambiguous and is deferred to intent routing.
+    amount_match = _AMOUNT_TOKEN_RE.search(body)
+    if not amount_match:
         return None
-    raw_num = match.group("num").replace(",", ".")
-    try:
-        amount = float(raw_num)
-    except ValueError:
+
+    if not sign and re.fullmatch(r"\d+", body):
         return None
-    if unit in {"k", "nghìn"}:
-        amount *= 1_000
-    elif unit in {"tr", "triệu", "m"}:
-        amount *= 1_000_000
-    if amount <= 0:
+
+    amount_token = amount_match.group("amt").strip()
+    amount_decimal = parse_amount(amount_token)
+    if amount_decimal is None or amount_decimal <= 0:
         return None
-    # Sign is the source of truth for direction. Absent sign defaults to
-    # expense, matching the convention "không dấu = chi".
+
+    merchant = f"{body[:amount_match.start()]} {body[amount_match.end():]}"
+    merchant = re.sub(r"\s+", " ", merchant).strip(" ,-+;:")[:500]
+
     return {
-        "amount": amount,
-        "merchant": desc,
+        "amount": float(amount_decimal),
+        "merchant": merchant,
         "note": text[:1000],
         "transaction_type": "money_in" if sign == "+" else "expense",
     }
