@@ -780,37 +780,6 @@ class TestNavigateCashflow:
         assert edited["message_id"] == 99
         assert "Tháng này dư 5tr" in edited["text"]
 
-
-class TestNavigateMainFallback:
-    @pytest.mark.asyncio
-    async def test_navigate_main_falls_back_to_send_when_edit_fails(self, monkeypatch):
-        from backend.bot.handlers import menu_handler
-
-        sent: dict = {}
-
-        async def fake_edit_message_text(**kwargs):
-            raise RuntimeError("message is not a text message")
-
-        async def fake_send_message(**kwargs):
-            sent.update(kwargs)
-
-        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
-        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
-        monkeypatch.setattr(
-            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
-        )
-
-        await menu_handler._navigate(
-            db=None,
-            user=_fake_user(),
-            chat_id=42,
-            message_id=777,
-            target="main",
-        )
-
-        assert sent["chat_id"] == 42
-        assert "inline_keyboard" in sent["reply_markup"]
-
     @pytest.mark.asyncio
     async def test_hint_appended_to_outcome_text(self, monkeypatch):
         """The submenu hint from YAML is appended to the overview content."""
@@ -914,6 +883,37 @@ class TestNavigateMainFallback:
         assert result.intent == IntentType.QUERY_CASHFLOW
         assert result.confidence == 1.0
         assert result.parameters == {}
+
+
+class TestNavigateMainFallback:
+    @pytest.mark.asyncio
+    async def test_navigate_main_falls_back_to_send_when_edit_fails(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+
+        sent: dict = {}
+
+        async def fake_edit_message_text(**kwargs):
+            raise RuntimeError("message is not a text message")
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
+
+        await menu_handler._navigate(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=777,
+            target="main",
+        )
+
+        assert sent["chat_id"] == 42
+        assert "inline_keyboard" in sent["reply_markup"]
 
 
 # ============================================================
