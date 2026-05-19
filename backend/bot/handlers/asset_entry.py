@@ -44,7 +44,7 @@ import html
 import logging
 import re
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,6 +117,20 @@ from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import asset_service, net_worth_calculator, rental_service
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_vietnamese_date(value: str) -> date | None:
+    cleaned = (value or "").strip()
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            pass
+    # Backward-compatible fallback for old YYYY-MM-DD prompts still visible in chat history.
+    try:
+        return date.fromisoformat(cleaned)
+    except ValueError:
+        return None
 
 _DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
 # Tracks the dashboard report page each user last viewed so wizard returns
@@ -2226,9 +2240,9 @@ async def _handle_rental_extra_choice(
             chat_id=chat_id,
             text=(
                 "📅 <b>Thời hạn hợp đồng thuê?</b>\n\n"
-                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code> "
+                "Format: <code>dd/mm/yyyy dd/mm/yyyy</code> "
                 "(ngày bắt đầu - ngày kết thúc)\n"
-                "Ví dụ: <code>2024-01-01 2025-12-31</code>\n\n"
+                "Ví dụ: <code>01/01/2024 31/12/2025</code>\n\n"
                 "Gõ <code>skip</code> để bỏ qua."
             ),
             parse_mode="HTML",
@@ -2286,19 +2300,18 @@ async def _handle_rental_lease_input(
         await send_message(
             chat_id=chat_id,
             text=(
-                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code>\n"
-                "Ví dụ: <code>2024-01-01 2025-12-31</code>"
+                "Format: <code>dd/mm/yyyy dd/mm/yyyy</code>\n"
+                "Ví dụ: <code>01/01/2024 31/12/2025</code>"
             ),
             parse_mode="HTML",
         )
         return
-    try:
-        start = date.fromisoformat(parts[0])
-        end = date.fromisoformat(parts[1])
-    except ValueError:
+    start = _parse_vietnamese_date(parts[0])
+    end = _parse_vietnamese_date(parts[1])
+    if start is None or end is None:
         await send_message(
             chat_id=chat_id,
-            text="Ngày không hợp lệ. Format: <code>YYYY-MM-DD YYYY-MM-DD</code>",
+            text="Ngày không hợp lệ. Format: <code>dd/mm/yyyy dd/mm/yyyy</code>",
             parse_mode="HTML",
         )
         return
@@ -2320,7 +2333,10 @@ async def _handle_rental_lease_input(
     )
     await send_message(
         chat_id=chat_id,
-        text=f"✅ Đã ghi: <b>{start} → {end}</b>. Còn thông tin nào khác không?",
+        text=(
+            f"✅ Đã ghi: <b>{start.strftime('%d/%m/%Y')} → "
+            f"{end.strftime('%d/%m/%Y')}</b>. Còn thông tin nào khác không?"
+        ),
         parse_mode="HTML",
         reply_markup=rental_extra_keyboard(),
     )
