@@ -35,6 +35,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #703 | Bug: ModuleNotFoundError backend.adapters.telegram_service — import path sai | [issue-703.md](issue-703.md) |
 | #719 | [Epic] Enhance Expense Flow — Transaction-based Architecture | [issue-719.md](issue-719.md) |
 | #720 | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [issue-720.md](issue-720.md) |
+| #721 | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [issue-721.md](issue-721.md) |
 | #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
 
-**Total active:** 32
+**Total active:** 33
