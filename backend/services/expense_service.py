@@ -264,6 +264,20 @@ async def _create_transaction_record(db: AsyncSession, user_id: uuid.UUID, expen
     db.add(tx)
     await db.flush()
     return tx
+
+
+async def _latest_active_transaction(
+    db: AsyncSession, expense_id: uuid.UUID
+) -> Transaction | None:
+    stmt = (
+        select(Transaction)
+        .where(Transaction.expense_id == expense_id, Transaction.status == "active")
+        .order_by(Transaction.created_at.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def create_expense(
     db: AsyncSession, user_id: uuid.UUID, data: ExpenseCreate
 ) -> Expense:
