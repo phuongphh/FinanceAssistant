@@ -123,7 +123,9 @@ def test_four_wealth_level_fixtures_do_not_raise():
 
 
 def test_engine_version_is_exported_and_consumed():
-    assert ENGINE_VERSION == "4a.1.0"
+    # 4a.2.0 ships the Pareto-aware optimal trajectory: scenarios may select
+    # ``savings_only`` instead of always rebalancing to the wealth-tier target.
+    assert ENGINE_VERSION == "4a.2.0"
     assert engine_version_for_projection() == ENGINE_VERSION
 
 
