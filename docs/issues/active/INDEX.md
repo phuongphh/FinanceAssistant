@@ -39,7 +39,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #723 | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [issue-723.md](issue-723.md) |
 | #725 | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [issue-725.md](issue-725.md) |
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
+| #727 | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [issue-727.md](issue-727.md) |
 | #728 | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [issue-728.md](issue-728.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
 
-**Total active:** 37
+**Total active:** 38
