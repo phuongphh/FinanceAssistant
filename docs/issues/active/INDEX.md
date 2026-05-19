@@ -40,5 +40,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #725 | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [issue-725.md](issue-725.md) |
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #728 | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [issue-728.md](issue-728.md) |
+| #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
 
-**Total active:** 36
+**Total active:** 37
