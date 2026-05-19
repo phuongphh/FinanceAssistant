@@ -409,6 +409,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
 | #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
 | #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
+| #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
 
-**Total:** 405 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 388 Pre-Phase)
+**Total:** 406 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 389 Pre-Phase)
