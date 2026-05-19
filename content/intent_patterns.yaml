@@ -290,7 +290,7 @@ action_add_asset:
     - pattern: '^(?:them|tao|nhap|ghi)\s+(?:moi\s+)?(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b'
       confidence: 0.95
     # "thêm cổ phiếu" / "thêm chứng khoán"
-    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:co\s*phieu|chung\s*khoan|stocks?)\b'
+    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b'
       confidence: 0.95
     # "thêm crypto" / "thêm tiền số" / "thêm btc"
     - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b'
@@ -311,7 +311,7 @@ action_add_asset:
     asset_type:
       patterns:
         - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
-        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
+        - { match: 'co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf', value: stock }
         - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
         - { match: 'vang|gold', value: gold }
         - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
@@ -335,7 +335,7 @@ action_edit_asset:
     # exactly which asset family to look in.
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
@@ -347,7 +347,7 @@ action_edit_asset:
     # "sửa bất động sản" / "sửa cổ phiếu FPT" / "sửa đất ba tư"
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
@@ -363,7 +363,7 @@ action_edit_asset:
         # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
         # words doesn't accidentally flip asset_type to real_estate.
         - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
-        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b', value: stock }
         - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
@@ -377,9 +377,11 @@ action_delete_asset:
   patterns:
     - pattern: '^(?:xoa|xo|huy|remove|delete|del)\s+tai\s*san(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
+    - pattern: "^(?:xoa|xo|huy|remove|delete|del)\\s+tai\\s*san\\s+(?P<asset_name>[a-z0-9._-]{2,})\\s*$"
+      confidence: 0.97
     - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
-    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
     - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
@@ -393,7 +395,7 @@ action_delete_asset:
         # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
         # words doesn't accidentally flip asset_type to real_estate.
         - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
-        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b', value: stock }
         - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
