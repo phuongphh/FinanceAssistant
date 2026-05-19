@@ -368,6 +368,11 @@ action_edit_asset:
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
 
+    asset_subtype:
+      patterns:
+        - { match: '\b(?:quy|quy\s*mo|chung\s*chi\s*quy|fund)\b', value: fund }
+        - { match: '\betf\b', value: etf }
+
 action_delete_asset:
   description: "User wants to remove an existing asset."
   # "xoá tài sản", "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT".
@@ -399,6 +404,11 @@ action_delete_asset:
         - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
+
+    asset_subtype:
+      patterns:
+        - { match: '\b(?:quy|quy\s*mo|chung\s*chi\s*quy|fund)\b', value: fund }
+        - { match: '\betf\b', value: etf }
 
 action_add_goal:
   description: "User wants to add a new financial goal."

@@ -123,6 +123,20 @@ async def _latest_vcb_rate(db: AsyncSession) -> Decimal | None:
     return result.scalar_one_or_none()
 
 
+
+_ASSET_TYPE_LABELS = {
+    "cash": "Tiền mặt",
+    "stock": "Cổ phiếu/Quỹ",
+    "real_estate": "Bất động sản",
+    "crypto": "Tiền số",
+    "gold": "Vàng",
+    "other": "Khác",
+}
+
+
+def _asset_type_label(asset_type: str) -> str:
+    return _ASSET_TYPE_LABELS.get(str(asset_type), str(asset_type).replace("_", " ").title())
+
 async def _portfolio_assets(db: AsyncSession, user_id) -> list[Asset]:
     result = await db.execute(select(Asset).where(Asset.user_id == user_id, Asset.is_active.is_(True)))
     return list(result.scalars().all())
@@ -134,7 +148,7 @@ def _allocation_lines(breakdown: net_worth_calculator.NetWorthBreakdown) -> str:
     lines: list[str] = []
     for asset_type, value in sorted(breakdown.by_type.items(), key=lambda item: item[1], reverse=True):
         pct = value / breakdown.total * Decimal(100)
-        lines.append(f"• {asset_type}: {format_money_short(value)} ({pct:.0f}%)")
+        lines.append(f"• {_asset_type_label(asset_type)}: {format_money_short(value)} ({pct:.0f}%)")
     return "\n".join(lines)
 
 

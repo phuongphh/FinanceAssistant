@@ -50,6 +50,7 @@ class ActionDeleteAssetHandler(IntentHandler):
         params = intent.parameters or {}
         asset_type = params.get("asset_type")
         asset_name = (params.get("asset_name") or "").strip()
+        asset_subtype = params.get("asset_subtype")
         chat_id = user.telegram_id
 
         if asset_name:
@@ -59,6 +60,7 @@ class ActionDeleteAssetHandler(IntentHandler):
                 for a in assets
                 if a.is_active and _name_matches(a.name, asset_name)
                 and (asset_type is None or str(a.asset_type) == asset_type)
+                and (asset_subtype is None or str(getattr(a, "subtype", "")) == asset_subtype)
             ]
             if len(matches) == 1:
                 await asset_entry_handlers._confirm_asset_delete(
@@ -67,13 +69,13 @@ class ActionDeleteAssetHandler(IntentHandler):
                 return ""
             if len(matches) > 1 and asset_type:
                 await asset_entry_handlers.show_asset_delete_list(
-                    db, chat_id, user, asset_type
+                    db, chat_id, user, asset_type, subtype=asset_subtype
                 )
                 return ""
 
         if asset_type:
             await asset_entry_handlers.show_asset_delete_list(
-                db, chat_id, user, asset_type
+                db, chat_id, user, asset_type, subtype=asset_subtype
             )
             return ""
 
