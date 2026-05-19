@@ -46,7 +46,7 @@ def twin_view_buttons() -> tuple[tuple[Button, ...], ...]:
         [
             (Button("⚖️ So tối ưu", callback_data="menu:twin:compare_optimal"),),
             (Button("❓ Cách hoạt động", callback_data="menu:twin:how_it_works"),),
-            (Button("◀️ Quay về Twin", callback_data="menu:twin:view_current"),),
+            (Button("◀️ Quay về Twin", callback_data="menu:twin"),),
         ]
     )
     return tuple(rows)

@@ -407,7 +407,22 @@
 
     function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('vi-VN')}đ`; }
     function trim(value) { return value.toFixed(value >= 10 ? 0 : 1).replace('.0', ''); }
-    function formatDate(value) { return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); }
+
+    const DATE_FORMAT_BY_LANGUAGE = {
+        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+    };
+
+    function resolveDateFormat() {
+        const lang = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
+        return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
+    }
+
+    function formatDate(value) {
+        if (!value) return '--/--/----';
+        const fmt = resolveDateFormat();
+        return new Date(value).toLocaleDateString(fmt.locale, fmt.options);
+    }
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }

@@ -163,10 +163,21 @@
         return `Tháng ${parseInt(month, 10)}/${year}`;
     }
 
+    const DATE_FORMAT_BY_LANGUAGE = {
+        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+    };
+
+    function resolveDateFormat() {
+        const lang = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
+        return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
+    }
+
     function formatDate(iso) {
-        if (!iso) return '--/--';
+        if (!iso) return '--/--/----';
         const d = new Date(iso + 'T00:00:00');
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        const fmt = resolveDateFormat();
+        return d.toLocaleDateString(fmt.locale, fmt.options);
     }
 
     async function fetchAPI(endpoint, options = {}) {
