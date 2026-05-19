@@ -34,7 +34,7 @@
 .section-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .twin-chart-wrap { height: 260px; }
 .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.kpi-card { border: 1px solid rgba(100,116,139,.14); border-radius: 16px; padding: 12px 10px; background: rgba(255,255,255,.64); }
+.kpi-card { border: 1px solid rgba(79,70,229,.18); border-radius: 16px; padding: 12px 10px; background: linear-gradient(135deg, rgba(109,93,251,.12), rgba(20,184,166,.08)); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
 .kpi-label { color: var(--text-muted); font-size: 12px; margin-bottom: 6px; }
 .kpi-value { font-size: 16px; font-weight: 800; }
 .kpi-year { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
@@ -55,10 +55,10 @@
 .delta-badge-pill { padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .delta-badge-pill.positive { background: rgba(20,184,166,.22); color: #0f766e; }
 .delta-badge-pill.negative { background: rgba(239,68,68,.12); color: #dc2626; }
-.savings-cta { margin-top: 10px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.savings-cta { margin-top: 10px; font-size: 14px; font-weight: 700; color: #4338ca; line-height: 1.5; background: rgba(67,56,202,.07); border: 1px solid rgba(67,56,202,.16); border-radius: 12px; padding: 10px 12px; }
 
 .uncertainty-list { display: grid; gap: 10px; }
-.uncertainty-row { display: grid; grid-template-columns: 1fr 1fr 48px; gap: 8px; align-items: center; font-size: 14px; }
+.uncertainty-row { display: grid; grid-template-columns: 1fr 1fr 48px; gap: 10px; align-items: center; font-size: 14px; line-height: 1.4; min-height: 32px; }
 .uncertainty-bar-wrap { height: 8px; background: rgba(100,116,139,.12); border-radius: 999px; overflow: hidden; }
 .uncertainty-bar { height: 100%; background: linear-gradient(90deg, #6D5DFB, #14B8A6); border-radius: inherit; }
 .uncertainty-pct { text-align: right; font-weight: 700; font-size: 13px; }
@@ -115,29 +115,3 @@
 .outcome-section { border-left: 4px solid #6D5DFB; }
 .life-outcome-copy { margin: 8px 0; line-height: 1.55; color: var(--text); }
 .text-btn { border: 0; background: transparent; color: var(--primary); font-weight: 700; padding: 4px 0; }
-
-.story-flow {
-    border: 1px solid rgba(109,93,251,.16);
-    background: linear-gradient(180deg, rgba(109,93,251,.08), rgba(20,184,166,.05)), var(--card-bg);
-}
-.story-progress, .story-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.story-progress { margin-bottom: 12px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
-.story-card { min-height: 178px; display: grid; gap: 10px; }
-.story-card h2 { margin: 0; font-size: 20px; line-height: 1.2; }
-.story-card p { color: var(--text-color); line-height: 1.55; }
-.story-emoji { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 16px; background: rgba(109,93,251,.12); font-size: 26px; }
-.story-nav { margin-top: 14px; }
-.story-nav button { min-width: 104px; padding: 11px 14px; }
-.story-nav button:disabled { opacity: .45; cursor: not-allowed; }
-.story-scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
-.story-scenario-card { position: relative; overflow: hidden; border: 1px solid rgba(100,116,139,.14); border-radius: 16px; padding: 10px; background: rgba(255,255,255,.70); min-height: 112px; }
-.story-scenario-card strong, .story-scenario-card span { display: block; }
-.story-scenario-card strong { font-size: 12px; color: var(--text-muted); }
-.story-scenario-card span { margin-top: 4px; font-size: 15px; font-weight: 800; }
-.story-scenario-card img { position: absolute; right: 6px; bottom: 4px; width: 48px; height: 48px; object-fit: contain; }
-#open-technical-btn { margin-top: 6px; background: rgba(100,116,139,.12); color: var(--text-color); }
-
-@media (max-width: 420px) {
-    .story-scenario-grid { grid-template-columns: 1fr; }
-    .story-scenario-card { min-height: 86px; }
-}
