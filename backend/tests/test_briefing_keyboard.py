@@ -14,6 +14,7 @@ from backend.bot.handlers import briefing as briefing_handler
 from backend.bot.keyboards.briefing_keyboard import (
     BRIEFING_ACTION_ADD_ASSET,
     BRIEFING_ACTION_DASHBOARD,
+    BRIEFING_ACTION_OPEN_TWIN,
     BRIEFING_ACTION_SETTINGS,
     BRIEFING_ACTION_STORY,
     CB_BRIEFING,
@@ -58,3 +59,28 @@ def test_briefing_callbacks_use_canonical_prefix():
     assert BRIEFING_ACTION_SETTINGS in seen_actions
     for action in seen_actions:
         assert action in briefing_handler._ACTION_TO_EVENT
+
+
+def test_include_twin_prepends_open_twin_row():
+    """When the morning briefing includes a Twin section, the keyboard
+    surfaces an additional ``open_twin`` row above the 2x2 grid — the
+    full-width Twin button is the habit-loop trigger moment."""
+    kb = briefing_actions_keyboard(include_twin=True, twin_label="🔮 Mở Twin →")
+    rows = kb["inline_keyboard"]
+    assert len(rows) == 3
+    # First row is the single full-width Twin button.
+    assert len(rows[0]) == 1
+    btn = rows[0][0]
+    assert btn["text"] == "🔮 Mở Twin →"
+    prefix, parts = parse_callback(btn["callback_data"])
+    assert prefix == CB_BRIEFING
+    assert parts[0] == BRIEFING_ACTION_OPEN_TWIN
+    # Underlying 2x2 grid is untouched.
+    for row in rows[1:]:
+        assert len(row) == 2
+
+
+def test_open_twin_action_dispatched_by_handler():
+    """The Twin button must map to an analytics event in the handler —
+    otherwise the trigger-moment funnel goes silent."""
+    assert BRIEFING_ACTION_OPEN_TWIN in briefing_handler._ACTION_TO_EVENT
