@@ -19,6 +19,13 @@ TRANSACTION_TYPE_EXPENSE = "expense"
 TRANSACTION_TYPE_MONEY_IN = "money_in"
 SOURCE_TYPES = {"cash", "bank_account", "e_wallet"}
 EWALLET_PROVIDERS = {"momo", "vnpay", "zalopay", "viettelpay"}
+SOURCE_TYPE_SUBTYPE_ALIASES = {
+    "cash": ("cash",),
+    # The source picker uses the product-level label "Tài khoản" while
+    # the asset wizard stores bank accounts with more specific subtypes.
+    # Keep the legacy ``bank_account`` subtype too for older auto-created rows.
+    "bank_account": ("bank_checking", "bank_account"),
+}
 
 
 class SourceResolution(NamedTuple):
@@ -60,37 +67,84 @@ async def _adjust_source_asset(
     asset.last_valued_at = datetime.utcnow()
 
 
+def _subtypes_for_source_type(
+    source_type: str, e_wallet_provider: str | None = None
+) -> tuple[str, ...]:
+    if source_type == "e_wallet":
+        if e_wallet_provider not in EWALLET_PROVIDERS:
+            raise ValueError("e_wallet_provider is not supported")
+        # New source rows use provider-specific subtypes (``momo``), while
+        # assets added via the cash wizard historically used generic
+        # ``e_wallet`` plus a user-entered name ("MoMo 2tr"). Match both.
+        return (e_wallet_provider, "e_wallet")
+    if source_type not in SOURCE_TYPE_SUBTYPE_ALIASES:
+        raise ValueError("source_type is not supported")
+    return SOURCE_TYPE_SUBTYPE_ALIASES[source_type]
+
+
+def _choose_best_source_asset(
+    assets: list[Asset], *, amount: Decimal | None = None
+) -> Asset | None:
+    if not assets:
+        return None
+
+    def sort_key(asset: Asset) -> tuple[int, int, Decimal, float]:
+        balance = Decimal(asset.current_value or 0)
+        covers_amount = amount is not None and balance >= amount
+        is_user_confirmed = bool(asset.is_confirmed) and not bool(
+            asset.is_placeholder_asset
+        )
+        created_at = asset.created_at or datetime.min
+        return (
+            1 if covers_amount else 0,
+            1 if is_user_confirmed else 0,
+            balance,
+            # Keep a stable tie-breaker without letting an older empty
+            # auto-created row beat a funded user-entered cash asset.
+            -float(created_at.toordinal()),
+        )
+
+    return max(assets, key=sort_key)
+
+
 async def get_or_create_source_asset(
     db: AsyncSession,
     user_id: uuid.UUID,
     *,
     source_type: str,
     e_wallet_provider: str | None = None,
+    amount: Decimal | float | int | str | None = None,
 ) -> Asset:
-    """Resolve a user's cash-like source asset, creating a zero-balance one if needed."""
+    """Resolve a user's cash-like source asset, creating a zero-balance one if needed.
+
+    When multiple matching assets exist, prefer a funded, confirmed asset that
+    can cover the transaction. This avoids false low-balance warnings caused by
+    old auto-created zero-balance source rows.
+    """
     if source_type not in SOURCE_TYPES:
         raise ValueError("source_type is not supported")
     if source_type != "e_wallet":
         e_wallet_provider = None
-    elif e_wallet_provider not in EWALLET_PROVIDERS:
-        raise ValueError("e_wallet_provider is not supported")
+    subtypes = _subtypes_for_source_type(source_type, e_wallet_provider)
+    amount_decimal = Decimal(str(amount)) if amount is not None else None
 
-    subtype = e_wallet_provider if source_type == "e_wallet" else source_type
     stmt = (
         select(Asset)
         .where(
             Asset.user_id == user_id,
             Asset.asset_type == "cash",
-            Asset.subtype == subtype,
+            Asset.subtype.in_(subtypes),
             Asset.is_active.is_(True),
         )
         .order_by(Asset.created_at.asc())
-        .limit(1)
     )
-    asset = (await db.execute(stmt)).scalar_one_or_none()
+    result = await db.execute(stmt)
+    assets = list(result.scalars().all())
+    asset = _choose_best_source_asset(assets, amount=amount_decimal)
     if asset is not None:
         return asset
 
+    subtype = e_wallet_provider if source_type == "e_wallet" else source_type
     names = {
         "cash": "Tiền mặt",
         "bank_account": "Tài khoản ngân hàng",
@@ -171,6 +225,9 @@ async def resolve_source_asset_for_payload(
         user_id,
         source_type=data.source_type,
         e_wallet_provider=data.e_wallet_provider,
+        amount=(
+            data.amount if data.transaction_type == TRANSACTION_TYPE_EXPENSE else None
+        ),
     )
     provider = data.e_wallet_provider if data.source_type == "e_wallet" else None
     return SourceResolution(
