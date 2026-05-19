@@ -1,11 +1,15 @@
+import logging
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.income_record import IncomeRecord
 from backend.schemas.income import IncomeRecordCreate, IncomeRecordUpdate
+
+logger = logging.getLogger(__name__)
 
 
 async def create_income(
@@ -23,6 +27,24 @@ async def create_income(
     db.add(record)
     await db.flush()
     await db.refresh(record)
+
+    # Phase 4.3 Story 3.1 — Twin recompute trigger. New income reshapes the
+    # cashflow projection so we always publish; segment-based filtering is
+    # the worker's job.
+    try:
+        from infra.event_bus.twin_events import TwinEvent, publish
+
+        await publish(
+            TwinEvent(
+                event_type="income.added",
+                user_id=user_id,
+                amount_vnd=Decimal(str(data.amount)),
+                metadata={"income_type": data.income_type, "source": data.source},
+            )
+        )
+    except Exception:
+        logger.warning("twin event publish failed for income", exc_info=True)
+
     return record
 
 

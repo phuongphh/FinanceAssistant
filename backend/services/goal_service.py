@@ -39,6 +39,25 @@ async def _try_goal_completed_feedback_prompt(db: AsyncSession, user_id: uuid.UU
         logger.exception("goal-completed feedback prompt hook failed")
 
 
+async def _publish_goal_milestone_event(
+    user_id: uuid.UUID, goal: Goal, *, kind: str
+) -> None:
+    """Phase 4.3 Story 3.1 — Twin recompute hook for goal milestones."""
+    try:
+        from infra.event_bus.twin_events import TwinEvent, publish
+
+        await publish(
+            TwinEvent(
+                event_type="goal.milestone_reached",
+                user_id=user_id,
+                amount_vnd=Decimal(goal.target_amount or 0),
+                metadata={"goal_id": str(goal.id), "kind": kind},
+            )
+        )
+    except Exception:
+        logger.warning("twin event publish failed for goal milestone", exc_info=True)
+
+
 # ---------------------------------------------------------------------
 # Mutation API
 # ---------------------------------------------------------------------
@@ -75,6 +94,7 @@ async def create_goal(
     await db.flush()
     if initial_status == "completed":
         await _try_goal_completed_feedback_prompt(db, user_id)
+        await _publish_goal_milestone_event(user_id, goal, kind="created_completed")
     return goal
 
 
@@ -132,13 +152,17 @@ async def update_goal(
         setattr(goal, field, value)
     # If status moved to 'completed' for the first time, stamp
     # completed_at so the celebration logic (Phase 4) fires once.
+    just_completed = False
     if (
         payload.get("status") == "completed"
         and goal.completed_at is None
     ):
         goal.completed_at = datetime.utcnow()
+        just_completed = True
         await _try_goal_completed_feedback_prompt(db, user_id)
     await db.flush()
+    if just_completed:
+        await _publish_goal_milestone_event(user_id, goal, kind="status_completed")
     return goal
 
 
@@ -157,6 +181,7 @@ async def update_goal_progress(
     if not goal:
         return None
     goal.current_amount = Decimal(data.current_amount)
+    just_completed = False
     if (
         Decimal(goal.target_amount or 0) > 0
         and goal.current_amount >= Decimal(goal.target_amount)
@@ -164,9 +189,12 @@ async def update_goal_progress(
     ):
         goal.status = "completed"
         goal.completed_at = datetime.utcnow()
+        just_completed = True
         await _try_goal_completed_feedback_prompt(db, user_id)
     goal.updated_at = datetime.utcnow()
     await db.flush()
+    if just_completed:
+        await _publish_goal_milestone_event(user_id, goal, kind="progress_completed")
     return goal
 
 

@@ -1,0 +1,13 @@
+# Lightweight content reference for outcome examples, not an investment dataset.
+# Avoid brand/project names and keep ranges broad to reduce stale or promissory copy.
+period: "Q2 2026"
+locations:
+  TP.HCM:
+    apartment_2br_outer_district_vnd: [3500000000, 5500000000]
+    down_payment_ratio: [0.25, 0.35]
+  Hà Nội:
+    apartment_2br_outer_district_vnd: [3200000000, 5200000000]
+    down_payment_ratio: [0.25, 0.35]
+  Đà Nẵng:
+    apartment_2br_outer_district_vnd: [2200000000, 3800000000]
+    down_payment_ratio: [0.25, 0.35]

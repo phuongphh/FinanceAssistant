@@ -6,7 +6,7 @@ filtering introduced by issue #562 without requiring a real database.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -131,6 +131,101 @@ async def test_get_or_create_source_asset_auto_creates_zero_balance_wallet():
     db.add.assert_called_once_with(asset)
     db.flush.assert_awaited_once()
     db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_source_asset_prefers_funded_cash_over_old_empty_row():
+    user_id = uuid.uuid4()
+    old_auto = _asset(user_id=user_id, current_value="0", subtype="cash")
+    old_auto.name = "Tiền mặt tự tạo"
+    old_auto.is_confirmed = True
+    old_auto.is_placeholder_asset = False
+    old_auto.created_at = datetime(2026, 1, 1)
+    funded_cash = _asset(user_id=user_id, current_value="1000000000", subtype="cash")
+    funded_cash.name = "Tiền mặt"
+    funded_cash.is_confirmed = True
+    funded_cash.is_placeholder_asset = False
+    funded_cash.created_at = datetime(2026, 2, 1)
+    db = _db(execute_results=[_ScalarResult([old_auto, funded_cash])])
+
+    asset = await expense_service.get_or_create_source_asset(
+        db,
+        user_id,
+        source_type="cash",
+        amount=Decimal("2000000"),
+    )
+
+    assert asset.id == funded_cash.id
+    assert asset.current_value == Decimal("1000000000")
+    db.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_resolve_source_asset_cash_spend_has_no_false_warning_with_funded_cash():
+    user_id = uuid.uuid4()
+    old_auto = _asset(user_id=user_id, current_value="0", subtype="cash")
+    old_auto.created_at = datetime(2026, 1, 1)
+    funded_cash = _asset(user_id=user_id, current_value="1000000000", subtype="cash")
+    funded_cash.created_at = datetime(2026, 2, 1)
+    db = _db(execute_results=[_ScalarResult([old_auto, funded_cash])])
+
+    result = await expense_service.resolve_source_asset_for_payload(
+        db,
+        user_id,
+        ExpenseCreate(
+            amount=2_000_000,
+            source_type="cash",
+            transaction_type="expense",
+        ),
+    )
+
+    assert result.source_asset_id == funded_cash.id
+    assert result.source_type == "cash"
+    assert result.warning is None
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_source_asset_maps_bank_account_to_checking_asset():
+    user_id = uuid.uuid4()
+    checking = _asset(
+        user_id=user_id,
+        current_value="5000000",
+        subtype="bank_checking",
+    )
+    db = _db(execute_results=[_ScalarResult([checking])])
+
+    asset = await expense_service.get_or_create_source_asset(
+        db,
+        user_id,
+        source_type="bank_account",
+        amount=Decimal("2000000"),
+    )
+
+    assert asset.id == checking.id
+    db.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_source_asset_maps_provider_to_generic_wallet_asset():
+    user_id = uuid.uuid4()
+    wallet = _asset(
+        user_id=user_id,
+        current_value="3000000",
+        subtype="e_wallet",
+    )
+    wallet.name = "MoMo"
+    db = _db(execute_results=[_ScalarResult([wallet])])
+
+    asset = await expense_service.get_or_create_source_asset(
+        db,
+        user_id,
+        source_type="e_wallet",
+        e_wallet_provider="momo",
+        amount=Decimal("2000000"),
+    )
+
+    assert asset.id == wallet.id
+    db.add.assert_not_called()
 
 
 @pytest.mark.asyncio

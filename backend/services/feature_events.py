@@ -35,6 +35,7 @@ FEATURE_CATALOG: dict[str, str] = {
     "cashflow": "Cashflow",
     "onboarding": "Onboarding",
     "storytelling": "Storytelling",
+    "twin_storytelling": "Twin Storytelling",
 }
 
 # Existing event stream → standardized feature keys. This mirrors many more
@@ -60,6 +61,8 @@ EVENT_TO_FEATURE_KEY: dict[str, str] = {
     "cashflow_tab_opened": "cashflow",
     "onboarding_v2_started": "onboarding",
     "storytelling_opened_direct": "storytelling",
+    "twin_story_opened": "twin_storytelling",
+    "twin_story_completed": "twin_storytelling",
 }
 
 _pending: set[asyncio.Task] = set()
@@ -85,6 +88,8 @@ def feature_key_for_event(event_type: str, properties: dict[str, Any] | None = N
         return "cashflow"
     if lowered.startswith("onboarding_"):
         return "onboarding"
+    if lowered.startswith("twin_story_"):
+        return "twin_storytelling"
     if lowered.startswith("storytelling_"):
         return "storytelling"
     if properties and properties.get("feature_key") in FEATURE_CATALOG:

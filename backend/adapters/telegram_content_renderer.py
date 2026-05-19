@@ -61,14 +61,25 @@ class TelegramContentRenderer(ContentRenderer):
     def render_twin_view(self, snapshot: TwinViewSnapshot) -> ChannelContent:
         copy = _copy()["trajectory"]
         png = self._chart_renderer(snapshot.cone, optimal=snapshot.optimal_cone)
+        labels = snapshot.scenario_labels or {}
         caption = copy["caption"].format(
             name=snapshot.user_name,
             target_year=snapshot.target_year,
             p10=format_money_short(snapshot.p10),
             p50=format_money_short(snapshot.p50),
             p90=format_money_short(snapshot.p90),
+            p10_label=labels.get("p10", "🌧️ Khiêm tốn"),
+            p50_label=labels.get("p50", "⛅ Bình thường"),
+            p90_label=labels.get("p90", "☀️ Lạc quan"),
             age_text=snapshot.age_text,
         )
+        card_lines = self._scenario_card_lines(snapshot.scenario_cards)
+        if card_lines:
+            caption = f"{caption}\n\n{card_lines}"
+        if snapshot.present_anchor:
+            caption = f"{snapshot.present_anchor}\n\n{caption}"
+        if snapshot.life_outcome:
+            caption += f"\n\n⛅ Ví dụ dễ hình dung: {snapshot.life_outcome}"
         if snapshot.is_stale:
             caption += copy["stale_note"]
         if snapshot.narrative:
@@ -79,6 +90,33 @@ class TelegramContentRenderer(ContentRenderer):
             buttons=twin_view_buttons(),
             filename=snapshot.filename,
         )
+
+    @staticmethod
+    def _scenario_card_lines(cards: list[dict[str, Any]]) -> str:
+        """Render the three weather cards as Telegram-safe text.
+
+        Telegram captions cannot embed three independent image cards next to the
+        chart, so this keeps the card semantics visible and relies on each
+        card's emoji fallback when mascot images are unavailable.
+        """
+        if not cards:
+            return ""
+        personality = {
+            "p10": "áo mưa sẵn sàng, ưu tiên giữ an toàn",
+            "p50": "cầm dù vừa đủ, đi đều và cân bằng",
+            "p90": "đeo kính nắng, tận dụng nhịp thuận lợi",
+        }
+        lines = ["Ba sắc thái Bé Tiền trong vùng dự phóng:"]
+        for card in cards[:3]:
+            p_code = str(card.get("p_code") or "").lower()
+            label = card.get("label") or card.get("p_code") or ""
+            amount = format_money_short(card.get("amount") or 0)
+            detail = personality.get(p_code)
+            if not detail:
+                mascot = card.get("mascot") or {}
+                detail = mascot.get("mood") or "giữ nhịp phù hợp"
+            lines.append(f"• {label} — khoảng {amount}: {detail}.")
+        return "\n".join(lines)
 
     def render_twin_comparison(
         self, snapshot: TwinComparisonSnapshot

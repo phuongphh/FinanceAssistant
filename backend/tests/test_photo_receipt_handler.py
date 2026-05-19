@@ -64,6 +64,37 @@ def test_format_receipt_renders_total_and_items():
     assert "⚠️" not in out  # high confidence => no warning
 
 
+def test_format_receipt_renders_date_in_dd_mm_yyyy():
+    out = photo_receipt._format_receipt({
+        "total_amount": 100000,
+        "currency": "VND",
+        "merchant_name": "Shop",
+        "date": "2026-04-22",
+        "items": [],
+        "confidence": "high",
+    })
+    assert "22/04/2026" in out
+    # Raw ISO date must NOT leak through to the user.
+    assert "2026-04-22" not in out
+
+
+def test_parse_iso_date_rejects_garbage_and_future():
+    from datetime import date, timedelta
+
+    assert photo_receipt._parse_iso_date(None) is None
+    assert photo_receipt._parse_iso_date("not a date") is None
+    assert photo_receipt._parse_iso_date("2026-13-40") is None
+    future = (date.today() + timedelta(days=30)).isoformat()
+    assert photo_receipt._parse_iso_date(future) is None
+    assert photo_receipt._parse_iso_date("2026-04-22").isoformat() == "2026-04-22"
+
+
+def test_resolve_ocr_category_falls_back_to_needs_review():
+    assert photo_receipt._resolve_ocr_category("food_drink") == "food_drink"
+    assert photo_receipt._resolve_ocr_category("unknown_xyz") == "needs_review"
+    assert photo_receipt._resolve_ocr_category(None) == "needs_review"
+
+
 def test_format_receipt_low_confidence_adds_warning():
     out = photo_receipt._format_receipt({
         "total_amount": 1000,
@@ -82,7 +113,9 @@ async def test_handle_photo_returns_false_when_no_image():
 
 
 @pytest.mark.asyncio
-async def test_handle_photo_happy_path_edits_ack_with_result():
+async def test_handle_photo_happy_path_autosaves_expense_with_keyboard():
+    from datetime import date
+
     user = _user()
     msg = _photo_message(photos=[
         {"file_id": "small", "width": 90, "height": 90},
@@ -98,23 +131,79 @@ async def test_handle_photo_happy_path_edits_ack_with_result():
         "confidence": "high",
         "error": None,
     }
+    fake_expense = MagicMock()
+    fake_expense.id = uuid.uuid4()
+    fake_expense.amount = 250000
+    fake_expense.merchant = "Co.op Mart"
+    fake_expense.note = "Sữa"
+    fake_expense.category = "food_drink"
+    fake_expense.expense_date = date(2026, 5, 13)
+
     send = AsyncMock(return_value={"result": {"message_id": 77}})
     edit = AsyncMock()
+    create = AsyncMock(return_value=fake_expense)
     with patch.object(photo_receipt, "send_message", send), \
          patch.object(photo_receipt, "edit_message_text", edit), \
          patch.object(photo_receipt, "send_chat_action", AsyncMock()), \
          patch.object(photo_receipt, "download_file", AsyncMock(return_value=b"img")), \
+         patch.object(photo_receipt.expense_service, "create_expense", create), \
          patch.object(photo_receipt, "parse_receipt_image",
                        AsyncMock(return_value=parsed)) as ocr:
         ok = await photo_receipt.handle_photo_message(MagicMock(), msg, user)
 
     assert ok is True
-    # OCR called with the *medium* photo, not the smallest.
     ocr.assert_awaited_once()
+    create.assert_awaited_once()
+    # Expense persisted with the correct shape.
+    expense_payload = create.await_args.args[2]
+    assert expense_payload.amount == 250000
+    assert expense_payload.source == "ocr"
+    assert expense_payload.category == "food_drink"
+    assert expense_payload.expense_date == date(2026, 5, 13)
+    # Confirmation rendered with dd/mm/yyyy date and an inline keyboard.
     edit.assert_awaited()
     final_text = edit.await_args.kwargs["text"]
     assert "Co.op Mart" in final_text
-    assert "250k" in final_text
+    assert "13/05/2026" in final_text
+    assert "2026-05-13" not in final_text
+    keyboard = edit.await_args.kwargs["reply_markup"]
+    assert keyboard and keyboard["inline_keyboard"]
+    # The category-change button must be present so user can correct it.
+    flat_buttons = [b for row in keyboard["inline_keyboard"] for b in row]
+    assert any("Đổi danh mục" in b["text"] for b in flat_buttons)
+
+
+@pytest.mark.asyncio
+async def test_handle_photo_zero_total_skips_autosave():
+    user = _user()
+    msg = _photo_message(photos=[{"file_id": "good", "width": 1280, "height": 960}])
+    parsed = {
+        "total_amount": 0,
+        "currency": "VND",
+        "merchant_name": "Shop",
+        "date": "2026-04-22",
+        "items": [],
+        "confidence": "low",
+        "error": None,
+    }
+    create = AsyncMock()
+    with patch.object(photo_receipt, "send_message",
+                       AsyncMock(return_value={"result": {"message_id": 1}})), \
+         patch.object(photo_receipt, "edit_message_text", AsyncMock()) as edit, \
+         patch.object(photo_receipt, "send_chat_action", AsyncMock()), \
+         patch.object(photo_receipt, "download_file", AsyncMock(return_value=b"img")), \
+         patch.object(photo_receipt.expense_service, "create_expense", create), \
+         patch.object(photo_receipt, "parse_receipt_image",
+                       AsyncMock(return_value=parsed)):
+        ok = await photo_receipt.handle_photo_message(MagicMock(), msg, user)
+
+    assert ok is True
+    create.assert_not_awaited()
+    # User is nudged to type the amount manually instead of a silent failure.
+    final_text = edit.await_args.kwargs["text"]
+    assert "gõ tay" in final_text or "150k" in final_text
+    # Date is still rendered in dd/mm/yyyy in the fallback view.
+    assert "22/04/2026" in final_text
 
 
 @pytest.mark.asyncio

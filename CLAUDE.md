@@ -107,6 +107,7 @@ webhook → claim update_id → asyncio.create_task → worker → handler → s
 - ❌ Read these directories: `tests/fixtures/`, `docs/archive/`, `node_modules/`, `.venv/`
 - ❌ Modify migrations already committed and applied
 - ❌ Direct `git push origin main` for substantive changes (see [GitHub workflow doc](docs/conventions/github-workflow.md))
+- ❌ Direct `git push origin prod` for releases — **always go through a PR** from the release/working branch (e.g. `claude/merge-prod-release-N-XXXX`) into `prod`, even when the user says "merge main into prod". Operator reviews & merges via GitHub UI. No fast-forward push to `prod` from CLI.
 
 ---
 

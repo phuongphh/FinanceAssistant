@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
 | #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
 | #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
-| #421 | [Story] P4B-S4: Scenario Comparison UX Enhancement | [issue-421.md](issue-421.md) |
 | #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 | #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
@@ -33,24 +32,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
 | #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #642 | improve: Hide/show total asset amount with eye button | [issue-642.md](issue-642.md) |
-| #643 | improve: Reword Bé Tiền note in Asset menu with natural tone | [issue-643.md](issue-643.md) |
-| #644 | improve: Add asset category note in Asset Management | [issue-644.md](issue-644.md) |
-| #645 | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [issue-645.md](issue-645.md) |
-| #646 | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [issue-646.md](issue-646.md) |
-| #647 | improve: Change land asset icon from house to tree in rental real estate | [issue-647.md](issue-647.md) |
-| #648 | improve: Reorder guidance in Expense Management — chat-first | [issue-648.md](issue-648.md) |
-| #649 | improve: Add today's date to cashflow title | [issue-649.md](issue-649.md) |
-| #650 | fix: Fix recurring income calculation in cashflow view | [issue-650.md](issue-650.md) |
-| #652 | [Epic] Bugs — NLU parsing failures (8 bugs) | [issue-652.md](issue-652.md) |
-| #653 | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [issue-653.md](issue-653.md) |
-| #654 | [Bug] 'Thêm bất động sản' → Bé Tiền show báo cáo thay vì add asset | [issue-654.md](issue-654.md) |
-| #655 | [Bug] 'Chi tiêu dashboard' → Bé Tiền show báo cáo thay vì mở Dashboard | [issue-655.md](issue-655.md) |
-| #656 | [Bug] 'Nhận lương 20tr vào tiền mặt' → ghi expense sai thay vì add income | [issue-656.md](issue-656.md) |
-| #657 | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [issue-657.md](issue-657.md) |
-| #658 | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [issue-658.md](issue-658.md) |
-| #659 | [Bug] 'Thêm mục tiêu' → Bé Tiền show goals report thay vì add goal | [issue-659.md](issue-659.md) |
-| #660 | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [issue-660.md](issue-660.md) |
-| #661 | [Improve] Expand expense keyword mapping for better NLU | [issue-661.md](issue-661.md) |
 
-**Total active:** 48
+**Total active:** 28

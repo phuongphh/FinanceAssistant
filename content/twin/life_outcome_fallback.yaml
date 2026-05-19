@@ -1,0 +1,24 @@
+# Static, non-promissory examples used when LLM translation is unavailable.
+# Ordered by amount bucket upper bound (VND). Keep phrases <= 30 Vietnamese words.
+default_location: "TP.HCM"
+buckets:
+  - max_vnd: 1000000000
+    phrases:
+      - "có thể là quỹ dự phòng vững hơn và khoản đặt cọc nhỏ cho mục tiêu lớn"
+      - "có thể giúp gia đình nhẹ áp lực hơn khi có việc bất ngờ"
+  - max_vnd: 3000000000
+    phrases:
+      - "có thể gần một khoản trả trước căn hộ nhỏ và vẫn còn quỹ an toàn"
+      - "có thể tạo nền cho nhà ở đầu tiên hoặc vốn học tập dài hạn"
+  - max_vnd: 6000000000
+    phrases:
+      - "có thể tương đương căn 2PN ở khu ven trung tâm và một phần tiết kiệm"
+      - "có thể là nền tài chính khá thoải mái cho gia đình nhỏ"
+  - max_vnd: 12000000000
+    phrases:
+      - "có thể mở ra lựa chọn nhà ở tốt hơn và quỹ đầu tư dài hạn"
+      - "có thể giúp cân bằng nhà ở, giáo dục và dự phòng sức khỏe"
+  - max_vnd: null
+    phrases:
+      - "có thể tạo nhiều lựa chọn sống linh hoạt hơn, nhưng vẫn cần xem như dự phóng"
+      - "có thể là nền độc lập tài chính mạnh hơn, không phải lời hứa chắc chắn"

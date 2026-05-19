@@ -11,6 +11,7 @@ from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.income_record import IncomeRecord
 from backend.models.event import Event
 from backend.models.feature_event import FeatureEvent
+from backend.models.twin_view_event import TwinViewEvent
 from backend.models.user_milestone import MilestoneType, UserMilestone
 from backend.models.streak import UserStreak
 from backend.models.telegram_update import (
@@ -27,6 +28,7 @@ from backend.models.news_article import NewsArticle
 from backend.models.stock_historical_price import StockHistoricalPrice
 from backend.models.price_alert import NotificationSettings, PriceAlertLog
 from backend.models.twin_projection import TwinProjection
+from backend.models.twin_habit_loop import TwinDeltaThresholdConfig, TwinRecomputeLog
 from backend.models.life_event import LifeEvent, LifeEventType
 from backend.models.conversation_context import (
     ROLE_ASSISTANT,
@@ -99,6 +101,7 @@ __all__ = [
     "IncomeRecord",
     "Event",
     "FeatureEvent",
+    "TwinViewEvent",
     "UserMilestone",
     "MilestoneType",
     "UserStreak",
@@ -119,6 +122,8 @@ __all__ = [
     "NotificationSettings",
     "PriceAlertLog",
     "TwinProjection",
+    "TwinDeltaThresholdConfig",
+    "TwinRecomputeLog",
     "LifeEvent",
     "LifeEventType",
     # Phase 4.1

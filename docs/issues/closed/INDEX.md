@@ -226,6 +226,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
 | #417 | Pre-Phase | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [pre-phase/issue-417.md](by-phase/pre-phase/issue-417.md) |
+| #421 | Pre-Phase | [Story] P4B-S4: Scenario Comparison UX Enhancement | [pre-phase/issue-421.md](by-phase/pre-phase/issue-421.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
 | #438 | Pre-Phase | [Story] P4B-S21: Zalo Official Account Setup + SDK | [pre-phase/issue-438.md](by-phase/pre-phase/issue-438.md) |
 | #439 | Pre-Phase | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [pre-phase/issue-439.md](by-phase/pre-phase/issue-439.md) |
@@ -365,6 +366,44 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #635 | Pre-Phase | bug: KeyError 'vip' in menu_formatter.format_main_menu when wealth_level is 'vip' | [pre-phase/issue-635.md](by-phase/pre-phase/issue-635.md) |
 | #638 | Pre-Phase | Bug: KeyError 'vip' in menu_formatter.py khi user VIP nhấn /menu | [pre-phase/issue-638.md](by-phase/pre-phase/issue-638.md) |
 | #641 | Pre-Phase | [Epic] Enhance UI/UX 5 — Asset privacy, Bé Tiền tone, natural language, cashflow fixes | [pre-phase/issue-641.md](by-phase/pre-phase/issue-641.md) |
+| #642 | Pre-Phase | improve: Hide/show total asset amount with eye button | [pre-phase/issue-642.md](by-phase/pre-phase/issue-642.md) |
+| #643 | Pre-Phase | improve: Reword Bé Tiền note in Asset menu with natural tone | [pre-phase/issue-643.md](by-phase/pre-phase/issue-643.md) |
+| #644 | Pre-Phase | improve: Add asset category note in Asset Management | [pre-phase/issue-644.md](by-phase/pre-phase/issue-644.md) |
+| #645 | Pre-Phase | improve: Rename 'BĐS cho thuê' to 'Cho thuê BĐS' | [pre-phase/issue-645.md](by-phase/pre-phase/issue-645.md) |
+| #646 | Pre-Phase | improve: Change 'Hủy' to 'Quay về menu' in new asset form | [pre-phase/issue-646.md](by-phase/pre-phase/issue-646.md) |
+| #647 | Pre-Phase | improve: Change land asset icon from house to tree in rental real estate | [pre-phase/issue-647.md](by-phase/pre-phase/issue-647.md) |
+| #648 | Pre-Phase | improve: Reorder guidance in Expense Management — chat-first | [pre-phase/issue-648.md](by-phase/pre-phase/issue-648.md) |
+| #649 | Pre-Phase | improve: Add today's date to cashflow title | [pre-phase/issue-649.md](by-phase/pre-phase/issue-649.md) |
+| #650 | Pre-Phase | fix: Fix recurring income calculation in cashflow view | [pre-phase/issue-650.md](by-phase/pre-phase/issue-650.md) |
+| #652 | Pre-Phase | [Epic] Bugs — NLU parsing failures (8 bugs) | [pre-phase/issue-652.md](by-phase/pre-phase/issue-652.md) |
+| #653 | Pre-Phase | [Bug] 'Sửa đất ba tư' → Bé Tiền không hiểu là edit asset | [pre-phase/issue-653.md](by-phase/pre-phase/issue-653.md) |
+| #654 | Pre-Phase | [Bug] 'Thêm bất động sản' → Bé Tiền show báo cáo thay vì add asset | [pre-phase/issue-654.md](by-phase/pre-phase/issue-654.md) |
+| #655 | Pre-Phase | [Bug] 'Chi tiêu dashboard' → Bé Tiền show báo cáo thay vì mở Dashboard | [pre-phase/issue-655.md](by-phase/pre-phase/issue-655.md) |
+| #656 | Pre-Phase | [Bug] 'Nhận lương 20tr vào tiền mặt' → ghi expense sai thay vì add income | [pre-phase/issue-656.md](by-phase/pre-phase/issue-656.md) |
+| #657 | Pre-Phase | [Bug] 'TCB 25tr320' → không bắt được số lẻ amount | [pre-phase/issue-657.md](by-phase/pre-phase/issue-657.md) |
+| #658 | Pre-Phase | [Bug] 'Giá vàng hôm nay' → Bé Tiền không query gold price | [pre-phase/issue-658.md](by-phase/pre-phase/issue-658.md) |
+| #659 | Pre-Phase | [Bug] 'Thêm mục tiêu' → Bé Tiền show goals report thay vì add goal | [pre-phase/issue-659.md](by-phase/pre-phase/issue-659.md) |
+| #660 | Pre-Phase | [Bug] 'Sửa cổ phiếu FPT thành 200 cổ' → ghi expense sai thay vì edit stock | [pre-phase/issue-660.md](by-phase/pre-phase/issue-660.md) |
+| #661 | Pre-Phase | [Improve] Expand expense keyword mapping for better NLU | [pre-phase/issue-661.md](by-phase/pre-phase/issue-661.md) |
+| #670 | Pre-Phase | [Epic 1] Twin Comprehension Foundation — Phase 4.3 | [pre-phase/issue-670.md](by-phase/pre-phase/issue-670.md) |
+| #671 | Pre-Phase | [Epic 2] Twin Storytelling — Phase 4.3 | [pre-phase/issue-671.md](by-phase/pre-phase/issue-671.md) |
+| #672 | Pre-Phase | [Epic 3] Twin Habit Loop — Phase 4.3 | [pre-phase/issue-672.md](by-phase/pre-phase/issue-672.md) |
+| #673 | Pre-Phase | [Epic 4] Twin Admin Dashboard — Phase 4.3 | [pre-phase/issue-673.md](by-phase/pre-phase/issue-673.md) |
+| #674 | Pre-Phase | [Story 1.1] Rename P10/P50/P90 → Weather Vocabulary — Phase 4.3 | [pre-phase/issue-674.md](by-phase/pre-phase/issue-674.md) |
+| #675 | Pre-Phase | [Story 1.2] Life Outcome Translation via LLM — Phase 4.3 | [pre-phase/issue-675.md](by-phase/pre-phase/issue-675.md) |
+| #676 | Pre-Phase | [Story 1.3] Present Anchor + Delta + Growth Rate — Phase 4.3 | [pre-phase/issue-676.md](by-phase/pre-phase/issue-676.md) |
+| #677 | Pre-Phase | [Story 2.1] Bé Tiền Mascot Personification (3 Versions) — Phase 4.3 | [pre-phase/issue-677.md](by-phase/pre-phase/issue-677.md) |
+| #678 | Pre-Phase | [Story 2.2] Story Narrative Flow (Swipe-Through Screens) — Phase 4.3 | [pre-phase/issue-678.md](by-phase/pre-phase/issue-678.md) |
+| #679 | Pre-Phase | [Story 3.1] On-Demand Twin Recompute — Phase 4.3 | [pre-phase/issue-679.md](by-phase/pre-phase/issue-679.md) |
+| #680 | Pre-Phase | [Story 3.2] Causality Breakdown with Contribution Weights — Phase 4.3 | [pre-phase/issue-680.md](by-phase/pre-phase/issue-680.md) |
+| #681 | Pre-Phase | [Story 3.3] Action Suggestion Embedded in Twin Flow — Phase 4.3 | [pre-phase/issue-681.md](by-phase/pre-phase/issue-681.md) |
+| #682 | Pre-Phase | [Story 3.4] Negative Delta Handling — Phase 4.3 | [pre-phase/issue-682.md](by-phase/pre-phase/issue-682.md) |
+| #683 | Pre-Phase | [Story 3.5] Delta Threshold for Noticeable Change — Phase 4.3 | [pre-phase/issue-683.md](by-phase/pre-phase/issue-683.md) |
+| #684 | Pre-Phase | [Story 3.6] Return Tease + Loop Closure — Phase 4.3 | [pre-phase/issue-684.md](by-phase/pre-phase/issue-684.md) |
+| #685 | Pre-Phase | [Story 4.1] Twin Engagement Funnel Section — Phase 4.3 | [pre-phase/issue-685.md](by-phase/pre-phase/issue-685.md) |
+| #686 | Pre-Phase | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [pre-phase/issue-686.md](by-phase/pre-phase/issue-686.md) |
+| #687 | Pre-Phase | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [pre-phase/issue-687.md](by-phase/pre-phase/issue-687.md) |
+| #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
 
-**Total:** 361 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 344 Pre-Phase)
+**Total:** 400 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 383 Pre-Phase)

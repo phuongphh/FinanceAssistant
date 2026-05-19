@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -26,9 +27,22 @@ from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
     top_rebalance_deltas,
 )
-from backend.twin.services import twin_projection_service, twin_query_service
+from backend.twin import label_resolver
+from backend.twin.services import (
+    life_outcome_translator,
+    twin_projection_service,
+    twin_query_service,
+)
+from backend.twin.services.growth_rate_calculator import (
+    GrowthRateSnapshot,
+    calculate_growth_snapshot,
+)
+from backend.twin.views.present_anchor import build_present_anchor_view
+from backend.twin.views.scenario_card import scenario_cards_for_point
 from backend.twin.services.twin_narrative_service import build_twin_narrative
 from backend.twin.services.twin_chart_service import render_projection_chart
+
+logger = logging.getLogger(__name__)
 
 _COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "twin_copy.yaml"
 _MIN_TWIN_NET_WORTH = Decimal("10000000")
@@ -129,7 +143,15 @@ async def send_twin_current(
         )
         return
 
-    if snapshot.projection is None:
+    # Recompute synchronously when the stored cone is missing OR no longer
+    # reflects the user's wallet. ``is_value_stale`` catches the case where
+    # we computed the cone with 50tr of assets and the user has since added
+    # 2.6 tỷ — the time-staleness check alone would call this "fresh today"
+    # while the chart starts from a wrong anchor. Telegram users are tapping
+    # and waiting, so a ~500ms Monte Carlo is acceptable here; the Mini App
+    # GET path stays read-only.
+    needs_recompute = snapshot.projection is None or snapshot.is_value_stale
+    if needs_recompute:
         await notifier.send_message(
             chat_id, copy["trajectory"]["recomputing"], parse_mode=None
         )
@@ -139,22 +161,73 @@ async def send_twin_current(
             )
             snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
         except Exception:
-            await notifier.send_message(
-                chat_id,
-                copy["trajectory"]["no_projection"],
-                parse_mode=None,
-                reply_markup=back_to_main_keyboard(),
+            logger.exception(
+                "twin_handler: synchronous recompute failed user=%s", user.id
             )
-            return
+            # If the user had a (stale) cone to fall back on, render it with
+            # a warning rather than the empty state. Better than a blank screen.
+            if snapshot.projection is None:
+                await notifier.send_message(
+                    chat_id,
+                    copy["trajectory"]["no_projection"],
+                    parse_mode=None,
+                    reply_markup=back_to_main_keyboard(),
+                )
+                return
 
     cone = snapshot.latest_cone or []
     point = _target_point(cone)
-    optimal_projection = await twin_query_service.get_latest_projection(
-        db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
-    )
     narrative = await build_twin_narrative(
         db, user, cone, cone_age_days=snapshot.cone_age_days
     )
+    target_year = point_year = point.get("year", 0)
+    if snapshot.projection is not None and getattr(
+        snapshot.projection, "computed_at", None
+    ):
+        target_year = snapshot.projection.computed_at.year + int(point_year)
+    try:
+        growth = await calculate_growth_snapshot(
+            db, user.id, current_net_worth=snapshot.actual_nw
+        )
+    except Exception:
+        growth = GrowthRateSnapshot(
+            current_net_worth=snapshot.actual_nw,
+            weekly_delta=None,
+            monthly_growth_rate=None,
+            days_observed=0,
+            has_enough_data=False,
+        )
+    anchor_view = build_present_anchor_view(
+        growth,
+        target_year=target_year,
+        target_p50=Decimal(str(point.get("p50") or 0)),
+        breakdown=getattr(snapshot, "actual_breakdown", {}) or {},
+    )
+    present_anchor = " • ".join(
+        [
+            anchor_view.present_label,
+            anchor_view.weekly_delta_label,
+            anchor_view.growth_rate_label,
+        ]
+    )
+    life_outcome = await life_outcome_translator.translate(
+        db,
+        amount_vnd=Decimal(str(point.get("p50") or 0)),
+        target_year=target_year,
+        user_context={
+            "user_segment": getattr(user, "wealth_level", None) or "mass_affluent",
+            "known_goals": (
+                [getattr(user, "primary_goal", None)]
+                if getattr(user, "primary_goal", None)
+                else []
+            ),
+        },
+    )
+    label_payload = label_resolver.labels_for_payload(
+        show_technical_terms=bool(getattr(user, "twin_show_technical_terms", False))
+    )
+    scenario_labels = {key: value["label"] for key, value in label_payload.items()}
+    scenario_cards = scenario_cards_for_point(point, label_payload)
 
     # Phase 4.1 Story B.2 — log snapshot per Twin open and (if enabled
     # + enough completed) append the honest hit-rate section to the
@@ -167,36 +240,47 @@ async def send_twin_current(
             db, user_id=user.id, projection=snapshot.projection
         )
     if twin_calibration_service.is_display_enabled():
-        hit = await twin_calibration_service.get_hit_rate(db, user.id)
+        try:
+            hit = await twin_calibration_service.get_hit_rate(db, user.id)
+        except Exception:
+            hit = None
         if hit is not None:
             calib_copy = _copy().get("calibration", {})
-            extra = (
-                f"\n\n{calib_copy.get('section_title', '')}\n"
-                + calib_copy.get("hit_line", "").format(
-                    correct=hit.correct, total=hit.total, pct=hit.pct
-                )
-            )
+            extra = f"\n\n{calib_copy.get('section_title', '')}\n" + calib_copy.get(
+                "hit_line", ""
+            ).format(correct=hit.correct, total=hit.total, pct=hit.pct)
             if hit.is_low_confidence:
                 extra += "\n" + calib_copy.get("learning_note", "")
             narrative = (narrative or "") + extra
 
+    # Surface BOTH time-staleness and value-staleness through the existing
+    # ``is_stale`` flag so the renderer's "⚠️ Dự phóng hơi cũ" banner fires
+    # when an on-demand recompute failed and we are falling back to a cone
+    # whose anchor no longer matches the wallet.
     content = renderer.render_twin_view(
         TwinViewSnapshot(
             user_name=_name(user),
-            target_year=int(point.get("year", 0)),
+            target_year=target_year,
             p10=Decimal(str(point.get("p10", 0))),
             p50=Decimal(str(point.get("p50", 0))),
             p90=Decimal(str(point.get("p90", 0))),
             age_text=_age_text(snapshot.cone_age_days),
             cone=cone,
-            optimal_cone=optimal_projection.cone_data if optimal_projection else None,
+            optimal_cone=None,
             narrative=narrative,
-            is_stale=snapshot.is_stale,
+            present_anchor=present_anchor,
+            life_outcome=life_outcome,
+            scenario_labels=scenario_labels,
+            scenario_cards=scenario_cards,
+            is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
         )
     )
     await _send_channel_content(notifier, chat_id, content)
-    await _maybe_send_next_action(db, chat_id, user, notifier)
+    try:
+        await _maybe_send_next_action(db, chat_id, user, notifier)
+    except Exception:
+        pass
 
 
 async def _maybe_send_next_action(
@@ -240,7 +324,9 @@ async def send_twin_share(
     if not twin_share_service.is_share_enabled():
         await notifier.send_message(
             chat_id,
-            _copy().get("share", {}).get(
+            _copy()
+            .get("share", {})
+            .get(
                 "disabled",
                 "📸 Tính năng tạm tắt — quay lại sau bạn nhé.",
             ),
@@ -380,13 +466,19 @@ async def send_twin_compare_optimal(
         chart_renderer=render_projection_chart
     )
     copy = _copy()["comparison"]
+    snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
     current = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_CURRENT
     )
     optimal = await twin_query_service.get_latest_projection(
         db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
     )
-    if current is None or optimal is None:
+    # Same value-staleness gate as ``send_twin_current``: if the cone's
+    # anchor no longer matches the wallet, recompute before drawing the
+    # comparison — otherwise we render "Current vs Optimal" against a
+    # base that doesn't exist anymore.
+    needs_recompute = current is None or optimal is None or snapshot.is_value_stale
+    if needs_recompute:
         await notifier.send_message(chat_id, copy["recomputing"], parse_mode=None)
         try:
             await twin_projection_service.compute_and_store(
@@ -399,13 +491,17 @@ async def send_twin_compare_optimal(
                 db, user.id, scenario=twin_projection_service.SCENARIO_OPTIMAL
             )
         except Exception:
-            await notifier.send_message(
-                chat_id,
-                copy["no_projection"],
-                parse_mode=None,
-                reply_markup=back_to_main_keyboard(),
+            logger.exception(
+                "twin_handler: comparison recompute failed user=%s", user.id
             )
-            return
+            if current is None or optimal is None:
+                await notifier.send_message(
+                    chat_id,
+                    copy["no_projection"],
+                    parse_mode=None,
+                    reply_markup=back_to_main_keyboard(),
+                )
+                return
 
     if (
         current is None

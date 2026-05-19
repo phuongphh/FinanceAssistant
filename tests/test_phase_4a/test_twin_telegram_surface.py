@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.bot.handlers import twin_handler
+from backend.ports.content_renderer import ChannelContent
 
 
 class FakeNotifier:
@@ -38,6 +39,7 @@ async def test_twin_handler_empty_state_uses_notifier(monkeypatch):
             latest_cone=None,
             cone_age_days=None,
             is_stale=True,
+            is_value_stale=True,
             delta_vs_p50=None,
         )
 
@@ -64,10 +66,14 @@ async def test_twin_handler_sends_photo_with_cone_caption(monkeypatch):
     async def fake_snapshot(db, user_id):
         return SimpleNamespace(
             actual_nw=Decimal("100000000"),
-            projection=SimpleNamespace(cone_data=cone),
+            actual_breakdown={},
+            projection=SimpleNamespace(
+                cone_data=cone, base_net_worth=Decimal("100000000")
+            ),
             latest_cone=cone,
             cone_age_days=2,
             is_stale=False,
+            is_value_stale=False,
             delta_vs_p50=Decimal("0"),
         )
 
@@ -96,8 +102,164 @@ async def test_twin_handler_sends_photo_with_cone_caption(monkeypatch):
     assert notifier.messages == []
     assert notifier.photos[0][1] == b"png-bytes"
     caption = notifier.photos[0][2]["caption"]
-    assert "có thể nằm trong khoảng 150tr — 350tr" in caption
+    assert "vùng khả năng từ 150tr đến 350tr" in caption
     assert "cập nhật 2 ngày trước" in caption
+    assert "Ba sắc thái Bé Tiền trong vùng dự phóng:" in caption
+    assert "🌧️ Khiêm tốn" in caption
+    assert "⛅ Bình thường" in caption
+    assert "☀️ Lạc quan" in caption
+    assert "áo mưa sẵn sàng" in caption
+    assert "P10" not in caption
+    assert "P50" not in caption
+    assert "P90" not in caption
+
+
+@pytest.mark.asyncio
+async def test_twin_current_does_not_overlay_optimal_cone(monkeypatch):
+    """Regression: Lộ trình must render only the current path.
+
+    The optimal overlay belongs to ⚖️ So tối ưu, otherwise both buttons produce
+    nearly identical images and the comparison loses meaning.
+    """
+    cone = [
+        {"year": 0, "p10": "100000000", "p50": "100000000", "p90": "100000000"},
+        {"year": 10, "p10": "150000000", "p50": "220000000", "p90": "350000000"},
+    ]
+
+    async def fake_snapshot(db, user_id):
+        return SimpleNamespace(
+            actual_nw=Decimal("100000000"),
+            actual_breakdown={},
+            projection=SimpleNamespace(
+                cone_data=cone, base_net_worth=Decimal("100000000")
+            ),
+            latest_cone=cone,
+            cone_age_days=0,
+            is_stale=False,
+            is_value_stale=False,
+            delta_vs_p50=Decimal("0"),
+        )
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("Lộ trình should not fetch/render optimal cone")
+
+    async def fake_narrative(db, user, cone_data, cone_age_days=None):
+        return "Mình theo dõi vùng này để bạn điều chỉnh nhẹ nhàng khi cần."
+
+    class FakeRenderer:
+        def __init__(self):
+            self.snapshot = None
+
+        def render_twin_view(self, snapshot):
+            self.snapshot = snapshot
+            return ChannelContent(text="rendered current", images=(b"current-png",))
+
+    monkeypatch.setattr(
+        twin_handler.twin_query_service, "get_twin_snapshot", fake_snapshot
+    )
+    monkeypatch.setattr(
+        twin_handler.twin_query_service, "get_latest_projection", fail_if_called
+    )
+    monkeypatch.setattr(twin_handler, "build_twin_narrative", fake_narrative)
+    notifier = FakeNotifier()
+    renderer = FakeRenderer()
+
+    await twin_handler.send_twin_current(
+        object(), chat_id=123, user=FakeUser(), notifier=notifier, renderer=renderer
+    )
+
+    assert renderer.snapshot is not None
+    assert renderer.snapshot.optimal_cone is None
+    assert notifier.photos[0][1] == b"current-png"
+
+
+@pytest.mark.asyncio
+async def test_twin_handler_recomputes_when_value_stale(monkeypatch):
+    """Regression: user with 2.6 tỷ in real assets but a stale TwinProjection
+    anchored at 50tr would see a chart projecting 85tr at year 10. The
+    handler must detect the divergence on read and recompute before
+    rendering, so the chart matches the wallet."""
+    fresh_cone = [
+        {"year": 0, "p10": "2600000000", "p50": "2600000000", "p90": "2600000000"},
+        {"year": 10, "p10": "3500000000", "p50": "5200000000", "p90": "8000000000"},
+    ]
+    stale_cone = [
+        {"year": 0, "p10": "50000000", "p50": "50000000", "p90": "50000000"},
+        {"year": 10, "p10": "82200000", "p50": "85500000", "p90": "88900000"},
+    ]
+    snapshots = iter(
+        [
+            SimpleNamespace(
+                actual_nw=Decimal("2600000000"),
+                actual_breakdown={},
+                projection=SimpleNamespace(
+                    cone_data=stale_cone, base_net_worth=Decimal("50000000")
+                ),
+                latest_cone=stale_cone,
+                cone_age_days=0,
+                is_stale=False,
+                is_value_stale=True,
+                delta_vs_p50=Decimal("0"),
+            ),
+            SimpleNamespace(
+                actual_nw=Decimal("2600000000"),
+                actual_breakdown={},
+                projection=SimpleNamespace(
+                    cone_data=fresh_cone,
+                    base_net_worth=Decimal("2600000000"),
+                    computed_at=None,
+                ),
+                latest_cone=fresh_cone,
+                cone_age_days=0,
+                is_stale=False,
+                is_value_stale=False,
+                delta_vs_p50=Decimal("0"),
+            ),
+        ]
+    )
+
+    async def fake_snapshot(db, user_id):
+        return next(snapshots)
+
+    recompute_calls = []
+
+    async def fake_compute(db, user_id, scenario="both"):
+        recompute_calls.append(scenario)
+        return []
+
+    async def fake_latest(db, user_id, scenario=None):
+        return None
+
+    async def fake_narrative(db, user, cone_data, cone_age_days=None):
+        return ""
+
+    monkeypatch.setattr(
+        twin_handler.twin_query_service, "get_twin_snapshot", fake_snapshot
+    )
+    monkeypatch.setattr(
+        twin_handler.twin_query_service, "get_latest_projection", fake_latest
+    )
+    monkeypatch.setattr(
+        twin_handler.twin_projection_service, "compute_and_store", fake_compute
+    )
+    monkeypatch.setattr(
+        twin_handler, "render_projection_chart", lambda c, optimal=None: b"png"
+    )
+    monkeypatch.setattr(twin_handler, "build_twin_narrative", fake_narrative)
+
+    notifier = FakeNotifier()
+    await twin_handler.send_twin_current(
+        object(), chat_id=42, user=FakeUser(), notifier=notifier
+    )
+
+    assert recompute_calls == ["both"]
+    # The "đang dựng 1.000 kịch bản" message should fire before the chart.
+    assert notifier.messages, "Expected a recompute progress message"
+    # The photo's caption must use the FRESH cone numbers (2.6 tỷ-scale),
+    # not the stale 85tr.
+    caption = notifier.photos[0][2]["caption"]
+    assert "85.5tr" not in caption
+    assert "tỷ" in caption
 
 
 @pytest.mark.asyncio
@@ -135,6 +297,18 @@ async def test_compare_optimal_uses_content_renderer(monkeypatch):
             return optimal
         return current
 
+    async def fake_snapshot(db, user_id):
+        return SimpleNamespace(
+            actual_nw=Decimal("100000000"),
+            actual_breakdown={},
+            projection=current,
+            latest_cone=cone_current,
+            cone_age_days=0,
+            is_stale=False,
+            is_value_stale=False,
+            delta_vs_p50=Decimal("0"),
+        )
+
     class FakeRenderer:
         def __init__(self):
             self.snapshot = None
@@ -150,6 +324,9 @@ async def test_compare_optimal_uses_content_renderer(monkeypatch):
 
     monkeypatch.setattr(
         twin_handler.twin_query_service, "get_latest_projection", fake_latest
+    )
+    monkeypatch.setattr(
+        twin_handler.twin_query_service, "get_twin_snapshot", fake_snapshot
     )
     notifier = FakeNotifier()
     renderer = FakeRenderer()

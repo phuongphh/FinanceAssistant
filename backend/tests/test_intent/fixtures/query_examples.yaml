@@ -298,3 +298,82 @@ edge_cases:
   - text: "dashboard chi tiêu"
     expected_intent: nav_expense_dashboard
     notes: "Expense dashboard, inverted word order (#655)."
+
+  # Delete-asset intent — added after the chat screenshot showed
+  # "xoá tài sản ACB" / "xoá tài sản ví zalopay" falling through to
+  # UNCLEAR because no rule pattern covered the delete shape.
+  - text: "xoá tài sản"
+    expected_intent: action_delete_asset
+    notes: "Delete wizard — generic form."
+
+  - text: "xoá tài sản ACB"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_name: "acb"
+    notes: "Delete by exact name — handler should jump to confirm card."
+
+  - text: "xoá ví zalopay"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_type: "cash"
+      asset_name: "zalopay"
+    notes: "Delete a cash wallet by its label."
+
+  - text: "xoá cổ phiếu FPT"
+    expected_intent: action_delete_asset
+    expected_parameters:
+      asset_type: "stock"
+      asset_name: "fpt"
+    notes: "Delete stock holding by ticker."
+
+  # Income-to-wallet — anchored shapes that previously hit the LLM
+  # tier (or worse, fell through entirely) when the user expected the
+  # quick-transaction card.
+  - text: "thêm 3tr vào ví momo"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.8
+    notes: "Add income to a named wallet — rule tier saves an LLM call."
+
+  - text: "nhận lương 20tr vào tiền mặt"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.8
+    notes: "Salary income credited to a cash account (#656)."
+
+  # Inline-edit shapes — these used to fall through the picker even
+  # though the user had already named both the asset and the new
+  # value. The handler now reads asset_name + new_value and applies
+  # the update inline.
+  - text: "sửa cổ phiếu FPT thành 200 cổ"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "stock"
+      asset_name: "fpt"
+      new_value: "200 cổ"
+    notes: "Inline stock-quantity edit (#659)."
+
+  - text: "sửa ACB thành 50tr"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_name: "acb"
+      new_value: "50tr"
+    notes: "Inline cash-balance edit by name."
+
+  - text: "cập nhật vàng SJC thành 5 chỉ"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "gold"
+      asset_name: "sjc"
+      new_value: "5 chỉ"
+    notes: "Inline gold-quantity edit."
+
+  - text: "sửa BĐS nhà số 1 thành 3 tỷ 2"
+    expected_intent: action_edit_asset
+    expected_parameters:
+      asset_type: "real_estate"
+      new_value: "3 tỷ 2"
+    notes: "Inline real-estate revaluation with VN decimal shortcut."
+
+  - text: "dashboard"
+    expected_intent: nav_expense_dashboard
+    expected_min_confidence: 0.9
+    notes: "Bare 'dashboard' should open the miniapp, not produce a report."

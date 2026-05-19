@@ -58,6 +58,7 @@ WRITE_INTENTS = frozenset(
         IntentType.ACTION_QUICK_TRANSACTION,
         IntentType.ACTION_ADD_ASSET,
         IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
     }
 )
@@ -69,6 +70,7 @@ _WIZARD_LAUNCHING_INTENTS = frozenset(
     {
         IntentType.ACTION_ADD_ASSET,
         IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
@@ -88,6 +90,7 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.ACTION_QUICK_TRANSACTION,
         IntentType.ACTION_ADD_ASSET,
         IntentType.ACTION_EDIT_ASSET,
+        IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
@@ -416,6 +419,12 @@ class IntentDispatcher:
             )
 
             return ActionEditAssetHandler()
+        if intent == IntentType.ACTION_DELETE_ASSET:
+            from backend.intent.handlers.action_delete_asset import (
+                ActionDeleteAssetHandler,
+            )
+
+            return ActionDeleteAssetHandler()
         if intent == IntentType.ACTION_ADD_GOAL:
             from backend.intent.handlers.action_add_goal import (
                 ActionAddGoalHandler,

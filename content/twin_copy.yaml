@@ -17,7 +17,7 @@ menu:
       Financial Twin mô phỏng nhiều kịch bản thị trường cho danh mục hiện tại của bạn.
       Dùng để tham khảo chiến lược, không thay thế tư vấn đầu tư cá nhân.
   hint: |-
-    💡 Twin dùng P10/P50/P90: 80% kịch bản có thể nằm giữa P10 và P90.
+    💡 Twin dùng 3 kiểu thời tiết: 🌧️ Khiêm tốn, ⛅ Bình thường, ☀️ Lạc quan. Thuật ngữ P10/P50/P90 vẫn nằm trong phần kỹ thuật.
   buttons:
     - label: "📈 Lộ trình"
       callback: "menu:twin:view_current"
@@ -31,12 +31,13 @@ menu:
       callback: "menu:main"
 
 chart:
-  title: "Bé Tiền tương lai — vùng xác suất"
+  title: "Bé Tiền tương lai — vùng thời tiết"
+  comparison_title: "Bé Tiền — hiện tại so với tối ưu"
   current_label: "Hiện tại"
-  p50_label: "P50 — đường giữa"
-  optimal_label: "P50 — tối ưu"
-  optimal_cone_label: "Vùng tối ưu P10–P90"
-  cone_label: "Vùng P10–P90"
+  p50_label: "Bình thường"
+  optimal_label: "Tối ưu"
+  optimal_cone_label: "Vùng tối ưu"
+  cone_label: "Vùng khiêm tốn–lạc quan"
   x_label: "Năm"
   y_label: "Giá trị tài sản"
   watermark: "Bé Tiền — dự phóng xác suất, không phải lời hứa"
@@ -56,8 +57,8 @@ trajectory:
   caption: |-
     🔮 Bé Tiền tương lai của {name}
 
-    Năm {target_year}, tài sản có thể nằm trong khoảng {p10} — {p90}.
-    Đường giữa P50: {p50}.
+    Đến năm {target_year}, Twin thấy một vùng khả năng từ {p10} đến {p90}.
+    Bé Tiền không chốt một con số duy nhất — mình đọc vùng này như thời tiết để bạn dễ cảm nhận rủi ro và nhịp đi tiếp.
 
     Dữ liệu dự phóng: {age_text}. Đây là mô phỏng xác suất, không phải cam kết lợi nhuận.
   age_today: "vừa cập nhật hôm nay"
@@ -67,9 +68,9 @@ trajectory:
 ⚠️ Dự phóng hơi cũ, mình có thể cập nhật lại ở lượt chạy kế tiếp."
 
 briefing:
-  ahead: "🚀 Twin: tài sản đang cao hơn đường giữa P50 khoảng {delta_pct}% — nhịp này ổn đó."
-  on_track: "🎯 Twin: bạn đang đi khá sát đường giữa P50 — cứ đều tay nhé."
-  behind: "🌱 Twin: đang thấp hơn P50 khoảng {delta_pct}%, không sao — mình đi chậm mà chắc."
+  ahead: "🚀 Twin: tài sản đang cao hơn đường bình thường khoảng {delta_pct}% — nhịp này ổn đó."
+  on_track: "🎯 Twin: bạn đang đi khá sát đường bình thường — cứ đều tay nhé."
+  behind: "🌱 Twin: đang thấp hơn đường bình thường khoảng {delta_pct}%, không sao — mình đi chậm mà chắc."
   accuracy_neutral: "📊 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} ({error_pct}%)."
   accuracy_celebrate: "🎉 Tuần trước Bé Tiền dự báo P50 = {predicted}, thực tế = {actual} — bạn vượt kỳ vọng rồi!"
   accuracy_reassure: "💪 Tuần trước dự báo P50 = {predicted}, thực tế = {actual} — chưa sao, mình điều chỉnh dần nhé."
@@ -79,7 +80,7 @@ how_it_works: |-
 
   • Mình lấy tổng tài sản, phân bổ danh mục và dòng tiền gần đây.
   • Sau đó mô phỏng 1.000 kịch bản thị trường trong 10 năm.
-  • Kết quả là vùng P10/P50/P90: không phải một con số cố định, mà là “có thể nằm trong khoảng”.
+  • Kết quả được mặc định viết bằng thời tiết: 🌧️ Khiêm tốn, ⛅ Bình thường, ☀️ Lạc quan. Nếu bật thuật ngữ kỹ thuật, bạn sẽ thấy P10/P50/P90.
 
   Mục tiêu là giúp bạn thấy xu hướng và rủi ro trong vùng khả năng, không khẳng định tương lai.
 
@@ -96,13 +97,13 @@ narrative:
     Bạn là Bé Tiền, trợ lý tài chính cá nhân. Viết 2-3 câu tiếng Việt, 50-200 ký tự, không markdown.
 
     Dữ liệu của người dùng:
-    - Năm mục tiêu: {target_year}, P10={p10}, P50={p50}, P90={p90}
+    - Năm mục tiêu: {target_year}, vùng khiêm tốn={p10}, vùng bình thường={p50}, vùng lạc quan={p90}
     - Mức tài sản: {wealth_level}
     - Thay đổi 30 ngày qua: {top_changes}
     - Sự kiện gần đây: {life_events_summary}
 
-    Yêu cầu: đề cập số tiền cụ thể từ dữ liệu, nêu tên loại tài sản thực tế nếu có, không dùng câu chung chung như "tài sản của bạn", "bạn đang đi đúng hướng". Giọng ấm áp, xác suất, không hứa lợi nhuận.
-  fallback: "Nếu giữ nhịp hiện tại, P50 năm {target_year} có thể đạt {p50}. Mình theo dõi cùng bạn nhé."
+    Yêu cầu: đề cập số tiền cụ thể từ dữ liệu, nêu tên loại tài sản thực tế nếu có, không dùng câu chung chung như "tài sản của bạn", "bạn đang đi đúng hướng". Giọng ấm áp, xác suất, không hứa lợi nhuận. Không dùng thuật ngữ P10/P50/P90 trong câu trả lời.
+  fallback: "Nếu giữ nhịp hiện tại, vùng bình thường ở mốc {target_year} năm có thể quanh {p50}. Mình theo dõi cùng bạn nhé."
   wealth_level_labels:
     starter: "mới bắt đầu"
     young_prof: "đang xây dựng"
@@ -113,7 +114,7 @@ scenario_comparison:
   tooltip_optimal: "Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt."
   delta_badge_positive: "+{delta_pct}%"
   delta_badge_negative: "{delta_pct}%"
-  cta_savings: "Để đạt P50 tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng"
+  cta_savings: "Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng"
   cta_no_change: "Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!"
   milestone_label: "Năm {year}"
 
@@ -125,12 +126,12 @@ comparison:
   caption: |-
     ⚖️ So sánh lộ trình hiện tại và tối ưu
 
-    Năm {target_year}, đường giữa P50 có thể tăng từ {current_p50} → {optimal_p50} ({delta_pct}).
+    Ở mốc {target_year} năm, đường bình thường có thể tăng từ {current_p50} → {optimal_p50} ({delta_pct}).
 
     {actions}
 
     {disclaimer}
-    CTA "Bắt đầu kế hoạch" có thể mở ở Phase 4B; hiện tại mình chỉ dùng để tham khảo.
+    Khi bạn muốn hành động, Bé Tiền sẽ ưu tiên các bước nhỏ, dễ kiểm soát trước.
   action_savings: "• Tăng tiết kiệm đều: {current_savings}/tháng → {optimal_savings}/tháng."
   action_rebalance_add: "• Tăng tỷ trọng {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."
   action_rebalance_trim: "• Giảm bớt {asset_label}: {current_pct}% → {target_pct}% (khoảng {amount})."

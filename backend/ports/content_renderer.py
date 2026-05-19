@@ -44,6 +44,10 @@ class TwinViewSnapshot:
     cone: list[dict[str, Any]]
     optimal_cone: list[dict[str, Any]] | None = None
     narrative: str = ""
+    present_anchor: str = ""
+    life_outcome: str = ""
+    scenario_labels: dict[str, str] = field(default_factory=dict)
+    scenario_cards: list[dict[str, Any]] = field(default_factory=list)
     is_stale: bool = False
     filename: str = "be-tien-twin.png"
 

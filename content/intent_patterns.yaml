@@ -59,11 +59,11 @@ query_assets:
   parameter_extractors:
     asset_type:
       patterns:
-        - { match: 'bat\s*dong\s*san|bds|nha\s+dat', value: real_estate }
-        - { match: 'chung\s*khoan|co\s*phieu|stocks?', value: stock }
-        - { match: 'crypto|tien\s*so|btc|bitcoin|ethereum|eth|sol|solana', value: crypto }
-        - { match: 'vang|gold', value: gold }
-        - { match: 'tien\s*mat|cash|tien\s+gui', value: cash }
+        - { match: '\b(?:bat\s*dong\s*san|bds|nha\s+dat)\b', value: real_estate }
+        - { match: '\b(?:chung\s*khoan|co\s*phieu|stocks?)\b', value: stock }
+        - { match: '\b(?:crypto|tien\s*so|btc|bitcoin|ethereum|eth|sol|solana)\b', value: crypto }
+        - { match: '\b(?:vang|gold)\b', value: gold }
+        - { match: '\b(?:tien\s*mat|cash|tien\s+gui)\b', value: cash }
 
 query_net_worth:
   description: "User asks total net worth."
@@ -249,6 +249,25 @@ query_goals:
     - pattern: '(?:liet\s*ke|xem|list)\s+(?:muc\s*tieu|goals?)'
       confidence: 0.9
 
+action_quick_transaction:
+  description: "User logs a quick income or expense in natural language."
+  # Anchored phrasing that the LLM tier would otherwise have to handle:
+  # "thêm 3tr vào ví momo", "nhận 5tr vào tiền mặt", "cộng 2tr vào tài
+  # khoản VCB". We let the rule tier catch the high-signal shapes so
+  # latency stays sub-200ms and the LLM budget stays trim. The
+  # canonical parser inside the handler re-extracts amount + merchant
+  # from the raw text, so we don't need named groups here.
+  patterns:
+    # "thêm 3tr vào ví momo" / "them 200k vao vi zalopay"
+    - pattern: '^(?:them|cong|nap|nhan|cho|gui|bo)\s+[\d.,]+.*(?:vao|into)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+    # "nhận lương 20tr vào tiền mặt"
+    - pattern: '^(?:nhan|duoc|thuong|luong)\s+(?:luong\s+)?[\d.,]+.*(?:vao|tai|o|trong)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+    # "trừ 50k khỏi ví momo" — explicit expense from named asset.
+    - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
+      confidence: 0.9
+
 action_record_saving:
   description: "User wants to record a saving."
   patterns:
@@ -299,28 +318,85 @@ action_add_asset:
 
 action_edit_asset:
   description: "User wants to edit an existing asset."
+  # Two shapes are supported:
+  #   (1) plain "sửa <type> [<name>]" — opens the picker/wizard
+  #   (2) inline edit "sửa <type> [<name>] thành <value>" — applies the
+  #       update immediately (e.g. "sửa cổ phiếu FPT thành 200 cổ",
+  #       "sửa ACB thành 50tr"). The handler reads asset_name and
+  #       new_value from the named capture groups and confirms before
+  #       writing — see action_edit_asset.py.
   patterns:
-    # "sửa bất động sản" / "sửa cổ phiếu FPT" / "sửa đất ba tư"
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b'
-      confidence: 0.95
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)\b'
-      confidence: 0.95
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b'
-      confidence: 0.95
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:vang|gold)\b'
+    # Inline edit — generic "sửa <name> thành <value>" without type token.
+    # Lower confidence than the typed variants so a more specific match
+    # wins when both apply (e.g. "sửa cổ phiếu FPT thành 200 cổ").
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?P<asset_name>.+?)\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.93
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem)\b'
+    # Inline edit + explicit type. Highest confidence — the user told us
+    # exactly which asset family to look in.
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+      confidence: 0.97
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+      confidence: 0.97
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+      confidence: 0.97
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:vang|gold)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+      confidence: 0.97
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+      confidence: 0.97
+    # Wizard launch — plain "sửa <type>" without a "thành" clause.
+    # "sửa bất động sản" / "sửa cổ phiếu FPT" / "sửa đất ba tư"
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.95
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:vang|gold)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.93
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.93
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+tai\s*san\b'
       confidence: 0.92
   parameter_extractors:
     asset_type:
       patterns:
-        - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
-        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
-        - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
-        - { match: 'vang|gold', value: gold }
-        - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
+        # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
+        # words doesn't accidentally flip asset_type to real_estate.
+        - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
+        - { match: '\b(?:vang|gold)\b', value: gold }
+        - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
+
+action_delete_asset:
+  description: "User wants to remove an existing asset."
+  # "xoá tài sản", "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT".
+  # Diacritic-stripped: "xoa" / "xoa tai san". The trailing capture
+  # (?P<asset_name>...) lets the handler skip straight to the
+  # confirm-delete card when the name matches exactly one active asset.
+  patterns:
+    - pattern: '^(?:xoa|xo|huy|remove|delete|del)\s+tai\s*san(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.95
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:vang|gold)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.9
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)(?:\s+(?P<asset_name>.+))?$'
+      confidence: 0.92
+  parameter_extractors:
+    asset_type:
+      patterns:
+        # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
+        # words doesn't accidentally flip asset_type to real_estate.
+        - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
+        - { match: '\b(?:vang|gold)\b', value: gold }
+        - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
 
 action_add_goal:
   description: "User wants to add a new financial goal."
@@ -336,9 +412,17 @@ nav_expense_dashboard:
   patterns:
     # "chi tiêu dashboard" / "dashboard chi tiêu" / "mở dashboard chi tiêu"
     - pattern: '\b(?:mo\s+)?(?:dashboard|bang\s*dieu\s*khien)\s+chi\s*(?:tieu|phi)\b'
-      confidence: 0.95
+      confidence: 0.97
     - pattern: '\bchi\s*(?:tieu|phi)\s+(?:dashboard|bang\s*dieu\s*khien)\b'
-      confidence: 0.95
+      confidence: 0.97
+    # Standalone "dashboard" / "mở dashboard" — user is clearly asking
+    # for the miniapp, not a report. Confidence intentionally below
+    # the typed variants so "dashboard chi tiêu" still wins via a
+    # narrower regex.
+    - pattern: '^(?:mo\s+)?dashboard\s*$'
+      confidence: 0.92
+    - pattern: '^mo\s+(?:bang\s*dieu\s*khien|dashboard)'
+      confidence: 0.92
 
 advisory:
   description: "User asks for investment / financial advice."

@@ -120,7 +120,7 @@ def format_rental_marked(
     if monthly_expenses > 0:
         lines.append(f"   • Chi phí: {format_money_short(monthly_expenses)}/tháng")
     lines.append(
-        f"   • Net yield: <b>{format_money_short(net_monthly)}</b>/tháng"
+        f"   • Lợi nhuận ròng: <b>{format_money_short(net_monthly)}</b>/tháng"
         f" (~{annual_yield_pct:.1f}%/năm)"
     )
     lines.append(f"   • Trạng thái: {status_label}")

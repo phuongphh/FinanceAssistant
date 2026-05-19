@@ -17,6 +17,7 @@ from backend.api.admin import (
     audit as admin_audit,
     auth as admin_auth,
     licenses as admin_licenses,
+    twin_metrics as admin_twin_metrics,
     users as admin_users,
 )
 from backend.database import get_session_factory
@@ -139,6 +140,22 @@ async def lifespan(app: FastAPI):
         logger.exception(
             "Failed to register chat menu button at startup; continuing — "
             "users keep whatever menu button BotFather has on file"
+        )
+
+    # Phase 4.3 Story 3.1 — register the Twin recompute worker on the
+    # in-memory event bus. Importing the module runs ``register()`` and
+    # subscribes ``handle_twin_event`` so that ``expense.added``,
+    # ``asset.created`` etc. published from services actually wake up a
+    # debounced recompute. Without this import, every publish is a no-op
+    # because the subscriber set is empty.
+    try:
+        from backend.workers import twin_recompute_worker  # noqa: F401
+
+        logger.info("Twin recompute worker subscribed to event bus")
+    except Exception:
+        logger.exception(
+            "Failed to register Twin recompute worker — on-demand Twin "
+            "recompute (Story 3.1) will be inactive this boot"
         )
 
     # Pick up any telegram_updates that were mid-flight when the previous
@@ -281,6 +298,7 @@ app.include_router(admin_analytics.router, prefix="/api/admin")
 app.include_router(admin_audit.router, prefix="/api/admin")
 app.include_router(admin_users.router, prefix="/api/admin")
 app.include_router(admin_licenses.router, prefix="/api/admin")
+app.include_router(admin_twin_metrics.router, prefix="/api/admin")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 

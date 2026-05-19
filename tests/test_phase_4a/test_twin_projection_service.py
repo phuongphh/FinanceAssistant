@@ -133,6 +133,151 @@ async def test_twin_snapshot_handles_fresh_stale_and_missing(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_twin_snapshot_flags_value_staleness_when_wallet_diverges(monkeypatch):
+    """A cone computed when assets were 50tr must read as value-stale once
+    the wallet grows to 2.6 tỷ — the chart's anchor no longer matches the
+    user's portfolio even though the projection was computed today."""
+    user_id = uuid.uuid4()
+
+    async def fake_calculate(db, uid):
+        return SimpleNamespace(total=Decimal("2_595_122_754"))
+
+    monkeypatch.setattr(
+        twin_query_service.wealth_service, "calculate_stored_current", fake_calculate
+    )
+
+    diverged_projection = SimpleNamespace(
+        computed_at=datetime.now(timezone.utc),
+        cone_data=[{"year": 0, "p50": "50000000"}, {"year": 10, "p50": "85500000"}],
+        horizon_years=10,
+        base_net_worth=Decimal("50000000"),
+    )
+
+    async def fake_latest(db, uid, scenario=None):
+        return diverged_projection
+
+    monkeypatch.setattr(twin_query_service, "get_latest_projection", fake_latest)
+    snap = await twin_query_service.get_twin_snapshot(FakeDB(), user_id)
+    assert snap.is_value_stale is True
+    # The cone is still "fresh" by the 14-day clock — only value-staleness
+    # caught the bug.
+    assert snap.is_stale is False
+
+
+@pytest.mark.asyncio
+async def test_twin_snapshot_does_not_flag_value_staleness_within_threshold(
+    monkeypatch,
+):
+    user_id = uuid.uuid4()
+
+    async def fake_calculate(db, uid):
+        return SimpleNamespace(total=Decimal("104_000_000"))
+
+    monkeypatch.setattr(
+        twin_query_service.wealth_service, "calculate_stored_current", fake_calculate
+    )
+
+    matched_projection = SimpleNamespace(
+        computed_at=datetime.now(timezone.utc),
+        cone_data=[{"year": 0, "p50": "100000000"}],
+        horizon_years=10,
+        base_net_worth=Decimal("100000000"),
+    )
+
+    async def fake_latest(db, uid, scenario=None):
+        return matched_projection
+
+    monkeypatch.setattr(twin_query_service, "get_latest_projection", fake_latest)
+    snap = await twin_query_service.get_twin_snapshot(FakeDB(), user_id)
+    # 4% gap < 10% threshold — still considered current.
+    assert snap.is_value_stale is False
+
+
+@pytest.mark.asyncio
+async def test_recompute_bypasses_debounce_when_base_diverged(monkeypatch):
+    """A 50tr → 2.6 tỷ jump must trigger recompute even if the previous
+    projection was computed five minutes ago — the long debounce only
+    holds while the wallet still matches the stored base."""
+    user_id = uuid.uuid4()
+    recompute_service._pending_user_ids.clear()
+
+    async def fake_calculate(db, uid):
+        return SimpleNamespace(total=Decimal("2_600_000_000"))
+
+    async def fake_latest(db, uid):
+        return SimpleNamespace(
+            computed_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+            base_net_worth=Decimal("50000000"),
+        )
+
+    monkeypatch.setattr(
+        recompute_service.wealth_service, "calculate_stored_current", fake_calculate
+    )
+    monkeypatch.setattr(recompute_service, "get_latest_projection", fake_latest)
+
+    allowed = await recompute_service.should_recompute(
+        FakeDB(), user_id, Decimal("1_580_000_000")
+    )
+    assert allowed is True
+
+
+@pytest.mark.asyncio
+async def test_recompute_holds_debounce_when_base_matches(monkeypatch):
+    """Tiny edit five minutes after the last compute stays debounced when
+    the base is still close to the wallet — protects against compute
+    storms on noisy auto-quote refreshes."""
+    user_id = uuid.uuid4()
+    recompute_service._pending_user_ids.clear()
+
+    async def fake_calculate(db, uid):
+        return SimpleNamespace(total=Decimal("100_000_000"))
+
+    async def fake_latest(db, uid):
+        return SimpleNamespace(
+            computed_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+            base_net_worth=Decimal("99_500_000"),
+        )
+
+    monkeypatch.setattr(
+        recompute_service.wealth_service, "calculate_stored_current", fake_calculate
+    )
+    monkeypatch.setattr(recompute_service, "get_latest_projection", fake_latest)
+
+    allowed = await recompute_service.should_recompute(
+        FakeDB(), user_id, Decimal("500_000")
+    )
+    assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_recompute_hard_throttles_within_sixty_seconds(monkeypatch):
+    """Even when the base diverges, two recomputes inside HARD_THROTTLE
+    must collapse to one — onboarding can fire add/edit pairs at a few
+    hundred ms apart and we don't want each one to fan out a Monte Carlo."""
+    user_id = uuid.uuid4()
+    recompute_service._pending_user_ids.clear()
+
+    async def fake_calculate(db, uid):
+        return SimpleNamespace(total=Decimal("2_600_000_000"))
+
+    async def fake_latest(db, uid):
+        return SimpleNamespace(
+            computed_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            base_net_worth=Decimal("50_000_000"),
+        )
+
+    monkeypatch.setattr(
+        recompute_service.wealth_service, "calculate_stored_current", fake_calculate
+    )
+    monkeypatch.setattr(recompute_service, "get_latest_projection", fake_latest)
+
+    allowed = await recompute_service.should_recompute(
+        FakeDB(), user_id, Decimal("1_500_000_000")
+    )
+    assert allowed is False
+
+
+@pytest.mark.asyncio
 async def test_recompute_enqueue_debounces_three_quick_edits(monkeypatch):
     user_id = uuid.uuid4()
     recompute_service._pending_user_ids.clear()

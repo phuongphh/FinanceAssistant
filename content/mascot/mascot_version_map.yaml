@@ -1,0 +1,36 @@
+# Phase 4.3 Epic 2 — Bé Tiền 2030 mascot variants.
+# ``asset_url`` points to a versioned in-app asset until production upload
+# replaces ``telegram_cdn_url`` with Telegram CDN file URLs.
+variants:
+  p10:
+    label: "Khiêm tốn"
+    emoji: "🌧️"
+    mood: "bình tĩnh, thận trọng"
+    outfit: "áo mưa"
+    asset_path: "assets/mascot/betien_2030_p10_v1.png"
+    asset_url: "/miniapp/static/mascot/betien_2030_p10_v1.png"
+    telegram_cdn_url: null
+    alt: "Bé Tiền 2030 mặc áo mưa, bình tĩnh trong kịch bản khiêm tốn"
+  p50:
+    label: "Bình thường"
+    emoji: "⛅"
+    mood: "tự tin, cân bằng"
+    outfit: "cầm dù"
+    asset_path: "assets/mascot/betien_2030_p50_v1.png"
+    asset_url: "/miniapp/static/mascot/betien_2030_p50_v1.png"
+    telegram_cdn_url: null
+    alt: "Bé Tiền 2030 cầm dù, tự tin trong kịch bản bình thường"
+  p90:
+    label: "Lạc quan"
+    emoji: "☀️"
+    mood: "vui, sáng sủa"
+    outfit: "kính râm"
+    asset_path: "assets/mascot/betien_2030_p90_v1.png"
+    asset_url: "/miniapp/static/mascot/betien_2030_p90_v1.png"
+    telegram_cdn_url: null
+    alt: "Bé Tiền 2030 đeo kính râm, vui trong kịch bản lạc quan"
+tone_guard:
+  - "Không cute-aggressive"
+  - "Không trẻ con quá"
+  - "Không patronizing"
+  - "Ưu tiên cảm giác trợ lý tài chính thân thiện cho mass affluent Việt Nam"

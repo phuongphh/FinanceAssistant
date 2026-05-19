@@ -51,7 +51,9 @@ Trả về JSON với format:
 {{"amount": <số>, "merchant": "<tên hoặc mô tả ngắn>", "is_expense": <true|false>}}
 
 Quy tắc:
-- Nếu có số tiền và mô tả → is_expense: true
+- Nếu text bắt đầu bằng "+" trước số → đây là TIỀN VÀO (income), is_expense: false
+- Nếu text bắt đầu bằng "-" trước số → là chi tiêu, is_expense: true
+- Nếu có số tiền và mô tả (không có dấu +/-) → is_expense: true
 - Nếu là câu hỏi, tin nhắn thông thường, không phải chi tiêu → is_expense: false, amount: 0
 - "k" hoặc "K" cuối số = × 1000: 50k = 50000, 150k = 150000
 - merchant = nơi mua hoặc mô tả ngắn gọn nhất
@@ -71,6 +73,8 @@ Trả về JSON với format:
 }}
 
 Quy tắc:
+- Nếu text bắt đầu bằng "+" trước số → đây là TIỀN VÀO (income), is_expense: false.
+- Nếu text bắt đầu bằng "-" trước số → là chi tiêu, is_expense: true.
 - Nếu có nhiều cụm mô tả + số tiền, hãy tách thành nhiều items.
 - Ví dụ: "tiền xăng 50k, ăn trưa 50k" → 2 items.
 - Nếu chỉ có một số tiền tổng cho nhiều món, ví dụ "ăn tối và trà sữa 400k" → 1 item.
@@ -115,6 +119,33 @@ _FALLBACK_REPLY = (
     "Mình chưa nhận ra số tiền trong câu này 🌱 — bạn thử gõ rõ hơn"
     " như '50k cà phê' hoặc '150 ngàn ăn trưa' nhé."
 )
+
+
+# Wallet top-up shape: "thêm/cộng/nạp/nhận X vào ví|tài khoản Y" —
+# the user is explicitly moving money INTO a wallet/account, which is
+# income from the cash-flow perspective. Without this guard the
+# verbs (thêm, cộng, nạp) flow through the expense recorder because
+# they're not in _INCOME_KEYWORDS — silently corrupting expense
+# history (caught by code review on PR #669).
+_WALLET_TOPUP_RE = re.compile(
+    r"^\s*(?:them|cong|nap|nhan|cho|gui|bo|duoc|nop)\s+[+\-]?\s*[\d.,]+"
+    r".*?\b(?:vao|into|toi|den)\s+"
+    r"(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|"
+    r"vcb|acb|tcb|mb|tpb|techcom|sacombank|bidv|vietinbank)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_wallet_topup(text: str) -> bool:
+    """True when the message reads as a wallet/account top-up.
+
+    Distinct from generic income (no salary verb) but still income from
+    the expense-recorder's perspective — recording these as expenses
+    inverts cash flow on the user's books.
+    """
+    if not text:
+        return False
+    return bool(_WALLET_TOPUP_RE.search(_strip_diacritics(text.lower())))
 
 
 # Verbs that indicate the user is receiving money (income), NOT spending.
@@ -172,6 +203,18 @@ def _strip_diacritics(text: str) -> str:
     ).replace("đ", "d").replace("Đ", "D")
 
 
+def _has_leading_plus_sign(text: str) -> bool:
+    """True if the message starts with an explicit ``+`` before a number.
+
+    Convention: a leading ``+`` is the user's most direct signal that
+    this is money-in, not expense. The fast-path in ``message.py``
+    normally catches these before they reach the intent classifier; this
+    is a belt-and-suspenders check so signed input is never silently
+    recorded as expense even if routing changes.
+    """
+    return bool(re.match(r"^\s*\+\s*\d", text or ""))
+
+
 def _looks_like_income(text: str) -> bool:
     """True if the message reads as income rather than expense.
 
@@ -179,9 +222,21 @@ def _looks_like_income(text: str) -> bool:
     "nhận lương 20tr vào tiền mặt" as an expense (#656). If the message
     contains BOTH income and expense verbs, expense wins — the user is
     describing what they did with the money, not the receipt itself.
+
+    Also fires when the message starts with an explicit ``+`` sign so
+    "+200k" never gets recorded as an expense.
     """
     if not text:
         return False
+    if _has_leading_plus_sign(text):
+        return True
+    # Explicit wallet top-ups ("thêm 3tr vào ví momo") are always
+    # income, regardless of which verb leads. Check before the
+    # keyword/expense balancing because the topup phrasing is
+    # unambiguous — there is no "thêm 3tr vào ví momo để tiêu" reading
+    # that makes the money flow OUT.
+    if _looks_like_wallet_topup(text):
+        return True
     norm = _strip_diacritics(text.lower())
     has_income = any(kw in norm for kw in _INCOME_KEYWORDS)
     if not has_income:

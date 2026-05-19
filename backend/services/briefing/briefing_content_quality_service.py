@@ -43,9 +43,7 @@ class BriefingInsight:
 
     @property
     def render_text(self) -> str:
-        return (
-            f"🔎 {self.insight_text}\n💬 Hỏi thử: <code>{self.suggested_query}</code>"
-        )
+        return f"🔎 {self.insight_text}\n💬 Hỏi thử: {self.suggested_query}"
 
 
 def load_templates() -> dict[str, Any]:

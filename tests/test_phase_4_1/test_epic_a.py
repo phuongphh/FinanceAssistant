@@ -191,6 +191,8 @@ def test_first_briefing_decorate_wraps_with_explainer_and_button():
 
     assert "briefing đầu tiên" in decorated
     assert original in decorated  # don't drop the underlying briefing
+    assert "<b>" not in decorated
+    assert "<code>" not in decorated
     assert markup["inline_keyboard"][0][0]["callback_data"].startswith(
         "first_briefing:"
     )

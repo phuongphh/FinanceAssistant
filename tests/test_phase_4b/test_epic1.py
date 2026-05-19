@@ -272,11 +272,16 @@ async def test_should_recompute_at_threshold_returns_true(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_should_recompute_debounce_window_blocks(monkeypatch):
+    """Debounce holds when the projection's base still matches the wallet
+    — the user is editing inside a stable portfolio so we throttle.
+    Divergent wallets are tested separately, since they intentionally
+    bypass the long debounce."""
     user_id = uuid.uuid4()
     recompute_service._pending_user_ids.clear()
 
     fresh_projection = SimpleNamespace(
-        computed_at=datetime.now(timezone.utc) - timedelta(minutes=10)
+        computed_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        base_net_worth=Decimal("100000000"),
     )
 
     async def fake_latest(db, uid, scenario=None):

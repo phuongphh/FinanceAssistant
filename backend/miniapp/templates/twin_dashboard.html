@@ -32,16 +32,29 @@
         </section>
 
         <section id="content" hidden>
+            <section id="story-flow" class="story-flow section" aria-label="Câu chuyện Bé Tiền tương lai" hidden>
+                <div class="story-progress"><span id="story-step">1/5</span><button id="story-skip" class="text-btn" type="button">Bỏ qua, xem nhanh</button></div>
+                <article id="story-card" class="story-card"></article>
+                <div class="story-nav">
+                    <button id="story-prev" class="secondary-btn" type="button">← Lùi</button>
+                    <button id="story-next" class="primary-btn" type="button">Tiếp →</button>
+                </div>
+            </section>
+
             <header class="twin-hero" aria-label="Tổng quan Twin">
                 <div class="eyebrow">🔮 Bé Tiền tương lai</div>
                 <div class="hero-row">
                     <div>
-                        <div class="hero-label">Giá trị ròng hiện tại</div>
-                        <div class="hero-amount" id="net-worth">—</div>
+                        <button class="anchor-action" id="present-anchor-btn" type="button" aria-expanded="false">
+                            <span class="hero-label">Giá trị ròng hiện tại</span>
+                            <span class="hero-amount" id="net-worth">—</span>
+                        </button>
                     </div>
-                    <div class="delta-pill" id="delta-pill">—</div>
+                    <button class="delta-pill" id="delta-pill" type="button">—</button>
                 </div>
-                <p class="trust-copy">Mô phỏng xác suất P10/P50/P90 — không phải cam kết lợi nhuận.</p>
+                <div class="growth-row"><button id="growth-rate" class="growth-pill" type="button">Đang theo dõi nhịp</button></div>
+                <p class="trust-copy">Mô phỏng xác suất bằng thời tiết — không phải cam kết lợi nhuận.</p>
+                <div id="net-worth-breakdown" class="breakdown-panel" hidden></div>
             </header>
 
             <section class="section scenario-section" aria-label="Chọn kịch bản">
@@ -51,7 +64,7 @@
                 </div>
             </section>
 
-            <section class="section chart-section">
+            <section class="section chart-section" id="technical-detail" hidden>
                 <div class="section-heading">
                     <h2>Vùng xác suất 10 năm</h2>
                     <span id="computed-at" class="muted">—</span>
@@ -60,6 +73,12 @@
                     <canvas id="cone-chart" role="img" aria-label="Biểu đồ vùng xác suất Twin"></canvas>
                 </div>
                 <p class="section-hint">👆 Chạm vào điểm trên biểu đồ để xem khoảng P10–P90 từng năm.</p>
+            </section>
+
+            <section class="section outcome-section" id="life-outcome-section" hidden>
+                <h2>Dễ hình dung hơn</h2>
+                <p id="life-outcome-copy" class="life-outcome-copy"></p>
+                <button id="life-outcome-refresh" class="text-btn" type="button">Đổi ví dụ khác →</button>
             </section>
 
             <section class="section kpi-section">
@@ -87,7 +106,8 @@
                 <p class="section-hint" id="uncertainty-hint"></p>
             </section>
 
-            <button class="primary-btn full-width" id="cta-btn" type="button">Thay đổi để đạt Optimal</button>
+            <button class="primary-btn full-width" id="open-technical-btn" type="button">Xem chi tiết kỹ thuật</button>
+            <button class="primary-btn full-width" id="cta-btn" type="button">Thay đổi để đạt Tối ưu</button>
             <!-- APP_VERSION_MARKER -->
         </section>
     </main>
