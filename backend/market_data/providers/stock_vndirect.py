@@ -14,6 +14,15 @@ from backend.market_data.normalizer import PriceQuote
 from backend.market_data.providers.http_utils import decimal_or_none, first_present, require_decimal, unwrap_first_record
 
 
+DEFAULT_STOCK_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+}
+
+
 class VNDIRECTStockProvider(BaseProvider):
     """Fetch and normalize VNDIRECT stock quotes."""
 
@@ -60,7 +69,11 @@ class VNDIRECTStockProvider(BaseProvider):
         if self._client is not None:
             response = await request(self._client)
         else:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                headers=DEFAULT_STOCK_HEADERS,
+            ) as client:
                 response = await request(client)
         self._raise_for_status(response)
         return response.json()
