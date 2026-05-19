@@ -485,7 +485,7 @@
                     <div class="expense-amount">${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Xoá ${escapeHtml(title)}">🗑️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Reverse ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -525,7 +525,7 @@
                     <div class="expense-amount money-in-amount">+${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Xoá ${escapeHtml(title)}">🗑️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Reverse ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -550,7 +550,7 @@
 
     async function onQuickDelete(item) {
         const title = item.merchant || item.note || item.category_label || 'chi tiêu này';
-        const message = `Xoá "${title}"?\nThao tác này không thể hoàn tác.`;
+        const message = `Reverse "${title}"?\nBạn có chắc muốn đảo ngược giao dịch này?`;
         const confirmed = await new Promise((resolve) => {
             if (tg && tg.showConfirm) tg.showConfirm(message, resolve);
             else resolve(window.confirm(message));
@@ -560,7 +560,7 @@
         try {
             await fetchAPI(`/expenses/${item.id}`, { method: 'DELETE' });
         } catch (_err) {
-            if (tg && tg.showAlert) tg.showAlert('Không xoá được chi tiêu, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert('Không reverse được giao dịch, thử lại nhé.');
             await renderDashboard();
             return;
         }
@@ -726,7 +726,7 @@
     async function onDelete() {
         if (!editingExpenseId) return;
         const confirmed = await new Promise((resolve) => {
-            const msg = 'Xoá chi tiêu này?\nThao tác không thể hoàn tác.';
+            const msg = 'Reverse giao dịch này?\nBạn có chắc muốn đảo ngược giao dịch này?';
             if (tg && tg.showConfirm) tg.showConfirm(msg, resolve);
             else resolve(window.confirm(msg));
         });
@@ -737,7 +737,7 @@
             await fetchAPI(`/expenses/${idToDelete}`, { method: 'DELETE' });
         } catch (_err) {
             els.modalDelete.disabled = false;
-            if (tg && tg.showAlert) tg.showAlert('Không xoá được, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert('Không reverse được giao dịch, thử lại nhé.');
             return;
         }
         closeModal();

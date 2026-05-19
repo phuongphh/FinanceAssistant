@@ -76,6 +76,7 @@ from backend.models.onboarding_session import (
     OnboardingSession,
 )
 from backend.models.twin_calibration import HORIZONS_DAYS, TwinCalibrationSnapshot
+from backend.models.transaction import Transaction
 from backend.models.positioning_survey import (
     ALIGNED_POSITIONING_RESPONSES,
     MISALIGNED_POSITIONING_RESPONSES,
@@ -92,6 +93,7 @@ __all__ = [
     "AdminUser",
     "AdminAuditLog",
     "Expense",
+    "Transaction",
     "Goal",
     "MonthlyReport",
     "MarketSnapshot",
