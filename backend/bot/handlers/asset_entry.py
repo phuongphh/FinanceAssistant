@@ -81,7 +81,7 @@ from backend.bot.keyboards.asset_keyboard import (
     stock_current_price_keyboard,
     stock_subtype_keyboard,
 )
-from backend.bot.keyboards.common import parse_callback
+from backend.bot.keyboards.common import build_callback, parse_callback
 from backend.models.user import User
 from backend.services import wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
