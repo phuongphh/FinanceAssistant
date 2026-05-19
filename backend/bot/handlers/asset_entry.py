@@ -57,6 +57,7 @@ from backend.bot.formatters.wealth_formatter import (
     format_rental_marked,
 )
 from backend.bot.keyboards.asset_keyboard import (
+    CB_ASSET_MANAGE,
     clamp_page,
     add_more_keyboard,
     asset_delete_confirm_keyboard,
