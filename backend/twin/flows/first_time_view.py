@@ -39,6 +39,32 @@ async def should_show_full_story(db: AsyncSession, user_id: uuid.UUID) -> bool:
     return created_at < cutoff
 
 
+async def mark_story_completed(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    surface: str,
+    flow_mode: str = "compact",
+    screen_id: str | None = None,
+) -> None:
+    """Record a ``story_completed`` event for the reshow gate.
+
+    Logging this from the Telegram preamble path keeps
+    ``should_show_full_story`` consistent between Mini App and Bot
+    surfaces — both feed the same 30-day cooldown.
+    """
+    db.add(
+        TwinViewEvent(
+            user_id=user_id,
+            event_type="story_completed",
+            screen_id=screen_id,
+            flow_mode=flow_mode,
+            metadata_={"surface": surface},
+        )
+    )
+    await db.flush()
+
+
 def build_story_flow(data: dict[str, Any], *, full_flow: bool) -> dict[str, Any]:
     screens = [
         narrative_screen_intro.build(data),

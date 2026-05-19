@@ -150,6 +150,23 @@ async def send_twin_current(
     # while the chart starts from a wrong anchor. Telegram users are tapping
     # and waiting, so a ~500ms Monte Carlo is acceptable here; the Mini App
     # GET path stays read-only.
+    # First-time (or 30-day reshow) preamble. Sent BEFORE the chart so
+    # the user has a one-line orientation while the recompute spins. We
+    # only do this once per RESHOW_AFTER_DAYS — ``should_show_full_story``
+    # is keyed off ``twin_view_events`` of type ``story_completed`` /
+    # ``story_skipped``, so logging ``story_completed`` after the chart
+    # lands keeps subsequent opens silent.
+    first_time = False
+    try:
+        from backend.twin.flows.first_time_view import should_show_full_story
+        first_time = await should_show_full_story(db, user.id)
+    except Exception:
+        logger.exception("twin_handler: first-time check failed user=%s", user.id)
+    if first_time:
+        intro = copy.get("habit_loop", {}).get("first_time_intro")
+        if intro:
+            await notifier.send_message(chat_id, intro, parse_mode=None)
+
     needs_recompute = snapshot.projection is None or snapshot.is_value_stale
     if needs_recompute:
         await notifier.send_message(
@@ -277,6 +294,20 @@ async def send_twin_current(
         )
     )
     await _send_channel_content(notifier, chat_id, content)
+    if first_time:
+        try:
+            from backend.twin.flows.first_time_view import mark_story_completed
+
+            await mark_story_completed(
+                db,
+                user.id,
+                surface="telegram",
+                screen_id="telegram_preamble",
+            )
+        except Exception:
+            logger.exception(
+                "twin_handler: story_completed log failed user=%s", user.id
+            )
     try:
         await _send_habit_loop_prompt(chat_id, notifier)
     except Exception:

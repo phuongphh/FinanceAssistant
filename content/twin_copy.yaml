@@ -50,6 +50,20 @@ habit_loop:
   prompt: "Bé Tiền có thể giải thích vì sao Twin trông như vậy, hoặc gợi ý một bước nhỏ tiếp theo nhé."
   button_causality: "🧭 Vì sao Twin thay đổi?"
   button_action: "✨ Việc nên làm tiếp →"
+  # Push sent from on-demand recompute after a noticeable Twin change.
+  # ``direction_up`` / ``direction_down`` are inlined into ``push_text``
+  # so the punctuation/spacing stays consistent across both signs.
+  push_direction_up: "nhích lên"
+  push_direction_down: "nhích xuống"
+  push_text: "🔮 Twin vừa {direction} {pct}%. Bấm '{causality}' để xem chi tiết."
+  # First-time Twin preamble: a single warm orientation line sent BEFORE
+  # the chart on the user's first ever Twin view (or once per 30 days
+  # — see ``RESHOW_AFTER_DAYS``). Keeps the carousel-style screens of
+  # the Mini App out of Telegram while still giving the chart context.
+  first_time_intro: |-
+    🌱 Đây là Bé Tiền tương lai của bạn.
+
+    Mình mô phỏng 1.000 kịch bản và vẽ vùng từ khiêm tốn → lạc quan để bạn hình dung. Không phải lời hứa — chỉ là một bức tranh để cùng nhau lái tới.
 
 recompute:
   done: "🔮 Bé Tiền vừa cập nhật xong dự phóng tương lai cho bạn. Mở Twin để xem nhé!"
