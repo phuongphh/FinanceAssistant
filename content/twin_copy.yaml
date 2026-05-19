@@ -111,10 +111,16 @@ narrative:
     hnw: "tài sản lớn"
 
 scenario_comparison:
-  tooltip_optimal: "Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt."
+  # Strategy-aware tooltips. Engine picks one per user based on whether the
+  # wealth-tier rebalance would *raise* or *lower* their expected return.
+  tooltip_optimal_rebalance: "Kịch bản Tối Ưu giả định: phân bổ lại theo danh mục mục tiêu của bậc tài sản hiện tại, kèm tiết kiệm thêm 10% mỗi tháng. Mục tiêu là đa dạng hoá rủi ro và đẩy mức kỳ vọng lên."
+  tooltip_optimal_savings_only: "Danh mục hiện tại của bạn đã có mức kỳ vọng cao hơn nhịp khuyến nghị cho bậc tài sản này. Bé Tiền không gợi ý đổi phân bổ — chỉ thêm 10% tiết kiệm mỗi tháng để vùng dự phóng nhích lên đều."
+  # Legacy key kept so older bundles fall back safely. Treat as the rebalance tooltip.
+  tooltip_optimal: "Kịch bản Tối Ưu giả định: phân bổ lại theo danh mục mục tiêu, kèm tiết kiệm thêm 10% mỗi tháng."
   delta_badge_positive: "+{delta_pct}%"
   delta_badge_negative: "{delta_pct}%"
   cta_savings: "Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng"
+  cta_savings_only: "Bé Tiền chỉ gợi ý tiết kiệm thêm ~{amount}/tháng — phân bổ hiện tại giữ nguyên."
   cta_no_change: "Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!"
   milestone_label: "Năm {year}"
 

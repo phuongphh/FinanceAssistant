@@ -10,6 +10,6 @@ Every persisted projection must stamp this version so future accuracy tracking
 can separate old predictions from newer engine behavior.
 """
 
-ENGINE_VERSION = "4a.1.0"
+ENGINE_VERSION = "4a.2.0"
 
 __all__ = ["ENGINE_VERSION"]

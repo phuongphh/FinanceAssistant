@@ -36,6 +36,7 @@
         comparisonBadges: document.getElementById('comparison-badges'),
         savingsCta: document.getElementById('savings-cta'),
         optimalInfoBtn: document.getElementById('optimal-info-btn'),
+        optimalStrategyNote: document.getElementById('optimal-strategy-note'),
         uncertaintySection: document.getElementById('uncertainty-section'),
         uncertaintyList: document.getElementById('uncertainty-list'),
         uncertaintyHint: document.getElementById('uncertainty-hint'),
@@ -132,6 +133,7 @@
             ? `${computedLabel} • đang cập nhật lại theo tài sản mới`
             : computedLabel;
         renderChart(data.cone || []);
+        renderOptimalStrategyNote(data);
         renderLifeOutcome(data);
         renderKpis(data.cone || [], data.scenario_labels || {});
         renderAllocation(data.allocation || {});
@@ -279,6 +281,25 @@
         return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'Đường bình thường' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
     }
 
+    function renderOptimalStrategyNote(data) {
+        if (!els.optimalStrategyNote) return;
+        if (data.scenario !== 'optimal' || !data.optimal_strategy) {
+            els.optimalStrategyNote.hidden = true;
+            return;
+        }
+        const copy = data.scenario_comparison_copy || {};
+        const msg = copy.tooltip || '';
+        if (!msg) {
+            els.optimalStrategyNote.hidden = true;
+            return;
+        }
+        els.optimalStrategyNote.textContent = msg;
+        els.optimalStrategyNote.classList.toggle(
+            'savings-only', data.optimal_strategy === 'savings_only'
+        );
+        els.optimalStrategyNote.hidden = false;
+    }
+
     function renderLifeOutcome(data) {
         if (!els.lifeOutcomeSection) return;
         if (!data.life_outcome) { els.lifeOutcomeSection.hidden = true; return; }
@@ -329,10 +350,13 @@
                 </div>
             </div>`;
         }).join('');
-        if (data.monthly_savings_needed && Number(data.monthly_savings_needed) > 0) {
-            els.savingsCta.textContent = `Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~${formatMoneyShort(Number(data.monthly_savings_needed))}/tháng`;
+        const copy = data.scenario_comparison_copy || {};
+        const savingsAmount = Number(data.monthly_savings_needed || 0);
+        if (savingsAmount > 0) {
+            const template = copy.cta_savings || 'Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng';
+            els.savingsCta.textContent = template.replace('{amount}', formatMoneyShort(savingsAmount));
         } else {
-            els.savingsCta.textContent = 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
+            els.savingsCta.textContent = copy.cta_no_change || 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
         }
         els.savingsCta.hidden = false;
         els.comparisonSection.hidden = false;
@@ -406,7 +430,10 @@
     }
 
     function showOptimalTooltip() {
-        const msg = 'Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt.';
+        const data = cache[currentScenario] || cache.current || {};
+        const copy = data.scenario_comparison_copy || {};
+        const msg = copy.tooltip
+            || 'Kịch bản Tối Ưu giả định: phân bổ lại theo danh mục mục tiêu, kèm tiết kiệm thêm 10% mỗi tháng.';
         if (tg && tg.showAlert) tg.showAlert(msg);
         else alert(msg);
     }
