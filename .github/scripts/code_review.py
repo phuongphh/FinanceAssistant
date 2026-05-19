@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import anthropic
 import requests
 
@@ -49,18 +50,36 @@ anywhere except on the final VERDICT line. If a check raised a concern but
 your re-evaluation cleared it, that is a PASS.
 """
 
-response = client.messages.create(
-    model="claude-haiku-4-5-20251001",
-    max_tokens=1500,
-    temperature=0,
-    system=SYSTEM_PROMPT,
-    messages=[
-        {
-            "role": "user",
-            "content": diff
-        }
-    ]
-)
+def request_review_with_retry(max_attempts: int = 5):
+    """Call Anthropic with retry for transient overloaded errors (HTTP 529)."""
+    delay_seconds = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1500,
+                temperature=0,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": diff
+                    }
+                ]
+            )
+        except anthropic.OverloadedError as e:
+            if attempt == max_attempts:
+                print(f"ERROR: Anthropic overloaded after {max_attempts} attempts: {e}")
+                raise
+            print(
+                f"Anthropic overloaded (attempt {attempt}/{max_attempts}). "
+                f"Retrying in {delay_seconds}s..."
+            )
+            time.sleep(delay_seconds)
+            delay_seconds *= 2
+
+
+response = request_review_with_retry()
 
 result = response.content[0].text.strip()
 
