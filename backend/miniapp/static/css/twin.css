@@ -28,6 +28,8 @@
 .scenario-btn { border: 0; border-radius: 14px; padding: 11px 10px; background: rgba(100,116,139,0.10); color: var(--text-muted); font-weight: 700; transition: transform .15s ease, background .15s ease, color .15s ease; }
 .scenario-btn.active { background: var(--primary); color: var(--primary-text); box-shadow: 0 6px 16px rgba(59,130,246,.18); }
 .scenario-btn:active { transform: scale(.98); }
+.optimal-strategy-note { margin: 10px 4px 0; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.45; color: var(--text); background: rgba(20,184,166,.10); border: 1px solid rgba(20,184,166,.28); }
+.optimal-strategy-note.savings-only { background: rgba(124,58,237,.10); border-color: rgba(124,58,237,.28); }
 
 .section-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .twin-chart-wrap { height: 260px; }

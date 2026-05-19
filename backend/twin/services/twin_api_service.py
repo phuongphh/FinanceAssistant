@@ -10,8 +10,11 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +49,15 @@ _EMPTY_COPY = (
 )
 _MILESTONE_CALENDAR_YEARS = (2027, 2030, 2035)
 _SAVINGS_ROUND = Decimal("500000")
+_COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "twin_copy.yaml"
+
+
+@lru_cache(maxsize=1)
+def _scenario_comparison_copy() -> dict[str, str]:
+    """Return the ``scenario_comparison`` block from twin_copy.yaml."""
+    with _COPY_PATH.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    return dict(data.get("scenario_comparison") or {})
 
 
 async def build_twin_payload(
@@ -85,9 +97,11 @@ async def build_twin_payload(
         try:
             from backend.twin.services import recompute_service
 
-            delta_for_signal = snapshot.actual_nw - Decimal(
-                str(projection.base_net_worth or 0)
-            ) if projection else snapshot.actual_nw
+            delta_for_signal = (
+                snapshot.actual_nw - Decimal(str(projection.base_net_worth or 0))
+                if projection
+                else snapshot.actual_nw
+            )
             await recompute_service.enqueue_recompute_if_needed(
                 db, user_id, delta_for_signal
             )
@@ -126,6 +140,7 @@ async def build_twin_payload(
         current_proj, optimal_proj, projection.computed_at
     )
     monthly_savings_needed = _compute_monthly_savings_needed(current_proj, optimal_proj)
+    optimal_strategy = _derive_optimal_strategy(current_proj, optimal_proj)
 
     # Phase 4B Epic 2: ``exclude_event_ids`` lets the Mini App toggle a single
     # event off and re-render the cone WITHOUT a Monte Carlo recompute. We
@@ -199,6 +214,8 @@ async def build_twin_payload(
         "sim_paths": projection.sim_paths,
         "engine_version": projection.engine_version,
         "comparison_deltas": comparison_deltas,
+        "optimal_strategy": optimal_strategy,
+        "scenario_comparison_copy": _strategy_copy(optimal_strategy),
         "monthly_savings_needed": (
             _money(monthly_savings_needed)
             if monthly_savings_needed is not None
@@ -245,6 +262,7 @@ def etag_for_payload(payload: dict[str, Any]) -> str:
             "engine_version",
             "excluded_event_count",
             "is_value_stale",
+            "optimal_strategy",
             "story_flow",
         )
     )
@@ -346,3 +364,44 @@ def _compute_monthly_savings_needed(
     # Round to nearest 500k
     rounded = (diff / _SAVINGS_ROUND).quantize(Decimal("1")) * _SAVINGS_ROUND
     return max(rounded, Decimal("0"))
+
+
+_ALLOCATION_MATCH_TOLERANCE = Decimal("0.005")
+
+
+def _strategy_copy(strategy: str | None) -> dict[str, str]:
+    """Return the localized copy bundle for ``strategy`` (defaults to rebalance)."""
+    copy = _scenario_comparison_copy()
+    tooltip_key = (
+        "tooltip_optimal_savings_only"
+        if strategy == "savings_only"
+        else "tooltip_optimal_rebalance"
+    )
+    cta_key = "cta_savings_only" if strategy == "savings_only" else "cta_savings"
+    return {
+        "tooltip": str(copy.get(tooltip_key) or copy.get("tooltip_optimal") or ""),
+        "cta_savings": str(copy.get(cta_key) or copy.get("cta_savings") or ""),
+        "cta_no_change": str(copy.get("cta_no_change") or ""),
+    }
+
+
+def _derive_optimal_strategy(current_proj: Any, optimal_proj: Any) -> str | None:
+    """Return ``"savings_only"`` when optimal keeps current weights, else ``"rebalance_to_target"``.
+
+    The Pareto-aware engine swaps in the user's current allocation when the
+    wealth-tier target would lower expected return; comparing the two stored
+    snapshots avoids a schema migration to persist the decision explicitly.
+    """
+    if current_proj is None or optimal_proj is None:
+        return None
+    current_alloc = current_proj.allocation_snapshot or {}
+    optimal_alloc = optimal_proj.allocation_snapshot or {}
+    if not current_alloc or not optimal_alloc:
+        return None
+    assets = set(current_alloc) | set(optimal_alloc)
+    for asset in assets:
+        cur = Decimal(str(current_alloc.get(asset, 0)))
+        opt = Decimal(str(optimal_alloc.get(asset, 0)))
+        if abs(cur - opt) > _ALLOCATION_MATCH_TOLERANCE:
+            return "rebalance_to_target"
+    return "savings_only"
