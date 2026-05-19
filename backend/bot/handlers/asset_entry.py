@@ -44,7 +44,7 @@ import html
 import logging
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -112,25 +112,13 @@ from backend.services.wealth_dashboard_service import (
     normalize_sort,
 )
 from backend.twin.services.recompute_service import enqueue_recompute_if_needed
+from backend.bot.utils.date_parser import parse_vietnamese_date
 from backend.wealth.ladder import update_user_level
 from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import asset_service, net_worth_calculator, rental_service
 
 logger = logging.getLogger(__name__)
 
-
-def _parse_vietnamese_date(value: str) -> date | None:
-    cleaned = (value or "").strip()
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(cleaned, fmt).date()
-        except ValueError:
-            pass
-    # Backward-compatible fallback for old YYYY-MM-DD prompts still visible in chat history.
-    try:
-        return date.fromisoformat(cleaned)
-    except ValueError:
-        return None
 
 _DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
 # Tracks the dashboard report page each user last viewed so wizard returns
@@ -2306,8 +2294,8 @@ async def _handle_rental_lease_input(
             parse_mode="HTML",
         )
         return
-    start = _parse_vietnamese_date(parts[0])
-    end = _parse_vietnamese_date(parts[1])
+    start = parse_vietnamese_date(parts[0])
+    end = parse_vietnamese_date(parts[1])
     if start is None or end is None:
         await send_message(
             chat_id=chat_id,

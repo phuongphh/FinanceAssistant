@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,23 +54,10 @@ from backend.services import (
 )
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import answer_callback, send_message
+from backend.bot.utils.date_parser import parse_vietnamese_date
 from backend.wealth.amount_parser import has_negative_sign, parse_amount
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_vietnamese_date(value: str) -> date | None:
-    cleaned = (value or "").strip()
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(cleaned, fmt).date()
-        except ValueError:
-            pass
-    # Backward-compatible fallback for old YYYY-MM-DD prompts still visible in chat history.
-    try:
-        return date.fromisoformat(cleaned)
-    except ValueError:
-        return None
 
 
 class GoalEvent:
@@ -391,7 +378,7 @@ async def _handle_date_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict,
 ) -> None:
     cleaned = text.strip()
-    target_date = _parse_vietnamese_date(cleaned)
+    target_date = parse_vietnamese_date(cleaned)
     if target_date is None:
         await send_message(
             chat_id=chat_id,
@@ -752,7 +739,7 @@ async def _handle_edit_date_input(
     cleaned = text.strip().lower()
     target_date: date | None = None
     if cleaned not in ("skip", "bỏ qua", "bo qua"):
-        target_date = _parse_vietnamese_date(text.strip())
+        target_date = parse_vietnamese_date(text.strip())
         if target_date is None:
             await send_message(
                 chat_id=chat_id,
