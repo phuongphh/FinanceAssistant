@@ -674,6 +674,49 @@ async def show_asset_delete_list(
     )
 
 
+
+
+async def show_asset_delete_matches_list(
+    chat_id: int,
+    matches: list,
+) -> None:
+    """Show only the matched assets for delete confirmation."""
+    if not matches:
+        return
+
+    rows = [
+        [
+            {
+                "text": f"🗑 {_asset_delete_row_label(asset)}"[:60],
+                "callback_data": build_callback(
+                    CB_ASSET_MANAGE, "delete_confirm", str(asset.id)
+                ),
+            }
+        ]
+        for asset in matches
+    ]
+    rows.append(
+        [
+            {
+                "text": "◀️ Chọn loại khác",
+                "callback_data": build_callback(CB_ASSET_MANAGE, "delete_type"),
+            }
+        ]
+    )
+    rows.append(
+        [
+            {
+                "text": "❌ Hủy",
+                "callback_data": build_callback(CB_ASSET_MANAGE, "cancel"),
+            }
+        ]
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="Chọn tài sản muốn xoá:",
+        parse_mode="HTML",
+        reply_markup={"inline_keyboard": rows},
+    )
 async def _confirm_asset_delete(
     db: AsyncSession, chat_id: int, user: User, asset_id_text: str
 ) -> None:

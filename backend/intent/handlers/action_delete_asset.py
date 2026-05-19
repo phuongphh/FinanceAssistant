@@ -105,9 +105,9 @@ class ActionDeleteAssetHandler(IntentHandler):
                     db, chat_id, user, str(matches[0].id)
                 )
                 return ""
-            if len(matches) > 1 and asset_type:
-                await asset_entry_handlers.show_asset_delete_list(
-                    db, chat_id, user, asset_type, subtype=asset_subtype
+            if len(matches) > 1:
+                await asset_entry_handlers.show_asset_delete_matches_list(
+                    chat_id, matches
                 )
                 return ""
 
