@@ -94,3 +94,33 @@ async def test_delete_asset_name_match_respects_subtype(delete_handler_module):
     called_asset_id = delete_handler_module.asset_entry_handlers._confirm_asset_delete.await_args.args[3]
     assert called_asset_id == str(fund.id)
     delete_handler_module.asset_entry_handlers.show_asset_delete_list.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_delete_asset_matches_ticker_in_extra(delete_handler_module):
+    intent = IntentResult(
+        intent=IntentType.ACTION_DELETE_ASSET,
+        confidence=0.95,
+        raw_text="xóa tài sản tcef",
+        parameters={"asset_name": "tcef"},
+    )
+    matched = SimpleNamespace(
+        id=uuid.uuid4(),
+        is_active=True,
+        name="Quỹ trái phiếu dài hạn",
+        asset_type="stock",
+        subtype="fund",
+        extra={"ticker": "TCEF"},
+    )
+
+    with patch.object(
+        delete_handler_module.asset_service,
+        "get_user_assets",
+        AsyncMock(return_value=[matched]),
+    ):
+        out = await delete_handler_module.ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
+
+    assert out == ""
+    delete_handler_module.asset_entry_handlers._confirm_asset_delete.assert_awaited_once()
+    called_asset_id = delete_handler_module.asset_entry_handlers._confirm_asset_delete.await_args.args[3]
+    assert called_asset_id == str(matched.id)

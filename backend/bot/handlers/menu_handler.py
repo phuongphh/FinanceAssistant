@@ -403,14 +403,25 @@ async def _navigate(
         )
         return
 
-    await edit_message_text(
-        chat_id=chat_id,
-        message_id=message_id,
-        text=text,
-        parse_mode=None,
-        reply_markup=keyboard,
-        **message_kwargs_for_animation(text, "submenu"),
-    )
+    try:
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode=None,
+            reply_markup=keyboard,
+            **message_kwargs_for_animation(text, "submenu"),
+        )
+    except Exception:
+        # Some callbacks come from non-text messages (e.g. Twin share photo).
+        # ``editMessageText`` is invalid there; fall back to a fresh message.
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=None,
+            reply_markup=keyboard,
+            **message_kwargs_for_animation(text, "submenu"),
+        )
     analytics.track(
         "menu_navigated",
         user_id=user.id,

@@ -43,6 +43,20 @@ def _name_matches(asset_name: str, query: str) -> bool:
     return strip_diacritics(query.lower()) in strip_diacritics(asset_name.lower())
 
 
+
+
+def _asset_matches_query(asset, query: str) -> bool:
+    """Match by display name OR ticker/symbol in ``asset.extra``."""
+    if _name_matches(getattr(asset, "name", ""), query):
+        return True
+    extra = getattr(asset, "extra", {}) or {}
+    for key in ("ticker", "symbol", "code"):
+        v = extra.get(key)
+        if not v:
+            continue
+        if _name_matches(str(v), query):
+            return True
+    return False
 class ActionDeleteAssetHandler(IntentHandler):
     async def handle(
         self, intent: IntentResult, user: User, db: AsyncSession
@@ -58,7 +72,7 @@ class ActionDeleteAssetHandler(IntentHandler):
             matches = [
                 a
                 for a in assets
-                if a.is_active and _name_matches(a.name, asset_name)
+                if a.is_active and _asset_matches_query(a, asset_name)
                 and (asset_type is None or str(a.asset_type) == asset_type)
                 and (asset_subtype is None or str(getattr(a, "subtype", "")) == asset_subtype)
             ]
