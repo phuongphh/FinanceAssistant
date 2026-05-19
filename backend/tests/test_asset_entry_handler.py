@@ -2231,3 +2231,20 @@ async def test_grouped_dashboard_picker_uses_one_user_scoped_asset_query():
     ]
     assert f"asset:edit:{first.id}" in callbacks
     assert f"asset:edit:{second.id}" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_show_asset_delete_matches_list_builds_manage_callbacks():
+    first = _asset()
+    second = _asset()
+    second.name = "HPG tích lũy"
+
+    with patch.object(asset_entry, "send_message", AsyncMock()) as send:
+        await asset_entry.show_asset_delete_matches_list(12345, [first, second])
+
+    send.assert_awaited_once()
+    rows = send.await_args.kwargs["reply_markup"]["inline_keyboard"]
+    assert rows[0][0]["callback_data"] == f"asset_manage:delete_confirm:{first.id}"
+    assert rows[1][0]["callback_data"] == f"asset_manage:delete_confirm:{second.id}"
+    assert rows[-2][0]["callback_data"] == "asset_manage:delete_type"
+    assert rows[-1][0]["callback_data"] == "asset_manage:cancel"
