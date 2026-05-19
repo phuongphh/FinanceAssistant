@@ -75,9 +75,17 @@ def _parse_quantity(text: str) -> Decimal | None:
     m = _QUANTITY_SUFFIX_RE.search(text)
     if not m:
         return None
-    raw = m.group("num").replace(",", "").replace(".", "")
-    if not raw.isdigit():
-        return None
+    raw = m.group("num")
+    if "," in raw and "." in raw:
+        # Mixed separators: treat the rightmost as decimal, the other as thousands.
+        if raw.rfind(",") > raw.rfind("."):
+            raw = raw.replace(".", "").replace(",", ".")
+        else:
+            raw = raw.replace(",", "")
+    else:
+        # Single (or no) separator: in VN inputs "," is the decimal mark; "."
+        # is also commonly used. Normalize either to a Decimal-friendly dot.
+        raw = raw.replace(",", ".")
     try:
         return Decimal(raw)
     except Exception:

@@ -29,6 +29,10 @@ router = APIRouter(prefix="/twin-metrics", tags=["admin-twin-metrics"])
 CACHE_TTL_SECONDS = 15 * 60
 _RANGE_RE = r"^(7d|14d|30d|90d|custom)$"
 _SEGMENTS = {"starter", "young_pro", "mass_affluent", "hnw"}
+_ACTION_EVENT_KEYS = {
+    "action_suggestion.shown": "suggested",
+    "action_suggestion.complete": "completed",
+}
 
 
 def _admin_tenant_id(admin: AdminUser) -> int:
@@ -82,7 +86,7 @@ def _wealth_subquery():
             PortfolioAsset.user_id.label("user_id"),
             func.coalesce(func.sum(asset_value), 0).label("net_worth"),
         )
-        .where(PortfolioAsset.is_active.is_(True))
+        .where(PortfolioAsset.deleted_at.is_(None))
         .group_by(PortfolioAsset.user_id)
         .subquery()
     )
@@ -248,14 +252,16 @@ async def loop_health(
             .where(
                 Event.timestamp >= start,
                 Event.timestamp < end,
-                Event.event_type.in_(["twin_action_suggested", "twin_action_completed", "twin_return_after_action"]),
+                Event.event_type.in_(list(_ACTION_EVENT_KEYS.keys())),
                 *user_filter,
             )
             .group_by(func.date(Event.timestamp), Event.event_type)
         )).all()
         totals = Counter()
         for day, event_type, count in action_rows:
-            key = str(event_type).replace("twin_action_", "").replace("twin_", "")
+            key = _ACTION_EVENT_KEYS.get(str(event_type))
+            if not key:
+                continue
             day_counts[day][key] += int(count or 0)
             totals[key] += int(count or 0)
         trend = []
@@ -279,11 +285,9 @@ async def loop_health(
             select(TwinViewEvent.user_id).join(User, User.id == TwinViewEvent.user_id).outerjoin(wealth_sq, wealth_sq.c.user_id == User.id).where(TwinViewEvent.created_at >= start, TwinViewEvent.created_at < end, TwinViewEvent.event_type.in_(["story_opened", "screen_viewed"]), *user_filter)
         )).scalars().all())
         completed_users = set((await db.execute(
-            select(Event.user_id).join(User, User.id == Event.user_id).outerjoin(wealth_sq, wealth_sq.c.user_id == User.id).where(Event.timestamp >= start, Event.timestamp < end, Event.event_type == "twin_action_completed", *user_filter)
+            select(Event.user_id).join(User, User.id == Event.user_id).outerjoin(wealth_sq, wealth_sq.c.user_id == User.id).where(Event.timestamp >= start, Event.timestamp < end, Event.event_type == "action_suggestion.complete", *user_filter)
         )).scalars().all())
-        returned_users = set((await db.execute(
-            select(Event.user_id).join(User, User.id == Event.user_id).outerjoin(wealth_sq, wealth_sq.c.user_id == User.id).where(Event.timestamp >= start, Event.timestamp < end + timedelta(days=7), Event.event_type == "twin_return_after_action", *user_filter)
-        )).scalars().all())
+        returned_users: set = set()
         loop_closed = len(triggered_users & viewed_users & completed_users & returned_users)
         loop_rate = _pct(loop_closed, len(triggered_users))
         action_completion = _pct(totals["completed"], totals["suggested"])
