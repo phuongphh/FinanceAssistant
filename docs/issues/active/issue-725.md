@@ -9,11 +9,11 @@ UI/UX improvements for the Twin Dashboard: fix color contrast issues, improve re
 Dogfooding feedback highlights several UI pain points in the Twin Dashboard: gray milestone card lacks contrast, suggestion text blends in, uneven spacing in uncertainty card, the 5-slide intro carousel adds friction without value, and the "Xem kỹ thuật" button creates unnecessary tapping. These fixes make the dashboard cleaner and more readable.
 
 ## Issues
-- [#725](https://github.com/phuongphh/FinanceAssistant/issues/725) Fix milestone card color contrast
-- [#726](https://github.com/phuongphh/FinanceAssistant/issues/726) Bold/colorize suggestion text in Current vs Optimal card
-- [#727](https://github.com/phuongphh/FinanceAssistant/issues/727) Fix uniform spacing in Main Uncertainty Source card
-- [#728](https://github.com/phuongphh/FinanceAssistant/issues/728) Remove 5-slide intro carousel
-- [#729](https://github.com/phuongphh/FinanceAssistant/issues/729) Always show tech detail card with friendly labels, remove button
+- [#726](https://github.com/phuongphh/FinanceAssistant/issues/726) Fix milestone card color contrast
+- [#727](https://github.com/phuongphh/FinanceAssistant/issues/727) Bold/colorize suggestion text in Current vs Optimal card
+- [#728](https://github.com/phuongphh/FinanceAssistant/issues/728) Fix uniform spacing in Main Uncertainty Source card
+- [#729](https://github.com/phuongphh/FinanceAssistant/issues/729) Remove 5-slide intro carousel
+- [#730](https://github.com/phuongphh/FinanceAssistant/issues/730) Always show tech detail card with friendly labels, remove button
 
 ## Acceptance Criteria
 - [ ] Milestone card has visible, readable color (not gray)
@@ -30,7 +30,7 @@ Dogfooding feedback highlights several UI pain points in the Twin Dashboard: gra
 
 ## Claude Code Implementation Prompt
 ```
-Read Epic #[EPIC_NUMBER] and all sub-issues (#725-#729) in phuongphh/FinanceAssistant.
+Read Epic #725 and all sub-issues (#726-#730) in phuongphh/FinanceAssistant.
 
 Implement UI/UX improvements for Twin Dashboard:
 1. Fix milestone card color (replace gray with more visible color)
@@ -44,6 +44,6 @@ Guidelines:
 - UI changes only — no logic changes
 - Vietnamese labels for technical terms (use existing weather vocabulary: 🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan)
 - Conventional commits
-- Create draft PR linking to epic #[EPIC_NUMBER]
+- Create draft PR linking to epic #725
 ```
 
