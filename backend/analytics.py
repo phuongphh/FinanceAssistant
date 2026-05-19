@@ -66,6 +66,7 @@ class EventType:
     BRIEFING_STORY_CLICKED = "briefing_story_clicked"
     BRIEFING_ADD_ASSET_CLICKED = "briefing_add_asset_clicked"
     BRIEFING_SETTINGS_CLICKED = "briefing_settings_clicked"
+    BRIEFING_OPEN_TWIN_CLICKED = "briefing_open_twin_clicked"
 
     # Daily snapshot job — counters land here so we can confirm the
     # 23:59 cron actually ran each day (one row = one job execution).

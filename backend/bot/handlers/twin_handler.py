@@ -278,9 +278,38 @@ async def send_twin_current(
     )
     await _send_channel_content(notifier, chat_id, content)
     try:
+        await _send_habit_loop_prompt(chat_id, notifier)
+    except Exception:
+        logger.exception("twin_handler: habit-loop prompt failed user=%s", user.id)
+    try:
         await _maybe_send_next_action(db, chat_id, user, notifier)
     except Exception:
         pass
+
+
+async def _send_habit_loop_prompt(chat_id: int, notifier: Notifier) -> None:
+    """Attach the trust+action loop buttons under every Twin view.
+
+    Same callbacks as the threshold-crossing push so a single set of
+    handlers in ``twin_callback_handler`` owns both entry points.
+    """
+    loop_copy = _copy().get("habit_loop", {})
+    prompt = loop_copy.get("prompt")
+    causality_label = loop_copy.get("button_causality", "🧭 Vì sao Twin thay đổi?")
+    action_label = loop_copy.get("button_action", "✨ Việc nên làm tiếp →")
+    if not prompt:
+        return
+    await notifier.send_message(
+        chat_id,
+        prompt,
+        parse_mode=None,
+        reply_markup={
+            "inline_keyboard": [[
+                {"text": causality_label, "callback_data": "twin:causality"},
+                {"text": action_label, "callback_data": "twin:action"},
+            ]]
+        },
+    )
 
 
 async def _maybe_send_next_action(
