@@ -15,16 +15,16 @@ Currently expenses and money-ins are recorded as isolated records without proper
 ## Issues
 
 ### Data Layer
-- [#717](https://github.com/phuongphh/FinanceAssistant/issues/717) Transaction Data Model & DB Migration
+- [#720](https://github.com/phuongphh/FinanceAssistant/issues/720) Transaction Data Model & DB Migration
 
 ### Core Logic
-- [#718](https://github.com/phuongphh/FinanceAssistant/issues/718) Record Transactions from Expense & Money-In
+- [#721](https://github.com/phuongphh/FinanceAssistant/issues/721) Record Transactions from Expense & Money-In
 
 ### Expense Dashboard
-- [#719](https://github.com/phuongphh/FinanceAssistant/issues/719) Expense Dashboard — Display Transactions + Reverse Button
+- [#722](https://github.com/phuongphh/FinanceAssistant/issues/722) Expense Dashboard — Display Transactions + Reverse Button
 
 ### Edit Transaction
-- [#720](https://github.com/phuongphh/FinanceAssistant/issues/720) Edit Transaction with Reverse Logic
+- [#723](https://github.com/phuongphh/FinanceAssistant/issues/723) Edit Transaction with Reverse Logic
 
 ## Acceptance Criteria
 - [ ] All expenses and money-ins are stored as transactions in the DB
@@ -42,7 +42,7 @@ Currently expenses and money-ins are recorded as isolated records without proper
 
 ## Claude Code Implementation Prompt
 ```
-Read Epic #[EPIC_NUMBER] and all sub-issues (#717-#720) in phuongphh/FinanceAssistant.
+Read Epic #719 and all sub-issues (#720-#723) in phuongphh/FinanceAssistant.
 
 Implement transaction-based expense/money-in architecture:
 1. Create transaction table with source, amount, direction, note, status, timestamps
@@ -56,6 +56,6 @@ Guidelines:
 - Backward compatible — existing data migration must be safe
 - Conventional commits (improve:, feat:)
 - Write tests for reverse and edit edge cases
-- Create draft PR linking to epic #[EPIC_NUMBER]
+- Create draft PR linking to epic #719
 ```
 
