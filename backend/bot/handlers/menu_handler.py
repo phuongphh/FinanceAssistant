@@ -403,8 +403,9 @@ async def _navigate(
         )
         return
 
+    edited: dict | None = None
     try:
-        await edit_message_text(
+        edited = await edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
             text=text,
@@ -413,8 +414,12 @@ async def _navigate(
             **message_kwargs_for_animation(text, "submenu"),
         )
     except Exception:
-        # Some callbacks come from non-text messages (e.g. Twin share photo).
-        # ``editMessageText`` is invalid there; fall back to a fresh message.
+        edited = None
+    # ``send_telegram`` swallows API errors and returns ``None`` instead of
+    # raising — common when the source bubble is a photo (Twin share) so
+    # ``editMessageText`` is rejected. Fall back to a fresh message so the
+    # "Quay về menu" button never appears dead.
+    if edited is None:
         await send_message(
             chat_id=chat_id,
             text=text,
