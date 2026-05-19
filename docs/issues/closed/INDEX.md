@@ -404,6 +404,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #686 | Pre-Phase | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [pre-phase/issue-686.md](by-phase/pre-phase/issue-686.md) |
 | #687 | Pre-Phase | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [pre-phase/issue-687.md](by-phase/pre-phase/issue-687.md) |
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
+| #706 | Pre-Phase | Stock market data: VNDIRECT 403 (missing User-Agent), SSI 502 | [pre-phase/issue-706.md](by-phase/pre-phase/issue-706.md) |
 
-**Total:** 400 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 383 Pre-Phase)
+**Total:** 401 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 384 Pre-Phase)
