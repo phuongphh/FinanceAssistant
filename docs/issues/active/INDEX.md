@@ -34,5 +34,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
 | #703 | Bug: ModuleNotFoundError backend.adapters.telegram_service — import path sai | [issue-703.md](issue-703.md) |
 | #719 | [Epic] Enhance Expense Flow — Transaction-based Architecture | [issue-719.md](issue-719.md) |
+| #720 | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [issue-720.md](issue-720.md) |
 
-**Total active:** 30
+**Total active:** 31
