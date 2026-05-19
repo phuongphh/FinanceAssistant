@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import importlib
+import sys
 import uuid
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.intent.handlers.action_delete_asset import ActionDeleteAssetHandler
 from backend.intent.intents import IntentResult, IntentType
 
 
@@ -17,8 +18,27 @@ def _user() -> MagicMock:
     return u
 
 
+@pytest.fixture
+def delete_handler_module():
+    """Import handler with a lightweight fake ``asset_entry`` dependency.
+
+    CI intent suite may run without heavy optional deps (e.g. numpy from Twin
+    modules). ``action_delete_asset`` only needs a few async functions from
+    ``asset_entry``; stub that module so import stays isolated.
+    """
+    fake_asset_entry = ModuleType("backend.bot.handlers.asset_entry")
+    fake_asset_entry.show_asset_delete_list = AsyncMock()
+    fake_asset_entry.show_asset_delete_type_picker = AsyncMock()
+    fake_asset_entry._confirm_asset_delete = AsyncMock()
+
+    with patch.dict(sys.modules, {"backend.bot.handlers.asset_entry": fake_asset_entry}):
+        mod = importlib.import_module("backend.intent.handlers.action_delete_asset")
+        mod = importlib.reload(mod)
+        yield mod
+
+
 @pytest.mark.asyncio
-async def test_delete_asset_scopes_list_by_subtype_when_no_name_match():
+async def test_delete_asset_scopes_list_by_subtype_when_no_name_match(delete_handler_module):
     intent = IntentResult(
         intent=IntentType.ACTION_DELETE_ASSET,
         confidence=0.95,
@@ -26,28 +46,21 @@ async def test_delete_asset_scopes_list_by_subtype_when_no_name_match():
         parameters={"asset_type": "stock", "asset_subtype": "fund"},
     )
 
-    with (
-        patch(
-            "backend.intent.handlers.action_delete_asset.asset_entry_handlers.show_asset_delete_list",
-            AsyncMock(),
-        ) as show_list,
-        patch(
-            "backend.intent.handlers.action_delete_asset.asset_entry_handlers.show_asset_delete_type_picker",
-            AsyncMock(),
-        ) as show_type_picker,
-    ):
-        out = await ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
+    out = await delete_handler_module.ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
 
     assert out == ""
-    show_list.assert_awaited_once()
-    _, _, _, asset_type = show_list.await_args.args
+    delete_handler_module.asset_entry_handlers.show_asset_delete_list.assert_awaited_once()
+    _, _, _, asset_type = delete_handler_module.asset_entry_handlers.show_asset_delete_list.await_args.args
     assert asset_type == "stock"
-    assert show_list.await_args.kwargs["subtype"] == "fund"
-    show_type_picker.assert_not_called()
+    assert (
+        delete_handler_module.asset_entry_handlers.show_asset_delete_list.await_args.kwargs["subtype"]
+        == "fund"
+    )
+    delete_handler_module.asset_entry_handlers.show_asset_delete_type_picker.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_delete_asset_name_match_respects_subtype():
+async def test_delete_asset_name_match_respects_subtype(delete_handler_module):
     intent = IntentResult(
         intent=IntentType.ACTION_DELETE_ASSET,
         confidence=0.95,
@@ -69,24 +82,15 @@ async def test_delete_asset_name_match_respects_subtype():
         subtype="vn_stock",
     )
 
-    with (
-        patch(
-            "backend.intent.handlers.action_delete_asset.asset_service.get_user_assets",
-            AsyncMock(return_value=[fund, stock]),
-        ),
-        patch(
-            "backend.intent.handlers.action_delete_asset.asset_entry_handlers._confirm_asset_delete",
-            AsyncMock(),
-        ) as confirm,
-        patch(
-            "backend.intent.handlers.action_delete_asset.asset_entry_handlers.show_asset_delete_list",
-            AsyncMock(),
-        ) as show_list,
+    with patch.object(
+        delete_handler_module.asset_service,
+        "get_user_assets",
+        AsyncMock(return_value=[fund, stock]),
     ):
-        out = await ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
+        out = await delete_handler_module.ActionDeleteAssetHandler().handle(intent, _user(), MagicMock())
 
     assert out == ""
-    confirm.assert_awaited_once()
-    called_asset_id = confirm.await_args.args[3]
+    delete_handler_module.asset_entry_handlers._confirm_asset_delete.assert_awaited_once()
+    called_asset_id = delete_handler_module.asset_entry_handlers._confirm_asset_delete.await_args.args[3]
     assert called_asset_id == str(fund.id)
-    show_list.assert_not_called()
+    delete_handler_module.asset_entry_handlers.show_asset_delete_list.assert_not_called()
