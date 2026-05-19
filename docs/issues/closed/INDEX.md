@@ -408,6 +408,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #711 | Pre-Phase | Delete asset: multiple matches with no asset_type shows wrong screen | [pre-phase/issue-711.md](by-phase/pre-phase/issue-711.md) |
 | #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
 | #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
+| #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
 
-**Total:** 404 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 387 Pre-Phase)
+**Total:** 405 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 388 Pre-Phase)
