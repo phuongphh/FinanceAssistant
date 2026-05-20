@@ -37,4 +37,12 @@ def test_expense_overview_fetch_disables_cache_and_adds_timestamp_nonce():
     js = JS.read_text()
 
     assert "params.set('_t', String(Date.now()));" in js
-    assert "fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' });" in js
+    assert "fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' })" in js
+
+
+def test_expense_overview_has_watchdog_timeout_to_prevent_infinite_spinner():
+    js = JS.read_text()
+
+    assert "Promise.race([" in js
+    assert "failAfter(15000)" in js
+    assert "new Error('API timeout')" in js

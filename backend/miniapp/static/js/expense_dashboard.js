@@ -89,6 +89,7 @@
     const SOURCE = new URLSearchParams(window.location.search).get('source');
     let refreshInFlight = false;
     let lastRefreshAt = 0;
+    let activeRequestId = 0;
 
     initModalForm();
     applyLocalizedKeywords();
@@ -137,6 +138,12 @@
         if (refreshInFlight || (now - lastRefreshAt) < 3000) return;
         lastRefreshAt = now;
         renderDashboard({ showSpinner: false });
+    }
+
+    function failAfter(ms) {
+        return new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('API timeout')), ms);
+        });
     }
 
     function applyTheme(theme) {
@@ -245,6 +252,7 @@
     // -- Top-level render -------------------------------------------------
 
     async function renderDashboard({ showSpinner = false } = {}) {
+        const requestId = ++activeRequestId;
         if (refreshInFlight) return;
         refreshInFlight = true;
         if (showSpinner) showState('loading');
@@ -253,7 +261,11 @@
             if (SOURCE) params.set('source', SOURCE);
             params.set('_t', String(Date.now()));
             const qs = params.toString() ? `?${params.toString()}` : '';
-            const data = await fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' });
+            const data = await Promise.race([
+                fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' }),
+                failAfter(15000),
+            ]);
+            if (requestId !== activeRequestId) return;
             lastOverview = data;
 
             renderAll();
