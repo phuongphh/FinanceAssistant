@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from backend.agent import caching
 from backend.models.llm_cache import LLMCache
@@ -45,6 +46,17 @@ def _mock_db(get_returns: object | None = None) -> MagicMock:
     db.execute = AsyncMock(side_effect=_exec_return)
     return db
 
+
+
+
+def _first_execute_statement(db: MagicMock):
+    assert db.execute.await_count >= 1
+    return db.execute.await_args_list[0].args[0]
+
+
+def _compiled_sql_and_params(stmt):
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    return str(compiled), compiled.params
 
 class TestKeyConstruction:
     def test_query_normalisation(self):
@@ -96,8 +108,13 @@ class TestTier2Cache:
         await caching.set_tier2(
             db, user_id=uuid.uuid4(), query="?", result={"x": 1}
         )
-        # single upsert + flush.
-        assert db.execute.await_count >= 1
+        stmt = _first_execute_statement(db)
+        sql, params = _compiled_sql_and_params(stmt)
+        assert "ON CONFLICT (cache_key) DO UPDATE" in sql
+        assert params["response"] == '{"x": 1}'
+        assert params["model"] == "agent_tier2"
+        assert params["tokens_used"] is None
+        assert params["expires_at"] <= datetime.utcnow() + timedelta(seconds=305)
         db.flush.assert_awaited_once()
 
 
@@ -109,7 +126,12 @@ class TestTier3Cache:
             db, user_id=uuid.uuid4(), query="?",
             response="đây là phân tích",
         )
-        assert db.execute.await_count >= 1
+        stmt = _first_execute_statement(db)
+        sql, params = _compiled_sql_and_params(stmt)
+        assert "ON CONFLICT (cache_key) DO UPDATE" in sql
+        assert params["response"] == "đây là phân tích"
+        assert params["model"] == "agent_tier3"
+        assert params["expires_at"] >= datetime.utcnow() + timedelta(minutes=50)
         db.flush.assert_awaited_once()
 
     async def test_get_returns_response_text(self):
