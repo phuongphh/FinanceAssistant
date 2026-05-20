@@ -22,3 +22,19 @@ def test_expense_reverse_keyword_is_vietnamese_by_default():
     assert "reverse: 'Huỷ'" in js
     assert "if (els.modalDelete) els.modalDelete.textContent = keywords.reverse;" in js
     assert "Reverse</button>" not in html
+
+
+def test_expense_dashboard_refreshes_on_resume_events_with_debounced_background_sync():
+    js = JS.read_text()
+
+    assert "document.addEventListener('visibilitychange', onResumeRefresh);" in js
+    assert "window.addEventListener('focus', onResumeRefresh);" in js
+    assert "window.addEventListener('pageshow', onPageShowRefresh);" in js
+    assert "if (refreshInFlight || (now - lastRefreshAt) < 3000) return;" in js
+
+
+def test_expense_overview_fetch_disables_cache_and_adds_timestamp_nonce():
+    js = JS.read_text()
+
+    assert "params.set('_t', String(Date.now()));" in js
+    assert "fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' });" in js
