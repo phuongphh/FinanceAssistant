@@ -91,6 +91,23 @@ class TestHeuristics:
 
 @pytest.mark.asyncio
 class TestCascade:
+    async def test_llm_history_reads_exactly_3_previous_conversations(self):
+        orch = _orch_with_streamable()
+        import backend.agent.orchestrator as orch_mod
+
+        orig_get_recent = orch_mod.conversation_context_service.get_recent_messages
+        get_recent_mock = AsyncMock(
+            return_value=[]
+        )
+        orch_mod.conversation_context_service.get_recent_messages = get_recent_mock  # type: ignore[assignment]
+        try:
+            await orch.route("hello", _user(), MagicMock(), streamer=None)
+        finally:
+            orch_mod.conversation_context_service.get_recent_messages = orig_get_recent  # type: ignore[assignment]
+
+        get_recent_mock.assert_awaited_once()
+        assert get_recent_mock.await_args.kwargs["limit"] == 6
+
     async def test_clear_tier3_signal_skips_tier1_2(self):
         orch = _orch_with_streamable()
         result = await orch.route(

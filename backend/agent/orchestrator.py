@@ -69,6 +69,8 @@ TIER_1 = "tier1"
 TIER_2 = "tier2"
 TIER_3 = "tier3"
 AMBIGUOUS = "ambiguous"
+LLM_CONTEXT_CONVERSATIONS = 3
+_LLM_CONTEXT_LIMIT = LLM_CONTEXT_CONVERSATIONS * 2
 
 _HEURISTICS_PATH = (
     Path(__file__).resolve().parents[2] / "content" / "router_heuristics.yaml"
@@ -161,7 +163,7 @@ class Orchestrator:
         # (user message + assistant reply) happens AFTER routing so
         # this turn doesn't appear in its own history.
         history = await conversation_context_service.get_recent_messages(
-            db, user_id=user.id
+            db, user_id=user.id, limit=_LLM_CONTEXT_LIMIT
         )
         result = await self._route_inner(
             query, user, db, streamer=streamer, history=history

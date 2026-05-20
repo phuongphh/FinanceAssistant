@@ -62,7 +62,7 @@ DEFAULT_TTL_MINUTES = 15
 # tables, monthly reports) can be many KB; we only need a key-data
 # snippet for follow-up resolution. 200 chars matches the spec and
 # fits within prompt budgets for ~5-turn windows.
-MAX_CONTENT_CHARS = 200
+MAX_CONTENT_CHARS = 280
 
 
 class ConversationTurn(NamedTuple):
@@ -201,4 +201,11 @@ def _truncate(text: str, max_chars: int) -> str:
     text = text.strip()
     if len(text) <= max_chars:
         return text
-    return text[: max_chars - 1].rstrip() + "…"
+    # Keep both the beginning and the end so follow-up questions that
+    # are appended at the tail ("Bạn có muốn so với tháng trước không?")
+    # survive truncation.
+    if max_chars < 20:
+        return text[: max_chars - 1].rstrip() + "…"
+    head = int(max_chars * 0.65)
+    tail = max_chars - head - 1
+    return f"{text[:head].rstrip()}…{text[-tail:].lstrip()}"
