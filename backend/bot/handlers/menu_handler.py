@@ -1506,10 +1506,27 @@ async def _action_market_vnindex(
 async def _action_market_stock_board(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Show a stock price board filtered to the user's own portfolio."""
+    """Show a stock price board filtered to the user's own portfolio.
+
+    Holdings are grouped by ``Asset.subtype`` so VN stocks, funds/ETFs and
+    foreign tickers each get their own section. Only VN stocks are sent to
+    the SSI/VNDIRECT dispatcher — funds and foreign tickers are unsupported
+    upstream and would otherwise trip the circuit breaker and starve the
+    quotable group of live prices too.
+    """
+    from datetime import datetime
     from decimal import Decimal
+    from zoneinfo import ZoneInfo
 
     from backend.bot.formatters.money import format_money_short
+    from backend.bot.formatters.stock_groups import (
+        GROUP_FOREIGN,
+        GROUP_FUND_ETF,
+        GROUP_ORDER,
+        GROUP_VN_STOCK,
+        collect_quotable_tickers,
+        group_assets,
+    )
     from backend.market_data.client import get_stock_quotes
     from backend.wealth.services import asset_service
 
@@ -1526,39 +1543,71 @@ async def _action_market_stock_board(
         )
         return
 
-    tickers = []
-    for asset in assets:
-        ticker = str((asset.extra or {}).get("ticker") or asset.name or "").upper()
-        if ticker and ticker not in tickers:
-            tickers.append(ticker)
+    buckets = group_assets(assets)
+    quotable_tickers = collect_quotable_tickers(buckets)
 
-    try:
-        quotes = await get_stock_quotes(tickers)
-    except Exception:
-        logger.exception("Unable to fetch portfolio stock quotes")
-        quotes = {}
+    quotes: dict[str, Any] = {}
+    if quotable_tickers:
+        try:
+            quotes = await get_stock_quotes(quotable_tickers)
+        except Exception:
+            logger.exception("Unable to fetch portfolio stock quotes")
+            quotes = {}
 
-    lines = [
+    now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    updated_at = get_action_copy("action_market_portfolio", "stock_updated_at").format(
+        time=now_vn.strftime("%H:%M · %d/%m/%Y")
+    )
+
+    lines: list[str] = [
         "📈 *Bảng giá cổ phiếu của bạn*",
+        updated_at,
         f"_{get_action_copy('action_market_portfolio', 'stock_hint')}_",
-        "",
     ]
-    for asset in assets:
-        ticker = str((asset.extra or {}).get("ticker") or asset.name or "").upper()
-        quote = quotes.get(ticker)
-        if quote is not None:
-            change = quote.metadata.get("change_pct")
-            change_text = ""
-            if change is not None:
-                pct = Decimal(str(change))
-                sign = "+" if pct >= 0 else ""
-                change_text = f" · {sign}{pct:.2f}%"
-            stale = " · dữ liệu cũ" if quote.is_stale else ""
-            lines.append(f"• *{ticker}*: {quote.price:,.0f}đ{change_text}{stale}")
-        else:
-            lines.append(
-                f"• *{ticker}*: {format_money_short(asset.current_value)} _(giá trong portfolio)_"
-            )
+
+    group_note_key = {
+        GROUP_FUND_ETF: "stock_note_fund_etf",
+        GROUP_FOREIGN: "stock_note_foreign",
+    }
+    has_stale_quote = False
+
+    for group in GROUP_ORDER:
+        entries = buckets.get(group) or []
+        if not entries:
+            continue
+        header = get_action_copy(
+            "action_market_portfolio", f"stock_group_{group}"
+        )
+        lines.append("")
+        lines.append(f"*{header}*")
+        for entry in entries:
+            quote = quotes.get(entry.ticker) if group == GROUP_VN_STOCK else None
+            if quote is not None:
+                change = quote.metadata.get("change_pct")
+                change_text = ""
+                if change is not None:
+                    pct = Decimal(str(change))
+                    sign = "+" if pct >= 0 else ""
+                    change_text = f" · {sign}{pct:.2f}%"
+                if quote.is_stale:
+                    has_stale_quote = True
+                stale = " · dữ liệu cũ" if quote.is_stale else ""
+                lines.append(
+                    f"• *{entry.ticker}*: {quote.price:,.0f}đ{change_text}{stale}"
+                )
+            else:
+                lines.append(
+                    f"• *{entry.ticker}*: "
+                    f"{format_money_short(entry.asset.current_value)} "
+                    f"_(giá trong portfolio)_"
+                )
+        note_key = group_note_key.get(group)
+        if note_key:
+            lines.append(get_action_copy("action_market_portfolio", note_key))
+
+    if has_stale_quote:
+        lines.append("")
+        lines.append(get_action_copy("action_market_portfolio", "stock_note_stale"))
 
     await send_message(
         chat_id=chat_id,
