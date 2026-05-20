@@ -367,6 +367,35 @@
     opacity: 0.9;
 }
 
+.back-menu-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(78, 205, 196, 0.28);
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.12), rgba(59, 130, 246, 0.08));
+    color: #0F766E;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.back-menu-btn:hover {
+    border-color: rgba(78, 205, 196, 0.5);
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.18), rgba(59, 130, 246, 0.14));
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.14);
+}
+
+.back-menu-btn:active {
+    transform: translateY(1px);
+}
+
+.back-menu-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
 .empty-card {
     text-align: center;
     padding: 32px 20px;
@@ -420,6 +449,11 @@
     }
     .milestone-section h2 {
         color: #FEF3C7;
+    }
+    .back-menu-btn {
+        border-color: rgba(45, 212, 191, 0.4);
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.16), rgba(59, 130, 246, 0.2));
+        color: #CCFBF1;
     }
 }
 
