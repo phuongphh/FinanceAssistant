@@ -20,9 +20,11 @@ from infra.cache import causality_cache
 
 _CONTENT_PATH = Path(__file__).resolve().parents[3] / "content" / "twin" / "causality_explainer.yaml"
 ZERO_DELTA_PCT = Decimal("0.10")
-# Align the causality forward anchor with the system's medium-term milestone
-# (matches ``_MILESTONE_CALENDAR_YEARS`` in ``twin_api_service``: 2027/2030/2035).
-_FORWARD_MILESTONE_YEARS_AHEAD = 4
+# Mirror the medium-term milestone calendar tracked by ``twin_api_service``
+# (``_MILESTONE_CALENDAR_YEARS``). Duplicated to avoid pulling twin_api_service's
+# heavy dependency surface — keep in sync if either constant changes.
+_FORWARD_MILESTONE_YEARS = (2027, 2030, 2035)
+_FORWARD_TARGET_YEARS_AHEAD = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +139,23 @@ def _render(direction: str, factors: tuple[CausalityFactor, ...], forward: str |
     return "\n".join(lines)
 
 
+def _select_forward_milestone(today_year: int) -> int | None:
+    """Pick the medium-term Twin milestone for the causality forward sentence.
+
+    Returns the FIXED milestone year (2027/2030/2035) still in the future and
+    closest to ``today_year + _FORWARD_TARGET_YEARS_AHEAD``. Anchoring on the
+    same calendar twin_api_service uses prevents the forward sentence from
+    drifting off the milestone grid year-over-year (e.g. without this, Jan
+    2027 would target 2031 — a year the rest of the product never references).
+    Returns ``None`` when every milestone is in the past.
+    """
+    target = today_year + _FORWARD_TARGET_YEARS_AHEAD
+    candidates = [y for y in _FORWARD_MILESTONE_YEARS if y > today_year]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda y: abs(y - target))
+
+
 def _cone_anchor(
     projection: TwinProjection,
     *,
@@ -144,20 +163,28 @@ def _cone_anchor(
 ) -> tuple[int, Decimal] | None:
     """Return ``(calendar_year, p50)`` from the Twin cone for the forward sentence.
 
-    Picks the cone point closest to ``today + _FORWARD_MILESTONE_YEARS_AHEAD``
-    so the causality message reuses the SAME Monte Carlo cone the user already
-    sees in the main Twin view — no linear extrapolation, no stale annualized
-    deltas. Falls back to the horizon point when the preferred milestone is
-    beyond the cone or the cone is empty.
+    Anchors on the fixed milestone calendar (2027/2030/2035) so the causality
+    surface always agrees with the rest of the Twin — same year as the main
+    view, same P50 from the stored Monte Carlo cone. Falls back to the cone
+    horizon when no milestone fits (e.g. all milestones are in the past or
+    beyond the projection's horizon).
     """
     cone = projection.cone_data or []
     if not cone:
         return None
     base_year = (projection.computed_at or datetime.now(timezone.utc)).year
     today = today or date.today()
-    preferred_offset = max(today.year + _FORWARD_MILESTONE_YEARS_AHEAD - base_year, 1)
     max_offset = max(int(point.get("year", 0)) for point in cone)
-    target_offset = min(preferred_offset, max_offset)
+    horizon_year = base_year + max_offset
+
+    milestone = _select_forward_milestone(today.year)
+    if milestone is None or milestone > horizon_year:
+        target_year = horizon_year
+    else:
+        target_year = milestone
+    target_offset = max(target_year - base_year, 1)
+    target_offset = min(target_offset, max_offset)
+
     point = next(
         (p for p in cone if int(p.get("year", 0)) == target_offset),
         cone[-1],
@@ -169,19 +196,24 @@ def _cone_anchor(
     return calendar_year, p50
 
 
-def _forward_sentence(projection: TwinProjection, delta: Decimal) -> str | None:
+def _forward_sentence(
+    projection: TwinProjection,
+    delta: Decimal,
+    *,
+    today: date | None = None,
+) -> str | None:
     """Build the forward-looking sentence shown after the causality breakdown.
 
     The value is read directly from the stored Twin cone — the same cone the
     user sees in the main Twin view — so the two surfaces never disagree.
-    Returns ``None`` when the delta is too small to anchor a forward claim or
-    the cone is missing/non-positive.
+    ``today`` is injectable for tests; production callers leave it ``None``
+    and ``_cone_anchor`` resolves it from ``date.today()``.
     """
     if delta == 0:
         return None
     if delta < 0:
         return _copy()["forward"]["negative"][0]
-    anchor = _cone_anchor(projection)
+    anchor = _cone_anchor(projection, today=today)
     if anchor is None:
         return None
     target_year, target_p50 = anchor
