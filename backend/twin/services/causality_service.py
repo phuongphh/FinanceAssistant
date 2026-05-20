@@ -12,6 +12,7 @@ import yaml
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.bot.formatters.money import format_money_short
 from backend.models.event import Event
 from backend.models.twin_projection import TwinProjection
 from backend.twin.services.twin_projection_service import SCENARIO_CURRENT
@@ -19,6 +20,9 @@ from infra.cache import causality_cache
 
 _CONTENT_PATH = Path(__file__).resolve().parents[3] / "content" / "twin" / "causality_explainer.yaml"
 ZERO_DELTA_PCT = Decimal("0.10")
+# Align the causality forward anchor with the system's medium-term milestone
+# (matches ``_MILESTONE_CALENDAR_YEARS`` in ``twin_api_service``: 2027/2030/2035).
+_FORWARD_MILESTONE_YEARS_AHEAD = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,16 +137,59 @@ def _render(direction: str, factors: tuple[CausalityFactor, ...], forward: str |
     return "\n".join(lines)
 
 
-def _forward_sentence(current: Decimal, delta: Decimal, target_year: int | None = None) -> str | None:
-    if current <= 0 or delta == 0:
+def _cone_anchor(
+    projection: TwinProjection,
+    *,
+    today: date | None = None,
+) -> tuple[int, Decimal] | None:
+    """Return ``(calendar_year, p50)`` from the Twin cone for the forward sentence.
+
+    Picks the cone point closest to ``today + _FORWARD_MILESTONE_YEARS_AHEAD``
+    so the causality message reuses the SAME Monte Carlo cone the user already
+    sees in the main Twin view — no linear extrapolation, no stale annualized
+    deltas. Falls back to the horizon point when the preferred milestone is
+    beyond the cone or the cone is empty.
+    """
+    cone = projection.cone_data or []
+    if not cone:
         return None
-    target_year = target_year or (date.today().year + 4)
-    annualized = delta * Decimal("52")
-    projected = current + annualized * Decimal(max(target_year - date.today().year, 1))
-    template = _copy()["forward"]["positive"][0] if delta > 0 else _copy()["forward"]["negative"][0]
+    base_year = (projection.computed_at or datetime.now(timezone.utc)).year
+    today = today or date.today()
+    preferred_offset = max(today.year + _FORWARD_MILESTONE_YEARS_AHEAD - base_year, 1)
+    max_offset = max(int(point.get("year", 0)) for point in cone)
+    target_offset = min(preferred_offset, max_offset)
+    point = next(
+        (p for p in cone if int(p.get("year", 0)) == target_offset),
+        cone[-1],
+    )
+    p50 = Decimal(str(point.get("p50") or 0))
+    if p50 <= 0:
+        return None
+    calendar_year = base_year + int(point.get("year", 0))
+    return calendar_year, p50
+
+
+def _forward_sentence(projection: TwinProjection, delta: Decimal) -> str | None:
+    """Build the forward-looking sentence shown after the causality breakdown.
+
+    The value is read directly from the stored Twin cone — the same cone the
+    user sees in the main Twin view — so the two surfaces never disagree.
+    Returns ``None`` when the delta is too small to anchor a forward claim or
+    the cone is missing/non-positive.
+    """
+    if delta == 0:
+        return None
     if delta < 0:
-        return template
-    return template.format(target_year=target_year, amount=_format_vnd(projected))
+        return _copy()["forward"]["negative"][0]
+    anchor = _cone_anchor(projection)
+    if anchor is None:
+        return None
+    target_year, target_p50 = anchor
+    template = _copy()["forward"]["positive"][0]
+    return template.format(
+        target_year=target_year,
+        amount=format_money_short(target_p50),
+    )
 
 
 async def _recent_factor_events(db: AsyncSession, user_id: uuid.UUID, period_days: int) -> list[dict[str, Any]]:
@@ -205,7 +252,7 @@ async def attribute_delta(db: AsyncSession, user_id: uuid.UUID, period_days: int
     factors = build_weighted_factors(raw, max_items=5)
     if direction == "negative" and factors:
         factors = (factors[0],)
-    forward = _forward_sentence(current, delta)
+    forward = _forward_sentence(projections[0], delta)
     breakdown = CausalityBreakdown(direction=direction, delta_pct=delta_pct, delta_absolute_vnd=delta, factors=factors, text=_render(direction, factors, forward), forward_sentence=forward, show_breakdown=True)
     causality_cache.set(cache_key, breakdown)
     return breakdown
