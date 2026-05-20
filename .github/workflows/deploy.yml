@@ -18,23 +18,33 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Fail fast — appleboy/ssh-action đã bỏ script_stop nên cần set -e thủ công.
+            set -eo pipefail
+
             # 1. Vào thư mục dự án (nhớ check lại tên folder FinanceAssistant hay TaxAssistant)
-            cd ~/FinanceAssistant 
-            
+            cd ~/FinanceAssistant
+
             # 2. Cập nhật code
             git fetch origin prod
             git checkout prod
             git pull origin prod
-            
-            # 3. Build và chạy lại, loại bỏ container thừa
-            docker compose down
-            docker compose up -d --build --remove-orphans
 
-            # 4. Rebuild & deploy admin SPA (FastAPI + Caddy chạy ngoài Docker)
-            #    Nạp env từ .env của project để có ADMIN_JWT_SECRET, DATABASE_URL, VITE_API_BASE…
-            set -a
-            [ -f .env ] && . ./.env
-            set +a
+            # 3. Build & chạy lại, --wait để chờ healthcheck (Postgres có start_period 30s)
+            docker compose down
+            docker compose up -d --build --remove-orphans --wait
+
+            # 4. Rebuild & deploy admin SPA (FastAPI + Caddy chạy ngoài Docker).
+            #    Nạp .env an toàn theo Compose-style (giữ nguyên giá trị, không expand $/&/#),
+            #    tránh các pitfall khi `source` trực tiếp bằng shell.
+            if [ -f .env ]; then
+              while IFS='=' read -r key value || [ -n "$key" ]; do
+                case "$key" in ''|\#*) continue ;; esac
+                # strip optional surrounding single/double quotes (Compose semantics)
+                value="${value%\"}"; value="${value#\"}"
+                value="${value%\'}"; value="${value#\'}"
+                export "$key=$value"
+              done < .env
+            fi
             # Production phục vụ admin tại https://finance.nuitruc.ai/admin → API ở /api/admin (relative path)
             export VITE_API_BASE="${VITE_API_BASE:-/api/admin}"
             bash scripts/deploy_admin.sh
