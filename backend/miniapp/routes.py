@@ -981,6 +981,23 @@ async def start_asset_wizard_route(
     return {"data": {"ok": True}, "error": None}
 
 
+@router.post("/api/wealth/back-to-menu")
+async def back_to_menu_route(
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Post the root ``/menu`` into chat before Mini App closes.
+
+    Keeps navigation explicit: user taps "Về Menu" in dashboard, the bot
+    immediately re-renders the main menu bubble in the private chat.
+    """
+    user = await _resolve_user(auth, db)
+    from backend.bot.handlers.menu_handler import cmd_menu
+
+    await cmd_menu(db, user.telegram_id, user)
+    return {"data": {"ok": True}, "error": None}
+
+
 @router.post("/api/wealth/start-asset-edit")
 async def start_asset_edit_route(
     payload: dict,

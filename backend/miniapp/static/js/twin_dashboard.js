@@ -172,6 +172,7 @@
         }
         if (chart) chart.destroy();
         const labels = cone.map((p) => `Năm ${p.year}`);
+        const bounds = getUnifiedYScaleBounds();
         chart = new Chart(els.coneChart, {
             type: 'line',
             data: {
@@ -190,13 +191,37 @@
                     legend: { display: true, labels: { usePointStyle: true, boxWidth: 8 } },
                     tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatMoneyShort(ctx.parsed.y)}` } },
                 },
-                scales: { y: { ticks: { callback: (value) => formatMoneyShort(value) } } },
+                scales: {
+                    y: {
+                        min: bounds.min,
+                        max: bounds.max,
+                        ticks: { callback: (value) => formatMoneyShort(value) },
+                    },
+                },
             },
         });
     }
 
     function series(label, data, backgroundColor, borderColor, fill) {
         return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'Đường bình thường' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
+    }
+
+
+
+    function getUnifiedYScaleBounds() {
+        const preferred = cache.optimal && Array.isArray(cache.optimal.cone) ? cache.optimal.cone : [];
+        const fallback = cache[currentScenario] && Array.isArray(cache[currentScenario].cone) ? cache[currentScenario].cone : [];
+        const source = preferred.length ? preferred : fallback;
+        const values = [];
+        source.forEach((p) => {
+            values.push(Number(p.p10 || 0), Number(p.p50 || 0), Number(p.p90 || 0));
+        });
+        const finite = values.filter((v) => Number.isFinite(v));
+        if (!finite.length) return { min: 0, max: 1 };
+        const min = Math.min(0, Math.min(...finite));
+        const max = Math.max(...finite);
+        if (max <= min) return { min: 0, max: Math.max(1, max) };
+        return { min, max: max * 1.05 };
     }
 
     function renderOptimalStrategyNote(data) {
@@ -292,7 +317,12 @@
                 return response.json();
             })
             .then((body) => {
-                if (body && body.data) cache[targetScenario] = body.data;
+                if (body && body.data) {
+                    cache[targetScenario] = body.data;
+                    if (currentScenario === 'current' && targetScenario === 'optimal' && cache[currentScenario]) {
+                        renderChart(cache[currentScenario].cone || []);
+                    }
+                }
             })
             .catch(() => {});
     }

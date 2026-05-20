@@ -44,6 +44,7 @@
         assetsList: document.getElementById('assets-list'),
         addAssetBtn: document.getElementById('add-asset-btn'),
         addFirstAssetBtn: document.getElementById('add-first-asset-btn'),
+        backMenuBtn: document.getElementById('back-menu-btn'),
         confetti: document.getElementById('confetti-canvas'),
     };
 
@@ -72,6 +73,7 @@
     els.retryBtn.addEventListener('click', renderDashboard);
     els.addAssetBtn.addEventListener('click', closeAndAddAsset);
     els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
+    if (els.backMenuBtn) els.backMenuBtn.addEventListener('click', backToMainMenu);
     els.assetsList.addEventListener('click', onAssetRowClick);
     els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
 
@@ -630,6 +632,20 @@
         } catch (_err) {
             // Best-effort: even on failure we still close so the user
             // isn't stuck staring at the dashboard.
+        }
+        if (tg && tg.close) tg.close();
+    }
+
+
+
+    async function backToMainMenu() {
+        if (els.backMenuBtn) els.backMenuBtn.disabled = true;
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            await fetch('/miniapp/api/wealth/back-to-menu', { method: 'POST', headers });
+        } catch (_err) {
+            // best-effort navigation: close webapp even if network hiccups
         }
         if (tg && tg.close) tg.close();
     }
