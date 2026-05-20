@@ -1521,9 +1521,9 @@ async def _action_market_stock_board(
     from backend.bot.formatters.money import format_money_short
     from backend.bot.formatters.stock_groups import (
         GROUP_FOREIGN,
-        GROUP_FUND_ETF,
+        GROUP_FUND,
         GROUP_ORDER,
-        GROUP_VN_STOCK,
+        QUOTABLE_GROUPS,
         collect_quotable_tickers,
         group_assets,
     )
@@ -1554,19 +1554,21 @@ async def _action_market_stock_board(
             logger.exception("Unable to fetch portfolio stock quotes")
             quotes = {}
 
+    has_live_quote = any(quote is not None for quote in quotes.values())
     now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
-    updated_at = get_action_copy("action_market_portfolio", "stock_updated_at").format(
+    header_key = "stock_updated_at" if has_live_quote else "stock_compiled_at"
+    timestamp_line = get_action_copy("action_market_portfolio", header_key).format(
         time=now_vn.strftime("%H:%M · %d/%m/%Y")
     )
 
     lines: list[str] = [
         "📈 *Bảng giá cổ phiếu của bạn*",
-        updated_at,
+        timestamp_line,
         f"_{get_action_copy('action_market_portfolio', 'stock_hint')}_",
     ]
 
     group_note_key = {
-        GROUP_FUND_ETF: "stock_note_fund_etf",
+        GROUP_FUND: "stock_note_fund",
         GROUP_FOREIGN: "stock_note_foreign",
     }
     has_stale_quote = False
@@ -1581,7 +1583,7 @@ async def _action_market_stock_board(
         lines.append("")
         lines.append(f"*{header}*")
         for entry in entries:
-            quote = quotes.get(entry.ticker) if group == GROUP_VN_STOCK else None
+            quote = quotes.get(entry.ticker) if group in QUOTABLE_GROUPS else None
             if quote is not None:
                 change = quote.metadata.get("change_pct")
                 change_text = ""

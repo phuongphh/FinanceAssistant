@@ -20,19 +20,24 @@ if TYPE_CHECKING:
 
 
 GROUP_VN_STOCK = "vn_stock"
-GROUP_FUND_ETF = "fund_etf"
+GROUP_ETF = "etf"
+GROUP_FUND = "fund"
 GROUP_FOREIGN = "foreign_stock"
 
-# Display order — VN first (largest cohort), then funds, then foreign.
-GROUP_ORDER: tuple[str, ...] = (GROUP_VN_STOCK, GROUP_FUND_ETF, GROUP_FOREIGN)
+# Display order — VN first (largest cohort), then ETFs, then open-ended
+# funds, then foreign. ETFs sit next to VN stocks because SSI/VNDIRECT
+# quote them on the same iBoard.
+GROUP_ORDER: tuple[str, ...] = (GROUP_VN_STOCK, GROUP_ETF, GROUP_FUND, GROUP_FOREIGN)
 
-# Only this group has a working live-quote provider chain today.
-QUOTABLE_GROUPS: frozenset[str] = frozenset({GROUP_VN_STOCK})
+# Groups whose tickers SSI/VNDIRECT can actually price. Open-ended funds
+# (NAV-published daily by the fund house) and foreign tickers stay out —
+# sending them to the dispatcher poisons the circuit breaker.
+QUOTABLE_GROUPS: frozenset[str] = frozenset({GROUP_VN_STOCK, GROUP_ETF})
 
 _SUBTYPE_TO_GROUP: dict[str, str] = {
     "vn_stock": GROUP_VN_STOCK,
-    "fund": GROUP_FUND_ETF,
-    "etf": GROUP_FUND_ETF,
+    "etf": GROUP_ETF,
+    "fund": GROUP_FUND,
     "foreign_stock": GROUP_FOREIGN,
 }
 

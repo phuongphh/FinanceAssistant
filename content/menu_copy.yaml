@@ -77,11 +77,13 @@ action_market_portfolio:
   crypto_empty: "Chưa có tài sản loại này. Bạn có thể thêm crypto đầu tiên để theo dõi realtime."
   gold_empty: "Chưa có tài sản loại này. Bạn có thể thêm vàng đầu tiên để theo dõi theo giá SJC."
   stock_updated_at: "🕐 Cập nhật: {time}"
+  stock_compiled_at: "🕐 Tổng hợp lúc: {time}"
   stock_group_vn_stock: "🇻🇳 Cổ phiếu VN"
-  stock_group_fund_etf: "📊 Quỹ mở / ETF"
+  stock_group_etf: "📊 ETF"
+  stock_group_fund: "🏦 Quỹ mở"
   stock_group_foreign_stock: "🌐 Cổ phiếu nước ngoài"
   stock_note_stale: "_⚠️ Một số mã đang dùng dữ liệu cũ do nguồn tin chậm cập nhật._"
-  stock_note_fund_etf: "_Bé Tiền chưa kết nối NAV quỹ/ETF realtime — tạm hiển thị giá trong portfolio._"
+  stock_note_fund: "_Bé Tiền chưa kết nối NAV quỹ mở realtime — tạm hiển thị giá trong portfolio._"
   stock_note_foreign: "_Bé Tiền chưa kết nối giá CK nước ngoài realtime — tạm hiển thị giá trong portfolio._"
 
 
