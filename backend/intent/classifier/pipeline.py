@@ -11,6 +11,7 @@ and the bot's "I didn't get that" behaviour explicit.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Confidence above which the rule classifier is trusted to short-circuit
 # the LLM step. Below this we escalate to the LLM (costs ~50 tokens).
 HIGH_CONFIDENCE_THRESHOLD = 0.85
+LLM_CLASSIFIER_TIMEOUT_SECONDS = 2.0
 
 
 class IntentPipeline:
@@ -51,7 +53,15 @@ class IntentPipeline:
 
         if self.llm_classifier is not None:
             try:
-                llm_result = await self._llm_classify(text)
+                llm_result = await asyncio.wait_for(
+                    self._llm_classify(text), timeout=LLM_CLASSIFIER_TIMEOUT_SECONDS
+                )
+            except TimeoutError:
+                logger.warning(
+                    "LLM classifier timeout after %.1fs; falling back to rule",
+                    LLM_CLASSIFIER_TIMEOUT_SECONDS,
+                )
+                llm_result = None
             except Exception:
                 logger.exception("LLM classifier raised; falling back")
                 llm_result = None

@@ -5,6 +5,7 @@ import random
 import anthropic
 import requests
 
+
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 PR_NUMBER = os.environ.get("PR_NUMBER")
@@ -48,6 +49,7 @@ def _resolve_anthropic_error_types() -> tuple[type[BaseException], ...]:
         "RateLimitError",
         "APIConnectionError",
         "APITimeoutError",
+        "InternalServerError",
     )
     resolved: list[type[BaseException]] = []
 
@@ -90,7 +92,11 @@ def request_review_with_retry(
     base_delay_seconds: float = DEFAULT_BASE_DELAY_SECONDS,
     max_delay_seconds: float = DEFAULT_MAX_DELAY_SECONDS,
 ):
-    """Call Anthropic with bounded exponential backoff + jitter."""
+    """Call Anthropic with bounded exponential backoff + jitter.
+
+    Returns ``None`` when all retry attempts fail with transient errors so
+    CI can degrade gracefully instead of failing due to provider overload.
+    """
     for attempt in range(1, max_attempts + 1):
         try:
             return client.messages.create(
@@ -110,8 +116,11 @@ def request_review_with_retry(
             if not _is_retryable_error(e):
                 raise
             if attempt == max_attempts:
-                print(f"ERROR: Anthropic transient failure after {max_attempts} attempts: {e}")
-                raise
+                print(
+                    f"WARNING: Anthropic transient failure after {max_attempts} attempts: {e}. "
+                    "Skipping automated review (non-blocking)."
+                )
+                return None
             sleep_seconds = _compute_sleep_seconds(attempt, base_delay_seconds, max_delay_seconds)
             print(
                 f"Anthropic transient error {type(e).__name__} "
@@ -157,21 +166,17 @@ def main() -> int:
         print("No diff found. Skipping review.")
         return 0
 
-    try:
-        response = request_review_with_retry(client=client, diff=diff)
-        result = response.content[0].text.strip()
-        print(result)
-        verdict, reason = parse_verdict(result)
-    except Exception as e:
-        if not _is_retryable_error(e):
-            raise
+    response = request_review_with_retry(client=client, diff=diff)
+    if response is None:
         result = (
-            "⚠️ Code review skipped: Anthropic service overloaded after retries.\n"
-            "Fallback verdict to avoid blocking CI on transient provider outage.\n\n"
+            "⚠️ Automated code review skipped: Anthropic service overloaded after retries.\n"
             "VERDICT: PASS"
         )
         verdict, reason = "PASS", "(transient provider overload — review skipped)"
-        print(result)
+    else:
+        result = response.content[0].text.strip()
+        verdict, reason = parse_verdict(result)
+    print(result)
     if GITHUB_TOKEN and PR_NUMBER and REPO:
         comment_body = f"## Code Review Result\n\n{result}"
         try:
