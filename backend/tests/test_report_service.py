@@ -21,27 +21,26 @@ class TestIsReportQuery:
     def test_detects_bao_cao(self):
         assert is_report_query("báo cáo tháng này") is True
 
-    def test_detects_tong_chi_tieu_lowercase(self):
-        assert is_report_query("tổng chi tiêu") is True
+    def test_does_not_hijack_tong_chi_tieu_lowercase(self):
+        assert is_report_query("tổng chi tiêu") is False
 
-    def test_detects_tong_chi_tieu_capitalized(self):
-        # User sent "Tổng chi tiêu" from the menu prompt — must match
-        assert is_report_query("Tổng chi tiêu") is True
+    def test_does_not_hijack_tong_chi_tieu_capitalized(self):
+        assert is_report_query("Tổng chi tiêu") is False
 
-    def test_detects_chi_tieu_thang(self):
-        assert is_report_query("chi tiêu tháng này bao nhiêu?") is True
+    def test_does_not_hijack_chi_tieu_thang(self):
+        assert is_report_query("chi tiêu tháng này bao nhiêu?") is False
 
-    def test_detects_xai_bao_nhieu(self):
-        assert is_report_query("tôi xài bao nhiêu tháng 3?") is True
+    def test_does_not_hijack_xai_bao_nhieu(self):
+        assert is_report_query("tôi xài bao nhiêu tháng 3?") is False
 
-    def test_detects_english_report(self):
-        assert is_report_query("spending this month") is True
+    def test_does_not_hijack_english_spending_query(self):
+        assert is_report_query("spending this month") is False
 
     def test_detects_english_report_keyword(self):
         assert is_report_query("show me a report") is True
 
-    def test_detects_da_chi(self):
-        assert is_report_query("tháng này tôi đã chi bao nhiêu") is True
+    def test_does_not_hijack_da_chi(self):
+        assert is_report_query("tháng này tôi đã chi bao nhiêu") is False
 
     def test_does_not_match_plain_expense_entry(self):
         assert is_report_query("ăn trưa 50k") is False
