@@ -209,19 +209,21 @@
 
 
     function getUnifiedYScaleBounds() {
-        const preferred = cache.optimal && Array.isArray(cache.optimal.cone) ? cache.optimal.cone : [];
-        const fallback = cache[currentScenario] && Array.isArray(cache[currentScenario].cone) ? cache[currentScenario].cone : [];
-        const source = preferred.length ? preferred : fallback;
         const values = [];
-        source.forEach((p) => {
-            values.push(Number(p.p10 || 0), Number(p.p50 || 0), Number(p.p90 || 0));
+        ['optimal', 'current'].forEach((key) => {
+            const cone = cache[key] && Array.isArray(cache[key].cone) ? cache[key].cone : [];
+            cone.forEach((p) => {
+                values.push(Number(p.p10 || 0), Number(p.p50 || 0), Number(p.p90 || 0));
+            });
         });
         const finite = values.filter((v) => Number.isFinite(v));
         if (!finite.length) return { min: 0, max: 1 };
         const min = Math.min(0, Math.min(...finite));
-        const max = Math.max(...finite);
-        if (max <= min) return { min: 0, max: Math.max(1, max) };
-        return { min, max: max * 1.05 };
+        const rawMax = Math.max(...finite);
+        if (rawMax <= min) return { min, max: Math.max(min + 1, rawMax + 1) };
+        // Pad upward by 5% regardless of sign (rawMax * 1.05 would shrink negatives).
+        const padding = Math.max(Math.abs(rawMax) * 0.05, 1);
+        return { min, max: rawMax + padding };
     }
 
     function renderOptimalStrategyNote(data) {

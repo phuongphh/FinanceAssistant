@@ -643,7 +643,19 @@
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
-            await fetch('/miniapp/api/wealth/back-to-menu', { method: 'POST', headers });
+            // Bound the request so a stalled mobile connection can't trap
+            // the user on the dashboard — we close regardless below.
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            try {
+                await fetch('/miniapp/api/wealth/back-to-menu', {
+                    method: 'POST',
+                    headers,
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timer);
+            }
         } catch (_err) {
             // best-effort navigation: close webapp even if network hiccups
         }
