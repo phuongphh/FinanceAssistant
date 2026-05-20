@@ -205,15 +205,15 @@ async def test_single_eligible_asset_returns_same_for_best_and_worst():
 
 
 @pytest.mark.asyncio
-async def test_sanity_boundary_at_minus_100_and_plus_1000_kept():
-    """Boundary check: exactly -100% and +1000% are allowed (within the
-    closed band). Defends against off-by-one tightening of the guard."""
+async def test_sanity_boundary_at_minus_100_and_upper_cap_kept():
+    """Boundary check: exactly -100% and +1,000,000% are allowed (within
+    the closed band). Defends against off-by-one tightening of the guard."""
     stock_loss = _stub_asset("stock", "LOSS")
     stock_moon = _stub_asset("stock", "MOON")
 
     returns = {
         stock_loss.id: Decimal("-100"),
-        stock_moon.id: Decimal("1000"),
+        stock_moon.id: Decimal("1000000"),
     }
 
     async def fake_value(asset):
@@ -227,6 +227,69 @@ async def test_sanity_boundary_at_minus_100_and_plus_1000_kept():
 
     assert best["symbol"] == "MOON"
     assert worst["symbol"] == "LOSS"
+
+
+@pytest.mark.asyncio
+async def test_legitimate_multi_bagger_kept_in_ranking():
+    """A 100x (10,000%) return is unusual but legitimate for long-held
+    crypto/stocks. The previous 1000% cap silently dropped these real
+    performers; the new generous bound must keep them in the ranking."""
+    moonbag = _stub_asset("crypto", "ETH")
+
+    async def fake_value(asset):
+        # ETH ICO at ~$0.30 → recent $4000 ≈ 1,300,000% — within new bound.
+        return Decimal("4000"), Decimal("30"), Decimal("9900")  # 99x = 9900%
+
+    with patch(
+        "backend.market_data.analytics.portfolio_metrics._value_asset",
+        new=fake_value,
+    ):
+        best, worst = await get_best_worst_from_assets([moonbag])
+
+    assert best is not None and best["return_pct"] == Decimal("9900")
+
+
+@pytest.mark.asyncio
+async def test_legacy_stocks_alias_recognized_as_eligible():
+    """Some assets persisted via the portfolio API carry the plural legacy
+    ``asset_type="stocks"`` (see backend/schemas/portfolio.py). Without
+    normalization, the filter would silently drop them — the reviewer's
+    P2 finding on PR #742."""
+    legacy = _stub_asset("stocks", "FPT")
+
+    async def fake_value(asset):
+        # _value_asset normalizes "stocks" → "stock" internally and routes
+        # to value_stock_holding; the test patches the wrapper directly.
+        return Decimal("12000000"), Decimal("9000000"), Decimal("33.33")
+
+    with patch(
+        "backend.market_data.analytics.portfolio_metrics._value_asset",
+        new=fake_value,
+    ):
+        best, worst = await get_best_worst_from_assets([legacy])
+
+    assert best is not None
+    assert best["symbol"] == "FPT"
+
+
+@pytest.mark.asyncio
+async def test_nan_return_pct_skipped_without_crash(caplog):
+    """Decimal('NaN') from corrupted cost-basis data must not raise
+    InvalidOperation during the range check — guard with is_nan() first."""
+    bad = _stub_asset("stock", "BAD")
+
+    async def fake_value(asset):
+        return Decimal("100"), Decimal("100"), Decimal("NaN")
+
+    with patch(
+        "backend.market_data.analytics.portfolio_metrics._value_asset",
+        new=fake_value,
+    ):
+        with caplog.at_level("WARNING", logger="backend.market_data.analytics.portfolio_metrics"):
+            best, worst = await get_best_worst_from_assets([bad])
+
+    assert best is None and worst is None
+    assert any("NaN" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.asyncio

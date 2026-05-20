@@ -28,13 +28,33 @@ logger = logging.getLogger(__name__)
 #   - other: unstructured asset class; can't trust the percentage.
 _PERFORMANCE_ELIGIBLE_TYPES: frozenset[str] = frozenset({"stock", "crypto", "gold"})
 
+# Legacy/external asset_type aliases that map to a canonical type. The
+# portfolio API schema (``backend/schemas/portfolio.py``) accepts plural
+# ``"stocks"`` for backward compatibility; without this normalization step
+# such holdings would be silently dropped from best/worst rankings (and
+# mis-routed to the cash branch in ``_value_asset``).
+_ASSET_TYPE_ALIASES: dict[str, str] = {"stocks": "stock"}
+
+
+def _canonical_asset_type(asset_type: str | None) -> str:
+    if not asset_type:
+        return "other"
+    return _ASSET_TYPE_ALIASES.get(asset_type, asset_type)
+
+
 # Sanity bounds on return percentages displayed to users. Anything outside this
 # band is almost always a data-quality bug (typo in avg_price, wrong unit,
 # placeholder cost basis). We exclude such holdings from rankings and log a
 # warning for ops investigation instead of rendering absurd numbers like
 # "+29099900%" or "-4569%" that destroy user trust.
-_MIN_REASONABLE_RETURN_PCT: Decimal = Decimal("-100")  # long position floor
-_MAX_REASONABLE_RETURN_PCT: Decimal = Decimal("1000")  # 10x in any briefing window = data error
+#
+# The upper bound is intentionally generous (10,000x) so legitimate
+# multi-baggers — long-held crypto or early-stage stocks that genuinely
+# returned hundreds of times their cost — are still ranked. The production
+# screenshot bug (+29,099,900%) is well above this cap, and no realistic
+# briefing-window return reaches it.
+_MIN_REASONABLE_RETURN_PCT: Decimal = Decimal("-100")     # long position floor
+_MAX_REASONABLE_RETURN_PCT: Decimal = Decimal("1000000")  # 10,000x — catches data corruption, keeps real moonshots
 
 
 @dataclass(frozen=True)
@@ -63,13 +83,14 @@ def _symbol(asset: Asset) -> str:
 
 
 async def _value_asset(asset: Asset) -> tuple[Decimal, Decimal, Decimal | None]:
-    if asset.asset_type == "stock":
+    asset_type = _canonical_asset_type(asset.asset_type)
+    if asset_type == "stock":
         valuation = await value_stock_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
-    if asset.asset_type == "crypto":
+    if asset_type == "crypto":
         valuation = await value_crypto_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
-    if asset.asset_type == "gold":
+    if asset_type == "gold":
         valuation = await value_gold_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
     current = Decimal(asset.current_value or 0)
@@ -143,10 +164,20 @@ async def get_best_worst_from_assets(assets: list[Asset]) -> tuple[dict[str, Any
     """
     performances: list[HoldingPerformance] = []
     for asset in assets:
-        if asset.asset_type not in _PERFORMANCE_ELIGIBLE_TYPES:
+        if _canonical_asset_type(asset.asset_type) not in _PERFORMANCE_ELIGIBLE_TYPES:
             continue
         current, cost, pct = await _value_asset(asset)
         if pct is None:
+            continue
+        # Decimal comparisons with NaN raise InvalidOperation; check finiteness
+        # first so a single corrupted holding can't abort the whole briefing.
+        if pct.is_nan():
+            logger.warning(
+                "Holding %s (asset_id=%s) excluded from best/worst: "
+                "return_pct is NaN (corrupted cost-basis or quantity data); "
+                "cost_basis_value=%s, current_value=%s",
+                _symbol(asset), asset.id, cost, current,
+            )
             continue
         if pct < _MIN_REASONABLE_RETURN_PCT or pct > _MAX_REASONABLE_RETURN_PCT:
             logger.warning(
