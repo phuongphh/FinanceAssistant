@@ -29,7 +29,16 @@ jobs:
             # 3. Build và chạy lại, loại bỏ container thừa
             docker compose down
             docker compose up -d --build --remove-orphans
-            
-            # 4. Dọn dẹp tài nguyên thừa
+
+            # 4. Rebuild & deploy admin SPA (FastAPI + Caddy chạy ngoài Docker)
+            #    Nạp env từ .env của project để có ADMIN_JWT_SECRET, DATABASE_URL, VITE_API_BASE…
+            set -a
+            [ -f .env ] && . ./.env
+            set +a
+            # Production phục vụ admin tại https://finance.nuitruc.ai/admin → API ở /api/admin (relative path)
+            export VITE_API_BASE="${VITE_API_BASE:-/api/admin}"
+            bash scripts/deploy_admin.sh
+
+            # 5. Dọn dẹp tài nguyên thừa
             docker image prune -f
             echo "✅ Hệ thống đã được cập nhật từ nhánh PROD tại $(date)!"
