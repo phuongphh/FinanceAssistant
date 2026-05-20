@@ -34,13 +34,9 @@ _REPORT_KEYWORDS = frozenset(
         "tong chi tieu",
         "chi tiêu tháng",
         "chi tieu thang",
-        "xài bao nhiêu",
-        "xai bao nhieu",
-        "tôi xài bao",
-        "toi xai bao",
-        "tôi đã chi",
-        "toi da chi",
-        "spending",
+        # Expense-style phrases are handled by the Phase 3.5 intent
+        # pipeline (query_expenses + time_range), not this legacy
+        # monthly financial report fast-path.
         "report",
         # Removed "tháng trước tôi" / "thang truoc toi": too greedy, swallowed
         # natural-language expense queries like "tháng trước tôi chi tiêu bao
@@ -64,6 +60,11 @@ def is_report_query(text: str) -> bool:
     normalized = strip_diacritics(lower)
 
     if "giao dich" in normalized:
+        return False
+    # "báo cáo chi tiêu tháng này" should route to the Phase 3.5
+    # query_expenses handler (time range aware), not the legacy monthly
+    # financial report generator.
+    if "chi tieu" in normalized or "chi phi" in normalized:
         return False
     if (
         "dashboard" in normalized
@@ -312,9 +313,12 @@ def _build_report_prompt(report_context: str, wealth_ctx: dict) -> str:
         "=== HƯỚNG DẪN VIẾT THEO LEVEL ===\n"
         f"{wealth_ctx['guidance']}\n\n"
         "=== YÊU CẦU OUTPUT ===\n"
-        "1. Ngắn gọn, dùng emoji phù hợp, format Telegram-friendly.\n"
+        "1. Dùng emoji phù hợp, format Telegram-friendly; viết đầy đủ ý, "
+        "không cắt câu giữa chừng.\n"
         "2. Có 2 section: '✅ Điểm chính' (3-4 bullet) + "
         "'💡 Lời khuyên' (2-3 bullet, action-oriented).\n"
+        "2b. Độ dài mục tiêu: khoảng 180-260 từ để đủ ngữ cảnh, không "
+        "quá ngắn.\n"
         "3. Mọi nhận xét về số tiền PHẢI frame theo level: với Mass "
         "Affluent / HNW, dùng % net worth thay vì comment tuyệt đối. "
         "Với Starter / Young Prof, có thể comment tuyệt đối nhưng tone "
