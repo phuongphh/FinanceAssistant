@@ -282,21 +282,8 @@ def _render_html_with_version(html_path: Path) -> str:
             bumped,
             count=1,
         )
-    # Inject a visible footer marker so users can read the running build
-    # straight from the dashboard — much faster than tailing server logs
-    # when verifying a deploy reached the VPS.
-    footer_html = (
-        '<div style="text-align:center;margin:18px 0 8px;font-size:11px;'
-        'opacity:0.45;letter-spacing:0.02em;font-family:system-ui,sans-serif;">'
-        f"build {_GIT_SHA} · assets {_STATIC_VERSION}"
-        "</div>"
-    )
     if _VERSION_MARKER_PATTERN.search(bumped):
-        bumped = _VERSION_MARKER_PATTERN.sub(lambda _m: footer_html, bumped, count=1)
-    else:
-        # Templates that haven't added the marker yet still get the footer
-        # right before </body> so the diagnostic is universal.
-        bumped = bumped.replace("</body>", footer_html + "\n</body>", 1)
+        bumped = _VERSION_MARKER_PATTERN.sub("", bumped, count=1)
     return bumped
 
 
