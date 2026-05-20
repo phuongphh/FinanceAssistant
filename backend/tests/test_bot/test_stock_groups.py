@@ -75,23 +75,23 @@ class TestStockDispatcherOrdering:
 
     def test_default_is_vndirect_first(self, monkeypatch):
         dispatcher, SSI, VND = self._build(monkeypatch, None)
-        assert isinstance(dispatcher.primary, VND)
-        assert isinstance(dispatcher.secondary, SSI)
+        assert isinstance(dispatcher.vn_dispatcher.primary, VND)
+        assert isinstance(dispatcher.vn_dispatcher.secondary, SSI)
 
     def test_explicit_vndirect_first(self, monkeypatch):
         dispatcher, SSI, VND = self._build(monkeypatch, "vndirect")
-        assert isinstance(dispatcher.primary, VND)
-        assert isinstance(dispatcher.secondary, SSI)
+        assert isinstance(dispatcher.vn_dispatcher.primary, VND)
+        assert isinstance(dispatcher.vn_dispatcher.secondary, SSI)
 
     def test_ssi_setting_flips_order(self, monkeypatch):
         dispatcher, SSI, VND = self._build(monkeypatch, "ssi")
-        assert isinstance(dispatcher.primary, SSI)
-        assert isinstance(dispatcher.secondary, VND)
+        assert isinstance(dispatcher.vn_dispatcher.primary, SSI)
+        assert isinstance(dispatcher.vn_dispatcher.secondary, VND)
 
     def test_setting_is_case_insensitive(self, monkeypatch):
         dispatcher, SSI, VND = self._build(monkeypatch, "SSI")
-        assert isinstance(dispatcher.primary, SSI)
+        assert isinstance(dispatcher.vn_dispatcher.primary, SSI)
 
     def test_unknown_value_defaults_to_vndirect(self, monkeypatch):
         dispatcher, SSI, VND = self._build(monkeypatch, "bogus")
-        assert isinstance(dispatcher.primary, VND)
+        assert isinstance(dispatcher.vn_dispatcher.primary, VND)
