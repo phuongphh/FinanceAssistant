@@ -36,9 +36,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #720 | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [issue-720.md](issue-720.md) |
 | #721 | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [issue-721.md](issue-721.md) |
 | #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
-| #723 | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [issue-723.md](issue-723.md) |
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
 | #730 | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [issue-730.md](issue-730.md) |
 
-**Total active:** 36
+**Total active:** 35
