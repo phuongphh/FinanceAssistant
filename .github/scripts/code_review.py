@@ -157,11 +157,21 @@ def main() -> int:
         print("No diff found. Skipping review.")
         return 0
 
-    response = request_review_with_retry(client=client, diff=diff)
-    result = response.content[0].text.strip()
-    print(result)
-
-    verdict, reason = parse_verdict(result)
+    try:
+        response = request_review_with_retry(client=client, diff=diff)
+        result = response.content[0].text.strip()
+        print(result)
+        verdict, reason = parse_verdict(result)
+    except Exception as e:
+        if not _is_retryable_error(e):
+            raise
+        result = (
+            "⚠️ Code review skipped: Anthropic service overloaded after retries.\n"
+            "Fallback verdict to avoid blocking CI on transient provider outage.\n\n"
+            "VERDICT: PASS"
+        )
+        verdict, reason = "PASS", "(transient provider overload — review skipped)"
+        print(result)
     if GITHUB_TOKEN and PR_NUMBER and REPO:
         comment_body = f"## Code Review Result\n\n{result}"
         try:
