@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from openai import AsyncOpenAI
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -76,15 +77,26 @@ async def _set_cache(
     tokens_used: int | None,
     ttl_days: int = 30,
 ) -> None:
-    entry = LLMCache(
+    expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+    stmt = insert(LLMCache).values(
         cache_key=cache_key,
         model=model,
         prompt_hash=prompt_hash,
         response=response,
         tokens_used=tokens_used,
-        expires_at=datetime.utcnow() + timedelta(days=ttl_days),
+        expires_at=expires_at,
     )
-    db.add(entry)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[LLMCache.cache_key],
+        set_={
+            "model": model,
+            "prompt_hash": prompt_hash,
+            "response": response,
+            "tokens_used": tokens_used,
+            "expires_at": expires_at,
+        },
+    )
+    await db.execute(stmt)
     await db.flush()
 
 

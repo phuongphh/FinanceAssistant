@@ -29,6 +29,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.llm_cache import LLMCache
@@ -176,17 +177,24 @@ async def _set(
     the rest of this module avoids. Two queries is fine for a cache
     write."""
     expires = datetime.utcnow() + timedelta(seconds=ttl_seconds)
-    # Replace any prior entry with the same key.
-    await db.execute(delete(LLMCache).where(LLMCache.cache_key == key))
-    db.add(
-        LLMCache(
-            cache_key=key,
-            model=model,
-            prompt_hash=key.split(":")[-1],
-            response=value,
-            tokens_used=None,
-            expires_at=expires,
-        )
+    stmt = insert(LLMCache).values(
+        cache_key=key,
+        model=model,
+        prompt_hash=key.split(":")[-1],
+        response=value,
+        tokens_used=None,
+        expires_at=expires,
     )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[LLMCache.cache_key],
+        set_={
+            "model": model,
+            "prompt_hash": key.split(":")[-1],
+            "response": value,
+            "tokens_used": None,
+            "expires_at": expires,
+        },
+    )
+    await db.execute(stmt)
     # Service flushes only — caller commits per layer contract.
     await db.flush()
