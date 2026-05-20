@@ -87,6 +87,9 @@
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
     const SOURCE = new URLSearchParams(window.location.search).get('source');
+    let refreshInFlight = false;
+    let lastRefreshAt = 0;
+    let activeRequestId = 0;
 
     initModalForm();
     applyLocalizedKeywords();
@@ -115,9 +118,33 @@
     });
     updateSortButtons();
 
+    document.addEventListener('visibilitychange', onResumeRefresh);
+    window.addEventListener('focus', onResumeRefresh);
+    window.addEventListener('pageshow', onPageShowRefresh);
+
     renderDashboard({ showSpinner: true });
 
     // -- Theme + utils ----------------------------------------------------
+
+
+    function onPageShowRefresh(event) {
+        if (event && event.persisted) onResumeRefresh();
+    }
+
+    function onResumeRefresh() {
+        if (document.hidden) return;
+        const now = Date.now();
+        // Debounce focus/visibility storms from Telegram Desktop panel toggles.
+        if (refreshInFlight || (now - lastRefreshAt) < 3000) return;
+        lastRefreshAt = now;
+        renderDashboard({ showSpinner: false });
+    }
+
+    function failAfter(ms) {
+        return new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('API timeout')), ms);
+        });
+    }
 
     function applyTheme(theme) {
         const root = document.documentElement;
@@ -225,12 +252,20 @@
     // -- Top-level render -------------------------------------------------
 
     async function renderDashboard({ showSpinner = false } = {}) {
+        const requestId = ++activeRequestId;
+        if (refreshInFlight) return;
+        refreshInFlight = true;
         if (showSpinner) showState('loading');
         try {
             const params = new URLSearchParams();
             if (SOURCE) params.set('source', SOURCE);
+            params.set('_t', String(Date.now()));
             const qs = params.toString() ? `?${params.toString()}` : '';
-            const data = await fetchAPI('/expense-dashboard/overview' + qs);
+            const data = await Promise.race([
+                fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' }),
+                failAfter(15000),
+            ]);
+            if (requestId !== activeRequestId) return;
             lastOverview = data;
 
             renderAll();
@@ -248,6 +283,8 @@
             els.errorMessage.textContent = buildErrorMessage(err);
             showState('error');
             if (tg && tg.showAlert) tg.showAlert('Không tải được dữ liệu, thử lại nhé.');
+        } finally {
+            refreshInFlight = false;
         }
     }
 
