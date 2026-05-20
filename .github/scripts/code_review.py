@@ -5,6 +5,15 @@ import random
 import anthropic
 import requests
 
+
+def _resolve_anthropic_error(name: str):
+    """Return Anthropic error class across SDK versions."""
+    cls = getattr(anthropic, name, None)
+    if cls is not None:
+        return cls
+    exceptions_mod = getattr(anthropic, "_exceptions", None)
+    return getattr(exceptions_mod, name, None) if exceptions_mod is not None else None
+
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 PR_NUMBER = os.environ.get("PR_NUMBER")
@@ -43,15 +52,18 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CODE_REVIEW_REQUEST_TIME
 
 def _is_retryable_error(error: Exception) -> bool:
     """Retry only transient upstream/service transport failures."""
-    return isinstance(
-        error,
-        (
-            anthropic.OverloadedError,
-            anthropic.RateLimitError,
-            anthropic.APIConnectionError,
-            anthropic.APITimeoutError,
-        ),
+    retryable_names = (
+        "OverloadedError",
+        "RateLimitError",
+        "APIConnectionError",
+        "APITimeoutError",
+        "InternalServerError",
     )
+    retryable_types = tuple(
+        cls for cls in (_resolve_anthropic_error(name) for name in retryable_names)
+        if cls is not None
+    )
+    return isinstance(error, retryable_types)
 
 
 def _compute_sleep_seconds(attempt: int, base_delay_seconds: float, max_delay_seconds: float) -> float:
