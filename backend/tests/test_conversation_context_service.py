@@ -72,7 +72,17 @@ class TestSaveMessage:
         # Truncation cap is exact: cut to MAX_CONTENT_CHARS-1 chars + the
         # ellipsis marker. Total length matches the cap.
         assert len(added.content) == svc.MAX_CONTENT_CHARS
-        assert added.content.endswith("…")
+        assert "…" in added.content
+
+    async def test_truncation_keeps_tail_for_follow_up_prompt(self):
+        db = _db_with_rows([])
+        suffix = "Bạn có muốn so với tháng trước không?"
+        long_text = ("x" * (svc.MAX_CONTENT_CHARS + 80)) + suffix
+        await svc.save_message(
+            db, user_id=uuid.uuid4(), role=ROLE_ASSISTANT, content=long_text,
+        )
+        added = db.add.call_args.args[0]
+        assert suffix in added.content
 
     async def test_skips_empty_content(self):
         db = _db_with_rows([])
