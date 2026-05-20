@@ -37,6 +37,8 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import secrets
+import time
 from datetime import date, datetime
 from typing import Any
 
@@ -46,7 +48,6 @@ from backend import analytics
 from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.templates import format_receipt_confirmation
 from backend.bot.handlers.transaction import _normalize_category
-from backend.bot.keyboards.transaction_keyboard import transaction_actions_keyboard
 from backend.models.user import User
 from backend.schemas.expense import VALID_CATEGORIES, ExpenseCreate
 from backend.services import expense_service
@@ -76,6 +77,8 @@ EVENT_RECEIPT_PHOTO_RECEIVED = "receipt_photo_received"
 EVENT_RECEIPT_PHOTO_PARSED = "receipt_photo_parsed"
 EVENT_RECEIPT_PHOTO_FAILED = "receipt_photo_failed"
 EVENT_RECEIPT_EXPENSE_AUTOSAVED = "receipt_expense_autosaved"
+_PENDING_RECEIPT_TTL_S = 180
+_pending_receipt_confirms: dict[str, dict[str, Any]] = {}
 
 
 def _parse_iso_date(value: Any) -> date | None:
@@ -264,51 +267,25 @@ async def _autosave_and_confirm(
             note_bits.append(preview)
     note = " · ".join(note_bits) or None
 
-    try:
-        async with db.begin_nested():
-            expense = await expense_service.create_expense(
-                db,
-                user.id,
-                ExpenseCreate(
-                    amount=amount,
-                    currency=currency,
-                    merchant=merchant,
-                    category=category,
-                    source="ocr",
-                    expense_date=parsed_date,
-                    note=note,
-                    raw_data={
-                        "ocr": {
-                            "confidence": confidence,
-                            "category_suggestion": result.get("category_suggestion"),
-                            "items": items[:20],
-                        }
-                    },
-                ),
-            )
-    except Exception:
-        # SAVEPOINT rolls back any partial writes so the outer transaction
-        # (committed by the worker after we return) stays clean — without
-        # this isolation a flush-error inside create_expense would poison
-        # the session and the worker's final commit would raise.
-        logger.exception("Auto-creating expense from OCR failed")
-        # Don't punish the user — show the parsed view as a graceful fallback.
-        await finish(
-            _format_receipt(result)
-            + "\n\n<i>Mình chưa ghi được vào sổ chi — bạn thử lại sau giúp nhé.</i>"
-        )
-        analytics.track(
-            EVENT_RECEIPT_PHOTO_FAILED,
-            user_id=user.id,
-            properties={"reason": "expense_create_error"},
-        )
-        return
-
+    token = secrets.token_urlsafe(8)
+    _pending_receipt_confirms[token] = {
+        "created_at": time.monotonic(),
+        "user_id": str(user.id),
+        "amount": amount,
+        "currency": currency,
+        "merchant": merchant,
+        "category": category,
+        "expense_date": parsed_date.isoformat(),
+        "note": note,
+        "confidence": confidence,
+        "items": items[:20],
+        "category_suggestion": result.get("category_suggestion"),
+    }
     text = format_receipt_confirmation(
-        merchant=merchant or expense.note or "Hoá đơn",
-        amount=float(expense.amount),
-        category_code=_normalize_category(expense.category),
-        receipt_date=expense.expense_date,
+        merchant=merchant or note or "Hoá đơn",
+        amount=amount,
+        category_code=_normalize_category(category),
+        receipt_date=parsed_date,
         items=[
             (str(it.get("name") or ""), it.get("price"))
             for it in items
@@ -317,8 +294,13 @@ async def _autosave_and_confirm(
         confidence=confidence,
         auto_categorized=True,
     )
-
-    keyboard = transaction_actions_keyboard(str(expense.id))
+    text += "\n\n✅ Đồng ý để mình lưu khoản chi này?"
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "✅ Đồng ý", "callback_data": f"confirm:receipt:{token}"},
+            {"text": "❌ Huỷ", "callback_data": f"cancel:receipt:{token}"},
+        ]]
+    }
 
     edited = False
     if ack_id:
@@ -341,18 +323,27 @@ async def _autosave_and_confirm(
             reply_markup=keyboard,
         )
 
-    analytics.track(
-        EVENT_RECEIPT_EXPENSE_AUTOSAVED,
-        user_id=user.id,
-        properties={
-            "expense_id": str(expense.id),
-            "amount": float(expense.amount),
-            "category": expense.category,
-            "auto_categorized": (result.get("category_suggestion") or "") not in VALID_CATEGORIES,
-            "confidence": confidence,
-            "has_date": bool(result.get("date")),
-        },
+async def confirm_pending_receipt(*, db: AsyncSession, user: User, token: str) -> bool:
+    payload = _pending_receipt_confirms.pop(token, None)
+    if not payload or payload.get("user_id") != str(user.id):
+        return False
+    if time.monotonic() - float(payload.get("created_at", 0)) > _PENDING_RECEIPT_TTL_S:
+        return False
+    await expense_service.create_expense(
+        db,
+        user.id,
+        ExpenseCreate(
+            amount=float(payload["amount"]),
+            currency=str(payload["currency"]),
+            merchant=payload.get("merchant"),
+            category=str(payload["category"]),
+            source="ocr",
+            expense_date=date.fromisoformat(str(payload["expense_date"])),
+            note=payload.get("note"),
+            raw_data={"ocr": {"confidence": payload.get("confidence"), "category_suggestion": payload.get("category_suggestion"), "items": payload.get("items") or []}},
+        ),
     )
+    return True
 
 
 async def handle_photo_message(
