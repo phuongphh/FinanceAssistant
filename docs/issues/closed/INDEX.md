@@ -411,6 +411,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
 | #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
 | #728 | Pre-Phase | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [pre-phase/issue-728.md](by-phase/pre-phase/issue-728.md) |
+| #740 | Pre-Phase | 🐌 /chitieu command: slow response (16s+) and import error failures | [pre-phase/issue-740.md](by-phase/pre-phase/issue-740.md) |
 
-**Total:** 407 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 390 Pre-Phase)
+**Total:** 408 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 391 Pre-Phase)
