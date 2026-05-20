@@ -252,11 +252,6 @@ async def _recent_factor_events(db: AsyncSession, user_id: uuid.UUID, period_day
 
 
 async def attribute_delta(db: AsyncSession, user_id: uuid.UUID, period_days: int = 7) -> CausalityBreakdown:
-    cache_key = f"causality:{user_id}:{date.today().isoformat()}:{period_days}"
-    cached = causality_cache.get(cache_key)
-    if cached is not None:
-        return cached
-
     result = await db.execute(
         select(TwinProjection)
         .where(TwinProjection.user_id == user_id, TwinProjection.scenario == SCENARIO_CURRENT)
@@ -264,12 +259,21 @@ async def attribute_delta(db: AsyncSession, user_id: uuid.UUID, period_days: int
         .limit(10)
     )
     projections = result.scalars().all()
+    latest_projection_at = projections[0].computed_at.isoformat() if projections else "none"
+    cache_key = f"causality:{user_id}:{latest_projection_at}:{period_days}"
+    cached = causality_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     if len(projections) < 2:
         current = _p50_at_horizon(projections[0]) if projections else Decimal("0")
         delta = Decimal("0")
     else:
         current = _p50_at_horizon(projections[0])
-        previous = _p50_at_horizon(projections[-1])
+        # Keep direction consistent with push notifications and latest Twin UI:
+        # compare the newest projection against the immediately previous one,
+        # not the oldest row from the fetched batch.
+        previous = _p50_at_horizon(projections[1])
         delta = current - previous
     delta_pct = Decimal("0") if current == 0 else (delta / current * Decimal("100")).quantize(Decimal("0.01"))
     direction = "positive" if delta > 0 else "negative" if delta < 0 else "stable"
