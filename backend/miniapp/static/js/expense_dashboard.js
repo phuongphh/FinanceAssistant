@@ -89,6 +89,7 @@
     const SOURCE = new URLSearchParams(window.location.search).get('source');
 
     initModalForm();
+    applyLocalizedKeywords();
     initCategoryFilter();
     els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
     els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
@@ -167,9 +168,30 @@
         vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
         en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
     };
+    const UI_KEYWORDS = {
+        vi: {
+            reverse: 'Huỷ',
+            reverseConfirmTitle: 'Huỷ giao dịch này?',
+            reverseFailed: 'Không huỷ được giao dịch, thử lại nhé.',
+        },
+        en: {
+            reverse: 'Reverse',
+            reverseConfirmTitle: 'Reverse this transaction?',
+            reverseFailed: 'Cannot reverse transaction. Please try again.',
+        },
+    };
+
+    function resolveLanguageCode() {
+        return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
+    }
+
+    function resolveKeywords() {
+        const lang = resolveLanguageCode();
+        return UI_KEYWORDS[lang] || UI_KEYWORDS[lang.split('-')[0]] || UI_KEYWORDS.vi;
+    }
 
     function resolveDateFormat() {
-        const lang = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
+        const lang = resolveLanguageCode();
         return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
     }
 
@@ -496,7 +518,7 @@
                     <div class="expense-amount">${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Reverse ${escapeHtml(title)}">↩️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="${escapeHtml(resolveKeywords().reverse)} ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -536,7 +558,7 @@
                     <div class="expense-amount money-in-amount">+${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Reverse ${escapeHtml(title)}">↩️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="${escapeHtml(resolveKeywords().reverse)} ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -561,7 +583,8 @@
 
     async function onQuickDelete(item) {
         const title = item.merchant || item.note || item.category_label || 'chi tiêu này';
-        const message = `Reverse "${title}"?\nBạn có chắc muốn đảo ngược giao dịch này?`;
+        const keywords = resolveKeywords();
+        const message = `${keywords.reverseConfirmTitle}\nBạn có chắc muốn đảo ngược giao dịch này?`;
         const confirmed = await new Promise((resolve) => {
             if (tg && tg.showConfirm) tg.showConfirm(message, resolve);
             else resolve(window.confirm(message));
@@ -571,7 +594,7 @@
         try {
             await fetchAPI(`/expenses/${item.id}`, { method: 'DELETE' });
         } catch (_err) {
-            if (tg && tg.showAlert) tg.showAlert('Không reverse được giao dịch, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert(resolveKeywords().reverseFailed);
             await renderDashboard();
             return;
         }
@@ -645,6 +668,11 @@
         els.modalCategory.innerHTML = CATEGORIES.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
+    }
+
+    function applyLocalizedKeywords() {
+        const keywords = resolveKeywords();
+        if (els.modalDelete) els.modalDelete.textContent = keywords.reverse;
     }
 
     function initCategoryFilter() {
@@ -737,7 +765,7 @@
     async function onDelete() {
         if (!editingExpenseId) return;
         const confirmed = await new Promise((resolve) => {
-            const msg = 'Reverse giao dịch này?\nBạn có chắc muốn đảo ngược giao dịch này?';
+            const msg = `${resolveKeywords().reverseConfirmTitle}\nBạn có chắc muốn đảo ngược giao dịch này?`;
             if (tg && tg.showConfirm) tg.showConfirm(msg, resolve);
             else resolve(window.confirm(msg));
         });
@@ -748,7 +776,7 @@
             await fetchAPI(`/expenses/${idToDelete}`, { method: 'DELETE' });
         } catch (_err) {
             els.modalDelete.disabled = false;
-            if (tg && tg.showAlert) tg.showAlert('Không reverse được giao dịch, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert(resolveKeywords().reverseFailed);
             return;
         }
         closeModal();
