@@ -41,17 +41,39 @@ DEFAULT_MAX_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_MAX_DELAY_SECONDS"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CODE_REVIEW_REQUEST_TIMEOUT_SECONDS", "30"))
 
 
+def _resolve_anthropic_error_types() -> tuple[type[BaseException], ...]:
+    """Support multiple SDK layouts (top-level vs anthropic._exceptions)."""
+    error_names = (
+        "OverloadedError",
+        "RateLimitError",
+        "APIConnectionError",
+        "APITimeoutError",
+    )
+    resolved: list[type[BaseException]] = []
+
+    for name in error_names:
+        err_type = getattr(anthropic, name, None)
+        if isinstance(err_type, type):
+            resolved.append(err_type)
+
+    if len(resolved) < len(error_names):
+        try:
+            from anthropic import _exceptions as anthropic_exceptions  # type: ignore
+
+            for name in error_names:
+                err_type = getattr(anthropic_exceptions, name, None)
+                if isinstance(err_type, type) and err_type not in resolved:
+                    resolved.append(err_type)
+        except Exception:
+            pass
+
+    return tuple(resolved)
+
+
 def _is_retryable_error(error: Exception) -> bool:
     """Retry only transient upstream/service transport failures."""
-    return isinstance(
-        error,
-        (
-            anthropic.OverloadedError,
-            anthropic.RateLimitError,
-            anthropic.APIConnectionError,
-            anthropic.APITimeoutError,
-        ),
-    )
+    retryable_types = _resolve_anthropic_error_types()
+    return bool(retryable_types) and isinstance(error, retryable_types)
 
 
 def _compute_sleep_seconds(attempt: int, base_delay_seconds: float, max_delay_seconds: float) -> float:
