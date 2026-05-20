@@ -144,6 +144,34 @@ canonical:
       time_range: "yesterday"
     notes: "Regression: report + giao dịch means transaction listing, not monthly CFO report."
 
+  - text: "báo cáo tài sản tháng này"
+    expected_intent: query_assets
+    expected_parameters:
+      time_range: "this_month"
+    notes: "Asset report by time range should stay in query_assets (regression #757)."
+
+  - text: "xem báo cáo đất tuần này"
+    expected_intent: query_assets
+    expected_parameters:
+      asset_type: "real_estate"
+      asset_subtype: "land"
+      time_range: "this_week"
+    notes: "Sub-asset (land) + time range should be captured for report asks (#757)."
+
+  - text: "show fund report tháng trước"
+    expected_intent: query_assets
+    expected_parameters:
+      asset_type: "stock"
+      asset_subtype: "fund"
+      time_range: "last_month"
+    notes: "Fund sub-asset report with English verb still maps correctly (#757)."
+
+  - text: "báo cáo mục tiêu tuần này"
+    expected_intent: query_goals
+    expected_parameters:
+      time_range: "this_week"
+    notes: "Goals report by time range should map to query_goals (#757)."
+
 
 edge_cases:
   # Edge cases — diacritics, typos, English, gibberish, OOS, greetings, etc.
