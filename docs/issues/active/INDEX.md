@@ -38,6 +38,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
-| #730 | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [issue-730.md](issue-730.md) |
 
-**Total active:** 35
+**Total active:** 34
