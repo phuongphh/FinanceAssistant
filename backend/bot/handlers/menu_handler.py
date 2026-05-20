@@ -1591,9 +1591,30 @@ async def _action_market_stock_board(
                     f"• *{entry.ticker}*: {quote.price:,.0f}đ/cp{change_text}{stale}"
                 )
             else:
-                lines.append(
-                    f"• *{entry.ticker}*: chưa có giá realtime"
-                )
+                extra = entry.asset.extra or {}
+                avg_price_raw = extra.get("avg_price")
+                quantity_raw = extra.get("quantity")
+                fallback_price: Decimal | None = None
+                if avg_price_raw not in (None, "", 0):
+                    try:
+                        fallback_price = Decimal(str(avg_price_raw))
+                    except (ArithmeticError, ValueError):
+                        fallback_price = None
+                if fallback_price is None and quantity_raw not in (None, "", 0):
+                    try:
+                        qty = Decimal(str(quantity_raw))
+                        if qty != 0:
+                            fallback_price = Decimal(entry.asset.current_value or 0) / qty
+                    except (ArithmeticError, ValueError):
+                        fallback_price = None
+                if fallback_price is not None:
+                    lines.append(
+                        f"• *{entry.ticker}*: {fallback_price:,.0f}đ/cp _(giá danh mục)_"
+                    )
+                else:
+                    lines.append(
+                        f"• *{entry.ticker}*: chưa có giá realtime"
+                    )
 
     if has_stale_quote:
         lines.append("")
