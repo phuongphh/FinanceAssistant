@@ -40,5 +40,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
 | #730 | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [issue-730.md](issue-730.md) |
+| #740 | 🐌 /chitieu command: slow response (16s+) and import error failures | [issue-740.md](issue-740.md) |
 
-**Total active:** 36
+**Total active:** 37
