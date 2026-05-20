@@ -113,8 +113,7 @@ async def test_handle_photo_returns_false_when_no_image():
 
 
 @pytest.mark.asyncio
-async def test_handle_photo_happy_path_autosaves_expense_with_keyboard():
-    from datetime import date
+async def test_handle_photo_happy_path_shows_two_button_confirm():
 
     user = _user()
     msg = _photo_message(photos=[
@@ -131,17 +130,9 @@ async def test_handle_photo_happy_path_autosaves_expense_with_keyboard():
         "confidence": "high",
         "error": None,
     }
-    fake_expense = MagicMock()
-    fake_expense.id = uuid.uuid4()
-    fake_expense.amount = 250000
-    fake_expense.merchant = "Co.op Mart"
-    fake_expense.note = "Sữa"
-    fake_expense.category = "food_drink"
-    fake_expense.expense_date = date(2026, 5, 13)
-
     send = AsyncMock(return_value={"result": {"message_id": 77}})
     edit = AsyncMock()
-    create = AsyncMock(return_value=fake_expense)
+    create = AsyncMock()
     with patch.object(photo_receipt, "send_message", send), \
          patch.object(photo_receipt, "edit_message_text", edit), \
          patch.object(photo_receipt, "send_chat_action", AsyncMock()), \
@@ -153,13 +144,7 @@ async def test_handle_photo_happy_path_autosaves_expense_with_keyboard():
 
     assert ok is True
     ocr.assert_awaited_once()
-    create.assert_awaited_once()
-    # Expense persisted with the correct shape.
-    expense_payload = create.await_args.args[2]
-    assert expense_payload.amount == 250000
-    assert expense_payload.source == "ocr"
-    assert expense_payload.category == "food_drink"
-    assert expense_payload.expense_date == date(2026, 5, 13)
+    create.assert_not_awaited()
     # Confirmation rendered with dd/mm/yyyy date and an inline keyboard.
     edit.assert_awaited()
     final_text = edit.await_args.kwargs["text"]
@@ -168,9 +153,9 @@ async def test_handle_photo_happy_path_autosaves_expense_with_keyboard():
     assert "2026-05-13" not in final_text
     keyboard = edit.await_args.kwargs["reply_markup"]
     assert keyboard and keyboard["inline_keyboard"]
-    # The category-change button must be present so user can correct it.
+    # OCR flow now has only two actions: Đồng ý / Huỷ.
     flat_buttons = [b for row in keyboard["inline_keyboard"] for b in row]
-    assert any("Đổi danh mục" in b["text"] for b in flat_buttons)
+    assert [b["text"] for b in flat_buttons] == ["✅ Đồng ý", "❌ Huỷ"]
 
 
 @pytest.mark.asyncio
