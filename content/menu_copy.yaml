@@ -83,8 +83,6 @@ action_market_portfolio:
   stock_group_fund: "🏦 Quỹ mở"
   stock_group_foreign_stock: "🌐 Cổ phiếu nước ngoài"
   stock_note_stale: "_⚠️ Một số mã đang dùng dữ liệu cũ do nguồn tin chậm cập nhật._"
-  stock_note_fund: "_Bé Tiền chưa kết nối NAV quỹ mở realtime — tạm hiển thị giá trong portfolio._"
-  stock_note_foreign: "_Bé Tiền chưa kết nối giá CK nước ngoài realtime — tạm hiển thị giá trong portfolio._"
 
 
 # ============================================================

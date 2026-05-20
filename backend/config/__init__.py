@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     market_data_timeout_seconds: float = 3.0
     market_data_alerts_enabled: bool = False
+    # VN stock dispatcher order. "vndirect" makes api-finfo.vndirect.com.vn the
+    # primary and SSI the backup; "ssi" keeps the historical SSI-first order.
+    # Switched to VNDIRECT-first by default after the SSI iboard dchart
+    # endpoint stopped returning data reliably.
+    stock_provider_primary: str = "vndirect"
 
     # OpenClaw Skills
     finance_api_url: str = "http://localhost:8001/api/v1"
