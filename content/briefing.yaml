@@ -23,5 +23,12 @@ sections:
   insights: |
     💡 Gợi ý nhanh:
     {insight_lines}
+# Format strings for individual insight bullets. Kept here (not hardcoded in
+# Python) per the Vietnamese-localization rule in CLAUDE.md so copy can be
+# tuned without code changes.
+insights_lines:
+  performance_pair: "Tốt nhất: {best_symbol} {best_pct}%; yếu nhất: {worst_symbol} {worst_pct}%."
+  performance_single: "Hiệu suất: {symbol} {pct}%."
+  diversification: "Đa dạng hóa: {score}/100 ({label})."
 footer:
   stale: "⚠️ Một số giá đang dùng dữ liệu gần nhất vì nguồn realtime tạm chậm."

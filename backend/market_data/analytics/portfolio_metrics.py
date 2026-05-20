@@ -1,6 +1,7 @@
 """Portfolio analytics for Phase 3.9 briefings."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
@@ -15,6 +16,25 @@ from backend.wealth.models.asset import Asset
 from backend.wealth.valuation.crypto import value_crypto_holding
 from backend.wealth.valuation.gold import value_gold_holding
 from backend.wealth.valuation.stock import value_stock_holding
+
+logger = logging.getLogger(__name__)
+
+# Asset types eligible for "best/worst performer" ranking. Cash, real_estate,
+# and other are intentionally excluded:
+#   - cash: initial_value is the onboarding snapshot, not a cost basis. As the
+#     user's balance changes, (current - initial)/initial yields a meaningless
+#     "return %" that confuses users and can grow unbounded.
+#   - real_estate: no daily price feed; using stale cost basis is misleading.
+#   - other: unstructured asset class; can't trust the percentage.
+_PERFORMANCE_ELIGIBLE_TYPES: frozenset[str] = frozenset({"stock", "crypto", "gold"})
+
+# Sanity bounds on return percentages displayed to users. Anything outside this
+# band is almost always a data-quality bug (typo in avg_price, wrong unit,
+# placeholder cost basis). We exclude such holdings from rankings and log a
+# warning for ops investigation instead of rendering absurd numbers like
+# "+29099900%" or "-4569%" that destroy user trust.
+_MIN_REASONABLE_RETURN_PCT: Decimal = Decimal("-100")  # long position floor
+_MAX_REASONABLE_RETURN_PCT: Decimal = Decimal("1000")  # 10x in any briefing window = data error
 
 
 @dataclass(frozen=True)
@@ -113,10 +133,29 @@ async def compute_ytd_return(user_id) -> dict[str, Any]:
 
 
 async def get_best_worst_from_assets(assets: list[Asset]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return (best, worst) holding by return % among investment positions.
+
+    Cash, real_estate, and other assets are excluded — they have no meaningful
+    investment return. Holdings whose computed return % falls outside
+    ``[_MIN_REASONABLE_RETURN_PCT, _MAX_REASONABLE_RETURN_PCT]`` are also
+    excluded (with a warning log) because such values indicate corrupted
+    cost-basis data rather than real performance.
+    """
     performances: list[HoldingPerformance] = []
     for asset in assets:
+        if asset.asset_type not in _PERFORMANCE_ELIGIBLE_TYPES:
+            continue
         current, cost, pct = await _value_asset(asset)
         if pct is None:
+            continue
+        if pct < _MIN_REASONABLE_RETURN_PCT or pct > _MAX_REASONABLE_RETURN_PCT:
+            logger.warning(
+                "Holding %s (asset_id=%s) excluded from best/worst: "
+                "return_pct=%s out of range [%s, %s]; cost_basis_value=%s, current_value=%s",
+                _symbol(asset), asset.id, pct,
+                _MIN_REASONABLE_RETURN_PCT, _MAX_REASONABLE_RETURN_PCT,
+                cost, current,
+            )
             continue
         performances.append(HoldingPerformance(asset.id, _symbol(asset), asset.asset_type, current, cost, pct))
     if not performances:
