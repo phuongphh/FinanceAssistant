@@ -139,7 +139,7 @@ class QueryPortfolioHandler(IntentHandler):
         )
         stale_marker = (
             " _(giá bạn nhập)_"
-            if extra.get("current_price") is not None
+            if self._is_user_entered_gold_price(asset, extra=extra, quantity=quantity)
             else ""
         )
         return (
@@ -169,6 +169,30 @@ class QueryPortfolioHandler(IntentHandler):
         if grams is not None:
             return Decimal(str(grams)) / Decimal("37.5")
         return None
+
+    def _is_user_entered_gold_price(
+        self,
+        asset,
+        *,
+        extra: dict[str, Any],
+        quantity: Decimal | None,
+    ) -> bool:
+        """True when current value still matches the user-entered unit price.
+
+        Gold flow stores ``extra.current_price`` at input time; after market
+        revaluation this key may still exist, so using key-existence alone
+        creates a false "giá bạn nhập" badge. We only show the badge when the
+        holding value still equals input unit-price × quantity.
+        """
+        input_price = extra.get("current_price")
+        if input_price is None or quantity is None:
+            return False
+        try:
+            manual_value = Decimal(str(input_price)) * quantity
+            current_value = Decimal(str(asset.current_value or 0))
+        except Exception:
+            return False
+        return abs(current_value - manual_value) < Decimal("0.5")
 
 
 def _format_quantity(quantity: Decimal) -> str:
