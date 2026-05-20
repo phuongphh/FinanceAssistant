@@ -6,14 +6,6 @@ import anthropic
 import requests
 
 
-def _resolve_anthropic_error(name: str):
-    """Return Anthropic error class across SDK versions."""
-    cls = getattr(anthropic, name, None)
-    if cls is not None:
-        return cls
-    exceptions_mod = getattr(anthropic, "_exceptions", None)
-    return getattr(exceptions_mod, name, None) if exceptions_mod is not None else None
-
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 PR_NUMBER = os.environ.get("PR_NUMBER")
@@ -50,20 +42,40 @@ DEFAULT_MAX_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_MAX_DELAY_SECONDS"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CODE_REVIEW_REQUEST_TIMEOUT_SECONDS", "30"))
 
 
-def _is_retryable_error(error: Exception) -> bool:
-    """Retry only transient upstream/service transport failures."""
-    retryable_names = (
+def _resolve_anthropic_error_types() -> tuple[type[BaseException], ...]:
+    """Support multiple SDK layouts (top-level vs anthropic._exceptions)."""
+    error_names = (
         "OverloadedError",
         "RateLimitError",
         "APIConnectionError",
         "APITimeoutError",
         "InternalServerError",
     )
-    retryable_types = tuple(
-        cls for cls in (_resolve_anthropic_error(name) for name in retryable_names)
-        if cls is not None
-    )
-    return isinstance(error, retryable_types)
+    resolved: list[type[BaseException]] = []
+
+    for name in error_names:
+        err_type = getattr(anthropic, name, None)
+        if isinstance(err_type, type):
+            resolved.append(err_type)
+
+    if len(resolved) < len(error_names):
+        try:
+            from anthropic import _exceptions as anthropic_exceptions  # type: ignore
+
+            for name in error_names:
+                err_type = getattr(anthropic_exceptions, name, None)
+                if isinstance(err_type, type) and err_type not in resolved:
+                    resolved.append(err_type)
+        except Exception:
+            pass
+
+    return tuple(resolved)
+
+
+def _is_retryable_error(error: Exception) -> bool:
+    """Retry only transient upstream/service transport failures."""
+    retryable_types = _resolve_anthropic_error_types()
+    return bool(retryable_types) and isinstance(error, retryable_types)
 
 
 def _compute_sleep_seconds(attempt: int, base_delay_seconds: float, max_delay_seconds: float) -> float:
@@ -160,7 +172,7 @@ def main() -> int:
             "⚠️ Automated code review skipped: Anthropic service overloaded after retries.\n"
             "VERDICT: PASS"
         )
-        verdict, reason = "PASS", ""
+        verdict, reason = "PASS", "(transient provider overload — review skipped)"
     else:
         result = response.content[0].text.strip()
         verdict, reason = parse_verdict(result)
