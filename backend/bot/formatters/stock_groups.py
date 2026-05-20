@@ -13,6 +13,7 @@ display the rest with the user's last known portfolio price.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -74,6 +75,36 @@ def group_assets(assets: list["Asset"]) -> dict[str, list[StockGroupEntry]]:
             StockGroupEntry(group=group, ticker=ticker, asset=asset)
         )
     return buckets
+
+
+def fallback_portfolio_price(asset: "Asset") -> Decimal | None:
+    """Per-share price from stored portfolio data when no realtime quote.
+
+    Prefers ``extra.avg_price`` (the user's recorded buy price). Falls
+    back to ``current_value / quantity`` if avg_price is missing but
+    both other fields are usable. Returns None when neither path yields
+    a positive Decimal — caller renders a "no price" placeholder.
+    """
+    extra = getattr(asset, "extra", None) or {}
+    avg_price_raw = extra.get("avg_price")
+    if avg_price_raw not in (None, "", 0):
+        try:
+            price = Decimal(str(avg_price_raw))
+        except (ArithmeticError, ValueError):
+            price = None
+        if price is not None and price > 0:
+            return price
+    quantity_raw = extra.get("quantity")
+    if quantity_raw in (None, "", 0):
+        return None
+    try:
+        qty = Decimal(str(quantity_raw))
+        if qty == 0:
+            return None
+        price = Decimal(asset.current_value or 0) / qty
+    except (ArithmeticError, ValueError):
+        return None
+    return price if price > 0 else None
 
 
 def collect_quotable_tickers(buckets: dict[str, list[StockGroupEntry]]) -> list[str]:

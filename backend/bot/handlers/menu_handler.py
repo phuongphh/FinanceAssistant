@@ -1518,13 +1518,11 @@ async def _action_market_stock_board(
     from decimal import Decimal
     from zoneinfo import ZoneInfo
 
-    from backend.bot.formatters.money import format_money_short
     from backend.bot.formatters.stock_groups import (
-        GROUP_FOREIGN,
-        GROUP_FUND,
         GROUP_ORDER,
         QUOTABLE_GROUPS,
         collect_quotable_tickers,
+        fallback_portfolio_price,
         group_assets,
     )
     from backend.market_data.client import get_stock_quotes
@@ -1567,10 +1565,6 @@ async def _action_market_stock_board(
         f"_{get_action_copy('action_market_portfolio', 'stock_hint')}_",
     ]
 
-    group_note_key = {
-        GROUP_FUND: "stock_note_fund",
-        GROUP_FOREIGN: "stock_note_foreign",
-    }
     has_stale_quote = False
 
     for group in GROUP_ORDER:
@@ -1590,22 +1584,23 @@ async def _action_market_stock_board(
                 if change is not None:
                     pct = Decimal(str(change))
                     sign = "+" if pct >= 0 else ""
-                    change_text = f" · {sign}{pct:.2f}%"
+                    change_text = f" {sign}{pct:.2f}%"
                 if quote.is_stale:
                     has_stale_quote = True
                 stale = " · dữ liệu cũ" if quote.is_stale else ""
                 lines.append(
-                    f"• *{entry.ticker}*: {quote.price:,.0f}đ{change_text}{stale}"
+                    f"• *{entry.ticker}*: {quote.price:,.0f}đ/cp{change_text}{stale}"
                 )
             else:
-                lines.append(
-                    f"• *{entry.ticker}*: "
-                    f"{format_money_short(entry.asset.current_value)} "
-                    f"_(giá trong portfolio)_"
-                )
-        note_key = group_note_key.get(group)
-        if note_key:
-            lines.append(get_action_copy("action_market_portfolio", note_key))
+                fallback_price = fallback_portfolio_price(entry.asset)
+                if fallback_price is not None:
+                    lines.append(
+                        f"• *{entry.ticker}*: {fallback_price:,.0f}đ/cp _(giá danh mục)_"
+                    )
+                else:
+                    lines.append(
+                        f"• *{entry.ticker}*: chưa có giá realtime"
+                    )
 
     if has_stale_quote:
         lines.append("")
