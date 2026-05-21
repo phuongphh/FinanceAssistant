@@ -9,9 +9,9 @@ Add Credit Card management to Finance Assistant: allow users to create credit ca
 Users need to track credit card debt alongside their other assets and expenses. Currently, expenses can only be sourced from cash/bank accounts. Adding credit card support enables complete financial tracking — users can record credit card spending and monitor their outstanding balance and closing dates.
 
 ## Issues
-- [#772](https://github.com/phuongphh/FinanceAssistant/issues/772) Create & Manage Credit Cards (data model + CRUD)
-- [#773](https://github.com/phuongphh/FinanceAssistant/issues/773) Expense Transaction with Credit Card Source
-- [#774](https://github.com/phuongphh/FinanceAssistant/issues/774) Credit Card Menu in Chi Tiêu
+- [#775](https://github.com/phuongphh/FinanceAssistant/issues/775) Create & Manage Credit Cards (data model + CRUD)
+- [#776](https://github.com/phuongphh/FinanceAssistant/issues/776) Expense Transaction with Credit Card Source
+- [#777](https://github.com/phuongphh/FinanceAssistant/issues/777) Credit Card Menu in Chi Tiêu
 
 ## Acceptance Criteria
 - [ ] User can create a credit card with bank name (unique), closing date, debt balance
@@ -30,7 +30,7 @@ Users need to track credit card debt alongside their other assets and expenses. 
 
 ## Claude Code Implementation Prompt
 ```
-Read Epic #[EPIC_NUMBER] and all sub-issues (#772-#774) in phuongphh/FinanceAssistant.
+Read Epic #774 and all sub-issues (#775-#777) in phuongphh/FinanceAssistant.
 
 Implement Credit Card management:
 1. Create credit_cards table + CRUD (bank name unique per user, closing date, debt balance)
@@ -42,6 +42,6 @@ Guidelines:
 - NLU must handle "trả bằng thẻ [bank]" patterns
 - Conventional commits (feat:)
 - Write tests for CRUD + expense with credit card source
-- Create draft PR linking to epic #[EPIC_NUMBER]
+- Create draft PR linking to epic #774
 ```
 
