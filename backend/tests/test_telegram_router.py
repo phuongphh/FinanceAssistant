@@ -10,8 +10,15 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
+from backend.database import get_db
 from backend.main import app
 
+
+async def _fake_db():
+    yield None
+
+
+app.dependency_overrides[get_db] = _fake_db
 client = TestClient(app)
 
 
@@ -56,6 +63,23 @@ class TestWebhookAuth:
             json={"update_id": 3, "message": {"text": "/menu", "chat": {"id": 123}}},
         )
         assert resp.status_code == 200
+
+    def test_returns_400_for_invalid_json_body(self):
+        resp = client.post(
+            "/api/v1/telegram/webhook",
+            data="not-json",
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Invalid JSON body"
+
+    def test_returns_400_for_non_object_json_body(self):
+        resp = client.post(
+            "/api/v1/telegram/webhook",
+            json=["unexpected", "array"],
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "JSON body must be an object"
 
 
 class TestMenuEndpoint:
