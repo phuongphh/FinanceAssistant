@@ -410,6 +410,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
 | #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
 | #720 | Pre-Phase | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [pre-phase/issue-720.md](by-phase/pre-phase/issue-720.md) |
+| #721 | Pre-Phase | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [pre-phase/issue-721.md](by-phase/pre-phase/issue-721.md) |
 | #723 | Pre-Phase | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [pre-phase/issue-723.md](by-phase/pre-phase/issue-723.md) |
 | #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
 | #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
@@ -423,5 +424,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 418 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 401 Pre-Phase)
+**Total:** 419 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 402 Pre-Phase)
