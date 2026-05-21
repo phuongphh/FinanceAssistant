@@ -187,6 +187,9 @@ submenu_assets:
     - label: "✏️ Quản lý tài sản"
       callback: "menu:assets:manage"
       description: "Hướng dẫn 3 cách quản lý tài sản"
+    - label: "🛡️ Bảo hiểm nhân thọ"
+      callback: "menu:assets:life_insurance"
+      description: "Xem danh sách hợp đồng BHNT và tổng đã đóng"
 
     - label: "🏠 Cho thuê BĐS"
       callback: "menu:assets:mark_rental"
