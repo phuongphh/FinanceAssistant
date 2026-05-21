@@ -52,7 +52,7 @@ async def test_dashboard_tap_records_open_and_click():
     # last sent: 5 min ago. opened lookup: nothing yet.
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=5)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     opened_result = MagicMock()
     opened_result.first.return_value = None
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])
@@ -85,6 +85,7 @@ async def test_dashboard_tap_records_open_and_click():
     args, kwargs = atrack_mock.await_args
     assert args[0] == analytics.EventType.MORNING_BRIEFING_OPENED
     assert kwargs["user_id"] == user.id
+    assert kwargs["properties"] == {"level": "starter"}
 
     # CLICK event for the dashboard action
     track_mock.assert_called_once()
@@ -100,7 +101,7 @@ async def test_second_tap_within_window_does_not_re_record_open():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=2)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     # Pretend an opened event already exists
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
@@ -148,7 +149,7 @@ async def test_tap_with_no_recent_send_does_not_record_open():
     user = _make_user()
 
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = None  # no recent send
+    sent_result.one_or_none.return_value = None  # no recent send
     db.execute = AsyncMock(return_value=sent_result)
 
     atrack_mock = AsyncMock()
@@ -187,7 +188,7 @@ async def test_add_asset_tap_forwards_to_wizard_and_tracks_click():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])
@@ -242,7 +243,7 @@ async def test_story_tap_forwards_to_storytelling_with_briefing_source():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])
@@ -292,7 +293,7 @@ async def test_dashboard_tap_sends_web_app_button_when_url_configured():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])
@@ -340,7 +341,7 @@ async def test_dashboard_tap_falls_back_to_placeholder_without_url():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {"level": "starter"})
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])

@@ -92,7 +92,7 @@ async def _record_open_if_first(
     cutoff = now - _OPEN_WINDOW
 
     last_sent_stmt = (
-        select(Event.timestamp)
+        select(Event.timestamp, Event.properties)
         .where(
             Event.user_id == user_id,
             Event.event_type == analytics.EventType.MORNING_BRIEFING_SENT,
@@ -101,11 +101,12 @@ async def _record_open_if_first(
         .order_by(Event.timestamp.desc())
         .limit(1)
     )
-    last_sent = (await db.execute(last_sent_stmt)).scalar_one_or_none()
-    if last_sent is None:
+    last_sent_row = (await db.execute(last_sent_stmt)).one_or_none()
+    if last_sent_row is None:
         # No briefing in the open window — must be a stale message
         # tap, don't credit an open.
         return
+    last_sent, sent_props = last_sent_row
 
     already_opened_stmt = (
         select(Event.id)
@@ -119,9 +120,12 @@ async def _record_open_if_first(
     if (await db.execute(already_opened_stmt)).first() is not None:
         return
 
+    level = (sent_props or {}).get("level")
+    properties = {"level": level} if level else None
     await analytics.atrack(
         analytics.EventType.MORNING_BRIEFING_OPENED,
         user_id=user_id,
+        properties=properties,
     )
 
 
