@@ -39,5 +39,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
 | #774 | [Epic] Credit Card Management — Create, Expense, Menu | [issue-774.md](issue-774.md) |
+| #775 | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [issue-775.md](issue-775.md) |
 
-**Total active:** 35
+**Total active:** 36
