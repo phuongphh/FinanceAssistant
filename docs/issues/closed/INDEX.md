@@ -417,6 +417,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #726 | Pre-Phase | [Story 1] Fix milestone card color contrast — Twin Dashboard | [pre-phase/issue-726.md](by-phase/pre-phase/issue-726.md) |
 | #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
 | #728 | Pre-Phase | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [pre-phase/issue-728.md](by-phase/pre-phase/issue-728.md) |
+| #729 | Pre-Phase | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [pre-phase/issue-729.md](by-phase/pre-phase/issue-729.md) |
 | #730 | Pre-Phase | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [pre-phase/issue-730.md](by-phase/pre-phase/issue-730.md) |
 | #740 | Pre-Phase | 🐌 /chitieu command: slow response (16s+) and import error failures | [pre-phase/issue-740.md](by-phase/pre-phase/issue-740.md) |
 | #750 | Pre-Phase | Add foreign stock provider (NVDA, IBM, ETF) — current providers only support VN stocks | [pre-phase/issue-750.md](by-phase/pre-phase/issue-750.md) |
@@ -426,5 +427,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 421 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 404 Pre-Phase)
+**Total:** 422 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 405 Pre-Phase)
