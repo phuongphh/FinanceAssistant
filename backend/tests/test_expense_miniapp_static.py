@@ -70,6 +70,10 @@ def test_expense_localised_constants_declared_before_init_usage():
     declared lower in the same scope, so the call hit TDZ and aborted
     init — the user saw "Đang tải chi tiêu…" forever. Lock the source
     order so a future move can't silently re-introduce the bug.
+
+    Note: ``DATE_FORMAT_BY_LANGUAGE`` moved to dashboard_common.js after
+    the helper-dedup refactor; this test now only guards the
+    expense-local ``UI_KEYWORDS`` binding.
     """
     js_lines = JS.read_text().splitlines()
 
@@ -80,19 +84,39 @@ def test_expense_localised_constants_declared_before_init_usage():
         return -1
 
     ui_keywords_decl = first_index(lambda line: line.lstrip().startswith("const UI_KEYWORDS"))
-    date_format_decl = first_index(lambda line: line.lstrip().startswith("const DATE_FORMAT_BY_LANGUAGE"))
     apply_call = first_index(lambda line: "applyLocalizedKeywords();" in line)
 
     assert ui_keywords_decl >= 0, "UI_KEYWORDS const declaration missing"
-    assert date_format_decl >= 0, "DATE_FORMAT_BY_LANGUAGE const declaration missing"
     assert apply_call >= 0, "applyLocalizedKeywords() init call missing"
     assert ui_keywords_decl < apply_call, (
         f"UI_KEYWORDS declared on line {ui_keywords_decl + 1} but read on "
         f"line {apply_call + 1} — TDZ violation, init will throw."
     )
-    assert date_format_decl < apply_call, (
-        f"DATE_FORMAT_BY_LANGUAGE declared on line {date_format_decl + 1} "
-        f"but reachable from init on line {apply_call + 1} — TDZ risk."
+
+
+def test_expense_destructures_shared_helpers_at_iife_top():
+    """The shared dashboard_common.js helpers must be destructured BEFORE
+    any init-phase caller — same TDZ rule that bit us on UI_KEYWORDS.
+    The destructuring line must sit above the first ``applyTheme`` call.
+    """
+    js_lines = JS.read_text().splitlines()
+
+    def first_index(predicate):
+        for idx, line in enumerate(js_lines):
+            if predicate(line):
+                return idx
+        return -1
+
+    destructure = first_index(
+        lambda line: "DashboardCommon" in line and "applyTheme" in line and "const {" in line
+    )
+    apply_theme_call = first_index(lambda line: "applyTheme(tg.themeParams" in line)
+
+    assert destructure >= 0, "destructuring from DashboardCommon missing"
+    assert apply_theme_call >= 0, "applyTheme bootstrap call missing"
+    assert destructure < apply_theme_call, (
+        f"DashboardCommon destructured on line {destructure + 1} but "
+        f"applyTheme called on line {apply_theme_call + 1} — TDZ risk."
     )
 
 

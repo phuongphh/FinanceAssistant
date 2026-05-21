@@ -2,6 +2,11 @@
 (function () {
     'use strict';
 
+    // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
+    // first via the template. Destructure at IIFE top so bindings exit
+    // TDZ before any caller (per the smoke-harness contract).
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
         tg.ready();
@@ -77,52 +82,11 @@
         }
     }
 
-    function applyTheme(theme) {
-        const root = document.documentElement;
-        const map = {
-            '--bg-color': theme.bg_color,
-            '--text-color': theme.text_color,
-            '--text-muted': theme.hint_color,
-            '--card-bg': theme.secondary_bg_color,
-            '--primary': theme.button_color,
-            '--primary-text': theme.button_text_color,
-        };
-        for (const [prop, value] of Object.entries(map)) {
-            if (value) root.style.setProperty(prop, value);
-        }
-    }
-
-    function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) return (amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + ' tỷ';
-        if (abs >= 1_000_000) return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
-    }
-
-    function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
-    }
-
-    async function fetchAPI(endpoint, options = {}) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 12000);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) {
-            headers['X-Telegram-Init-Data'] = tg.initData;
-        }
-        try {
-            const response = await fetch('/miniapp/api' + endpoint, { ...options, headers: { ...headers, ...(options.headers || {}) }, signal: controller.signal });
-            if (!response.ok) {
-                throw new Error('API ' + response.status);
-            }
-            const payload = await response.json();
-            if (payload.error) throw new Error(payload.error.message || 'API error');
-            return payload.data;
-        } finally {
-            clearTimeout(tid);
-        }
-    }
+    // applyTheme, formatMoneyShort, formatMoneyFull, fetchAPI moved to
+    // dashboard_common.js — destructured at the top of the IIFE.
+    // Note: legacy local formatMoneyShort showed "1.2 tỷ" (1-decimal);
+    // the shared one shows "1.23 tỷ" (2-decimal), aligning with the
+    // expense + wealth dashboards. Tiny precision boost, not regression.
 
     async function renderDashboard() {
         showState('loading');
@@ -356,28 +320,6 @@
         await renderDashboard();
     }
 
-    const DATE_FORMAT_BY_LANGUAGE = {
-        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-    };
-
-    function resolveDateFormat() {
-        const lang = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
-        return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
-    }
-
-    function formatDate(iso) {
-        if (!iso) return '--/--/----';
-        const d = new Date(iso + 'T00:00:00');
-        const fmt = resolveDateFormat();
-        return d.toLocaleDateString(fmt.locale, fmt.options);
-    }
-
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
+    // escapeHtml, formatDate, resolveDateFormat moved to
+    // dashboard_common.js — destructured at the top of the IIFE.
 })();
