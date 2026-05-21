@@ -55,9 +55,16 @@ def test_real_asset_served_directly(spa_app: TestClient):
     assert resp.content == b"\x00"
 
 
+BROWSER_ACCEPT = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+)
+
+
 @pytest.mark.parametrize("path", ["/login", "/admin", "/admin/users", "/anything/deep"])
-def test_spa_routes_fall_back_to_index(spa_app: TestClient, path: str):
-    resp = spa_app.get(path)
+def test_spa_routes_fall_back_to_index_for_browser_navigation(
+    spa_app: TestClient, path: str
+):
+    resp = spa_app.get(path, headers={"Accept": BROWSER_ACCEPT})
     assert resp.status_code == 200, f"{path} returned {resp.status_code}"
     assert "admin spa" in resp.text
 
@@ -66,3 +73,33 @@ def test_api_route_still_wins_over_spa_mount(spa_app: TestClient):
     resp = spa_app.get("/api/v1/ping")
     assert resp.status_code == 200
     assert resp.json() == {"ok": True}
+
+
+def test_unknown_api_path_keeps_404_even_for_browser_accept(spa_app: TestClient):
+    # Regression: unconditional fallback would turn /api/v1/unknown into
+    # an HTML 200, breaking API monitoring. The fallback must skip /api/.
+    resp = spa_app.get("/api/v1/unknown", headers={"Accept": BROWSER_ACCEPT})
+    assert resp.status_code == 404
+    assert "admin spa" not in resp.text
+
+
+@pytest.mark.parametrize(
+    "path,accept",
+    [
+        ("/foo.js", "*/*"),
+        ("/missing.css", "text/css,*/*;q=0.1"),
+        ("/img.png", "image/avif,image/webp,*/*;q=0.8"),
+    ],
+)
+def test_missing_assets_keep_404_not_html(spa_app: TestClient, path: str, accept: str):
+    # Browsers fetching <script>/<link>/<img> never send text/html in Accept;
+    # serving index.html for them would make the browser parse HTML as JS/CSS.
+    resp = spa_app.get(path, headers={"Accept": accept})
+    assert resp.status_code == 404
+    assert "admin spa" not in resp.text
+
+
+def test_no_accept_header_does_not_fall_back(spa_app: TestClient):
+    # Plain HTTP clients (curl with no -H) get a clean 404, not HTML.
+    resp = spa_app.get("/nope", headers={"Accept": "application/json"})
+    assert resp.status_code == 404
