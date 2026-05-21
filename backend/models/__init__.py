@@ -77,6 +77,7 @@ from backend.models.onboarding_session import (
 )
 from backend.models.twin_calibration import HORIZONS_DAYS, TwinCalibrationSnapshot
 from backend.models.transaction import Transaction
+from backend.models.credit_card import CreditCard
 from backend.models.positioning_survey import (
     ALIGNED_POSITIONING_RESPONSES,
     MISALIGNED_POSITIONING_RESPONSES,
@@ -94,6 +95,7 @@ __all__ = [
     "AdminAuditLog",
     "Expense",
     "Transaction",
+    "CreditCard",
     "Goal",
     "MonthlyReport",
     "MarketSnapshot",

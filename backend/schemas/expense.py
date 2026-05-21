@@ -18,7 +18,7 @@ VALID_CATEGORIES = [
 
 VALID_SOURCES = ["gmail", "ocr", "manual", "bank_sync"]
 VALID_TRANSACTION_TYPES = ["expense", "money_in"]
-VALID_SOURCE_TYPES = ["cash", "bank_account", "e_wallet"]
+VALID_SOURCE_TYPES = ["cash", "bank_account", "e_wallet", "credit_card"]
 VALID_E_WALLET_PROVIDERS = ["momo", "vnpay", "zalopay", "viettelpay"]
 
 
@@ -30,6 +30,7 @@ class ExpenseCreate(BaseModel):
     category: str = Field(default="needs_review")
     source: str = Field(default="manual")
     source_asset_id: uuid.UUID | None = None
+    source_credit_card_id: uuid.UUID | None = None
     source_type: str | None = None
     e_wallet_provider: str | None = None
     expense_date: date = Field(default_factory=date.today)
@@ -67,6 +68,7 @@ class ExpenseUpdate(BaseModel):
     merchant: str | None = None
     category: str | None = None
     source_asset_id: uuid.UUID | None = None
+    source_credit_card_id: uuid.UUID | None = None
     source_type: str | None = None
     e_wallet_provider: str | None = None
     expense_date: date | None = None
@@ -106,6 +108,7 @@ class ExpenseResponse(BaseModel):
     category: str
     source: str
     source_asset_id: uuid.UUID | None
+    source_credit_card_id: uuid.UUID | None
     source_type: str | None
     e_wallet_provider: str | None
     expense_date: date
