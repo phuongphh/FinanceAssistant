@@ -451,6 +451,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #776 | Pre-Phase | [Story 2] Expense Transaction with Credit Card Source | [pre-phase/issue-776.md](by-phase/pre-phase/issue-776.md) |
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
+| #791 | Pre-Phase | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [pre-phase/issue-791.md](by-phase/pre-phase/issue-791.md) |
 
-**Total:** 447 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 430 Pre-Phase)
+**Total:** 448 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 431 Pre-Phase)

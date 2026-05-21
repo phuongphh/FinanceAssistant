@@ -14,7 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #785 | [Story 2] Add Bảo hiểm nhân thọ Button in Asset Menu | [issue-785.md](issue-785.md) |
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
-| #791 | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [issue-791.md](issue-791.md) |
 | #793 | Webhook returns 500 on non-JSON body — bot responds slowly | [issue-793.md](issue-793.md) |
 
-**Total active:** 12
+**Total active:** 11
