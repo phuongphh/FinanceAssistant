@@ -13,6 +13,7 @@ from backend.schemas.credit_card import CreditCardCreate, CreditCardUpdate
 async def create_credit_card(
     db: AsyncSession, user_id: uuid.UUID, data: CreditCardCreate
 ) -> CreditCard:
+    """Create a credit card for a user with case-insensitive bank-name uniqueness."""
     normalized_name = data.bank_name.strip()
     existing = await db.execute(
         select(CreditCard).where(
@@ -35,6 +36,7 @@ async def create_credit_card(
 
 
 async def list_credit_cards(db: AsyncSession, user_id: uuid.UUID) -> list[CreditCard]:
+    """Return all credit cards of a user, newest first."""
     rows = await db.execute(
         select(CreditCard)
         .where(CreditCard.user_id == user_id)
@@ -46,6 +48,7 @@ async def list_credit_cards(db: AsyncSession, user_id: uuid.UUID) -> list[Credit
 async def get_credit_card(
     db: AsyncSession, user_id: uuid.UUID, card_id: uuid.UUID
 ) -> CreditCard | None:
+    """Return a single credit card by id if it belongs to the user."""
     return (
         await db.execute(
             select(CreditCard).where(
@@ -54,4 +57,3 @@ async def get_credit_card(
             )
         )
     ).scalar_one_or_none()
-
