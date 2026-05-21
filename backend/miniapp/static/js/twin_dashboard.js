@@ -48,15 +48,33 @@
     const etags = Object.create(null);
     const cache = Object.create(null);
 
-    els.retryBtn.addEventListener('click', () => load(currentScenario, { force: true }));
-    els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
-    els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
-    if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
-    if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
-    if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
-    if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
-    if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
-    switchScenario(currentScenario);
+    // See expense_dashboard.js: bootstrap guard so a sync throw (DOM
+    // mismatch, TDZ, Telegram shim drift) doesn't leave the user stuck
+    // on the initial "Đang tải Bé Tiền tương lai…" skeleton forever.
+    try {
+        els.retryBtn.addEventListener('click', () => load(currentScenario, { force: true }));
+        els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
+        els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
+        if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
+        if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
+        if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
+        if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
+        if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
+        switchScenario(currentScenario);
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('twin_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được Bé Tiền tương lai, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     function switchScenario(scenario) {
         currentScenario = scenario === 'optimal' ? 'optimal' : 'current';

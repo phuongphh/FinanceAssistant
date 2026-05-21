@@ -49,15 +49,33 @@
         ['saving', '💰 Tiết kiệm'], ['gift', '🎁 Quà tặng'], ['other', '📌 Chưa phân loại'],
     ];
 
-    els.retryBtn.addEventListener('click', renderDashboard);
-    els.addExpenseBtn?.addEventListener('click', () => showExpenseModal());
-    els.expenseCancel?.addEventListener('click', hideExpenseModal);
-    els.expenseSave?.addEventListener('click', saveExpense);
-    els.expenseDelete?.addEventListener('click', deleteExpense);
-    els.expenseMonth?.addEventListener('change', renderDashboard);
-    initExpenseForm();
+    // See expense_dashboard.js: bootstrap guard so a sync throw (DOM
+    // mismatch, TDZ, Telegram shim drift) doesn't leave the user stuck
+    // on the initial "Đang tải dashboard…" spinner forever.
+    try {
+        els.retryBtn.addEventListener('click', renderDashboard);
+        els.addExpenseBtn?.addEventListener('click', () => showExpenseModal());
+        els.expenseCancel?.addEventListener('click', hideExpenseModal);
+        els.expenseSave?.addEventListener('click', saveExpense);
+        els.expenseDelete?.addEventListener('click', deleteExpense);
+        els.expenseMonth?.addEventListener('change', renderDashboard);
+        initExpenseForm();
 
-    renderDashboard();
+        renderDashboard();
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được dashboard, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     function applyTheme(theme) {
         const root = document.documentElement;

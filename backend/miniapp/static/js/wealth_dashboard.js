@@ -70,22 +70,41 @@
     const LEVEL_RANK = ['starter', 'young_prof', 'mass_affluent', 'hnw', 'vip'];
     const LAST_LEVEL_KEY = 'wealth.last_level';
 
-    els.retryBtn.addEventListener('click', renderDashboard);
-    els.addAssetBtn.addEventListener('click', closeAndAddAsset);
-    els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
-    if (els.backMenuBtn) els.backMenuBtn.addEventListener('click', backToMainMenu);
-    els.assetsList.addEventListener('click', onAssetRowClick);
-    els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
+    // See expense_dashboard.js: a sync throw inside the bootstrap (DOM
+    // mismatch, TDZ, Telegram shim drift) would otherwise leave the
+    // user stuck on the initial spinner. Surface the error state with
+    // a fresh reload listener so they have an escape hatch.
+    try {
+        els.retryBtn.addEventListener('click', renderDashboard);
+        els.addAssetBtn.addEventListener('click', closeAndAddAsset);
+        els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
+        if (els.backMenuBtn) els.backMenuBtn.addEventListener('click', backToMainMenu);
+        els.assetsList.addEventListener('click', onAssetRowClick);
+        els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
 
-    document.querySelectorAll('.period-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onPeriodChange(btn));
-    });
-    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onAssetSortChange(btn));
-    });
-    updateAssetSortButtons();
+        document.querySelectorAll('.period-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onPeriodChange(btn));
+        });
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onAssetSortChange(btn));
+        });
+        updateAssetSortButtons();
 
-    renderDashboard();
+        renderDashboard();
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('wealth_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được trang tài sản, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     // -- Theme + utils ----------------------------------------------------
 
