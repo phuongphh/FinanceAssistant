@@ -433,6 +433,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
 | #720 | Pre-Phase | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [pre-phase/issue-720.md](by-phase/pre-phase/issue-720.md) |
 | #721 | Pre-Phase | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [pre-phase/issue-721.md](by-phase/pre-phase/issue-721.md) |
+| #722 | Pre-Phase | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [pre-phase/issue-722.md](by-phase/pre-phase/issue-722.md) |
 | #723 | Pre-Phase | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [pre-phase/issue-723.md](by-phase/pre-phase/issue-723.md) |
 | #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
 | #726 | Pre-Phase | [Story 1] Fix milestone card color contrast — Twin Dashboard | [pre-phase/issue-726.md](by-phase/pre-phase/issue-726.md) |
@@ -451,5 +452,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 446 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 429 Pre-Phase)
+**Total:** 447 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 430 Pre-Phase)
