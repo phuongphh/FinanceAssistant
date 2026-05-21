@@ -54,6 +54,7 @@ _STATIC_REF_FILES = (
     "css/twin.css",
     "css/cashflow.css",
     "css/expense.css",
+    "js/dashboard_common.js",
     "js/dashboard.js",
     "js/wealth_dashboard.js",
     "js/twin_dashboard.js",
@@ -282,21 +283,8 @@ def _render_html_with_version(html_path: Path) -> str:
             bumped,
             count=1,
         )
-    # Inject a visible footer marker so users can read the running build
-    # straight from the dashboard — much faster than tailing server logs
-    # when verifying a deploy reached the VPS.
-    footer_html = (
-        '<div style="text-align:center;margin:18px 0 8px;font-size:11px;'
-        'opacity:0.45;letter-spacing:0.02em;font-family:system-ui,sans-serif;">'
-        f"build {_GIT_SHA} · assets {_STATIC_VERSION}"
-        "</div>"
-    )
     if _VERSION_MARKER_PATTERN.search(bumped):
-        bumped = _VERSION_MARKER_PATTERN.sub(lambda _m: footer_html, bumped, count=1)
-    else:
-        # Templates that haven't added the marker yet still get the footer
-        # right before </body> so the diagnostic is universal.
-        bumped = bumped.replace("</body>", footer_html + "\n</body>", 1)
+        bumped = _VERSION_MARKER_PATTERN.sub("", bumped, count=1)
     return bumped
 
 
@@ -991,6 +979,23 @@ async def start_asset_wizard_route(
     from backend.bot.handlers.asset_entry import start_asset_wizard
 
     await start_asset_wizard(db, user.telegram_id, user)
+    return {"data": {"ok": True}, "error": None}
+
+
+@router.post("/api/wealth/back-to-menu")
+async def back_to_menu_route(
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Post the root ``/menu`` into chat before Mini App closes.
+
+    Keeps navigation explicit: user taps "Về Menu" in dashboard, the bot
+    immediately re-renders the main menu bubble in the private chat.
+    """
+    user = await _resolve_user(auth, db)
+    from backend.bot.handlers.menu_handler import cmd_menu
+
+    await cmd_menu(db, user.telegram_id, user)
     return {"data": {"ok": True}, "error": None}
 
 

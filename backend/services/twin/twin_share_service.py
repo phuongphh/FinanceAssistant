@@ -75,6 +75,16 @@ async def build_share_image_bytes(
     """Return a PNG-bytes share image for the user. Raises
     ``TwinShareUnavailable`` if there is no projection to share."""
     snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
+    # Keep share-image consistent with the Twin screen: if the stored
+    # projection is missing or stale vs current wallet value, recompute
+    # synchronously before rendering.
+    if snapshot.projection is None or snapshot.is_value_stale:
+        try:
+            await twin_projection_service.compute_and_store(db, user.id, scenario="both")
+            snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
+        except Exception:
+            logger.exception("twin_share: recompute failed user=%s", user.id)
+
     cone = snapshot.latest_cone
     if not cone or snapshot.projection is None:
         raise TwinShareUnavailable("no projection available")

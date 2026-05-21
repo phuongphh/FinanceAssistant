@@ -7,8 +7,11 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -208,10 +211,42 @@ def _idempotency_allows(user_id: uuid.UUID) -> bool:
     return datetime.now(timezone.utc) - last >= IDEMPOTENCY_WINDOW
 
 
+_COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "twin_copy.yaml"
+
+
+@lru_cache(maxsize=1)
+def _habit_loop_copy() -> dict[str, Any]:
+    with open(_COPY_PATH, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("habit_loop", {})
+
+
 async def _notify(chat_id: int, *, delta_abs: Decimal, delta_pct: Decimal) -> None:
-    direction = "nhích lên" if delta_abs >= 0 else "nhích xuống"
-    text = f"🔮 Twin vừa {direction} {abs(delta_pct)}%. Bấm ‘Vì sao Twin thay đổi?’ để xem chi tiết."
-    await get_notifier().send_message(chat_id=chat_id, text=text, reply_markup={"inline_keyboard": [[{"text": "Vì sao Twin thay đổi?", "callback_data": "twin:causality"}, {"text": "Việc nên làm tiếp →", "callback_data": "twin:action"}]]})
+    copy = _habit_loop_copy()
+    direction = (
+        copy.get("push_direction_up", "nhích lên")
+        if delta_abs >= 0
+        else copy.get("push_direction_down", "nhích xuống")
+    )
+    causality_label = copy.get("button_causality", "Vì sao Twin thay đổi?")
+    action_label = copy.get("button_action", "Việc nên làm tiếp →")
+    # Strip leading emoji + space from the button label when embedding it
+    # inside a sentence so the push reads naturally.
+    causality_short = causality_label.split(" ", 1)[-1] if causality_label.startswith(("🧭", "✨")) else causality_label
+    text = copy.get(
+        "push_text",
+        "🔮 Twin vừa {direction} {pct}%. Bấm '{causality}' để xem chi tiết.",
+    ).format(direction=direction, pct=abs(delta_pct), causality=causality_short)
+    await get_notifier().send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup={
+            "inline_keyboard": [[
+                {"text": causality_label, "callback_data": "twin:causality"},
+                {"text": action_label, "callback_data": "twin:action"},
+            ]]
+        },
+    )
 
 
 def pending_recompute_count() -> int:

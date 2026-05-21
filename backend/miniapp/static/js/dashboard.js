@@ -2,6 +2,11 @@
 (function () {
     'use strict';
 
+    // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
+    // first via the template. Destructure at IIFE top so bindings exit
+    // TDZ before any caller (per the smoke-harness contract).
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
         tg.ready();
@@ -49,62 +54,39 @@
         ['saving', '💰 Tiết kiệm'], ['gift', '🎁 Quà tặng'], ['other', '📌 Chưa phân loại'],
     ];
 
-    els.retryBtn.addEventListener('click', renderDashboard);
-    els.addExpenseBtn?.addEventListener('click', () => showExpenseModal());
-    els.expenseCancel?.addEventListener('click', hideExpenseModal);
-    els.expenseSave?.addEventListener('click', saveExpense);
-    els.expenseDelete?.addEventListener('click', deleteExpense);
-    els.expenseMonth?.addEventListener('change', renderDashboard);
-    initExpenseForm();
+    // See expense_dashboard.js: bootstrap guard so a sync throw (DOM
+    // mismatch, TDZ, Telegram shim drift) doesn't leave the user stuck
+    // on the initial "Đang tải dashboard…" spinner forever.
+    try {
+        els.retryBtn.addEventListener('click', renderDashboard);
+        els.addExpenseBtn?.addEventListener('click', () => showExpenseModal());
+        els.expenseCancel?.addEventListener('click', hideExpenseModal);
+        els.expenseSave?.addEventListener('click', saveExpense);
+        els.expenseDelete?.addEventListener('click', deleteExpense);
+        els.expenseMonth?.addEventListener('change', renderDashboard);
+        initExpenseForm();
 
-    renderDashboard();
+        renderDashboard();
+    } catch (err) {
+        handleInitFailure(err);
+    }
 
-    function applyTheme(theme) {
-        const root = document.documentElement;
-        const map = {
-            '--bg-color': theme.bg_color,
-            '--text-color': theme.text_color,
-            '--text-muted': theme.hint_color,
-            '--card-bg': theme.secondary_bg_color,
-            '--primary': theme.button_color,
-            '--primary-text': theme.button_text_color,
-        };
-        for (const [prop, value] of Object.entries(map)) {
-            if (value) root.style.setProperty(prop, value);
+    function handleInitFailure(err) {
+        console.error('dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được dashboard, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
         }
     }
 
-    function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) return (amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + ' tỷ';
-        if (abs >= 1_000_000) return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
-    }
-
-    function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
-    }
-
-    async function fetchAPI(endpoint, options = {}) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 12000);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) {
-            headers['X-Telegram-Init-Data'] = tg.initData;
-        }
-        try {
-            const response = await fetch('/miniapp/api' + endpoint, { ...options, headers: { ...headers, ...(options.headers || {}) }, signal: controller.signal });
-            if (!response.ok) {
-                throw new Error('API ' + response.status);
-            }
-            const payload = await response.json();
-            if (payload.error) throw new Error(payload.error.message || 'API error');
-            return payload.data;
-        } finally {
-            clearTimeout(tid);
-        }
-    }
+    // applyTheme, formatMoneyShort, formatMoneyFull, fetchAPI moved to
+    // dashboard_common.js — destructured at the top of the IIFE.
+    // Note: legacy local formatMoneyShort showed "1.2 tỷ" (1-decimal);
+    // the shared one shows "1.23 tỷ" (2-decimal), aligning with the
+    // expense + wealth dashboards. Tiny precision boost, not regression.
 
     async function renderDashboard() {
         showState('loading');
@@ -338,17 +320,6 @@
         await renderDashboard();
     }
 
-    function formatDate(iso) {
-        if (!iso) return '--/--';
-        const d = new Date(iso + 'T00:00:00');
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-    }
-
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
+    // escapeHtml, formatDate, resolveDateFormat moved to
+    // dashboard_common.js — destructured at the top of the IIFE.
 })();

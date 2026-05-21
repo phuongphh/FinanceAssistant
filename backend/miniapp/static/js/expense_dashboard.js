@@ -8,6 +8,13 @@
 (function () {
     'use strict';
 
+    // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
+    // first via the template's <script> tag. Destructure at the top of
+    // the IIFE so the bindings are out of TDZ before any init-phase
+    // caller (cf. the UI_KEYWORDS regression that motivated the smoke
+    // harness).
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
         tg.ready();
@@ -77,6 +84,19 @@
         ['other', '📌 Khác'],
     ];
 
+    // Localised UI strings live next to CATEGORIES so init-phase callers
+    // (applyLocalizedKeywords, renderExpenses) can read them without
+    // tripping the TDZ on `const` bindings declared lower in the IIFE
+    // body. Function declarations are hoisted; `const` is not. Date
+    // formats moved to dashboard_common.js — re-import below if needed.
+    const UI_KEYWORDS = {
+        vi: {
+            reverse: 'Huỷ',
+            reverseConfirmTitle: 'Huỷ giao dịch này?',
+            reverseFailed: 'Không huỷ được giao dịch, thử lại nhé.',
+        },
+    };
+
     let pieChart = null;
     let trendChart = null;
     let lastOverview = null;
@@ -87,74 +107,86 @@
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
     const SOURCE = new URLSearchParams(window.location.search).get('source');
+    let refreshInFlight = false;
+    let lastRefreshAt = 0;
+    let activeRequestId = 0;
 
-    initModalForm();
-    initCategoryFilter();
-    els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
-    els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
-    if (els.addMoneyInBtn) els.addMoneyInBtn.addEventListener('click', () => openModal(null, 'money_in'));
-    if (els.addFirstExpenseBtn) els.addFirstExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
-    els.expensesList.addEventListener('click', onExpenseRowClick);
-    if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
-    els.modalCancel.addEventListener('click', closeModal);
-    els.modalSave.addEventListener('click', onSave);
-    els.modalDelete.addEventListener('click', onDelete);
-    els.modal.addEventListener('click', (e) => {
-        if (e.target === els.modal) closeModal();
-    });
-    els.categoryFilter.addEventListener('change', () => {
-        currentCategoryFilter = els.categoryFilter.value || '';
-        renderExpensesSection();
-    });
-    document.querySelectorAll('.period-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onPeriodChange(btn));
-    });
-    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onSortChange(btn));
-    });
-    updateSortButtons();
+    // Guard the entire bootstrap. A synchronous throw here (eg. a TDZ
+    // violation, a DOM element missing from the template, a Telegram
+    // shim mismatch) would otherwise abort the IIFE silently and leave
+    // the user staring at the initial "Đang tải chi tiêu…" spinner
+    // forever — the failure mode that motivated this guard.
+    try {
+        initModalForm();
+        applyLocalizedKeywords();
+        initCategoryFilter();
+        els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
+        els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
+        if (els.addMoneyInBtn) els.addMoneyInBtn.addEventListener('click', () => openModal(null, 'money_in'));
+        if (els.addFirstExpenseBtn) els.addFirstExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
+        els.expensesList.addEventListener('click', onExpenseRowClick);
+        if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
+        els.modalCancel.addEventListener('click', closeModal);
+        els.modalSave.addEventListener('click', onSave);
+        els.modalDelete.addEventListener('click', onDelete);
+        els.modal.addEventListener('click', (e) => {
+            if (e.target === els.modal) closeModal();
+        });
+        els.categoryFilter.addEventListener('change', () => {
+            currentCategoryFilter = els.categoryFilter.value || '';
+            renderExpensesSection();
+        });
+        document.querySelectorAll('.period-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onPeriodChange(btn));
+        });
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onSortChange(btn));
+        });
+        updateSortButtons();
 
-    renderDashboard({ showSpinner: true });
+        document.addEventListener('visibilitychange', onResumeRefresh);
+        window.addEventListener('focus', onResumeRefresh);
+        window.addEventListener('pageshow', onPageShowRefresh);
+
+        renderDashboard({ showSpinner: true });
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('expense_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được trang chi tiêu, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        // The original retry listener may not have attached if init threw
+        // before that line, so bind a fresh hard-reload listener as a
+        // last-resort escape hatch.
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     // -- Theme + utils ----------------------------------------------------
 
-    function applyTheme(theme) {
-        const root = document.documentElement;
-        const map = {
-            '--bg-color': theme.bg_color,
-            '--text-color': theme.text_color,
-            '--text-muted': theme.hint_color,
-            '--card-bg': theme.secondary_bg_color,
-            '--primary': theme.button_color,
-            '--primary-text': theme.button_text_color,
-        };
-        for (const [prop, value] of Object.entries(map)) {
-            if (value) root.style.setProperty(prop, value);
-        }
+
+    function onPageShowRefresh(event) {
+        if (event && event.persisted) onResumeRefresh();
     }
 
-    function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) {
-            return (amount / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
-        }
-        if (abs >= 1_000_000) {
-            return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        }
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
+    function onResumeRefresh() {
+        if (document.hidden) return;
+        const now = Date.now();
+        // Debounce focus/visibility storms from Telegram Desktop panel toggles.
+        if (refreshInFlight || (now - lastRefreshAt) < 3000) return;
+        lastRefreshAt = now;
+        renderDashboard({ showSpinner: false });
     }
 
-    function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
-    }
-
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+    function failAfter(ms) {
+        return new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('API timeout')), ms);
+        });
     }
 
     function formatMonthLabel(monthKey) {
@@ -163,41 +195,32 @@
         return `Tháng ${parseInt(month, 10)}/${year}`;
     }
 
-    function formatDate(iso) {
-        if (!iso) return '--/--';
-        const d = new Date(iso + 'T00:00:00');
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    function resolveLanguageCode() {
+        return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
     }
 
-    async function fetchAPI(endpoint, options = {}) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 12000);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
-        try {
-            const response = await fetch('/miniapp/api' + endpoint, {
-                ...options,
-                headers: { ...headers, ...(options.headers || {}) },
-                signal: controller.signal,
-            });
-            if (!response.ok) throw new Error('API ' + response.status);
-            const payload = await response.json();
-            if (payload.error) throw new Error(payload.error.message || 'API error');
-            return payload.data;
-        } finally {
-            clearTimeout(tid);
-        }
+    function resolveKeywords() {
+        const lang = resolveLanguageCode();
+        return UI_KEYWORDS[lang] || UI_KEYWORDS[lang.split('-')[0]] || UI_KEYWORDS.vi;
     }
 
     // -- Top-level render -------------------------------------------------
 
     async function renderDashboard({ showSpinner = false } = {}) {
+        const requestId = ++activeRequestId;
+        if (refreshInFlight) return;
+        refreshInFlight = true;
         if (showSpinner) showState('loading');
         try {
             const params = new URLSearchParams();
             if (SOURCE) params.set('source', SOURCE);
+            params.set('_t', String(Date.now()));
             const qs = params.toString() ? `?${params.toString()}` : '';
-            const data = await fetchAPI('/expense-dashboard/overview' + qs);
+            const data = await Promise.race([
+                fetchAPI('/expense-dashboard/overview' + qs, { cache: 'no-store' }),
+                failAfter(15000),
+            ]);
+            if (requestId !== activeRequestId) return;
             lastOverview = data;
 
             renderAll();
@@ -215,6 +238,8 @@
             els.errorMessage.textContent = buildErrorMessage(err);
             showState('error');
             if (tg && tg.showAlert) tg.showAlert('Không tải được dữ liệu, thử lại nhé.');
+        } finally {
+            refreshInFlight = false;
         }
     }
 
@@ -485,7 +510,7 @@
                     <div class="expense-amount">${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Xoá ${escapeHtml(title)}">🗑️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="${escapeHtml(resolveKeywords().reverse)} ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -525,7 +550,7 @@
                     <div class="expense-amount money-in-amount">+${formatMoneyShort(it.amount || 0)}</div>
                     <div class="expense-actions">
                         <button class="expense-action-btn expense-edit-btn" type="button" aria-label="Sửa ${escapeHtml(title)}">✏️</button>
-                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="Xoá ${escapeHtml(title)}">🗑️</button>
+                        <button class="expense-action-btn expense-delete-row-btn" type="button" aria-label="${escapeHtml(resolveKeywords().reverse)} ${escapeHtml(title)}">↩️</button>
                     </div>
                 </div>
             `;
@@ -550,7 +575,8 @@
 
     async function onQuickDelete(item) {
         const title = item.merchant || item.note || item.category_label || 'chi tiêu này';
-        const message = `Xoá "${title}"?\nThao tác này không thể hoàn tác.`;
+        const keywords = resolveKeywords();
+        const message = `${keywords.reverseConfirmTitle}\nBạn có chắc muốn đảo ngược giao dịch này?`;
         const confirmed = await new Promise((resolve) => {
             if (tg && tg.showConfirm) tg.showConfirm(message, resolve);
             else resolve(window.confirm(message));
@@ -560,7 +586,7 @@
         try {
             await fetchAPI(`/expenses/${item.id}`, { method: 'DELETE' });
         } catch (_err) {
-            if (tg && tg.showAlert) tg.showAlert('Không xoá được chi tiêu, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert(resolveKeywords().reverseFailed);
             await renderDashboard();
             return;
         }
@@ -634,6 +660,11 @@
         els.modalCategory.innerHTML = CATEGORIES.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
+    }
+
+    function applyLocalizedKeywords() {
+        const keywords = resolveKeywords();
+        if (els.modalDelete) els.modalDelete.textContent = keywords.reverse;
     }
 
     function initCategoryFilter() {
@@ -726,7 +757,7 @@
     async function onDelete() {
         if (!editingExpenseId) return;
         const confirmed = await new Promise((resolve) => {
-            const msg = 'Xoá chi tiêu này?\nThao tác không thể hoàn tác.';
+            const msg = `${resolveKeywords().reverseConfirmTitle}\nBạn có chắc muốn đảo ngược giao dịch này?`;
             if (tg && tg.showConfirm) tg.showConfirm(msg, resolve);
             else resolve(window.confirm(msg));
         });
@@ -737,7 +768,7 @@
             await fetchAPI(`/expenses/${idToDelete}`, { method: 'DELETE' });
         } catch (_err) {
             els.modalDelete.disabled = false;
-            if (tg && tg.showAlert) tg.showAlert('Không xoá được, thử lại nhé.');
+            if (tg && tg.showAlert) tg.showAlert(resolveKeywords().reverseFailed);
             return;
         }
         closeModal();

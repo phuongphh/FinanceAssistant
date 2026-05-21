@@ -54,6 +54,7 @@ from backend.services import (
 )
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import answer_callback, send_message
+from backend.bot.utils.date_parser import parse_vietnamese_date
 from backend.wealth.amount_parser import has_negative_sign, parse_amount
 
 logger = logging.getLogger(__name__)
@@ -354,8 +355,8 @@ async def _handle_date_pick(
             chat_id=chat_id,
             text=(
                 "✏️ <b>Ngày target?</b>\n\n"
-                "Format: <code>YYYY-MM-DD</code>\n"
-                "Ví dụ: <code>2028-12-31</code>"
+                "Format: <code>dd/mm/yyyy</code>\n"
+                "Ví dụ: <code>31/12/2028</code>"
             ),
             parse_mode="HTML",
         )
@@ -377,12 +378,11 @@ async def _handle_date_input(
     db: AsyncSession, chat_id: int, user: User, text: str, draft: dict,
 ) -> None:
     cleaned = text.strip()
-    try:
-        target_date = date.fromisoformat(cleaned)
-    except ValueError:
+    target_date = parse_vietnamese_date(cleaned)
+    if target_date is None:
         await send_message(
             chat_id=chat_id,
-            text="Format: <code>YYYY-MM-DD</code>. Ví dụ: <code>2028-12-31</code>",
+            text="Format: <code>dd/mm/yyyy</code>. Ví dụ: <code>31/12/2028</code>",
             parse_mode="HTML",
         )
         return
@@ -726,7 +726,7 @@ async def _handle_edit_date_pick(
         chat_id=chat_id,
         text=(
             f"📅 Sửa hạn <b>{goal.name}</b>{current_line}\n\n"
-            "Nhập hạn mới (<code>YYYY-MM-DD</code>) hoặc gõ "
+            "Nhập hạn mới (<code>dd/mm/yyyy</code>) hoặc gõ "
             "<code>skip</code> để bỏ hạn:"
         ),
         parse_mode="HTML",
@@ -739,12 +739,11 @@ async def _handle_edit_date_input(
     cleaned = text.strip().lower()
     target_date: date | None = None
     if cleaned not in ("skip", "bỏ qua", "bo qua"):
-        try:
-            target_date = date.fromisoformat(text.strip())
-        except ValueError:
+        target_date = parse_vietnamese_date(text.strip())
+        if target_date is None:
             await send_message(
                 chat_id=chat_id,
-                text="Format: <code>YYYY-MM-DD</code> hoặc <code>skip</code>",
+                text="Format: <code>dd/mm/yyyy</code> hoặc <code>skip</code>",
                 parse_mode="HTML",
             )
             return

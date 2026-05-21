@@ -885,6 +885,37 @@ class TestNavigateCashflow:
         assert result.parameters == {}
 
 
+class TestNavigateMainFallback:
+    @pytest.mark.asyncio
+    async def test_navigate_main_falls_back_to_send_when_edit_fails(self, monkeypatch):
+        from backend.bot.handlers import menu_handler
+
+        sent: dict = {}
+
+        async def fake_edit_message_text(**kwargs):
+            raise RuntimeError("message is not a text message")
+
+        async def fake_send_message(**kwargs):
+            sent.update(kwargs)
+
+        monkeypatch.setattr(menu_handler, "edit_message_text", fake_edit_message_text)
+        monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
+        monkeypatch.setattr(
+            menu_handler, "message_kwargs_for_animation", lambda t, c: {}
+        )
+
+        await menu_handler._navigate(
+            db=None,
+            user=_fake_user(),
+            chat_id=42,
+            message_id=777,
+            target="main",
+        )
+
+        assert sent["chat_id"] == 42
+        assert "inline_keyboard" in sent["reply_markup"]
+
+
 # ============================================================
 # _navigate_assets — Issue #457 inline net_worth
 # ============================================================

@@ -170,19 +170,32 @@
 }
 
 .modal-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     margin-top: 16px;
 }
 
+/* When the danger button is hidden (Add mode), collapse to 2 equal columns
+   so Quay về / Lưu fill the row instead of leaving an empty third track. */
+.modal-actions:has(> .danger-btn[hidden]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .modal-actions button {
-    flex: 1;
-    padding: 11px;
+    min-height: 48px;
+    padding: 0 12px;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
+    transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.modal-actions button:active {
+    transform: translateY(1px);
 }
 
 .modal-actions .primary-btn {

@@ -36,41 +36,45 @@
         comparisonBadges: document.getElementById('comparison-badges'),
         savingsCta: document.getElementById('savings-cta'),
         optimalInfoBtn: document.getElementById('optimal-info-btn'),
+        optimalStrategyNote: document.getElementById('optimal-strategy-note'),
         uncertaintySection: document.getElementById('uncertainty-section'),
         uncertaintyList: document.getElementById('uncertainty-list'),
         uncertaintyHint: document.getElementById('uncertainty-hint'),
-        storyFlow: document.getElementById('story-flow'),
-        storyStep: document.getElementById('story-step'),
-        storySkip: document.getElementById('story-skip'),
-        storyCard: document.getElementById('story-card'),
-        storyPrev: document.getElementById('story-prev'),
-        storyNext: document.getElementById('story-next'),
         technicalDetail: document.getElementById('technical-detail'),
-        openTechnicalBtn: document.getElementById('open-technical-btn'),
     };
 
     let currentScenario = new URLSearchParams(window.location.search).get('scenario') || 'current';
     let chart = null;
-    let storyScreens = [];
-    let storyIndex = 0;
-    let storyMode = "compact";
     const etags = Object.create(null);
     const cache = Object.create(null);
 
-    els.retryBtn.addEventListener('click', () => load(currentScenario, { force: true }));
-    els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
-    els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
-    if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
-    if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
-    if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
-    if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
-    if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
-    if (els.storyPrev) els.storyPrev.addEventListener('click', () => moveStory(-1));
-    if (els.storyNext) els.storyNext.addEventListener('click', () => moveStory(1));
-    if (els.storySkip) els.storySkip.addEventListener('click', skipStory);
-    if (els.openTechnicalBtn) els.openTechnicalBtn.addEventListener('click', openTechnicalDetail);
+    // See expense_dashboard.js: bootstrap guard so a sync throw (DOM
+    // mismatch, TDZ, Telegram shim drift) doesn't leave the user stuck
+    // on the initial "Đang tải Bé Tiền tương lai…" skeleton forever.
+    try {
+        els.retryBtn.addEventListener('click', () => load(currentScenario, { force: true }));
+        els.openWealthBtn.addEventListener('click', () => { window.location.href = '/miniapp/wealth?source=twin_empty'; });
+        els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
+        if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
+        if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
+        if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
+        if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
+        if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
+        switchScenario(currentScenario);
+    } catch (err) {
+        handleInitFailure(err);
+    }
 
-    switchScenario(currentScenario);
+    function handleInitFailure(err) {
+        console.error('twin_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được Bé Tiền tương lai, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     function switchScenario(scenario) {
         currentScenario = scenario === 'optimal' ? 'optimal' : 'current';
@@ -98,6 +102,7 @@
             if (body.error) throw new Error(body.error);
             cache[scenario] = body.data;
             render(body.data);
+            preloadOtherScenario(scenario);
         } catch (err) {
             console.error(err);
             els.errorMessage.textContent = err.message || 'Không tải được Twin Dashboard.';
@@ -119,7 +124,6 @@
             showState('empty');
             return;
         }
-        renderStoryFlow(data);
         renderPresentAnchor(data);
         renderDelta(data.delta_vs_p50);
         const computedLabel = data.computed_at ? `cập nhật ${formatDate(data.computed_at)}` : '—';
@@ -132,6 +136,7 @@
             ? `${computedLabel} • đang cập nhật lại theo tài sản mới`
             : computedLabel;
         renderChart(data.cone || []);
+        renderOptimalStrategyNote(data);
         renderLifeOutcome(data);
         renderKpis(data.cone || [], data.scenario_labels || {});
         renderAllocation(data.allocation || {});
@@ -143,79 +148,13 @@
     }
 
 
-    function renderStoryFlow(data) {
-        const flow = data.story_flow || {};
-        storyScreens = flow.screens || [];
-        storyMode = flow.mode || 'compact';
-        storyIndex = 0;
-        if (!els.storyFlow || !storyScreens.length) return;
-        els.storySkip.textContent = flow.skip_label || 'Bỏ qua, xem nhanh';
-        els.technicalDetail.hidden = true;
-        els.openTechnicalBtn.hidden = false;
-        els.storyFlow.hidden = false;
-        renderStoryScreen();
-        postTwinEvent('story_opened', storyScreens[0] && storyScreens[0].id);
-    }
-
-    function renderStoryScreen() {
-        const screen = storyScreens[storyIndex] || {};
-        const cards = (screen.cards || []).map(renderScenarioStoryCard).join('');
-        els.storyStep.textContent = `${storyIndex + 1}/${storyScreens.length}`;
-        els.storyCard.innerHTML = `
-            <div class="story-emoji">${escapeHtml(screen.emoji || '🔮')}</div>
-            <h2>${escapeHtml(screen.title || '')}</h2>
-            <p>${escapeHtml(screen.body || '')}</p>
-            ${cards ? `<div class="story-scenario-grid">${cards}</div>` : ''}
-            ${screen.hint ? `<p class="section-hint">${escapeHtml(screen.hint)}</p>` : ''}
-        `;
-        els.storyPrev.disabled = storyIndex === 0;
-        els.storyNext.textContent = storyIndex === storyScreens.length - 1 ? 'Hoàn tất' : 'Tiếp →';
-        postTwinEvent('screen_viewed', screen.id);
-    }
-
-    function renderScenarioStoryCard(card) {
-        const mascot = card.mascot || {};
-        return `<article class="story-scenario-card">
-            <div>
-                <strong>${escapeHtml(card.label || card.p_code || '')}</strong>
-                <span>${formatMoneyShort(Number(card.amount || 0))}</span>
-            </div>
-            <img src="${escapeAttr(mascot.asset_url || '')}" alt="${escapeAttr(mascot.alt || '')}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${escapeAttr(mascot.fallback || '🔮')}'))">
-        </article>`;
-    }
-
-    function moveStory(delta) {
-        if (!storyScreens.length) return;
-        if (delta > 0 && storyIndex === storyScreens.length - 1) {
-            els.storyFlow.hidden = true;
-            postTwinEvent('story_completed', storyScreens[storyIndex].id);
-            return;
-        }
-        storyIndex = Math.max(0, Math.min(storyScreens.length - 1, storyIndex + delta));
-        renderStoryScreen();
-    }
-
-    function skipStory() {
-        if (!storyScreens.length) return;
-        storyIndex = storyScreens.length - 1;
-        renderStoryScreen();
-        postTwinEvent('story_skipped', storyScreens[storyIndex].id);
-    }
-
-    function openTechnicalDetail() {
-        els.technicalDetail.hidden = false;
-        els.openTechnicalBtn.hidden = true;
-        postTwinEvent('chart_opened', 'technical_detail');
-        setTimeout(() => { if (chart) chart.resize(); }, 0);
-    }
-
     function postTwinEvent(eventType, screenId) {
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
         if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
         fetch('/api/twin/events', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ event_type: eventType, screen_id: screenId || null, flow_mode: storyMode }),
+            body: JSON.stringify({ event_type: eventType, screen_id: screenId || null, flow_mode: 'compact' }),
             keepalive: true,
         }).catch(() => {});
     }
@@ -247,11 +186,11 @@
     function renderChart(cone) {
         if (!els.coneChart || typeof Chart === 'undefined') {
             if (els.technicalDetail) els.technicalDetail.hidden = true;
-            if (els.openTechnicalBtn) els.openTechnicalBtn.hidden = true;
             return;
         }
         if (chart) chart.destroy();
         const labels = cone.map((p) => `Năm ${p.year}`);
+        const bounds = getUnifiedYScaleBounds();
         chart = new Chart(els.coneChart, {
             type: 'line',
             data: {
@@ -270,13 +209,58 @@
                     legend: { display: true, labels: { usePointStyle: true, boxWidth: 8 } },
                     tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatMoneyShort(ctx.parsed.y)}` } },
                 },
-                scales: { y: { ticks: { callback: (value) => formatMoneyShort(value) } } },
+                scales: {
+                    y: {
+                        min: bounds.min,
+                        max: bounds.max,
+                        ticks: { callback: (value) => formatMoneyShort(value) },
+                    },
+                },
             },
         });
     }
 
     function series(label, data, backgroundColor, borderColor, fill) {
         return { label, data, borderColor, backgroundColor, borderWidth: label.includes('Bình thường') || label === 'Đường bình thường' ? 3 : 2, pointRadius: 3, tension: 0.32, fill };
+    }
+
+
+
+    function getUnifiedYScaleBounds() {
+        const values = [];
+        ['optimal', 'current'].forEach((key) => {
+            const cone = cache[key] && Array.isArray(cache[key].cone) ? cache[key].cone : [];
+            cone.forEach((p) => {
+                values.push(Number(p.p10 || 0), Number(p.p50 || 0), Number(p.p90 || 0));
+            });
+        });
+        const finite = values.filter((v) => Number.isFinite(v));
+        if (!finite.length) return { min: 0, max: 1 };
+        const min = Math.min(0, Math.min(...finite));
+        const rawMax = Math.max(...finite);
+        if (rawMax <= min) return { min, max: Math.max(min + 1, rawMax + 1) };
+        // Pad upward by 5% regardless of sign (rawMax * 1.05 would shrink negatives).
+        const padding = Math.max(Math.abs(rawMax) * 0.05, 1);
+        return { min, max: rawMax + padding };
+    }
+
+    function renderOptimalStrategyNote(data) {
+        if (!els.optimalStrategyNote) return;
+        if (data.scenario !== 'optimal' || !data.optimal_strategy) {
+            els.optimalStrategyNote.hidden = true;
+            return;
+        }
+        const copy = data.scenario_comparison_copy || {};
+        const msg = copy.tooltip || '';
+        if (!msg) {
+            els.optimalStrategyNote.hidden = true;
+            return;
+        }
+        els.optimalStrategyNote.textContent = msg;
+        els.optimalStrategyNote.classList.toggle(
+            'savings-only', data.optimal_strategy === 'savings_only'
+        );
+        els.optimalStrategyNote.hidden = false;
     }
 
     function renderLifeOutcome(data) {
@@ -329,13 +313,38 @@
                 </div>
             </div>`;
         }).join('');
-        if (data.monthly_savings_needed && Number(data.monthly_savings_needed) > 0) {
-            els.savingsCta.textContent = `Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~${formatMoneyShort(Number(data.monthly_savings_needed))}/tháng`;
+        const copy = data.scenario_comparison_copy || {};
+        const savingsAmount = Number(data.monthly_savings_needed || 0);
+        if (savingsAmount > 0) {
+            const template = copy.cta_savings || 'Để tiến gần vùng tối ưu, bạn cần tiết kiệm thêm ~{amount}/tháng';
+            els.savingsCta.textContent = template.replace('{amount}', formatMoneyShort(savingsAmount));
         } else {
-            els.savingsCta.textContent = 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
+            els.savingsCta.textContent = copy.cta_no_change || 'Danh mục hiện tại đã khá gần mức tối ưu — tiếp tục duy trì nhé!';
         }
         els.savingsCta.hidden = false;
         els.comparisonSection.hidden = false;
+    }
+
+    function preloadOtherScenario(activeScenario) {
+        const targetScenario = activeScenario === 'current' ? 'optimal' : 'current';
+        if (cache[targetScenario]) return;
+        const headers = buildHeaders(targetScenario);
+        fetch(`/api/twin?scenario=${encodeURIComponent(targetScenario)}`, { headers })
+            .then((response) => {
+                if (!response.ok) return null;
+                const etag = response.headers.get('ETag');
+                if (etag) etags[targetScenario] = etag;
+                return response.json();
+            })
+            .then((body) => {
+                if (body && body.data) {
+                    cache[targetScenario] = body.data;
+                    if (currentScenario === 'current' && targetScenario === 'optimal' && cache[currentScenario]) {
+                        renderChart(cache[currentScenario].cone || []);
+                    }
+                }
+            })
+            .catch(() => {});
     }
 
     function renderUncertaintyBreakdown(data) {
@@ -406,7 +415,10 @@
     }
 
     function showOptimalTooltip() {
-        const msg = 'Kịch bản Tối Ưu giả định: tăng tỷ trọng tài sản sinh lời, tiết kiệm đều đặn hơn, và phân bổ theo danh mục mục tiêu đã cài đặt.';
+        const data = cache[currentScenario] || cache.current || {};
+        const copy = data.scenario_comparison_copy || {};
+        const msg = copy.tooltip
+            || 'Kịch bản Tối Ưu giả định: phân bổ lại theo danh mục mục tiêu, kèm tiết kiệm thêm 10% mỗi tháng.';
         if (tg && tg.showAlert) tg.showAlert(msg);
         else alert(msg);
     }
@@ -445,7 +457,22 @@
 
     function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('vi-VN')}đ`; }
     function trim(value) { return value.toFixed(value >= 10 ? 0 : 1).replace('.0', ''); }
-    function formatDate(value) { return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }); }
+
+    const DATE_FORMAT_BY_LANGUAGE = {
+        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+    };
+
+    function resolveDateFormat() {
+        const lang = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
+        return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
+    }
+
+    function formatDate(value) {
+        if (!value) return '--/--/----';
+        const fmt = resolveDateFormat();
+        return new Date(value).toLocaleDateString(fmt.locale, fmt.options);
+    }
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }

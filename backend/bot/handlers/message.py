@@ -40,6 +40,7 @@ from backend.services import expense_service, report_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message
+from backend.wealth.amount_parser import parse_amount
 
 logger = logging.getLogger(__name__)
 
@@ -59,44 +60,97 @@ Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
-# Quick-syntax for manual transactions. Description is OPTIONAL so the
-# explicit-sign forms ("+200k" / "-200k") still match — they're the
-# user's most direct signal about direction. We accept the match only
-# when at least one of {sign, unit, description} is present; a bare
-# bareword number like "200" is too ambiguous and is left to the intent
+# Quick-syntax for manual transactions. We deliberately keep the
+# entry point narrow so that ordinary chat ("nhắc tôi mua sữa 50k
+# chiều mai", "200 nghìn là bao nhiêu USD") doesn't get hijacked
+# into the expense pipeline. The body must EITHER carry an explicit
+# +/- sign, OR begin with the amount token (allowing an optional
+# leading currency word/symbol). Anything else is left to the intent
 # pipeline.
-_AMOUNT_RE = re.compile(
-    r"^\s*(?P<sign>[+-])?\s*(?P<num>\d+(?:[\.,]\d+)?)\s*(?P<unit>k|nghìn|tr|triệu|m)?(?:\s+(?P<desc>.+?))?\s*$",
+_AMOUNT_TOKEN_PATTERN = (
+    r"\d{1,3}(?:[.,]\d{3})+"
+    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?"
+)
+
+_SIGNED_TX_RE = re.compile(
+    r"^\s*(?P<sign>[+-])\s*(?P<body>.+?)\s*$",
     re.IGNORECASE,
 )
 
+_AMOUNT_LED_TX_RE = re.compile(
+    rf"^\s*(?P<body>(?:{_AMOUNT_TOKEN_PATTERN})(?:\s+.{{0,500}})?)\s*$",
+    re.IGNORECASE,
+)
+
+_AMOUNT_TOKEN_RE = re.compile(
+    rf"(?P<amt>{_AMOUNT_TOKEN_PATTERN})",
+    re.IGNORECASE,
+)
+
+# Question-shaped inputs ("200k là bao nhiêu USD") must NOT be parsed as
+# expense entries. The list is narrow on purpose — real expense notes
+# don't use these phrases.
+_QUESTION_HINT_RE = re.compile(
+    r"\?|\bbao nhiêu\b|\bbao lâu\b|\bkhi nào\b|\bở đâu\b|\bthế nào\b|\blà gì\b|\bcó phải\b|\bcó không\b",
+    re.IGNORECASE,
+)
+_CARD_SOURCE_RE = re.compile(r"trả\s+bằng\s+thẻ\s+(.+)$", re.IGNORECASE)
+
+
+async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> tuple[str | None, str | None]:
+    match = _CARD_SOURCE_RE.search(text)
+    if not match:
+        return None, None
+    bank = match.group(1).strip(" .,:;!-")
+    if not bank:
+        return None, None
+    from backend.models.credit_card import CreditCard
+    from sqlalchemy import func, select
+
+    row = await db.execute(
+        select(CreditCard).where(
+            CreditCard.user_id == user_id,
+            func.lower(CreditCard.bank_name) == bank.lower(),
+        )
+    )
+    card = row.scalar_one_or_none()
+    if card is None:
+        return None, None
+    return "credit_card", str(card.id)
+
 
 def _parse_signed_transaction(text: str) -> dict | None:
-    match = _AMOUNT_RE.match(text)
-    if not match:
+    if _QUESTION_HINT_RE.search(text):
         return None
-    sign = match.group("sign")
-    unit = (match.group("unit") or "").lower()
-    desc = (match.group("desc") or "").strip()[:500]
-    # Reject bare numbers ("200") — let the intent pipeline decide.
-    if not sign and not unit and not desc:
+    signed = _SIGNED_TX_RE.match(text)
+    if signed:
+        sign = signed.group("sign")
+        body = (signed.group("body") or "").strip()
+    else:
+        amount_led = _AMOUNT_LED_TX_RE.match(text)
+        if not amount_led:
+            return None
+        sign = None
+        body = (amount_led.group("body") or "").strip()
+
+    amount_match = _AMOUNT_TOKEN_RE.search(body)
+    if not amount_match:
         return None
-    raw_num = match.group("num").replace(",", ".")
-    try:
-        amount = float(raw_num)
-    except ValueError:
+
+    if not sign and re.fullmatch(r"\d+", body):
         return None
-    if unit in {"k", "nghìn"}:
-        amount *= 1_000
-    elif unit in {"tr", "triệu", "m"}:
-        amount *= 1_000_000
-    if amount <= 0:
+
+    amount_token = amount_match.group("amt").strip()
+    amount_decimal = parse_amount(amount_token)
+    if amount_decimal is None or amount_decimal <= 0:
         return None
-    # Sign is the source of truth for direction. Absent sign defaults to
-    # expense, matching the convention "không dấu = chi".
+
+    merchant = f"{body[:amount_match.start()]} {body[amount_match.end():]}"
+    merchant = re.sub(r"\s+", " ", merchant).strip(" ,-+;:")[:500]
+
     return {
-        "amount": amount,
-        "merchant": desc,
+        "amount": float(amount_decimal),
+        "merchant": merchant,
         "note": text[:1000],
         "transaction_type": "money_in" if sign == "+" else "expense",
     }
@@ -217,12 +271,15 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         parsed = None
 
     if parsed and parsed.get("is_expense") and float(parsed.get("amount", 0)) > 0:
+        source_type, source_card_id = await _extract_credit_card_source(db, user.id, text)
         expense_data = ExpenseCreate(
             amount=float(parsed["amount"]),
             merchant=parsed.get("merchant") or text,
             note=text,
             source="manual",
             expense_date=date.today(),
+            source_type=source_type,
+            source_credit_card_id=source_card_id,
         )
         expense = await expense_service.create_expense(db, user.id, expense_data)
         await send_transaction_confirmation(db, expense)

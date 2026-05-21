@@ -57,6 +57,7 @@ from backend.bot.formatters.wealth_formatter import (
     format_rental_marked,
 )
 from backend.bot.keyboards.asset_keyboard import (
+    CB_ASSET_MANAGE,
     clamp_page,
     add_more_keyboard,
     asset_delete_confirm_keyboard,
@@ -81,7 +82,7 @@ from backend.bot.keyboards.asset_keyboard import (
     stock_current_price_keyboard,
     stock_subtype_keyboard,
 )
-from backend.bot.keyboards.common import parse_callback
+from backend.bot.keyboards.common import build_callback, parse_callback
 from backend.models.user import User
 from backend.services import wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
@@ -111,11 +112,13 @@ from backend.services.wealth_dashboard_service import (
     normalize_sort,
 )
 from backend.twin.services.recompute_service import enqueue_recompute_if_needed
+from backend.bot.utils.date_parser import parse_vietnamese_date
 from backend.wealth.ladder import update_user_level
 from backend.wealth.schemas.rental import OccupancyStatus, RentalMetadata
 from backend.wealth.services import asset_service, net_worth_calculator, rental_service
 
 logger = logging.getLogger(__name__)
+
 
 _DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
 # Tracks the dashboard report page each user last viewed so wizard returns
@@ -576,6 +579,8 @@ async def show_asset_edit_list(
         await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
         _dashboard_sort_for_user(user),
     )
+    if subtype:
+        assets = [a for a in assets if str(getattr(a, "subtype", "")) == subtype]
     label = get_label(asset_type)
     if not assets:
         await send_message(
@@ -632,17 +637,21 @@ async def show_asset_delete_list(
     *,
     page: int = 0,
     message_id: int | None = None,
+    subtype: str | None = None,
 ) -> None:
     """List only active assets of one type for deletion."""
     assets = _sort_assets_for_dashboard(
         await asset_service.get_user_assets(db, user.id, asset_type=asset_type),
         _dashboard_sort_for_user(user),
     )
+    if subtype:
+        assets = [a for a in assets if str(getattr(a, "subtype", "")) == subtype]
     label = get_label(asset_type)
     if not assets:
+        subtype_note = " quỹ" if subtype == "fund" else ""
         await send_message(
             chat_id=chat_id,
-            text=f"Không có tài sản loại {label}.",
+            text=f"Không có tài sản {label}{subtype_note}.",
             parse_mode="HTML",
             reply_markup=asset_delete_type_keyboard(),
         )
@@ -668,6 +677,49 @@ async def show_asset_delete_list(
     )
 
 
+
+
+async def show_asset_delete_matches_list(
+    chat_id: int,
+    matches: list,
+) -> None:
+    """Show only the matched assets for delete confirmation."""
+    if not matches:
+        return
+
+    rows = [
+        [
+            {
+                "text": f"🗑 {_asset_delete_row_label(asset)}"[:60],
+                "callback_data": build_callback(
+                    CB_ASSET_MANAGE, "delete_confirm", str(asset.id)
+                ),
+            }
+        ]
+        for asset in matches
+    ]
+    rows.append(
+        [
+            {
+                "text": "◀️ Chọn loại khác",
+                "callback_data": build_callback(CB_ASSET_MANAGE, "delete_type"),
+            }
+        ]
+    )
+    rows.append(
+        [
+            {
+                "text": "❌ Hủy",
+                "callback_data": build_callback(CB_ASSET_MANAGE, "cancel"),
+            }
+        ]
+    )
+    await send_message(
+        chat_id=chat_id,
+        text="Chọn tài sản muốn xoá:",
+        parse_mode="HTML",
+        reply_markup={"inline_keyboard": rows},
+    )
 async def _confirm_asset_delete(
     db: AsyncSession, chat_id: int, user: User, asset_id_text: str
 ) -> None:
@@ -2176,9 +2228,9 @@ async def _handle_rental_extra_choice(
             chat_id=chat_id,
             text=(
                 "📅 <b>Thời hạn hợp đồng thuê?</b>\n\n"
-                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code> "
+                "Format: <code>dd/mm/yyyy dd/mm/yyyy</code> "
                 "(ngày bắt đầu - ngày kết thúc)\n"
-                "Ví dụ: <code>2024-01-01 2025-12-31</code>\n\n"
+                "Ví dụ: <code>01/01/2024 31/12/2025</code>\n\n"
                 "Gõ <code>skip</code> để bỏ qua."
             ),
             parse_mode="HTML",
@@ -2236,19 +2288,18 @@ async def _handle_rental_lease_input(
         await send_message(
             chat_id=chat_id,
             text=(
-                "Format: <code>YYYY-MM-DD YYYY-MM-DD</code>\n"
-                "Ví dụ: <code>2024-01-01 2025-12-31</code>"
+                "Format: <code>dd/mm/yyyy dd/mm/yyyy</code>\n"
+                "Ví dụ: <code>01/01/2024 31/12/2025</code>"
             ),
             parse_mode="HTML",
         )
         return
-    try:
-        start = date.fromisoformat(parts[0])
-        end = date.fromisoformat(parts[1])
-    except ValueError:
+    start = parse_vietnamese_date(parts[0])
+    end = parse_vietnamese_date(parts[1])
+    if start is None or end is None:
         await send_message(
             chat_id=chat_id,
-            text="Ngày không hợp lệ. Format: <code>YYYY-MM-DD YYYY-MM-DD</code>",
+            text="Ngày không hợp lệ. Format: <code>dd/mm/yyyy dd/mm/yyyy</code>",
             parse_mode="HTML",
         )
         return
@@ -2270,7 +2321,10 @@ async def _handle_rental_lease_input(
     )
     await send_message(
         chat_id=chat_id,
-        text=f"✅ Đã ghi: <b>{start} → {end}</b>. Còn thông tin nào khác không?",
+        text=(
+            f"✅ Đã ghi: <b>{start.strftime('%d/%m/%Y')} → "
+            f"{end.strftime('%d/%m/%Y')}</b>. Còn thông tin nào khác không?"
+        ),
         parse_mode="HTML",
         reply_markup=rental_extra_keyboard(),
     )

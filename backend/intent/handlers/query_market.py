@@ -185,8 +185,10 @@ class QueryMarketHandler(IntentHandler):
         "which ticker?" clarification path.
         """
         symbols = PNJ_GOLD_MENU_PRODUCTS
-        lines = ["🥇 *Giá vàng hôm nay:*"]
+        header_placeholder = "🥇 *Giá vàng hôm nay:*"
+        lines = [header_placeholder]
         had_quote = False
+        fetched_times: list = []
 
         try:
             quote_by_symbol = await get_gold_quotes([symbol for symbol, _ in symbols])
@@ -206,6 +208,8 @@ class QueryMarketHandler(IntentHandler):
                 continue
 
             had_quote = True
+            if quote.fetched_at is not None:
+                fetched_times.append(quote.fetched_at)
             logger.info(
                 "Gold quote served for %s: source=%s stale=%s buy=%s sell=%s",
                 symbol,
@@ -224,6 +228,12 @@ class QueryMarketHandler(IntentHandler):
                 )
             else:
                 lines.append(f"• {label}: {quote.price:,.0f}đ/lượng{stale}")
+
+        if fetched_times:
+            tz = ZoneInfo("Asia/Ho_Chi_Minh")
+            latest = max(fetched_times).astimezone(tz)
+            stamp = latest.strftime("%H:%M ngày %d/%m/%Y")
+            lines[0] = f"🥇 *Giá vàng hôm nay* (cập nhật {stamp}):"
 
         if not had_quote:
             lines.extend(

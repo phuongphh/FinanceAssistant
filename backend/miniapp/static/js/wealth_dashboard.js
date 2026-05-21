@@ -8,6 +8,11 @@
 (function () {
     'use strict';
 
+    // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
+    // first via the template. Destructure at IIFE top so bindings exit
+    // TDZ before any caller (per the smoke-harness contract).
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI } = window.DashboardCommon;
+
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
         tg.ready();
@@ -44,6 +49,7 @@
         assetsList: document.getElementById('assets-list'),
         addAssetBtn: document.getElementById('add-asset-btn'),
         addFirstAssetBtn: document.getElementById('add-first-asset-btn'),
+        backMenuBtn: document.getElementById('back-menu-btn'),
         confetti: document.getElementById('confetti-canvas'),
     };
 
@@ -69,83 +75,46 @@
     const LEVEL_RANK = ['starter', 'young_prof', 'mass_affluent', 'hnw', 'vip'];
     const LAST_LEVEL_KEY = 'wealth.last_level';
 
-    els.retryBtn.addEventListener('click', renderDashboard);
-    els.addAssetBtn.addEventListener('click', closeAndAddAsset);
-    els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
-    els.assetsList.addEventListener('click', onAssetRowClick);
-    els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
+    // See expense_dashboard.js: a sync throw inside the bootstrap (DOM
+    // mismatch, TDZ, Telegram shim drift) would otherwise leave the
+    // user stuck on the initial spinner. Surface the error state with
+    // a fresh reload listener so they have an escape hatch.
+    try {
+        els.retryBtn.addEventListener('click', renderDashboard);
+        els.addAssetBtn.addEventListener('click', closeAndAddAsset);
+        els.addFirstAssetBtn.addEventListener('click', closeAndAddAsset);
+        if (els.backMenuBtn) els.backMenuBtn.addEventListener('click', backToMainMenu);
+        els.assetsList.addEventListener('click', onAssetRowClick);
+        els.netWorthToggle.addEventListener('click', toggleNetWorthVisibility);
 
-    document.querySelectorAll('.period-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onPeriodChange(btn));
-    });
-    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onAssetSortChange(btn));
-    });
-    updateAssetSortButtons();
+        document.querySelectorAll('.period-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onPeriodChange(btn));
+        });
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onAssetSortChange(btn));
+        });
+        updateAssetSortButtons();
 
-    renderDashboard();
+        renderDashboard();
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('wealth_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được trang tài sản, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     // -- Theme + utils ----------------------------------------------------
 
-    function applyTheme(theme) {
-        const root = document.documentElement;
-        const map = {
-            '--bg-color': theme.bg_color,
-            '--text-color': theme.text_color,
-            '--text-muted': theme.hint_color,
-            '--card-bg': theme.secondary_bg_color,
-            '--primary': theme.button_color,
-            '--primary-text': theme.button_text_color,
-        };
-        for (const [prop, value] of Object.entries(map)) {
-            if (value) root.style.setProperty(prop, value);
-        }
-    }
-
-    function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) {
-            return (amount / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
-        }
-        if (abs >= 1_000_000) {
-            return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        }
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
-    }
-
-    function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
-    }
-
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    async function fetchAPI(endpoint) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 12000);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
-        try {
-            const response = await fetch('/miniapp/api' + endpoint, {
-                headers,
-                signal: controller.signal,
-            });
-            if (!response.ok) throw new Error('API ' + response.status);
-            const payload = await response.json();
-            if (payload.error) {
-                throw new Error(payload.error.message || 'API error');
-            }
-            return payload.data;
-        } finally {
-            clearTimeout(tid);
-        }
-    }
+    // applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI
+    // moved to dashboard_common.js — destructured at the top of the IIFE.
 
     // -- Top-level render -------------------------------------------------
 
@@ -630,6 +599,32 @@
         } catch (_err) {
             // Best-effort: even on failure we still close so the user
             // isn't stuck staring at the dashboard.
+        }
+        if (tg && tg.close) tg.close();
+    }
+
+
+
+    async function backToMainMenu() {
+        if (els.backMenuBtn) els.backMenuBtn.disabled = true;
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            // Bound the request so a stalled mobile connection can't trap
+            // the user on the dashboard — we close regardless below.
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            try {
+                await fetch('/miniapp/api/wealth/back-to-menu', {
+                    method: 'POST',
+                    headers,
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timer);
+            }
+        } catch (_err) {
+            // best-effort navigation: close webapp even if network hiccups
         }
         if (tg && tg.close) tg.close();
     }

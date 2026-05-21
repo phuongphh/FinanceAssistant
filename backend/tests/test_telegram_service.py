@@ -63,6 +63,37 @@ class TestSendTelegram:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_treats_message_not_modified_as_noop(
+        self, mock_settings, mock_httpx
+    ):
+        """Re-tapping a callback that re-renders identical text+markup
+        triggers Telegram's 400 "message is not modified". Treat it as a
+        success no-op so callers (menu fallback) don't resend a duplicate.
+        """
+        from unittest.mock import MagicMock
+
+        resp = MagicMock()
+        resp.status_code = 400
+        resp.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: message is not modified"}'
+        )
+        resp.json.return_value = {
+            "ok": False,
+            "error_code": 400,
+            "description": "Bad Request: message is not modified",
+        }
+        mock_httpx.post.return_value = resp
+
+        result = await send_telegram(
+            "editMessageText",
+            {"chat_id": 1, "message_id": 2, "text": "same"},
+        )
+
+        assert result is not None
+        assert mock_httpx.post.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_retries_without_parse_mode_on_parse_entities_error(
         self, mock_settings, mock_httpx
     ):

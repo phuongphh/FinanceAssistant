@@ -43,6 +43,40 @@ def _name_matches(asset_name: str, query: str) -> bool:
     return strip_diacritics(query.lower()) in strip_diacritics(asset_name.lower())
 
 
+
+
+def _asset_matches_query(asset, query: str) -> bool:
+    """Match by display name OR ticker/symbol in ``asset.extra``."""
+    if _name_matches(getattr(asset, "name", ""), query):
+        return True
+    extra = getattr(asset, "extra", {}) or {}
+    for key in ("ticker", "symbol", "code"):
+        v = extra.get(key)
+        if not v:
+            continue
+        if _name_matches(str(v), query):
+            return True
+    return False
+
+
+def _asset_matches_exactly(asset, query: str) -> bool:
+    """Stricter than ``_asset_matches_query`` — requires equality on name
+    or ticker/symbol after diacritic+case normalization. Used to break
+    ties when a query like "TCEF" substring-hits multiple assets but the
+    user clearly meant the one named "TCEF".
+    """
+    q = strip_diacritics((query or "").lower()).strip()
+    if not q:
+        return False
+    name = strip_diacritics(str(getattr(asset, "name", "") or "").lower()).strip()
+    if name == q:
+        return True
+    extra = getattr(asset, "extra", {}) or {}
+    for key in ("ticker", "symbol", "code"):
+        v = extra.get(key)
+        if v and strip_diacritics(str(v).lower()).strip() == q:
+            return True
+    return False
 class ActionDeleteAssetHandler(IntentHandler):
     async def handle(
         self, intent: IntentResult, user: User, db: AsyncSession
@@ -50,6 +84,7 @@ class ActionDeleteAssetHandler(IntentHandler):
         params = intent.parameters or {}
         asset_type = params.get("asset_type")
         asset_name = (params.get("asset_name") or "").strip()
+        asset_subtype = params.get("asset_subtype")
         chat_id = user.telegram_id
 
         if asset_name:
@@ -57,23 +92,28 @@ class ActionDeleteAssetHandler(IntentHandler):
             matches = [
                 a
                 for a in assets
-                if a.is_active and _name_matches(a.name, asset_name)
+                if a.is_active and _asset_matches_query(a, asset_name)
                 and (asset_type is None or str(a.asset_type) == asset_type)
+                and (asset_subtype is None or str(getattr(a, "subtype", "")) == asset_subtype)
             ]
+            if len(matches) > 1:
+                exact = [a for a in matches if _asset_matches_exactly(a, asset_name)]
+                if len(exact) == 1:
+                    matches = exact
             if len(matches) == 1:
                 await asset_entry_handlers._confirm_asset_delete(
                     db, chat_id, user, str(matches[0].id)
                 )
                 return ""
-            if len(matches) > 1 and asset_type:
-                await asset_entry_handlers.show_asset_delete_list(
-                    db, chat_id, user, asset_type
+            if len(matches) > 1:
+                await asset_entry_handlers.show_asset_delete_matches_list(
+                    chat_id, matches
                 )
                 return ""
 
         if asset_type:
             await asset_entry_handlers.show_asset_delete_list(
-                db, chat_id, user, asset_type
+                db, chat_id, user, asset_type, subtype=asset_subtype
             )
             return ""
 

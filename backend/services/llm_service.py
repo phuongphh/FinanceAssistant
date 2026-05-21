@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from openai import AsyncOpenAI
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -21,6 +22,11 @@ deepseek_client = AsyncOpenAI(
 
 # Tasks that use Claude (only OCR and complex analysis)
 USE_CLAUDE = {"ocr", "complex_analysis"}
+TASK_MAX_TOKENS = {
+    # Monthly reports contain multiple sections + bullets and were
+    # getting cut mid-sentence at 500 tokens in production.
+    "report_text": 900,
+}
 
 
 class LLMError(Exception):
@@ -76,15 +82,26 @@ async def _set_cache(
     tokens_used: int | None,
     ttl_days: int = 30,
 ) -> None:
-    entry = LLMCache(
+    expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+    stmt = insert(LLMCache).values(
         cache_key=cache_key,
         model=model,
         prompt_hash=prompt_hash,
         response=response,
         tokens_used=tokens_used,
-        expires_at=datetime.utcnow() + timedelta(days=ttl_days),
+        expires_at=expires_at,
     )
-    db.add(entry)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[LLMCache.cache_key],
+        set_={
+            "model": model,
+            "prompt_hash": prompt_hash,
+            "response": response,
+            "tokens_used": tokens_used,
+            "expires_at": expires_at,
+        },
+    )
+    await db.execute(stmt)
     await db.flush()
 
 
@@ -133,6 +150,8 @@ async def call_llm(
     # via content/cost/budget_messages.yaml.
     from backend.adapters.llm.cost_tracking_adapter import tracked_call
 
+    max_tokens = TASK_MAX_TOKENS.get(task_type, 500)
+
     async with tracked_call(
         db, user_id, provider="deepseek", operation=task_type
     ) as recorder:
@@ -141,7 +160,7 @@ async def call_llm(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=500,
+                max_tokens=max_tokens,
             )
             result = response.choices[0].message.content.strip()
             tokens_used = response.usage.total_tokens if response.usage else None

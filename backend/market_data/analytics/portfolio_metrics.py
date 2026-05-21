@@ -1,6 +1,7 @@
 """Portfolio analytics for Phase 3.9 briefings."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
@@ -15,6 +16,45 @@ from backend.wealth.models.asset import Asset
 from backend.wealth.valuation.crypto import value_crypto_holding
 from backend.wealth.valuation.gold import value_gold_holding
 from backend.wealth.valuation.stock import value_stock_holding
+
+logger = logging.getLogger(__name__)
+
+# Asset types eligible for "best/worst performer" ranking. Cash, real_estate,
+# and other are intentionally excluded:
+#   - cash: initial_value is the onboarding snapshot, not a cost basis. As the
+#     user's balance changes, (current - initial)/initial yields a meaningless
+#     "return %" that confuses users and can grow unbounded.
+#   - real_estate: no daily price feed; using stale cost basis is misleading.
+#   - other: unstructured asset class; can't trust the percentage.
+_PERFORMANCE_ELIGIBLE_TYPES: frozenset[str] = frozenset({"stock", "crypto", "gold"})
+
+# Legacy/external asset_type aliases that map to a canonical type. The
+# portfolio API schema (``backend/schemas/portfolio.py``) accepts plural
+# ``"stocks"`` for backward compatibility; without this normalization step
+# such holdings would be silently dropped from best/worst rankings (and
+# mis-routed to the cash branch in ``_value_asset``).
+_ASSET_TYPE_ALIASES: dict[str, str] = {"stocks": "stock"}
+
+
+def _canonical_asset_type(asset_type: str | None) -> str:
+    if not asset_type:
+        return "other"
+    return _ASSET_TYPE_ALIASES.get(asset_type, asset_type)
+
+
+# Sanity bounds on return percentages displayed to users. Anything outside this
+# band is almost always a data-quality bug (typo in avg_price, wrong unit,
+# placeholder cost basis). We exclude such holdings from rankings and log a
+# warning for ops investigation instead of rendering absurd numbers like
+# "+29099900%" or "-4569%" that destroy user trust.
+#
+# The upper bound is intentionally generous (10,000x) so legitimate
+# multi-baggers — long-held crypto or early-stage stocks that genuinely
+# returned hundreds of times their cost — are still ranked. The production
+# screenshot bug (+29,099,900%) is well above this cap, and no realistic
+# briefing-window return reaches it.
+_MIN_REASONABLE_RETURN_PCT: Decimal = Decimal("-100")     # long position floor
+_MAX_REASONABLE_RETURN_PCT: Decimal = Decimal("1000000")  # 10,000x — catches data corruption, keeps real moonshots
 
 
 @dataclass(frozen=True)
@@ -43,13 +83,14 @@ def _symbol(asset: Asset) -> str:
 
 
 async def _value_asset(asset: Asset) -> tuple[Decimal, Decimal, Decimal | None]:
-    if asset.asset_type == "stock":
+    asset_type = _canonical_asset_type(asset.asset_type)
+    if asset_type == "stock":
         valuation = await value_stock_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
-    if asset.asset_type == "crypto":
+    if asset_type == "crypto":
         valuation = await value_crypto_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
-    if asset.asset_type == "gold":
+    if asset_type == "gold":
         valuation = await value_gold_holding(asset)
         return valuation.current_value, valuation.cost_basis * valuation.quantity, valuation.pnl_pct
     current = Decimal(asset.current_value or 0)
@@ -113,10 +154,39 @@ async def compute_ytd_return(user_id) -> dict[str, Any]:
 
 
 async def get_best_worst_from_assets(assets: list[Asset]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return (best, worst) holding by return % among investment positions.
+
+    Cash, real_estate, and other assets are excluded — they have no meaningful
+    investment return. Holdings whose computed return % falls outside
+    ``[_MIN_REASONABLE_RETURN_PCT, _MAX_REASONABLE_RETURN_PCT]`` are also
+    excluded (with a warning log) because such values indicate corrupted
+    cost-basis data rather than real performance.
+    """
     performances: list[HoldingPerformance] = []
     for asset in assets:
+        if _canonical_asset_type(asset.asset_type) not in _PERFORMANCE_ELIGIBLE_TYPES:
+            continue
         current, cost, pct = await _value_asset(asset)
         if pct is None:
+            continue
+        # Decimal comparisons with NaN raise InvalidOperation; check finiteness
+        # first so a single corrupted holding can't abort the whole briefing.
+        if pct.is_nan():
+            logger.warning(
+                "Holding %s (asset_id=%s) excluded from best/worst: "
+                "return_pct is NaN (corrupted cost-basis or quantity data); "
+                "cost_basis_value=%s, current_value=%s",
+                _symbol(asset), asset.id, cost, current,
+            )
+            continue
+        if pct < _MIN_REASONABLE_RETURN_PCT or pct > _MAX_REASONABLE_RETURN_PCT:
+            logger.warning(
+                "Holding %s (asset_id=%s) excluded from best/worst: "
+                "return_pct=%s out of range [%s, %s]; cost_basis_value=%s, current_value=%s",
+                _symbol(asset), asset.id, pct,
+                _MIN_REASONABLE_RETURN_PCT, _MAX_REASONABLE_RETURN_PCT,
+                cost, current,
+            )
             continue
         performances.append(HoldingPerformance(asset.id, _symbol(asset), asset.asset_type, current, cost, pct))
     if not performances:

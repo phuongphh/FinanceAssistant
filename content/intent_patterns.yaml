@@ -47,6 +47,9 @@ query_assets:
     # short forms "tài sản có gì" / "tai san co gi" (no possessive)
     - pattern: '^tai\s*san\s+co\s+gi'
       confidence: 0.7
+    # Time-range report asks: "báo cáo tài sản tháng này", "show asset report tuần này"
+    - pattern: '(?:bao\s*cao|tong\s*hop|xem|show).*(?:tai\s*san|asset|bds|bat\s*dong\s*san|nha\s*dat|dat|co\s*phieu|chung\s*khoan|stocks?|vang|gold|quy|fund|etf).*(?:hom\s*nay|hom\s*qua|tuan\s+nay|tuan\s+truoc|thang\s+nay|thang\s+truoc|nam\s+nay)'
+      confidence: 0.94
     # NEW (S21): "tài sản hiện tại bao nhiêu" — informational, no possessive
     - pattern: 'tai\s*san\s+hien\s*tai.*bao\s*nhieu'
       confidence: 0.85
@@ -57,13 +60,21 @@ query_assets:
     - pattern: 'tai\s*san\s+cua\s+(?:em|anh|chi|ban)'
       confidence: 0.9
   parameter_extractors:
+    time_range:
+      use_extractor: time_range
     asset_type:
       patterns:
-        - { match: '\b(?:bat\s*dong\s*san|bds|nha\s+dat)\b', value: real_estate }
-        - { match: '\b(?:chung\s*khoan|co\s*phieu|stocks?)\b', value: stock }
+        - { match: '\b(?:bat\s*dong\s*san|bds|nha\s+dat|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
+        - { match: '\b(?:chung\s*khoan|co\s*phieu|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b', value: stock }
         - { match: '\b(?:crypto|tien\s*so|btc|bitcoin|ethereum|eth|sol|solana)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s+gui)\b', value: cash }
+    asset_subtype:
+      patterns:
+        - { match: '\b(?:dat|nha\s*dat)\b', value: land }
+        - { match: '\b(?:chung\s*cu|can\s*ho)\b', value: apartment }
+        - { match: '\b(?:quy|quy\s*mo|chung\s*chi\s*quy|fund)\b', value: fund }
+        - { match: '\betf\b', value: etf }
 
 query_net_worth:
   description: "User asks total net worth."
@@ -248,6 +259,12 @@ query_goals:
     # NEW (S21): "liệt kê mục tiêu" / "xem mục tiêu" — imperative
     - pattern: '(?:liet\s*ke|xem|list)\s+(?:muc\s*tieu|goals?)'
       confidence: 0.9
+    # Time-range report asks: "báo cáo mục tiêu tháng này", "goal report tuần trước"
+    - pattern: '(?:bao\s*cao|tong\s*hop|xem|show).*(?:muc\s*tieu|goals?).*(?:hom\s*nay|hom\s*qua|tuan\s+nay|tuan\s+truoc|thang\s+nay|thang\s+truoc|nam\s+nay)'
+      confidence: 0.94
+  parameter_extractors:
+    time_range:
+      use_extractor: time_range
 
 action_quick_transaction:
   description: "User logs a quick income or expense in natural language."
@@ -290,7 +307,7 @@ action_add_asset:
     - pattern: '^(?:them|tao|nhap|ghi)\s+(?:moi\s+)?(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b'
       confidence: 0.95
     # "thêm cổ phiếu" / "thêm chứng khoán"
-    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:co\s*phieu|chung\s*khoan|stocks?)\b'
+    - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b'
       confidence: 0.95
     # "thêm crypto" / "thêm tiền số" / "thêm btc"
     - pattern: '^(?:them|tao|nhap|mua)\s+(?:moi\s+)?(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b'
@@ -308,10 +325,12 @@ action_add_asset:
     - pattern: '^them\s*tai\s*san\b'
       confidence: 0.92
   parameter_extractors:
+    time_range:
+      use_extractor: time_range
     asset_type:
       patterns:
         - { match: 'bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu', value: real_estate }
-        - { match: 'co\s*phieu|chung\s*khoan|stocks?', value: stock }
+        - { match: 'co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf', value: stock }
         - { match: 'crypto|tien\s*so|bitcoin|btc|ethereum|eth', value: crypto }
         - { match: 'vang|gold', value: gold }
         - { match: 'tien\s*mat|cash|tien\s*gui|so\s*tiet\s*kiem', value: cash }
@@ -335,7 +354,7 @@ action_edit_asset:
     # exactly which asset family to look in.
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+?))?\s+(?:thanh|=|toi|->|sang)\s+(?P<new_value>.+)$'
       confidence: 0.97
@@ -347,7 +366,7 @@ action_edit_asset:
     # "sửa bất động sản" / "sửa cổ phiếu FPT" / "sửa đất ba tư"
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
-    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+    - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
@@ -358,15 +377,22 @@ action_edit_asset:
     - pattern: '^(?:sua|chinh|cap\s*nhat|update|edit)\s+tai\s*san\b'
       confidence: 0.92
   parameter_extractors:
+    time_range:
+      use_extractor: time_range
     asset_type:
       patterns:
         # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
         # words doesn't accidentally flip asset_type to real_estate.
         - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
-        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b', value: stock }
         - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
+
+    asset_subtype:
+      patterns:
+        - { match: '\b(?:quy|quy\s*mo|chung\s*chi\s*quy|fund)\b', value: fund }
+        - { match: '\betf\b', value: etf }
 
 action_delete_asset:
   description: "User wants to remove an existing asset."
@@ -377,9 +403,11 @@ action_delete_asset:
   patterns:
     - pattern: '^(?:xoa|xo|huy|remove|delete|del)\s+tai\s*san(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.95
+    - pattern: "^(?:xoa|xo|huy|remove|delete|del)\\s+tai\\s*san\\s+(?P<asset_name>[a-z0-9._-]{2,})\\s*$"
+      confidence: 0.97
     - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
-    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?)(?:\s+(?P<asset_name>.+))?$'
+    - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
     - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
@@ -388,15 +416,22 @@ action_delete_asset:
     - pattern: '^(?:xoa|xo|remove|delete|del)\s+(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)(?:\s+(?P<asset_name>.+))?$'
       confidence: 0.92
   parameter_extractors:
+    time_range:
+      use_extractor: time_range
     asset_type:
       patterns:
         # Word-bounded so "nha" inside "cap nhat" / "dat" inside other
         # words doesn't accidentally flip asset_type to real_estate.
         - { match: '\b(?:bat\s*dong\s*san|bds|nha\s*dat|nha|dat|can\s*ho|chung\s*cu)\b', value: real_estate }
-        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?)\b', value: stock }
+        - { match: '\b(?:co\s*phieu|chung\s*khoan|stocks?|quy|quy\s*mo|chung\s*chi\s*quy|fund|etf)\b', value: stock }
         - { match: '\b(?:crypto|tien\s*so|bitcoin|btc|ethereum|eth)\b', value: crypto }
         - { match: '\b(?:vang|gold)\b', value: gold }
         - { match: '\b(?:tien\s*mat|cash|tien\s*gui|tai\s*khoan|so\s*tiet\s*kiem|vi)\b', value: cash }
+
+    asset_subtype:
+      patterns:
+        - { match: '\b(?:quy|quy\s*mo|chung\s*chi\s*quy|fund)\b', value: fund }
+        - { match: '\betf\b', value: etf }
 
 action_add_goal:
   description: "User wants to add a new financial goal."

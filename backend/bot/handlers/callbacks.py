@@ -31,6 +31,7 @@ from backend.bot.handlers.transaction import (
     resolve_transaction_by_callback_id,
     resolve_transactions_by_batch_id,
 )
+from backend.bot.handlers import photo_receipt
 from backend.bot.keyboards.common import CallbackPrefix, parse_callback
 from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
@@ -38,6 +39,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     e_wallet_provider_keyboard,
     transaction_actions_keyboard,
 )
+from backend.config.categories import get_all_categories
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
@@ -52,6 +54,7 @@ from backend.services.telegram_service import (
 logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
+_VALID_EXPENSE_CATEGORY_CODES = frozenset(cat.code for cat in get_all_categories())
 
 
 async def _handle_source_selection_callback(
@@ -255,7 +258,14 @@ async def _handle_change_category(*, db, user, args, callback_id, chat_id, messa
         await answer_callback(callback_id)
         return
 
-    new_code = args[1]
+    new_code = str(args[1]).strip().lower()
+    if new_code not in _VALID_EXPENSE_CATEGORY_CODES:
+        await answer_callback(
+            callback_id,
+            text="Danh mục không hợp lệ — bạn chọn lại trong danh sách nhé.",
+            show_alert=True,
+        )
+        return
     old_code = expense.category
     expense.category = new_code
     await db.flush()
@@ -302,6 +312,20 @@ async def _handle_confirm_action(*, db, user, args, callback_id, chat_id, messag
         return
 
     action, resource_id = args[0], args[1]
+    if action == "receipt":
+        ok = await photo_receipt.confirm_pending_receipt(
+            db=db, user=user, token=resource_id
+        )
+        if not ok:
+            await answer_callback(
+                callback_id, text="Phiên xác nhận đã hết hạn.", show_alert=True
+            )
+            return
+        await edit_message_reply_markup(
+            chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": []}
+        )
+        await answer_callback(callback_id, text="Đã lưu khoản chi ✅")
+        return
     if action != "delete":
         await answer_callback(callback_id)
         return
@@ -331,6 +355,12 @@ async def _handle_confirm_action(*, db, user, args, callback_id, chat_id, messag
 
 async def _handle_cancel_action(*, db, user, args, callback_id, chat_id, message_id):
     """User tap 'Hủy'. Nếu có tx_id, đưa keyboard về trạng thái actions gốc."""
+    if len(args) >= 2 and args[0] == "receipt":
+        await edit_message_reply_markup(
+            chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": []}
+        )
+        await answer_callback(callback_id, text="Đã huỷ")
+        return
     if args:
         expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
         if expense:

@@ -45,3 +45,14 @@ def test_twin_cta_is_fully_vietnamese():
     assert "Thay đổi để đạt Tối ưu" in html
     assert "Thay đổi để đạt Optimal" not in js
     assert "Thay đổi để đạt Optimal" not in html
+
+
+def test_twin_preloads_opposite_scenario_for_faster_toggle():
+    js = JS.read_text()
+
+    assert "function preloadOtherScenario(activeScenario)" in js
+    assert "const targetScenario = activeScenario === 'current' ? 'optimal' : 'current';" in js
+    assert "if (cache[targetScenario]) return;" in js
+    assert "fetch(`/api/twin?scenario=${encodeURIComponent(targetScenario)}`" in js
+    assert "if (body && body.data) cache[targetScenario] = body.data;" in js
+    assert "preloadOtherScenario(scenario);" in js

@@ -1,28 +1,15 @@
 import os
 import sys
+import time
+import random
 import anthropic
 import requests
+
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 PR_NUMBER = os.environ.get("PR_NUMBER")
 REPO = os.environ.get("REPO")
-
-if not ANTHROPIC_API_KEY:
-    print("ERROR: ANTHROPIC_API_KEY secret is not set.")
-    sys.exit(1)
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-try:
-    with open("pr_diff.txt", "r") as f:
-        diff = f.read().strip()
-except FileNotFoundError:
-    print("ERROR: pr_diff.txt not found. Diff step may have failed.")
-    sys.exit(1)
-
-if not diff:
-    print("No diff found. Skipping review.")
-    sys.exit(0)
 
 SYSTEM_PROMPT = """
 You are a strict code reviewer for a Vietnamese Personal Finance AI Assistant system.
@@ -49,22 +36,98 @@ anywhere except on the final VERDICT line. If a check raised a concern but
 your re-evaluation cleared it, that is a PASS.
 """
 
-response = client.messages.create(
-    model="claude-haiku-4-5-20251001",
-    max_tokens=1500,
-    temperature=0,
-    system=SYSTEM_PROMPT,
-    messages=[
-        {
-            "role": "user",
-            "content": diff
-        }
-    ]
-)
+DEFAULT_MAX_ATTEMPTS = int(os.environ.get("CODE_REVIEW_MAX_ATTEMPTS", "5"))
+DEFAULT_BASE_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_BASE_DELAY_SECONDS", "1.0"))
+DEFAULT_MAX_DELAY_SECONDS = float(os.environ.get("CODE_REVIEW_MAX_DELAY_SECONDS", "8.0"))
+DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CODE_REVIEW_REQUEST_TIMEOUT_SECONDS", "30"))
 
-result = response.content[0].text.strip()
 
-print(result)
+def _resolve_anthropic_error_types() -> tuple[type[BaseException], ...]:
+    """Support multiple SDK layouts (top-level vs anthropic._exceptions)."""
+    error_names = (
+        "OverloadedError",
+        "RateLimitError",
+        "APIConnectionError",
+        "APITimeoutError",
+        "InternalServerError",
+    )
+    resolved: list[type[BaseException]] = []
+
+    for name in error_names:
+        err_type = getattr(anthropic, name, None)
+        if isinstance(err_type, type):
+            resolved.append(err_type)
+
+    if len(resolved) < len(error_names):
+        try:
+            from anthropic import _exceptions as anthropic_exceptions  # type: ignore
+
+            for name in error_names:
+                err_type = getattr(anthropic_exceptions, name, None)
+                if isinstance(err_type, type) and err_type not in resolved:
+                    resolved.append(err_type)
+        except Exception:
+            pass
+
+    return tuple(resolved)
+
+
+def _is_retryable_error(error: Exception) -> bool:
+    """Retry only transient upstream/service transport failures."""
+    retryable_types = _resolve_anthropic_error_types()
+    return bool(retryable_types) and isinstance(error, retryable_types)
+
+
+def _compute_sleep_seconds(attempt: int, base_delay_seconds: float, max_delay_seconds: float) -> float:
+    """Exponential backoff with bounded jitter."""
+    backoff = min(max_delay_seconds, base_delay_seconds * (2 ** (attempt - 1)))
+    jitter = random.uniform(0, min(0.5, backoff / 2))
+    return backoff + jitter
+
+
+def request_review_with_retry(
+    client: anthropic.Anthropic,
+    diff: str,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    base_delay_seconds: float = DEFAULT_BASE_DELAY_SECONDS,
+    max_delay_seconds: float = DEFAULT_MAX_DELAY_SECONDS,
+):
+    """Call Anthropic with bounded exponential backoff + jitter.
+
+    Returns ``None`` when all retry attempts fail with transient errors so
+    CI can degrade gracefully instead of failing due to provider overload.
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1500,
+                temperature=0,
+                timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": diff
+                    }
+                ]
+            )
+        except Exception as e:
+            if not _is_retryable_error(e):
+                raise
+            if attempt == max_attempts:
+                print(
+                    f"WARNING: Anthropic transient failure after {max_attempts} attempts: {e}. "
+                    "Skipping automated review (non-blocking)."
+                )
+                return None
+            sleep_seconds = _compute_sleep_seconds(attempt, base_delay_seconds, max_delay_seconds)
+            print(
+                f"Anthropic transient error {type(e).__name__} "
+                f"(attempt {attempt}/{max_attempts}). "
+                f"Retrying in {sleep_seconds:.2f}s..."
+            )
+            time.sleep(sleep_seconds)
 
 
 def parse_verdict(text: str) -> tuple[str, str]:
@@ -87,25 +150,53 @@ def parse_verdict(text: str) -> tuple[str, str]:
                 return "FAIL", reason
     return "PASS", "(no verdict line — defaulting to PASS)"
 
-
-verdict, reason = parse_verdict(result)
-
-# Post comment to PR if GitHub token and PR number are available
-if GITHUB_TOKEN and PR_NUMBER and REPO:
-    comment_body = f"## Code Review Result\n\n{result}"
+def main() -> int:
+    if not ANTHROPIC_API_KEY:
+        print("ERROR: ANTHROPIC_API_KEY secret is not set.")
+        return 1
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
-        requests.post(
-            f"https://api.github.com/repos/{REPO}/issues/{PR_NUMBER}/comments",
-            json={"body": comment_body},
-            headers={
-                "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github+json",
-            },
-        )
-    except Exception as e:
-        print(f"Warning: Could not post PR comment: {e}")
+        with open("pr_diff.txt", "r") as f:
+            diff = f.read().strip()
+    except FileNotFoundError:
+        print("ERROR: pr_diff.txt not found. Diff step may have failed.")
+        return 1
 
-if verdict == "FAIL":
-    print(f"Verdict: FAIL — {reason}")
-    sys.exit(1)
-print("Verdict: PASS")
+    if not diff:
+        print("No diff found. Skipping review.")
+        return 0
+
+    response = request_review_with_retry(client=client, diff=diff)
+    if response is None:
+        result = (
+            "⚠️ Automated code review skipped: Anthropic service overloaded after retries.\n"
+            "VERDICT: PASS"
+        )
+        verdict, reason = "PASS", "(transient provider overload — review skipped)"
+    else:
+        result = response.content[0].text.strip()
+        verdict, reason = parse_verdict(result)
+    print(result)
+    if GITHUB_TOKEN and PR_NUMBER and REPO:
+        comment_body = f"## Code Review Result\n\n{result}"
+        try:
+            requests.post(
+                f"https://api.github.com/repos/{REPO}/issues/{PR_NUMBER}/comments",
+                json={"body": comment_body},
+                headers={
+                    "Authorization": f"Bearer {GITHUB_TOKEN}",
+                    "Accept": "application/vnd.github+json",
+                },
+            )
+        except Exception as e:
+            print(f"Warning: Could not post PR comment: {e}")
+
+    if verdict == "FAIL":
+        print(f"Verdict: FAIL — {reason}")
+        return 1
+    print("Verdict: PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

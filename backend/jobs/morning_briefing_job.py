@@ -216,7 +216,9 @@ async def run_morning_briefing_job(
                     )
                 else:
                     text_to_send = result.text
-                    reply_markup = briefing_actions_keyboard()
+                    reply_markup = briefing_actions_keyboard(
+                        include_twin=bool(result.sections.get("twin"))
+                    )
 
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,

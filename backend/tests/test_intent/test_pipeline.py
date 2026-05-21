@@ -6,8 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.intent.classifier import pipeline as pipeline_module
 from backend.intent.classifier.pipeline import (
     HIGH_CONFIDENCE_THRESHOLD,
+    LLM_CLASSIFIER_TIMEOUT_SECONDS,
     IntentPipeline,
 )
 from backend.intent.intents import (
@@ -111,3 +113,56 @@ async def test_llm_exception_falls_back_to_rule():
 def test_threshold_is_advertised_constant():
     # Other modules dispatch on this value — guard against silent drift.
     assert 0 < HIGH_CONFIDENCE_THRESHOLD <= 1
+
+
+@pytest.mark.asyncio
+async def test_llm_timeout_falls_back_to_rule(monkeypatch):
+    rule_match = IntentResult(
+        intent=IntentType.QUERY_ASSETS,
+        confidence=0.6,
+        classifier_used=CLASSIFIER_RULE,
+    )
+
+    class SlowClassifier:
+        async def classify(self, _text: str):
+            await asyncio.sleep(0.05)
+            return IntentResult(
+                intent=IntentType.QUERY_PORTFOLIO,
+                confidence=0.9,
+                classifier_used=CLASSIFIER_LLM,
+            )
+
+    monkeypatch.setattr(pipeline_module, "LLM_CLASSIFIER_TIMEOUT_SECONDS", 0.01)
+    pipeline = IntentPipeline(
+        rule_classifier=_stub_classifier(rule_match),
+        llm_classifier=SlowClassifier(),
+    )
+
+    result = await pipeline.classify("test timeout")
+    assert result is rule_match
+
+
+@pytest.mark.asyncio
+async def test_llm_timeout_without_rule_returns_unclear(monkeypatch):
+    class SlowClassifier:
+        async def classify(self, _text: str):
+            await asyncio.sleep(0.05)
+            return IntentResult(
+                intent=IntentType.QUERY_PORTFOLIO,
+                confidence=0.9,
+                classifier_used=CLASSIFIER_LLM,
+            )
+
+    monkeypatch.setattr(pipeline_module, "LLM_CLASSIFIER_TIMEOUT_SECONDS", 0.01)
+    pipeline = IntentPipeline(
+        rule_classifier=_stub_classifier(None),
+        llm_classifier=SlowClassifier(),
+    )
+
+    result = await pipeline.classify("test timeout")
+    assert result.intent == IntentType.UNCLEAR
+    assert result.classifier_used == CLASSIFIER_NONE
+
+
+def test_timeout_constant_is_positive():
+    assert LLM_CLASSIFIER_TIMEOUT_SECONDS > 0

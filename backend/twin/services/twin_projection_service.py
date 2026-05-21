@@ -19,12 +19,11 @@ from backend.life_events import service as life_event_service
 from backend.life_events.impact import event_to_injection
 from backend.models.twin_projection import TwinProjection
 from backend.services import cashflow_service
-from backend.twin.allocation.target_allocation import get_target_allocation
 from backend.twin.engine import ENGINE_VERSION
 from backend.twin.engine.cone_aggregator import ConePoint, aggregate_cone
 from backend.twin.engine.life_events import apply_life_events
 from backend.twin.engine.monte_carlo import Array2D, simulate_portfolio
-from backend.twin.engine.optimal_trajectory import simulate_optimal
+from backend.twin.engine.optimal_trajectory import resolve_optimal_plan
 from backend.wealth.ladder import detect_level
 from backend.models.onboarding_session import OnboardingSession
 from backend.wealth.services import asset_service
@@ -104,14 +103,22 @@ async def compute_and_store(
         injections = []
     base_year = datetime.now(timezone.utc).year
 
+    # Use the SAME seed across scenarios so the comparison is a paired draw:
+    # when current and optimal share the same allocation (Pareto-preserve case
+    # in ``resolve_optimal_plan``) the only difference between cones is the
+    # +10% savings boost — strictly Pareto-dominant by construction. When
+    # allocations differ, the asset universe differs and shocks naturally
+    # diverge, but both scenarios still start from the same RNG state.
+    paired_seed = seed
+
     projections: list[TwinProjection] = []
-    for index, scenario_name in enumerate(scenarios):
+    for scenario_name in scenarios:
         sim, monthly_savings, allocation_snapshot = _scenario_simulation(
             snapshot,
             scenario_name,
             horizon=horizon,
             paths=paths,
-            seed=None if seed is None else seed + index,
+            seed=paired_seed,
         )
         # Aggregate the pristine cone BEFORE injecting events so we can store
         # both views. Mini App toggle UX (S11) reads ``base_cone_data`` to
@@ -132,7 +139,7 @@ async def compute_and_store(
             cone_data=_cone_to_json(cone),
             base_cone_data=_cone_to_json(base_cone),
             sim_paths=paths,
-            seed=None if seed is None else seed + index,
+            seed=paired_seed,
             engine_version=engine_version_for_projection(),
         )
         db.add(projection)
@@ -157,7 +164,11 @@ async def load_portfolio_snapshot(
     demo_base_net_worth: Decimal | None = None
     if not assets and net_worth.total == 0:
         session = await db.get(OnboardingSession, user_id)
-        if session is not None and session.demo_mode_used and session.first_asset_value_vnd:
+        if (
+            session is not None
+            and session.demo_mode_used
+            and session.first_asset_value_vnd
+        ):
             demo_base_net_worth = Decimal(session.first_asset_value_vnd)
 
     allocation_amounts: dict[str, Decimal] = {}
@@ -212,19 +223,24 @@ def _scenario_simulation(
         return sim, snapshot.monthly_savings, snapshot.allocation_weights
     if scenario == SCENARIO_OPTIMAL:
         wealth_level = detect_level(snapshot.base_net_worth)
-        sim = simulate_optimal(
-            snapshot.allocation_amounts,
-            wealth_level,
-            horizon,
-            monthly_savings=snapshot.monthly_savings,
-            savings_boost=Decimal("1.10"),
-            paths=paths,
-            seed=seed,
-        )
+        plan = resolve_optimal_plan(snapshot.allocation_amounts, wealth_level)
+        total = snapshot.base_net_worth
+        chosen_amounts = {
+            asset_class: (total * Decimal(str(weight))).quantize(Decimal("1"))
+            for asset_class, weight in plan.allocation_weights.items()
+        }
         boosted_savings = (snapshot.monthly_savings * Decimal("1.10")).quantize(
             Decimal("1")
         )
-        return sim, boosted_savings, get_target_allocation(wealth_level)
+        sim = simulate_portfolio(
+            chosen_amounts,
+            boosted_savings,
+            savings_split=plan.allocation_weights,
+            horizon=horizon,
+            paths=paths,
+            seed=seed,
+        )
+        return sim, boosted_savings, plan.allocation_weights
     raise ValueError(f"Unsupported Twin scenario: {scenario}")
 
 

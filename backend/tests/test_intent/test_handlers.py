@@ -530,7 +530,45 @@ async def test_query_portfolio_handler_lists_gold_assets_when_requested():
     assert "2 lượng" in response
     assert "184tr" in response
     assert "🟢" in response
+    assert "giá bạn nhập" in response
     assert "NVDA" not in response
+
+
+@pytest.mark.asyncio
+async def test_query_portfolio_gold_hides_manual_price_badge_after_market_update():
+    from backend.intent.handlers.query_portfolio import QueryPortfolioHandler
+
+    gold_assets = [
+        _fake_asset(
+            name="Vàng SJC",
+            asset_type="gold",
+            subtype="sjc",
+            # 2 lượng × 92tr manual = 184tr, but market-updated value is 190tr.
+            current_value=Decimal("190000000"),
+            initial_value=Decimal("180000000"),
+            extra={"quantity": 2, "current_price": 92000000},
+        ),
+    ]
+    with (
+        patch(
+            "backend.intent.handlers.query_portfolio.asset_service.get_user_assets",
+            AsyncMock(return_value=gold_assets),
+        ),
+        patch(
+            "backend.intent.handlers.query_portfolio.resolve_style",
+            AsyncMock(return_value=_young_prof_style()),
+        ),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_PORTFOLIO,
+            confidence=0.95,
+            parameters={"asset_type": "gold"},
+            raw_text="portfolio vàng",
+        )
+        response = await QueryPortfolioHandler().handle(intent, _user(), _fake_db())
+
+    assert "190tr" in response
+    assert "giá bạn nhập" not in response
 
 
 @pytest.mark.asyncio

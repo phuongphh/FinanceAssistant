@@ -55,9 +55,37 @@ def get_icon(asset_type: str) -> str:
 
 
 def get_label(asset_type: str) -> str:
-    return get_asset_config(asset_type).get("label_vi", asset_type)
+    canonical = normalize_asset_type(asset_type)
+    return get_asset_config(canonical).get("label_vi", canonical or str(asset_type))
 
 
+
+
+# English/legacy tokens normalized to canonical asset_type.
+# Keep this table as the seed for future multi-language mapping.
+ASSET_TYPE_ALIASES: dict[str, str] = {
+    "cash": "cash",
+    "cash_savings": "cash",
+    "cashsavings": "cash",
+    "bank": "cash",
+    "stock": "stock",
+    "stocks": "stock",
+    "equity": "stock",
+    "real_estate": "real_estate",
+    "real-estate": "real_estate",
+    "realestate": "real_estate",
+    "property": "real_estate",
+    "crypto": "crypto",
+    "gold": "gold",
+    "other": "other",
+}
+
+
+def normalize_asset_type(asset_type: str | None) -> str:
+    raw = str(asset_type or "").strip().lower()
+    if not raw:
+        return ""
+    return ASSET_TYPE_ALIASES.get(raw, raw)
 _SUBTYPE_ICONS: dict[str, str] = {
     "bank_savings": "🏦",
     "bank_checking": "💳",

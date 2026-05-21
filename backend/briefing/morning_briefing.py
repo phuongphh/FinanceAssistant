@@ -123,6 +123,20 @@ async def _latest_vcb_rate(db: AsyncSession) -> Decimal | None:
     return result.scalar_one_or_none()
 
 
+
+_ASSET_TYPE_LABELS = {
+    "cash": "Tiền mặt",
+    "stock": "Cổ phiếu/Quỹ",
+    "real_estate": "Bất động sản",
+    "crypto": "Tiền số",
+    "gold": "Vàng",
+    "other": "Khác",
+}
+
+
+def _asset_type_label(asset_type: str) -> str:
+    return _ASSET_TYPE_LABELS.get(str(asset_type), str(asset_type).replace("_", " ").title())
+
 async def _portfolio_assets(db: AsyncSession, user_id) -> list[Asset]:
     result = await db.execute(select(Asset).where(Asset.user_id == user_id, Asset.is_active.is_(True)))
     return list(result.scalars().all())
@@ -134,7 +148,7 @@ def _allocation_lines(breakdown: net_worth_calculator.NetWorthBreakdown) -> str:
     lines: list[str] = []
     for asset_type, value in sorted(breakdown.by_type.items(), key=lambda item: item[1], reverse=True):
         pct = value / breakdown.total * Decimal(100)
-        lines.append(f"• {asset_type}: {format_money_short(value)} ({pct:.0f}%)")
+        lines.append(f"• {_asset_type_label(asset_type)}: {format_money_short(value)} ({pct:.0f}%)")
     return "\n".join(lines)
 
 
@@ -326,9 +340,33 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     is_empty_state = breakdown.asset_count == 0 or breakdown.total <= 0
     insight_lines = _insights(assets, vcb_rate)
     top, bottom = performers
-    if top is not None:
-        insight_lines.append(f"Tốt nhất: {top['symbol']} {_signed_pct(top['return_pct'])}%; yếu nhất: {bottom['symbol']} {_signed_pct(bottom['return_pct'])}%.")
-    insight_lines.append(f"Đa dạng hóa: {diversification['score']}/100 ({diversification['label']}).")
+    insight_templates = template["insights_lines"]
+    if top is not None and bottom is not None and top.get("return_pct") is not None:
+        if top["asset_id"] == bottom["asset_id"]:
+            # Only one investment holding has a comparable return — calling
+            # the same asset both "best" and "worst" reads as a bug to users,
+            # so collapse to a single-asset line.
+            insight_lines.append(
+                insight_templates["performance_single"].format(
+                    symbol=top["symbol"],
+                    pct=_signed_pct(top["return_pct"]),
+                )
+            )
+        else:
+            insight_lines.append(
+                insight_templates["performance_pair"].format(
+                    best_symbol=top["symbol"],
+                    best_pct=_signed_pct(top["return_pct"]),
+                    worst_symbol=bottom["symbol"],
+                    worst_pct=_signed_pct(bottom["return_pct"]),
+                )
+            )
+    insight_lines.append(
+        insight_templates["diversification"].format(
+            score=diversification["score"],
+            label=diversification["label"],
+        )
+    )
 
     sections = {
         "greeting": template["sections"]["greeting"].format(

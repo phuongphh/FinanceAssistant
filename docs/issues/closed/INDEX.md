@@ -404,6 +404,21 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #686 | Pre-Phase | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [pre-phase/issue-686.md](by-phase/pre-phase/issue-686.md) |
 | #687 | Pre-Phase | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [pre-phase/issue-687.md](by-phase/pre-phase/issue-687.md) |
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
+| #706 | Pre-Phase | Stock market data: VNDIRECT 403 (missing User-Agent), SSI 502 | [pre-phase/issue-706.md](by-phase/pre-phase/issue-706.md) |
+| #711 | Pre-Phase | Delete asset: multiple matches with no asset_type shows wrong screen | [pre-phase/issue-711.md](by-phase/pre-phase/issue-711.md) |
+| #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
+| #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
+| #723 | Pre-Phase | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [pre-phase/issue-723.md](by-phase/pre-phase/issue-723.md) |
+| #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
+| #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
+| #728 | Pre-Phase | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [pre-phase/issue-728.md](by-phase/pre-phase/issue-728.md) |
+| #730 | Pre-Phase | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [pre-phase/issue-730.md](by-phase/pre-phase/issue-730.md) |
+| #740 | Pre-Phase | 🐌 /chitieu command: slow response (16s+) and import error failures | [pre-phase/issue-740.md](by-phase/pre-phase/issue-740.md) |
+| #750 | Pre-Phase | Add foreign stock provider (NVDA, IBM, ETF) — current providers only support VN stocks | [pre-phase/issue-750.md](by-phase/pre-phase/issue-750.md) |
+| #762 | Pre-Phase | Expense Dashboard hangs on loading spinner — API call never reaches backend after deploy | [pre-phase/issue-762.md](by-phase/pre-phase/issue-762.md) |
+| #765 | Pre-Phase | Telegram WebView cache ignores query-string parameters — JS served stale after deploy | [pre-phase/issue-765.md](by-phase/pre-phase/issue-765.md) |
+| #770 | Pre-Phase | Internal dashboard navigation does not reload CSS — WebView uses cached styles | [pre-phase/issue-770.md](by-phase/pre-phase/issue-770.md) |
+| #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 
-**Total:** 400 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 383 Pre-Phase)
+**Total:** 415 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 398 Pre-Phase)
