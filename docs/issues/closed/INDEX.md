@@ -243,6 +243,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #429 | Pre-Phase | [Story] P4B-S12: LLM Narrative for Life Events | [pre-phase/issue-429.md](by-phase/pre-phase/issue-429.md) |
 | #430 | Pre-Phase | [Story] P4B-S13: Life Events Tests + Benchmarks | [pre-phase/issue-430.md](by-phase/pre-phase/issue-430.md) |
 | #431 | Pre-Phase | [Story] P4B-S14: Recurring Transaction Detector | [pre-phase/issue-431.md](by-phase/pre-phase/issue-431.md) |
+| #432 | Pre-Phase | [Story] P4B-S15: User Review Flow for Detected Patterns | [pre-phase/issue-432.md](by-phase/pre-phase/issue-432.md) |
 | #433 | Pre-Phase | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [pre-phase/issue-433.md](by-phase/pre-phase/issue-433.md) |
 | #434 | Pre-Phase | [Story] P4B-S17: Low-Balance Alert Engine | [pre-phase/issue-434.md](by-phase/pre-phase/issue-434.md) |
 | #438 | Pre-Phase | [Story] P4B-S21: Zalo Official Account Setup + SDK | [pre-phase/issue-438.md](by-phase/pre-phase/issue-438.md) |
@@ -446,5 +447,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 441 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 424 Pre-Phase)
+**Total:** 442 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 425 Pre-Phase)
