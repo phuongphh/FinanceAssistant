@@ -403,7 +403,7 @@ async def _handle_undo_transaction(*, db, user, args, callback_id, chat_id, mess
     if age > UNDO_WINDOW_SECONDS:
         await answer_callback(
             callback_id,
-            text="Quá muộn để hủy — dùng nút 🗑 Xóa nhé",
+            text="Hết hạn huỷ nhanh — mở Mini App rồi bấm ↩️ Huỷ giao dịch nhé",
             show_alert=True,
         )
         return
@@ -457,7 +457,7 @@ async def _handle_undo_transaction_batch(
     if age > UNDO_WINDOW_SECONDS:
         await answer_callback(
             callback_id,
-            text="Quá muộn để hủy — dùng nút 🗑 Xóa nhé",
+            text="Hết hạn huỷ nhanh — mở Mini App rồi bấm ↩️ Huỷ giao dịch nhé",
             show_alert=True,
         )
         return
