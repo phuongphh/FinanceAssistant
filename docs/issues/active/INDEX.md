@@ -11,7 +11,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
-| #428 | [Story] P4B-S11: Mini App Life Events Panel | [issue-428.md](issue-428.md) |
 | #431 | [Story] P4B-S14: Recurring Transaction Detector | [issue-431.md](issue-431.md) |
 | #432 | [Story] P4B-S15: User Review Flow for Detected Patterns | [issue-432.md](issue-432.md) |
 | #433 | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [issue-433.md](issue-433.md) |
@@ -25,4 +24,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
 
-**Total active:** 20
+**Total active:** 19
