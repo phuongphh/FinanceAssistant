@@ -9,10 +9,10 @@ Add Life Assurance (Bảo hiểm nhân thọ) as a sub-type of Asset. Users can 
 Life insurance is a significant financial commitment for many Vietnamese users. Tracking these contracts alongside other assets gives a complete financial picture. Users need to know their total paid amount, monthly obligation, and contract end date — all in one place.
 
 ## Issues
-- [#779](https://github.com/phuongphh/FinanceAssistant/issues/779) Life Assurance Data Model & Service
-- [#780](https://github.com/phuongphh/FinanceAssistant/issues/780) Add "Bảo hiểm nhân thọ" Button in Asset Menu
-- [#781](https://github.com/phuongphh/FinanceAssistant/issues/781) Life Assurance Contract List View
-- [#782](https://github.com/phuongphh/FinanceAssistant/issues/782) Life Assurance in Asset Report & Dashboard
+- [#784](https://github.com/phuongphh/FinanceAssistant/issues/779) Life Assurance Data Model & Service
+- [#785](https://github.com/phuongphh/FinanceAssistant/issues/780) Add "Bảo hiểm nhân thọ" Button in Asset Menu
+- [#786](https://github.com/phuongphh/FinanceAssistant/issues/781) Life Assurance Contract List View
+- [#787](https://github.com/phuongphh/FinanceAssistant/issues/782) Life Assurance in Asset Report & Dashboard
 
 ## Acceptance Criteria
 - [ ] Life Assurance model created with all required fields (company, monthly payment date, monthly amount, contract end year, total paid)
@@ -28,7 +28,7 @@ Life insurance is a significant financial commitment for many Vietnamese users. 
 
 ## Claude Code Implementation Prompt
 ```
-Read Epic #[EPIC_NUMBER] and all sub-issues (#779-#782) in phuongphh/FinanceAssistant.
+Read Epic #783 and all sub-issues (#784-#787) in phuongphh/FinanceAssistant.
 
 Implement Life Assurance as asset sub-type:
 1. Create life_insurance_contracts model (company_name, monthly_payment_date, monthly_amount, contract_end_year, total_paid)
