@@ -422,6 +422,31 @@ class TestWealthDashboardPage:
         assert f"assets {miniapp_routes._STATIC_VERSION}" in body
 
 
+class TestMiniAppStaticCacheBehavior:
+    def test_static_js_ignores_conditional_request_headers(self):
+        """Regression guard for issue #765.
+
+        Telegram WebView may ignore query-string cache busters and still send
+        conditional requests for /miniapp/static/*. We must return 200 with a
+        body (not 304) so stale JS never survives a deploy.
+        """
+        first = client.get("/miniapp/static/js/expense_dashboard.js")
+        assert first.status_code == 200
+        assert first.text
+
+        etag = first.headers.get("etag")
+        last_modified = first.headers.get("last-modified")
+        headers = {}
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
+
+        second = client.get("/miniapp/static/js/expense_dashboard.js", headers=headers)
+        assert second.status_code == 200
+        assert second.text
+
+
 class TestVersionEndpoint:
     def test_returns_git_sha_and_static_version(self):
         resp = client.get("/miniapp/api/version")

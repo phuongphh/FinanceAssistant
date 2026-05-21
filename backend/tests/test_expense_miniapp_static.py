@@ -24,6 +24,20 @@ def test_expense_reverse_keyword_is_vietnamese_by_default():
     assert "Reverse</button>" not in html
 
 
+def test_expense_modal_buttons_render_in_expected_order_and_labels():
+    """Guard UI rendering after redesign of Huỷ / Quay về / Lưu buttons."""
+    html = HTML.read_text()
+
+    delete_btn = '<button id="expense-delete-btn" type="button" class="danger-btn" hidden>Huỷ</button>'
+    cancel_btn = '<button id="expense-cancel-btn" type="button" class="secondary-btn">Quay về</button>'
+    save_btn = '<button id="expense-save-btn" type="button" class="primary-btn">Lưu</button>'
+
+    assert delete_btn in html
+    assert cancel_btn in html
+    assert save_btn in html
+    assert html.index(delete_btn) < html.index(cancel_btn) < html.index(save_btn)
+
+
 def test_expense_dashboard_refreshes_on_resume_events_with_debounced_background_sync():
     js = JS.read_text()
 
