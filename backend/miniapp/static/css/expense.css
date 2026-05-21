@@ -176,6 +176,12 @@
     margin-top: 16px;
 }
 
+/* When the danger button is hidden (Add mode), collapse to 2 equal columns
+   so Quay về / Lưu fill the row instead of leaving an empty third track. */
+.modal-actions:has(> .danger-btn[hidden]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .modal-actions button {
     min-height: 48px;
     padding: 0 12px;
