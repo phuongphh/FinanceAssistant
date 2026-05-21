@@ -82,10 +82,22 @@ def _parse_quantity(text: str) -> Decimal | None:
             raw = raw.replace(".", "").replace(",", ".")
         else:
             raw = raw.replace(",", "")
-    else:
-        # Single (or no) separator: in VN inputs "," is the decimal mark; "."
-        # is also commonly used. Normalize either to a Decimal-friendly dot.
-        raw = raw.replace(",", ".")
+    elif "," in raw:
+        # Single comma: ambiguous between thousands ("1,000") and decimal
+        # ("1,5"). VN users overwhelmingly write quantities as integers
+        # ("200 cổ", "1,000 cổ"), so treat groups of exactly 3 digits
+        # after the comma as a thousands separator. A non-3-digit tail
+        # ("1,5") is the decimal form.
+        head, _, tail = raw.rpartition(",")
+        if len(tail) == 3 and tail.isdigit() and head.replace(",", "").isdigit():
+            raw = raw.replace(",", "")
+        else:
+            raw = raw.replace(",", ".")
+    elif "." in raw:
+        # Single dot: same disambiguation. "1.000" → 1000, "1.5" → 1.5.
+        head, _, tail = raw.rpartition(".")
+        if len(tail) == 3 and tail.isdigit() and head.replace(".", "").isdigit():
+            raw = raw.replace(".", "")
     try:
         return Decimal(raw)
     except Exception:
