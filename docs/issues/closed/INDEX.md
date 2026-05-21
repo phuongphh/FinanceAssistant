@@ -427,7 +427,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 | #775 | Pre-Phase | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [pre-phase/issue-775.md](by-phase/pre-phase/issue-775.md) |
 | #776 | Pre-Phase | [Story 2] Expense Transaction with Credit Card Source | [pre-phase/issue-776.md](by-phase/pre-phase/issue-776.md) |
+| #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 424 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 407 Pre-Phase)
+**Total:** 425 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 408 Pre-Phase)
