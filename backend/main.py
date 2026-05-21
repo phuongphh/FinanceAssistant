@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from backend.admin_spa import SPAStaticFiles
+
 from backend.config import get_settings
 from backend.api.admin import (
     analytics as admin_analytics,
@@ -333,5 +335,5 @@ async def health_check():
 _ADMIN_STATIC = Path(__file__).parent / "static" / "admin"
 if _ADMIN_STATIC.exists():
     app.mount(
-        "/", StaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa"
+        "/", SPAStaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa"
     )
