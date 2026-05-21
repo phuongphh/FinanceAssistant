@@ -13,7 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #416 | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [issue-416.md](issue-416.md) |
 | #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
 | #426 | [Story] P4B-S9: Telegram Interface — Life Events | [issue-426.md](issue-426.md) |
-| #427 | [Story] P4B-S10: Life Event Impact Visualization | [issue-427.md](issue-427.md) |
 | #428 | [Story] P4B-S11: Mini App Life Events Panel | [issue-428.md](issue-428.md) |
 | #429 | [Story] P4B-S12: LLM Narrative for Life Events | [issue-429.md](issue-429.md) |
 | #430 | [Story] P4B-S13: Life Events Tests + Benchmarks | [issue-430.md](issue-430.md) |
@@ -30,4 +29,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
 
-**Total active:** 25
+**Total active:** 24
