@@ -261,6 +261,29 @@ async def admin_api_rate_limit(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def force_fresh_miniapp_static_assets(request: Request, call_next):
+    """Bypass conditional revalidation for Telegram Mini App static files.
+
+    Telegram WebView has a known cache-key quirk: query-string cache busters
+    (``?v=...``) may be ignored for ``/miniapp/static/*``. If the client sends
+    ``If-None-Match``/``If-Modified-Since``, Starlette StaticFiles can return
+    304 and the stale JS keeps running (spinner hangs forever).
+
+    We strip conditional headers for Mini App static requests so every request
+    gets a full 200 response body with the currently deployed bytes.
+    """
+    if request.url.path.startswith("/miniapp/static/"):
+        scope = request.scope
+        raw_headers = scope.get("headers") or []
+        scope["headers"] = [
+            (k, v)
+            for (k, v) in raw_headers
+            if k.lower() not in {b"if-none-match", b"if-modified-since"}
+        ]
+    return await call_next(request)
+
+
 _MINIAPP_STATIC = Path(__file__).parent / "miniapp" / "static"
 if _MINIAPP_STATIC.exists():
     app.mount(
