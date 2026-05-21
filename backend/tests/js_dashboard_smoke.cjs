@@ -178,6 +178,35 @@ async function run(target) {
     const { ctx, fetchCalls, documentListeners } = makeContext();
     vm.createContext(ctx);
 
+    // Mirror the production load order: dashboard_common.js (shared
+    // helpers exposed on window.DashboardCommon) is loaded by every
+    // template before the dashboard-specific bundle. Skip when the
+    // target IS dashboard_common.js itself, or for any file that
+    // doesn't reference DashboardCommon (eg. legacy bundles that
+    // haven't been refactored to use shared helpers).
+    const COMMON = path.join(path.dirname(target), 'dashboard_common.js');
+    if (
+        target !== COMMON
+        && fs.existsSync(COMMON)
+        && source.includes('DashboardCommon')
+    ) {
+        try {
+            vm.runInContext(fs.readFileSync(COMMON, 'utf8'), ctx, {
+                filename: 'dashboard_common.js',
+                timeout: 5000,
+            });
+        } catch (err) {
+            return {
+                ok: false,
+                error: 'dashboard_common.js failed to load: ' + String(err.message || err),
+                stack: err.stack ? String(err.stack).split('\n').slice(0, 4).join(' | ') : null,
+                domContentLoadedErrors: [],
+                fetchCalls: 0,
+                urls: [],
+            };
+        }
+    }
+
     const errors = [];
     let initError = null;
     try {

@@ -8,6 +8,13 @@
 (function () {
     'use strict';
 
+    // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
+    // first via the template's <script> tag. Destructure at the top of
+    // the IIFE so the bindings are out of TDZ before any init-phase
+    // caller (cf. the UI_KEYWORDS regression that motivated the smoke
+    // harness).
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
         tg.ready();
@@ -77,14 +84,11 @@
         ['other', '📌 Khác'],
     ];
 
-    // Localised tables live next to CATEGORIES so init-phase callers
-    // (initModalForm, applyLocalizedKeywords, renderExpenses) can read
-    // them without tripping the TDZ on `const` bindings declared lower
-    // in the IIFE body. Function declarations are hoisted; `const` is not.
-    const DATE_FORMAT_BY_LANGUAGE = {
-        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-    };
+    // Localised UI strings live next to CATEGORIES so init-phase callers
+    // (applyLocalizedKeywords, renderExpenses) can read them without
+    // tripping the TDZ on `const` bindings declared lower in the IIFE
+    // body. Function declarations are hoisted; `const` is not. Date
+    // formats moved to dashboard_common.js — re-import below if needed.
     const UI_KEYWORDS = {
         vi: {
             reverse: 'Huỷ',
@@ -190,45 +194,6 @@
         });
     }
 
-    function applyTheme(theme) {
-        const root = document.documentElement;
-        const map = {
-            '--bg-color': theme.bg_color,
-            '--text-color': theme.text_color,
-            '--text-muted': theme.hint_color,
-            '--card-bg': theme.secondary_bg_color,
-            '--primary': theme.button_color,
-            '--primary-text': theme.button_text_color,
-        };
-        for (const [prop, value] of Object.entries(map)) {
-            if (value) root.style.setProperty(prop, value);
-        }
-    }
-
-    function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) {
-            return (amount / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
-        }
-        if (abs >= 1_000_000) {
-            return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        }
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
-    }
-
-    function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
-    }
-
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
     function formatMonthLabel(monthKey) {
         if (!monthKey) return '';
         const [year, month] = monthKey.split('-');
@@ -242,38 +207,6 @@
     function resolveKeywords() {
         const lang = resolveLanguageCode();
         return UI_KEYWORDS[lang] || UI_KEYWORDS[lang.split('-')[0]] || UI_KEYWORDS.vi;
-    }
-
-    function resolveDateFormat() {
-        const lang = resolveLanguageCode();
-        return DATE_FORMAT_BY_LANGUAGE[lang] || DATE_FORMAT_BY_LANGUAGE[lang.split('-')[0]] || DATE_FORMAT_BY_LANGUAGE.vi;
-    }
-
-    function formatDate(iso) {
-        if (!iso) return '--/--/----';
-        const d = new Date(iso + 'T00:00:00');
-        const fmt = resolveDateFormat();
-        return d.toLocaleDateString(fmt.locale, fmt.options);
-    }
-
-    async function fetchAPI(endpoint, options = {}) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 12000);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
-        try {
-            const response = await fetch('/miniapp/api' + endpoint, {
-                ...options,
-                headers: { ...headers, ...(options.headers || {}) },
-                signal: controller.signal,
-            });
-            if (!response.ok) throw new Error('API ' + response.status);
-            const payload = await response.json();
-            if (payload.error) throw new Error(payload.error.message || 'API error');
-            return payload.data;
-        } finally {
-            clearTimeout(tid);
-        }
     }
 
     // -- Top-level render -------------------------------------------------
