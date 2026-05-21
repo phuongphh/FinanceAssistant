@@ -416,6 +416,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #740 | Pre-Phase | 🐌 /chitieu command: slow response (16s+) and import error failures | [pre-phase/issue-740.md](by-phase/pre-phase/issue-740.md) |
 | #750 | Pre-Phase | Add foreign stock provider (NVDA, IBM, ETF) — current providers only support VN stocks | [pre-phase/issue-750.md](by-phase/pre-phase/issue-750.md) |
 | #762 | Pre-Phase | Expense Dashboard hangs on loading spinner — API call never reaches backend after deploy | [pre-phase/issue-762.md](by-phase/pre-phase/issue-762.md) |
+| #765 | Pre-Phase | Telegram WebView cache ignores query-string parameters — JS served stale after deploy | [pre-phase/issue-765.md](by-phase/pre-phase/issue-765.md) |
 
-**Total:** 412 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 395 Pre-Phase)
+**Total:** 413 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 396 Pre-Phase)
