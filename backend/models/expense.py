@@ -40,6 +40,9 @@ class Expense(Base):
     source_asset_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL")
     )
+    source_credit_card_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("credit_cards.id", ondelete="SET NULL")
+    )
     source_type: Mapped[str | None] = mapped_column(String(30))
     e_wallet_provider: Mapped[str | None] = mapped_column(String(30))
     expense_date: Mapped[date] = mapped_column(Date, nullable=False)

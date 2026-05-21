@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.models.expense import Expense
+from backend.models.credit_card import CreditCard
 from backend.models.transaction import Transaction
 from backend.wealth.models.asset import Asset
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 TRANSACTION_TYPE_EXPENSE = "expense"
 TRANSACTION_TYPE_MONEY_IN = "money_in"
-SOURCE_TYPES = {"cash", "bank_account", "e_wallet"}
+SOURCE_TYPES = {"cash", "bank_account", "e_wallet", "credit_card"}
 EWALLET_PROVIDERS = {"momo", "vnpay", "zalopay", "viettelpay"}
 SOURCE_TYPE_SUBTYPE_ALIASES = {
     "cash": ("cash",),
@@ -31,6 +32,7 @@ SOURCE_TYPE_SUBTYPE_ALIASES = {
 
 class SourceResolution(NamedTuple):
     source_asset_id: uuid.UUID | None
+    source_credit_card_id: uuid.UUID | None
     warning: dict | None
     source_type: str | None
     e_wallet_provider: str | None
@@ -49,6 +51,13 @@ def _source_asset_delta(expense: Expense) -> Decimal:
 async def _adjust_source_asset(
     db: AsyncSession, expense: Expense, multiplier: int = 1
 ) -> None:
+    if expense.source_type == "credit_card" and expense.source_credit_card_id:
+        card = await db.get(CreditCard, expense.source_credit_card_id)
+        if card is not None and card.user_id == expense.user_id:
+            card.debt_balance = Decimal(card.debt_balance or 0) + (
+                Decimal(str(expense.amount or 0)) * multiplier
+            )
+        return
     if not expense.source_asset_id:
         return
     stmt = (
@@ -215,12 +224,20 @@ async def resolve_source_asset_for_payload(
             provider = None
         return SourceResolution(
             asset.id,
+            None,
             _source_warning(asset, data),
             source_type,
             provider,
         )
     if not data.source_type:
-        return SourceResolution(None, None, None, None)
+        return SourceResolution(None, None, None, None, None)
+    if data.source_type == "credit_card":
+        if not data.source_credit_card_id:
+            raise ValueError("source_credit_card_id là bắt buộc")
+        card = await db.get(CreditCard, data.source_credit_card_id)
+        if card is None or card.user_id != user_id:
+            raise ValueError("source_credit_card_id không hợp lệ")
+        return SourceResolution(None, card.id, None, data.source_type, None)
     asset = await get_or_create_source_asset(
         db,
         user_id,
@@ -233,6 +250,7 @@ async def resolve_source_asset_for_payload(
     provider = data.e_wallet_provider if data.source_type == "e_wallet" else None
     return SourceResolution(
         asset.id,
+        None,
         _source_warning(asset, data),
         data.source_type,
         provider,
@@ -318,6 +336,7 @@ async def create_expense(
         category=category,
         source=data.source,
         source_asset_id=source_resolution.source_asset_id,
+        source_credit_card_id=source_resolution.source_credit_card_id,
         source_type=source_resolution.source_type,
         e_wallet_provider=source_resolution.e_wallet_provider,
         expense_date=data.expense_date,
@@ -466,6 +485,9 @@ async def update_expense(
                 source_asset_id=update_data.get(
                     "source_asset_id", expense.source_asset_id
                 ),
+                source_credit_card_id=update_data.get(
+                    "source_credit_card_id", expense.source_credit_card_id
+                ),
                 source_type=update_data.get("source_type", expense.source_type),
                 e_wallet_provider=update_data.get(
                     "e_wallet_provider", expense.e_wallet_provider
@@ -479,6 +501,7 @@ async def update_expense(
                 db, user_id, merged
             )
             update_data["source_asset_id"] = source_resolution.source_asset_id
+            update_data["source_credit_card_id"] = source_resolution.source_credit_card_id
             update_data["source_type"] = source_resolution.source_type
             update_data["e_wallet_provider"] = source_resolution.e_wallet_provider
             raw_data = dict(update_data.get("raw_data", expense.raw_data) or {})

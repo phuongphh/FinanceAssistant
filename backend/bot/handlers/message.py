@@ -75,6 +75,29 @@ _AMOUNT_TOKEN_RE = re.compile(
     r"(?P<amt>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?)",
     re.IGNORECASE,
 )
+_CARD_SOURCE_RE = re.compile(r"trả\s+bằng\s+thẻ\s+(.+)$", re.IGNORECASE)
+
+
+async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> tuple[str | None, str | None]:
+    match = _CARD_SOURCE_RE.search(text)
+    if not match:
+        return None, None
+    bank = match.group(1).strip(" .,:;!-")
+    if not bank:
+        return None, None
+    from backend.models.credit_card import CreditCard
+    from sqlalchemy import func, select
+
+    row = await db.execute(
+        select(CreditCard).where(
+            CreditCard.user_id == user_id,
+            func.lower(CreditCard.bank_name) == bank.lower(),
+        )
+    )
+    card = row.scalar_one_or_none()
+    if card is None:
+        return None, None
+    return "credit_card", str(card.id)
 
 
 def _parse_signed_transaction(text: str) -> dict | None:
@@ -225,12 +248,15 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         parsed = None
 
     if parsed and parsed.get("is_expense") and float(parsed.get("amount", 0)) > 0:
+        source_type, source_card_id = await _extract_credit_card_source(db, user.id, text)
         expense_data = ExpenseCreate(
             amount=float(parsed["amount"]),
             merchant=parsed.get("merchant") or text,
             note=text,
             source="manual",
             expense_date=date.today(),
+            source_type=source_type,
+            source_credit_card_id=source_card_id,
         )
         expense = await expense_service.create_expense(db, user.id, expense_data)
         await send_transaction_confirmation(db, expense)
