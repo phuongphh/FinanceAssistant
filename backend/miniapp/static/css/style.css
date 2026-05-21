@@ -207,6 +207,11 @@ body {
     cursor: pointer;
 }
 
+.primary-btn, .secondary-btn, .danger-btn {
+    padding: 13px;
+    font-size: 15px;
+}
+
 .small-primary-btn {
     background: var(--primary);
     color: var(--primary-text);
