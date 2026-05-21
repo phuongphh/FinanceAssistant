@@ -1042,6 +1042,38 @@ async def _action_expenses_ocr_prompt(
     )
 
 
+
+
+async def _action_expenses_credit_cards(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Guide user to use the new credit-card source flow safely and quickly."""
+    title = get_action_copy("action_expenses_credit_cards", "title")
+    body = get_action_copy("action_expenses_credit_cards", "body")
+    text = f"{title}\n\n{body}"
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": get_action_copy(
+                            "action_expenses_credit_cards", "back_button"
+                        ),
+                        "callback_data": "menu:expenses",
+                    }
+                ]
+            ]
+        },
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "expenses", "action": "credit_cards"},
+    )
+
 async def _action_expenses_recurring(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -1798,6 +1830,7 @@ _DIRECT_HANDLERS = {
     ("expenses", "ocr"): _action_expenses_manage,
     ("expenses", "by_category"): _action_expenses_manage,
     ("expenses", "recurring"): _action_expenses_recurring,
+    ("expenses", "credit_cards"): _action_expenses_credit_cards,
     ("cashflow", "income"): _action_cashflow_income,
     ("cashflow", "goals"): _action_cashflow_goals,
     # Phase 3.8 Epic 5 — full CRUD via direct handlers (Phase 3A had
