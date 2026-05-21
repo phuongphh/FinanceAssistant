@@ -15,6 +15,10 @@ from backend.market_data.providers.stock_dispatcher import _is_likely_foreign_sy
         ("VNM", False),
         ("FPT", False),
         ("QQQ.US", True),
+        ("VIC", False),
+        ("VIX", False),
+        ("E1VFVN30", False),
+        ("AAPL", False),
     ],
 )
 def test_foreign_symbol_heuristics(symbol: str, expected: bool):

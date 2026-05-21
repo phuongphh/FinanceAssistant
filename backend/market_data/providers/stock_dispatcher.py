@@ -61,7 +61,11 @@ class SymbolAwareStockDispatcher:
 def _is_likely_foreign_symbol(symbol: str) -> bool:
     if symbol in _KNOWN_FOREIGN_TICKERS:
         return True
-    return len(symbol) > 3 or any(ch.isdigit() for ch in symbol) or "." in symbol or "-" in symbol
+    # VN tickers can be 3-4 letters and VN ETFs may include digits (e.g. E1VFVN30).
+    # Only route obvious non-VN shapes to foreign-first provider.
+    if "." in symbol or "-" in symbol:
+        return True
+    return False
 
 
 def build_stock_dispatcher(redis_client: RedisLike, *, timeout: float = 3.0):
