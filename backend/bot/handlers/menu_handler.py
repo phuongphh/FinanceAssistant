@@ -48,6 +48,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -912,6 +913,59 @@ async def _action_assets_manage(
         "menu_action",
         user_id=user.id,
         properties={"category": "assets", "action": "manage"},
+    )
+
+
+async def _action_assets_life_insurance(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.wealth.services.life_insurance_service import get_life_insurance_list
+
+    contracts = await get_life_insurance_list(db, user.id)
+    if not contracts:
+        await send_message(
+            chat_id=chat_id,
+            text="🛡️ Chưa có hợp đồng bảo hiểm nhân thọ nào.\n\nThêm mới?",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "⚙️ Quản lý hợp đồng BHNT", "callback_data": "menu:assets:manage"}],
+                    [{"text": "🔙 Quay về", "callback_data": "menu:assets"}],
+                ]
+            },
+        )
+        return
+
+    lines = ["🛡️ *Bảo hiểm nhân thọ*"]
+    total = Decimal(0)
+    for item in contracts:
+        extra = item.extra or {}
+        company = extra.get("company_name") or item.name
+        day = extra.get("monthly_payment_date", "-")
+        monthly = Decimal(str(extra.get("monthly_amount", 0)))
+        end_year = extra.get("contract_end_year", "-")
+        paid = Decimal(str(extra.get("total_paid", item.current_value or 0)))
+        total += paid
+        lines.extend(
+            [
+                "",
+                f"🛡️ {company}",
+                f"📅 Đóng ngày: {day} hàng tháng",
+                f"💰 Số tiền/tháng: {format_money_full(monthly)}",
+                f"📆 Tất toán: {end_year}",
+                f"💵 Tổng đã đóng: {format_money_full(paid)}",
+            ]
+        )
+    lines.extend(["", f"*Tổng BHNT: {format_money_full(total)}*"])
+    await send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup={
+            "inline_keyboard": [
+                [{"text": "⚙️ Quản lý hợp đồng BHNT", "callback_data": "menu:assets:manage"}],
+                [{"text": "🔙 Quay về", "callback_data": "menu:assets"}],
+            ]
+        },
     )
 
 
@@ -1819,6 +1873,7 @@ _DIRECT_HANDLERS = {
     ("assets", "add"): _action_assets_manage,
     ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
+    ("assets", "life_insurance"): _action_assets_life_insurance,
     ("expenses", "report"): _action_expenses_report,
     ("expenses", "manage"): _action_expenses_manage,
     ("expenses", "ocr_prompt"): _action_expenses_ocr_prompt,

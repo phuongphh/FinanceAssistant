@@ -75,3 +75,12 @@ asset_types:
       other: "Khác"
     required_fields: [name, initial_value]
     optional_fields: []
+
+  life_insurance:
+    icon: "🛡️"
+    label_vi: "Bảo hiểm nhân thọ"
+    color: "#0EA5E9"
+    subtypes:
+      contract: "Hợp đồng BHNT"
+    required_fields: [company_name, monthly_payment_date, monthly_amount, contract_end_year]
+    optional_fields: [total_paid]
