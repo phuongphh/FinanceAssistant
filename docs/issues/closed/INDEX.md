@@ -48,6 +48,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #83 | Pre-Phase | [P3A-25] User testing protocol — 7 users, 7 days validation | [pre-phase/issue-83.md](by-phase/pre-phase/issue-83.md) |
 | #84 | Pre-Phase | [P3A-26] Bug fixes & Phase 3A exit review | [pre-phase/issue-84.md](by-phase/pre-phase/issue-84.md) |
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
+| #92 | Pre-Phase | [Epic 4 / Phase 3A] Visualization & Testing | [pre-phase/issue-92.md](by-phase/pre-phase/issue-92.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
 | #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
@@ -424,5 +425,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 419 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 402 Pre-Phase)
+**Total:** 420 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 403 Pre-Phase)
