@@ -419,6 +419,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #765 | Pre-Phase | Telegram WebView cache ignores query-string parameters — JS served stale after deploy | [pre-phase/issue-765.md](by-phase/pre-phase/issue-765.md) |
 | #770 | Pre-Phase | Internal dashboard navigation does not reload CSS — WebView uses cached styles | [pre-phase/issue-770.md](by-phase/pre-phase/issue-770.md) |
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
+| #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 415 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 398 Pre-Phase)
+**Total:** 416 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 399 Pre-Phase)
