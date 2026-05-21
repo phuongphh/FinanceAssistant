@@ -418,6 +418,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #762 | Pre-Phase | Expense Dashboard hangs on loading spinner — API call never reaches backend after deploy | [pre-phase/issue-762.md](by-phase/pre-phase/issue-762.md) |
 | #765 | Pre-Phase | Telegram WebView cache ignores query-string parameters — JS served stale after deploy | [pre-phase/issue-765.md](by-phase/pre-phase/issue-765.md) |
 | #770 | Pre-Phase | Internal dashboard navigation does not reload CSS — WebView uses cached styles | [pre-phase/issue-770.md](by-phase/pre-phase/issue-770.md) |
+| #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
 
-**Total:** 414 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 397 Pre-Phase)
+**Total:** 415 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 398 Pre-Phase)

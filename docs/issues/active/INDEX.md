@@ -38,9 +38,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
 | #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
 | #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
-| #774 | [Epic] Credit Card Management — Create, Expense, Menu | [issue-774.md](issue-774.md) |
 | #775 | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [issue-775.md](issue-775.md) |
 | #776 | [Story 2] Expense Transaction with Credit Card Source | [issue-776.md](issue-776.md) |
 | #777 | [Story 3] Credit Card Menu in Chi Tiêu | [issue-777.md](issue-777.md) |
 
-**Total active:** 38
+**Total active:** 37
