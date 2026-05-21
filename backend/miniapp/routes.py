@@ -54,6 +54,7 @@ _STATIC_REF_FILES = (
     "css/twin.css",
     "css/cashflow.css",
     "css/expense.css",
+    "js/dashboard_common.js",
     "js/dashboard.js",
     "js/wealth_dashboard.js",
     "js/twin_dashboard.js",
