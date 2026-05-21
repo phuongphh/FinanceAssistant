@@ -226,6 +226,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
+| #414 | Pre-Phase | [Epic] Phase 4B — Epic 1: Twin Polish | [pre-phase/issue-414.md](by-phase/pre-phase/issue-414.md) |
 | #417 | Pre-Phase | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [pre-phase/issue-417.md](by-phase/pre-phase/issue-417.md) |
 | #421 | Pre-Phase | [Story] P4B-S4: Scenario Comparison UX Enhancement | [pre-phase/issue-421.md](by-phase/pre-phase/issue-421.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
@@ -430,5 +431,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 425 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 408 Pre-Phase)
+**Total:** 426 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 409 Pre-Phase)

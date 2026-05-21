@@ -10,7 +10,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #75 | [P3A-17] Write & test storytelling LLM prompt (accuracy ≥80%) | [issue-75.md](issue-75.md) |
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #414 | [Epic] Phase 4B — Epic 1: Twin Polish | [issue-414.md](issue-414.md) |
 | #415 | [Epic] Phase 4B — Epic 2: Life Event Simulator | [issue-415.md](issue-415.md) |
 | #416 | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [issue-416.md](issue-416.md) |
 | #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
@@ -37,4 +36,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
 
-**Total active:** 32
+**Total active:** 31
