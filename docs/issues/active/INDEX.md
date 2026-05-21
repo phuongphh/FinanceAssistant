@@ -41,5 +41,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #775 | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [issue-775.md](issue-775.md) |
 | #776 | [Story 2] Expense Transaction with Credit Card Source | [issue-776.md](issue-776.md) |
 | #777 | [Story 3] Credit Card Menu in Chi Tiêu | [issue-777.md](issue-777.md) |
+| #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 
-**Total active:** 37
+**Total active:** 38
