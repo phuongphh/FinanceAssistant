@@ -187,6 +187,10 @@ async function run(target) {
     }
 
     // Cashflow dashboard bootstraps via DOMContentLoaded instead of IIFE.
+    // An uncaught throw inside one of those callbacks aborts the rest of
+    // the bootstrap chain — same failure shape as the IIFE TDZ bug this
+    // harness was built to catch — so it must count as a failure, not
+    // just a logged side-channel error.
     if (!initError && documentListeners.DOMContentLoaded) {
         for (const fn of documentListeners.DOMContentLoaded) {
             try {
@@ -201,9 +205,12 @@ async function run(target) {
     // dashboard's own try/catch can swallow downstream render errors.
     await new Promise((resolve) => setTimeout(resolve, 80));
 
+    const ok = !initError && errors.length === 0;
     return {
-        ok: !initError,
-        error: initError ? String(initError.message || initError) : null,
+        ok,
+        error: initError
+            ? String(initError.message || initError)
+            : (errors[0] || null),
         stack: initError && initError.stack ? String(initError.stack).split('\n').slice(0, 4).join(' | ') : null,
         domContentLoadedErrors: errors,
         fetchCalls: fetchCalls.length,

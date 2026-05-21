@@ -37,13 +37,16 @@ STATIC_JS_DIR = ROOT / "backend/miniapp/static/js"
 
 NODE = shutil.which("node")
 
-# Dashboards that bootstrap via an IIFE. Each must issue at least one
+# Every dashboard bundle. The 4 IIFE-shaped ones bootstrap at module
+# load; cashflow boots via `document.addEventListener('DOMContentLoaded')`
+# — the harness fires that listener too. Each must issue at least one
 # fetch during init — the assertion that catches "silent halt" bugs.
-IIFE_DASHBOARDS = [
+DASHBOARDS = [
     "expense_dashboard.js",
     "wealth_dashboard.js",
     "twin_dashboard.js",
     "dashboard.js",
+    "cashflow_dashboard.js",
 ]
 
 
@@ -76,7 +79,7 @@ def _run_harness(target: Path) -> dict:
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js not on PATH; smoke test skipped.")
-@pytest.mark.parametrize("dashboard", IIFE_DASHBOARDS)
+@pytest.mark.parametrize("dashboard", DASHBOARDS)
 def test_dashboard_iife_initialises_without_throwing(dashboard: str) -> None:
     """The bundle must run to completion under the smoke harness.
 
@@ -96,7 +99,7 @@ def test_dashboard_iife_initialises_without_throwing(dashboard: str) -> None:
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js not on PATH; smoke test skipped.")
-@pytest.mark.parametrize("dashboard", IIFE_DASHBOARDS)
+@pytest.mark.parametrize("dashboard", DASHBOARDS)
 def test_dashboard_init_reaches_first_fetch(dashboard: str) -> None:
     """Init must issue at least one network request.
 
@@ -138,3 +141,34 @@ def test_smoke_harness_catches_simulated_tdz_violation(tmp_path: Path) -> None:
         f"expected TDZ error mentioning CONSTANT; got: {result.get('error')}"
     )
     assert result["fetchCalls"] == 0
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js not on PATH; smoke test skipped.")
+def test_smoke_harness_catches_dom_content_loaded_throw(tmp_path: Path) -> None:
+    """Self-test: an uncaught throw inside a DOMContentLoaded handler
+    must also be reported as a failure.
+
+    Without this guard, cashflow-shaped dashboards (which bootstrap via
+    ``document.addEventListener('DOMContentLoaded', ...)`` rather than
+    an IIFE) could throw during init and the harness would still report
+    ``ok=true`` — exactly the false-negative chatgpt-codex-connector
+    flagged in PR #767 review.
+    """
+    bad = tmp_path / "bad_domcontentloaded.js"
+    bad.write_text(
+        "'use strict';\n"
+        "document.addEventListener('DOMContentLoaded', function () {\n"
+        "    throw new Error('boot failure inside DOMContentLoaded');\n"
+        "});\n"
+    )
+    result = _run_harness(bad)
+    assert not result["ok"], (
+        "harness must surface DOMContentLoaded throws as failures; "
+        f"got ok=True with errors={result.get('domContentLoadedErrors')}"
+    )
+    assert result["domContentLoadedErrors"], (
+        f"expected non-empty domContentLoadedErrors; got: {result}"
+    )
+    assert "boot failure" in (result.get("error") or ""), (
+        f"expected error message to surface the throw; got: {result.get('error')}"
+    )
