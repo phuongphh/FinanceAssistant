@@ -236,6 +236,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #421 | Pre-Phase | [Story] P4B-S4: Scenario Comparison UX Enhancement | [pre-phase/issue-421.md](by-phase/pre-phase/issue-421.md) |
 | #422 | Pre-Phase | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [pre-phase/issue-422.md](by-phase/pre-phase/issue-422.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
+| #424 | Pre-Phase | [Story] P4B-S7: Vietnamese Life Event Presets | [pre-phase/issue-424.md](by-phase/pre-phase/issue-424.md) |
 | #425 | Pre-Phase | [Story] P4B-S8: Monte Carlo Integration — Life Events | [pre-phase/issue-425.md](by-phase/pre-phase/issue-425.md) |
 | #426 | Pre-Phase | [Story] P4B-S9: Telegram Interface — Life Events | [pre-phase/issue-426.md](by-phase/pre-phase/issue-426.md) |
 | #427 | Pre-Phase | [Story] P4B-S10: Life Event Impact Visualization | [pre-phase/issue-427.md](by-phase/pre-phase/issue-427.md) |
@@ -448,5 +449,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 443 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 426 Pre-Phase)
+**Total:** 444 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 427 Pre-Phase)
