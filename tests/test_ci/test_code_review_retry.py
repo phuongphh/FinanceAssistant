@@ -64,7 +64,8 @@ def test_retry_until_success_respects_limit(monkeypatch):
     assert client.messages.calls == 3
 
 
-def test_retry_exhaustion_raises(monkeypatch):
+def test_retry_exhaustion_returns_none(monkeypatch):
+    """All retryable failures exhausted → returns None (non-blocking)."""
     class RetryableError(Exception):
         pass
 
@@ -74,9 +75,9 @@ def test_retry_exhaustion_raises(monkeypatch):
 
     client = _FakeClient([RetryableError('a'), RetryableError('b'), RetryableError('c')])
 
-    with pytest.raises(RetryableError):
-        code_review.request_review_with_retry(client=client, diff='x', max_attempts=3)
+    result = code_review.request_review_with_retry(client=client, diff='x', max_attempts=3)
 
+    assert result is None
     assert client.messages.calls == 3
 
 

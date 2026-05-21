@@ -60,19 +60,38 @@ Chỉ trả về JSON, không giải thích."""
 
 _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 
-# Quick-syntax for manual transactions. Description is OPTIONAL so the
-# explicit-sign forms ("+200k" / "-200k") still match — they're the
-# user's most direct signal about direction. We accept the match only
-# when at least one of {sign, unit, description} is present; a bare
-# bareword number like "200" is too ambiguous and is left to the intent
+# Quick-syntax for manual transactions. We deliberately keep the
+# entry point narrow so that ordinary chat ("nhắc tôi mua sữa 50k
+# chiều mai", "200 nghìn là bao nhiêu USD") doesn't get hijacked
+# into the expense pipeline. The body must EITHER carry an explicit
+# +/- sign, OR begin with the amount token (allowing an optional
+# leading currency word/symbol). Anything else is left to the intent
 # pipeline.
+_AMOUNT_TOKEN_PATTERN = (
+    r"\d{1,3}(?:[.,]\d{3})+"
+    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?"
+)
+
 _SIGNED_TX_RE = re.compile(
-    r"^\s*(?P<sign>[+-])?\s*(?P<body>.+?)\s*$",
+    r"^\s*(?P<sign>[+-])\s*(?P<body>.+?)\s*$",
+    re.IGNORECASE,
+)
+
+_AMOUNT_LED_TX_RE = re.compile(
+    rf"^\s*(?P<body>(?:{_AMOUNT_TOKEN_PATTERN})(?:\s+.{{0,500}})?)\s*$",
     re.IGNORECASE,
 )
 
 _AMOUNT_TOKEN_RE = re.compile(
-    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?)",
+    rf"(?P<amt>{_AMOUNT_TOKEN_PATTERN})",
+    re.IGNORECASE,
+)
+
+# Question-shaped inputs ("200k là bao nhiêu USD") must NOT be parsed as
+# expense entries. The list is narrow on purpose — real expense notes
+# don't use these phrases.
+_QUESTION_HINT_RE = re.compile(
+    r"\?|\bbao nhiêu\b|\bbao lâu\b|\bkhi nào\b|\bở đâu\b|\bthế nào\b|\blà gì\b|\bcó phải\b|\bcó không\b",
     re.IGNORECASE,
 )
 _CARD_SOURCE_RE = re.compile(r"trả\s+bằng\s+thẻ\s+(.+)$", re.IGNORECASE)
@@ -101,15 +120,19 @@ async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> t
 
 
 def _parse_signed_transaction(text: str) -> dict | None:
-    match = _SIGNED_TX_RE.match(text)
-    if not match:
+    if _QUESTION_HINT_RE.search(text):
         return None
+    signed = _SIGNED_TX_RE.match(text)
+    if signed:
+        sign = signed.group("sign")
+        body = (signed.group("body") or "").strip()
+    else:
+        amount_led = _AMOUNT_LED_TX_RE.match(text)
+        if not amount_led:
+            return None
+        sign = None
+        body = (amount_led.group("body") or "").strip()
 
-    sign = match.group("sign")
-    body = (match.group("body") or "").strip()
-    # Keep legacy behaviour: unsigned input is accepted when it has a
-    # clear amount pattern with unit and/or description; a bare integer
-    # like "200" remains ambiguous and is deferred to intent routing.
     amount_match = _AMOUNT_TOKEN_RE.search(body)
     if not amount_match:
         return None

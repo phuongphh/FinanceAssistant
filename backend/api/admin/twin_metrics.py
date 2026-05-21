@@ -147,7 +147,11 @@ async def engagement_funnel(
         )).all()
         first_view = len(rows)
         second_view = sum(1 for row in rows if int(row.views or 0) >= 2)
-        habit = sum(1 for row in rows if int(row.views or 0) >= 3)
+        # Habit = ≥3 views/week sustained across the window. Compute as
+        # average views per ISO week ≥ 3 (window width in days / 7).
+        window_days = max((end - start).total_seconds() / 86400.0, 1.0)
+        weeks = max(window_days / 7.0, 1.0)
+        habit = sum(1 for row in rows if (int(row.views or 0) / weeks) >= 3)
         abandon = sum(1 for row in rows if int(row.views or 0) == 1)
         stages = [
             {"key": "first_view", "label": "First view", "users": first_view},
@@ -155,8 +159,15 @@ async def engagement_funnel(
             {"key": "habit", "label": "Habit ≥3/week", "users": habit},
             {"key": "abandonment", "label": "Abandonment", "users": abandon},
         ]
+        # Conversion is sequential from first_view → second_view → habit.
+        # Abandonment is NOT a sequential downstream of habit; it's the
+        # share of first-viewers who never came back, so it's computed
+        # against ``first_view``.
         previous = None
         for stage in stages:
+            if stage["key"] == "abandonment":
+                stage["conversion_pct"] = _pct(stage["users"], first_view)
+                continue
             stage["conversion_pct"] = 100.0 if previous is None else _pct(stage["users"], previous)
             previous = stage["users"]
         return {"generated_at": _now(), "refresh_seconds": CACHE_TTL_SECONDS, "stages": stages}
@@ -287,7 +298,38 @@ async def loop_health(
         completed_users = set((await db.execute(
             select(Event.user_id).join(User, User.id == Event.user_id).outerjoin(wealth_sq, wealth_sq.c.user_id == User.id).where(Event.timestamp >= start, Event.timestamp < end, Event.event_type == "action_suggestion.complete", *user_filter)
         )).scalars().all())
+        # "Returned" = users who came back to the twin (view event) AFTER
+        # completing an action. Implemented as the set of users who have a
+        # TwinViewEvent strictly later than their first
+        # ``action_suggestion.complete`` in the window.
+        complete_first = (await db.execute(
+            select(Event.user_id, func.min(Event.timestamp).label("first_complete"))
+            .join(User, User.id == Event.user_id)
+            .outerjoin(wealth_sq, wealth_sq.c.user_id == User.id)
+            .where(
+                Event.timestamp >= start,
+                Event.timestamp < end,
+                Event.event_type == "action_suggestion.complete",
+                *user_filter,
+            )
+            .group_by(Event.user_id)
+        )).all()
         returned_users: set = set()
+        for user_id, first_complete in complete_first:
+            if first_complete is None:
+                continue
+            later_view = (await db.execute(
+                select(TwinViewEvent.id)
+                .where(
+                    TwinViewEvent.user_id == user_id,
+                    TwinViewEvent.created_at > first_complete,
+                    TwinViewEvent.created_at < end,
+                    TwinViewEvent.event_type.in_(["story_opened", "screen_viewed"]),
+                )
+                .limit(1)
+            )).first()
+            if later_view is not None:
+                returned_users.add(user_id)
         loop_closed = len(triggered_users & viewed_users & completed_users & returned_users)
         loop_rate = _pct(loop_closed, len(triggered_users))
         action_completion = _pct(totals["completed"], totals["suggested"])
