@@ -248,6 +248,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #433 | Pre-Phase | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [pre-phase/issue-433.md](by-phase/pre-phase/issue-433.md) |
 | #434 | Pre-Phase | [Story] P4B-S17: Low-Balance Alert Engine | [pre-phase/issue-434.md](by-phase/pre-phase/issue-434.md) |
 | #435 | Pre-Phase | [Story] P4B-S18: Cashflow Waterfall Chart | [pre-phase/issue-435.md](by-phase/pre-phase/issue-435.md) |
+| #436 | Pre-Phase | [Story] P4B-S19: Morning Briefing Cashflow Summary | [pre-phase/issue-436.md](by-phase/pre-phase/issue-436.md) |
 | #438 | Pre-Phase | [Story] P4B-S21: Zalo Official Account Setup + SDK | [pre-phase/issue-438.md](by-phase/pre-phase/issue-438.md) |
 | #439 | Pre-Phase | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [pre-phase/issue-439.md](by-phase/pre-phase/issue-439.md) |
 | #440 | Pre-Phase | [Story] P4B-S23: User Zalo Linking Flow | [pre-phase/issue-440.md](by-phase/pre-phase/issue-440.md) |
@@ -449,5 +450,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 444 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 427 Pre-Phase)
+**Total:** 445 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 428 Pre-Phase)
