@@ -77,6 +77,27 @@
         ['other', '📌 Khác'],
     ];
 
+    // Localised tables live next to CATEGORIES so init-phase callers
+    // (initModalForm, applyLocalizedKeywords, renderExpenses) can read
+    // them without tripping the TDZ on `const` bindings declared lower
+    // in the IIFE body. Function declarations are hoisted; `const` is not.
+    const DATE_FORMAT_BY_LANGUAGE = {
+        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+    };
+    const UI_KEYWORDS = {
+        vi: {
+            reverse: 'Huỷ',
+            reverseConfirmTitle: 'Huỷ giao dịch này?',
+            reverseFailed: 'Không huỷ được giao dịch, thử lại nhé.',
+        },
+        en: {
+            reverse: 'Reverse',
+            reverseConfirmTitle: 'Reverse this transaction?',
+            reverseFailed: 'Cannot reverse transaction. Please try again.',
+        },
+    };
+
     let pieChart = null;
     let trendChart = null;
     let lastOverview = null;
@@ -91,38 +112,61 @@
     let lastRefreshAt = 0;
     let activeRequestId = 0;
 
-    initModalForm();
-    applyLocalizedKeywords();
-    initCategoryFilter();
-    els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
-    els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
-    if (els.addMoneyInBtn) els.addMoneyInBtn.addEventListener('click', () => openModal(null, 'money_in'));
-    if (els.addFirstExpenseBtn) els.addFirstExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
-    els.expensesList.addEventListener('click', onExpenseRowClick);
-    if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
-    els.modalCancel.addEventListener('click', closeModal);
-    els.modalSave.addEventListener('click', onSave);
-    els.modalDelete.addEventListener('click', onDelete);
-    els.modal.addEventListener('click', (e) => {
-        if (e.target === els.modal) closeModal();
-    });
-    els.categoryFilter.addEventListener('change', () => {
-        currentCategoryFilter = els.categoryFilter.value || '';
-        renderExpensesSection();
-    });
-    document.querySelectorAll('.period-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onPeriodChange(btn));
-    });
-    document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
-        btn.addEventListener('click', () => onSortChange(btn));
-    });
-    updateSortButtons();
+    // Guard the entire bootstrap. A synchronous throw here (eg. a TDZ
+    // violation, a DOM element missing from the template, a Telegram
+    // shim mismatch) would otherwise abort the IIFE silently and leave
+    // the user staring at the initial "Đang tải chi tiêu…" spinner
+    // forever — the failure mode that motivated this guard.
+    try {
+        initModalForm();
+        applyLocalizedKeywords();
+        initCategoryFilter();
+        els.retryBtn.addEventListener('click', () => renderDashboard({ showSpinner: true }));
+        els.addExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
+        if (els.addMoneyInBtn) els.addMoneyInBtn.addEventListener('click', () => openModal(null, 'money_in'));
+        if (els.addFirstExpenseBtn) els.addFirstExpenseBtn.addEventListener('click', () => openModal(null, 'expense'));
+        els.expensesList.addEventListener('click', onExpenseRowClick);
+        if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
+        els.modalCancel.addEventListener('click', closeModal);
+        els.modalSave.addEventListener('click', onSave);
+        els.modalDelete.addEventListener('click', onDelete);
+        els.modal.addEventListener('click', (e) => {
+            if (e.target === els.modal) closeModal();
+        });
+        els.categoryFilter.addEventListener('change', () => {
+            currentCategoryFilter = els.categoryFilter.value || '';
+            renderExpensesSection();
+        });
+        document.querySelectorAll('.period-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onPeriodChange(btn));
+        });
+        document.querySelectorAll('.asset-sort-btn').forEach((btn) => {
+            btn.addEventListener('click', () => onSortChange(btn));
+        });
+        updateSortButtons();
 
-    document.addEventListener('visibilitychange', onResumeRefresh);
-    window.addEventListener('focus', onResumeRefresh);
-    window.addEventListener('pageshow', onPageShowRefresh);
+        document.addEventListener('visibilitychange', onResumeRefresh);
+        window.addEventListener('focus', onResumeRefresh);
+        window.addEventListener('pageshow', onPageShowRefresh);
 
-    renderDashboard({ showSpinner: true });
+        renderDashboard({ showSpinner: true });
+    } catch (err) {
+        handleInitFailure(err);
+    }
+
+    function handleInitFailure(err) {
+        console.error('expense_dashboard init failed', err);
+        if (els.errorMessage) {
+            els.errorMessage.textContent = 'Không mở được trang chi tiêu, tải lại giúp mình nhé.';
+        }
+        showState('error');
+        // The original retry listener may not have attached if init threw
+        // before that line, so bind a fresh hard-reload listener as a
+        // last-resort escape hatch.
+        if (els.retryBtn) {
+            els.retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+        }
+    }
 
     // -- Theme + utils ----------------------------------------------------
 
@@ -190,23 +234,6 @@
         const [year, month] = monthKey.split('-');
         return `Tháng ${parseInt(month, 10)}/${year}`;
     }
-
-    const DATE_FORMAT_BY_LANGUAGE = {
-        vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-        en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
-    };
-    const UI_KEYWORDS = {
-        vi: {
-            reverse: 'Huỷ',
-            reverseConfirmTitle: 'Huỷ giao dịch này?',
-            reverseFailed: 'Không huỷ được giao dịch, thử lại nhé.',
-        },
-        en: {
-            reverse: 'Reverse',
-            reverseConfirmTitle: 'Reverse this transaction?',
-            reverseFailed: 'Cannot reverse transaction. Please try again.',
-        },
-    };
 
     function resolveLanguageCode() {
         return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code || 'vi').toLowerCase();
