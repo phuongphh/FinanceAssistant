@@ -275,6 +275,11 @@ class TestFormatSubmenu:
         assert "💎 Tỷ lệ tiết kiệm" not in labels
         assert "menu:cashflow:saving_rate" not in callbacks
 
+    def test_expenses_submenu_has_credit_card_button(self):
+        _, kb = format_submenu(_user("Phương"), "expenses")
+        callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
+        assert "menu:expenses:credit_cards" in callbacks
+
     def test_unknown_category_raises_value_error(self):
         with pytest.raises(ValueError):
             format_submenu(_user(), "nonexistent")
