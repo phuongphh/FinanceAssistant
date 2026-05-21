@@ -95,11 +95,6 @@
             reverseConfirmTitle: 'Huỷ giao dịch này?',
             reverseFailed: 'Không huỷ được giao dịch, thử lại nhé.',
         },
-        en: {
-            reverse: 'Reverse',
-            reverseConfirmTitle: 'Reverse this transaction?',
-            reverseFailed: 'Cannot reverse transaction. Please try again.',
-        },
     };
 
     let pieChart = null;
