@@ -229,6 +229,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #414 | Pre-Phase | [Epic] Phase 4B — Epic 1: Twin Polish | [pre-phase/issue-414.md](by-phase/pre-phase/issue-414.md) |
 | #417 | Pre-Phase | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [pre-phase/issue-417.md](by-phase/pre-phase/issue-417.md) |
 | #421 | Pre-Phase | [Story] P4B-S4: Scenario Comparison UX Enhancement | [pre-phase/issue-421.md](by-phase/pre-phase/issue-421.md) |
+| #422 | Pre-Phase | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [pre-phase/issue-422.md](by-phase/pre-phase/issue-422.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
 | #438 | Pre-Phase | [Story] P4B-S21: Zalo Official Account Setup + SDK | [pre-phase/issue-438.md](by-phase/pre-phase/issue-438.md) |
 | #439 | Pre-Phase | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [pre-phase/issue-439.md](by-phase/pre-phase/issue-439.md) |
@@ -431,5 +432,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 
-**Total:** 426 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 409 Pre-Phase)
+**Total:** 427 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 410 Pre-Phase)
