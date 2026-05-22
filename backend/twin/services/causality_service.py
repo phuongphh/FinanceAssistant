@@ -259,8 +259,10 @@ async def attribute_delta(db: AsyncSession, user_id: uuid.UUID, period_days: int
         .limit(10)
     )
     projections = result.scalars().all()
-    latest_projection_at = projections[0].computed_at.isoformat() if projections else "none"
-    cache_key = f"causality:{user_id}:{latest_projection_at}:{period_days}"
+    latest_projection = projections[0] if projections else None
+    latest_projection_at = latest_projection.computed_at.isoformat() if latest_projection else "none"
+    latest_projection_id = getattr(latest_projection, "id", "none")
+    cache_key = f"causality:{user_id}:{latest_projection_id}:{latest_projection_at}:{period_days}"
     cached = causality_cache.get(cache_key)
     if cached is not None:
         return cached
