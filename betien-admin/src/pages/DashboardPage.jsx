@@ -546,7 +546,7 @@ function UserDirectory({ refreshNonce }) {
               <tr key={user.user_id} className="cursor-pointer transition hover:bg-gold-50/50" onClick={() => setSelectedUserId(user.user_id)}>
                 <td className="max-w-[220px] px-4 py-3">
                   <p className="truncate font-medium text-ink-900">{user.display_name || '—'}</p>
-                  <p className="truncate font-mono text-[11px] text-ink-500">{shortId(user.user_id)}</p>
+                  <p className="truncate font-mono text-[11px] text-ink-500">tg:{user.telegram_id}</p>
                 </td>
                 <td className="px-4 py-3"><span className="whitespace-nowrap rounded-full bg-gold-50 px-2.5 py-1 text-xs text-gold">{formatTier(user.tier)}</span></td>
                 <td className="hidden px-4 py-3 font-mono text-xs text-ink-500 md:table-cell">{formatDate(user.joined_at)}</td>

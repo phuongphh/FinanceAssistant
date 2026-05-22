@@ -65,6 +65,7 @@ export async function apiFetch(path, options = {}) {
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    cache: 'no-store',
     headers,
   });
 

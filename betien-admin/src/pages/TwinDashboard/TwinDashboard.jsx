@@ -118,6 +118,12 @@ export default function TwinDashboard({ period, days, refreshNonce }) {
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/70"><RefreshCw className="h-3.5 w-3.5" /> Cache 15m · {days}d</span>
           </div>
         </div>
+        {payload?.funnel?.generated_at ? (
+          <p className="mt-3 text-xs text-white/70">
+            Data generated: {formatDateTime(payload.funnel.generated_at)}
+            {payload?.funnel?.latest_event_at ? ` · Latest Twin event: ${formatDateTime(payload.funnel.latest_event_at)}` : ''}
+          </p>
+        ) : null}
       </div>
       {error ? <TwinError message={error} /> : null}
       <div className="grid gap-6 xl:grid-cols-2">
@@ -128,6 +134,13 @@ export default function TwinDashboard({ period, days, refreshNonce }) {
       </div>
     </section>
   );
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('vi-VN', { hour12: false });
 }
 
 function EngagementFunnel({ loading, data, params }) {
@@ -320,7 +333,7 @@ function DeltaDistribution({ loading, data, params }) {
 function UserDrilldown({ users }) {
   return (
     <div className="mt-4 rounded-2xl bg-paper p-3">
-      <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-ink-500"><Users className="h-3.5 w-3.5" /> Anonymized drill-down</p>
+      <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-ink-500"><Users className="h-3.5 w-3.5" /> User drill-down (masked ID)</p>
       {users.length === 0 ? <p className="text-sm text-ink-500">Chưa có user trong stage này.</p> : users.slice(0, 5).map((user) => (
         <div key={user.anon_user_id} className="flex justify-between border-t border-hairline py-2 text-xs">
           <span className="font-mono text-ink-900">{user.anon_user_id}</span>

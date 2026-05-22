@@ -170,7 +170,8 @@ async def engagement_funnel(
                 continue
             stage["conversion_pct"] = 100.0 if previous is None else _pct(stage["users"], previous)
             previous = stage["users"]
-        return {"generated_at": _now(), "refresh_seconds": CACHE_TTL_SECONDS, "stages": stages}
+        latest_event_at = max((_to_utc(row.last_view) for row in rows if row.last_view is not None), default=None)
+        return {"generated_at": _now(), "refresh_seconds": CACHE_TTL_SECONDS, "latest_event_at": latest_event_at, "stages": stages}
 
     return await _cached(cache_key, build)
 
@@ -181,28 +182,33 @@ async def engagement_funnel_users(
     period: str = Query(default="30d", pattern=_RANGE_RE),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    cohort_week: date | None = Query(default=None),
+    segment: str | None = Query(default=None, pattern="^(starter|young_pro|mass_affluent|hnw)?$"),
     limit: int = Query(default=100, ge=1, le=500),
     admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _admin_tenant_id(admin)
     start, end, _ = _parse_window(period, start_date, end_date)
+    wealth_sq = _wealth_subquery()
     view_count = func.count(TwinViewEvent.id)
+    window_days = max((end - start).total_seconds() / 86400.0, 1.0)
+    weeks = max(window_days / 7.0, 1.0)
     having = {
         "first_view": view_count >= 1,
         "second_view": view_count >= 2,
-        "habit": view_count >= 3,
+        "habit": (view_count / weeks) >= 3,
         "abandonment": view_count == 1,
     }[stage]
     rows = (await db.execute(
         select(TwinViewEvent.user_id, view_count.label("views"), func.max(TwinViewEvent.created_at).label("last_view"))
         .join(User, User.id == TwinViewEvent.user_id)
+        .outerjoin(wealth_sq, wealth_sq.c.user_id == User.id)
         .where(
-            User.tenant_id == tenant_id,
-            User.deleted_at.is_(None),
             TwinViewEvent.created_at >= start,
             TwinViewEvent.created_at < end,
             TwinViewEvent.event_type.in_(["story_opened", "screen_viewed", "chart_opened"]),
+            *_user_filters(tenant_id, cohort_week, segment, wealth_sq),
         )
         .group_by(TwinViewEvent.user_id)
         .having(having)
