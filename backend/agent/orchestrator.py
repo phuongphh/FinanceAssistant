@@ -517,7 +517,7 @@ class Orchestrator:
         from backend.agent.limits import estimate_cost_usd
 
         cost = estimate_cost_usd(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             input_tokens=result.input_tokens or 0,
             output_tokens=result.output_tokens or 0,
         )
@@ -636,7 +636,7 @@ class Orchestrator:
                 tools_called = [
                     {"name": r.tool_called, "args": r.tool_args or {}}
                 ]
-            llm_model = "deepseek-chat"
+            llm_model = "deepseek-v4-flash"
             input_tokens = r.input_tokens
             output_tokens = r.output_tokens
             from backend.agent.limits import estimate_cost_usd

@@ -1,10 +1,13 @@
 """LLM-based intent classifier — Layer 2 fallback.
 
 Used when the rule-based classifier returns None or low confidence.
-Targets ~25% of queries (~150 input tokens, ~50 output tokens) at
-DeepSeek pricing — one-cent per ~120 calls. The pipeline only escalates
-here when needed so the budget stays well under $5/month even at
-1k queries/day.
+Targets ~25% of queries (~150 input tokens, ~50 output tokens) on Groq's
+Llama 3.3 70B — sub-second first-token latency at $0.59/$0.79 per 1M
+tokens, so the budget stays well under $5/month even at 1k queries/day.
+
+We deliberately do NOT use DeepSeek V4-Flash here: it's fast in
+throughput but takes 4-12s for first token by design (batch-oriented),
+which blows the 2s pipeline timeout for an interactive flow.
 
 Cache strategy
 --------------
@@ -40,12 +43,18 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-# DeepSeek pricing (USD per 1M tokens) — used to attribute cost to the
-# ``llm_classifier_call`` analytics event. Pricing as of 2026-04. Update
-# here when DeepSeek changes their rate card; the test for max-cost-per-
-# call will catch silent drift.
-_DEEPSEEK_INPUT_USD_PER_1M = 0.27
-_DEEPSEEK_OUTPUT_USD_PER_1M = 1.10
+# Groq pricing (USD per 1M tokens) — used to attribute cost to the
+# ``llm_classifier_call`` analytics event. Pricing as of 2026-05 for
+# llama-3.3-70b-versatile. Update here when Groq changes their rate
+# card; the test for max-cost-per-call will catch silent drift.
+_GROQ_INPUT_USD_PER_1M = 0.59
+_GROQ_OUTPUT_USD_PER_1M = 0.79
+
+# Tier 1 has to respond in <2s wall-clock from the pipeline's perspective.
+# Groq Llama 3.3 70B typically returns in 300-700ms; we cap at 3s to give
+# headroom for TLS / DNS jitter on cold connections without exceeding the
+# pipeline's wait_for budget.
+_TIER1_TIMEOUT_SECONDS = 3.0
 
 
 # Single-source-of-truth prompt. Kept as a module constant (per the
@@ -114,18 +123,25 @@ class LLMCallStats:
 
 
 class LLMClassifier:
-    """DeepSeek-backed intent classifier.
+    """Groq-backed intent classifier (Llama 3.3 70B).
 
     Constructor accepts a ``db_factory`` callable so tests can inject a
     fake session factory. In production we use the global engine via
     ``get_session_factory()``.
+
+    ``cache_ttl_days`` defaults to 7. Tier 1 prompts are simple
+    classification with ``shared_cache=True`` across all users, so the
+    same query hashes hit the same cache slot indefinitely — extending
+    from 1 day to 7 days lifts hit rate noticeably on common phrasings
+    ("tài sản của tôi", "giá vàng", "tổng chi tiêu tháng này") without
+    risking staleness, because the intent enum itself is stable.
     """
 
     def __init__(
         self,
         db_factory=None,
         *,
-        cache_ttl_days: int = 1,
+        cache_ttl_days: int = 7,
     ) -> None:
         self._db_factory = db_factory
         self._cache_ttl_days = cache_ttl_days
@@ -138,10 +154,11 @@ class LLMClassifier:
         prompt = LLM_CLASSIFIER_PROMPT.format(query=text.strip())
         started = time.perf_counter()
 
-        # ``call_llm`` already implements the cache-key + 30-day TTL +
-        # tokens accounting. We use ``shared_cache=True`` because the
-        # prompt only contains the user's raw text, never user-specific
-        # state, so one cached entry serves everyone.
+        # ``call_llm`` already implements the cache-key + tokens
+        # accounting. We use ``shared_cache=True`` because the prompt
+        # only contains the user's raw text, never user-specific state,
+        # so one cached entry serves everyone. ``provider="groq"`` keeps
+        # Tier 1 off DeepSeek's slow-first-token path.
         async with self._open_session() as db:
             try:
                 raw = await call_llm(
@@ -151,6 +168,8 @@ class LLMClassifier:
                     shared_cache=True,
                     use_cache=True,
                     cache_ttl_days=self._cache_ttl_days,
+                    provider="groq",
+                    timeout=_TIER1_TIMEOUT_SECONDS,
                 )
                 if db is not None:
                     await db.commit()
@@ -256,15 +275,15 @@ class LLMClassifier:
         *,
         cache_hit: bool,
     ) -> LLMCallStats:
-        # Rough token approximation — DeepSeek doesn't return exact
+        # Rough token approximation — the provider doesn't return exact
         # tokens for cache hits and we don't always have access to the
         # raw API response object here. ~4 chars/token works well for
         # Vietnamese mixed-script text in practice.
         input_tokens = max(1, len(prompt) // 4)
         output_tokens = max(1, len(response) // 4)
         cost = (
-            input_tokens * _DEEPSEEK_INPUT_USD_PER_1M / 1_000_000
-            + output_tokens * _DEEPSEEK_OUTPUT_USD_PER_1M / 1_000_000
+            input_tokens * _GROQ_INPUT_USD_PER_1M / 1_000_000
+            + output_tokens * _GROQ_OUTPUT_USD_PER_1M / 1_000_000
         )
         if cache_hit:
             cost = 0.0

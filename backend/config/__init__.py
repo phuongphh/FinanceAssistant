@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     # "tính năng voice chưa bật" message.
     openai_api_key: str = ""
 
+    # Groq (Tier 1 NLU classifier). DeepSeek V4-Flash is fast in
+    # throughput but 4-12s to first token by design, which is too slow
+    # for interactive intent classification. Groq's Llama 3.3 70B serves
+    # the same prompt in ~300-700ms at $0.59/$0.79 per 1M tokens. Empty
+    # in dev/CI degrades to rule-based classification only.
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "llama-3.3-70b-versatile"
+
+    # Default per-call timeout for LLM HTTP requests (seconds). Tier 1
+    # callers override to ~3s; everything else (OCR parse, reports,
+    # storytelling, advisory, goal roadmaps) flows through DeepSeek
+    # V4-Flash, which is 4-12s to first token by design and can run
+    # 20-40s for long-context outputs. Default keeps 5x headroom over
+    # worst-case first-token so the slow tail doesn't false-alarm, while
+    # still capping runaway hangs.
+    llm_timeout_seconds: float = 60.0
+
     # Gmail OAuth2
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
