@@ -11,7 +11,10 @@ from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
 from backend.wealth.services import asset_service
-from backend.wealth.valuation.crypto import HoldingValuation, value_crypto_holding
+from backend.wealth.valuation.crypto import (
+    HoldingValuation,
+    value_crypto_holdings,
+)
 
 # Top-N items per asset type to render before the "...và X mục nữa" tail.
 _TOP_N_PER_TYPE = 3
@@ -141,12 +144,11 @@ class QueryAssetsHandler(IntentHandler):
         return "\n".join(lines).rstrip()
 
     async def _value_crypto_assets(self, assets) -> dict[object, HoldingValuation]:
-        valuations: dict[object, HoldingValuation] = {}
-        for asset in assets:
-            if asset.asset_type != "crypto":
-                continue
-            valuations[asset] = await value_crypto_holding(asset)
-        return valuations
+        # Single batched provider call regardless of how many crypto
+        # holdings the user owns. The previous per-asset await loop was
+        # the dominant contributor to the 10s+ tail latency on the
+        # interactive ``query_assets`` reply (issue #797).
+        return await value_crypto_holdings(assets)
 
 
 # Inline tables — kept here rather than re-loading asset_categories.yaml
