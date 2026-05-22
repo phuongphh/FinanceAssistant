@@ -20,6 +20,15 @@ deepseek_client = AsyncOpenAI(
     base_url=settings.deepseek_base_url,
 ) if settings.deepseek_api_key else None
 
+# Groq powers the Tier 1 NLU classifier — Llama 3.3 70B at $0.59/$0.79 per
+# 1M tokens with sub-second first-token latency. DeepSeek V4-Flash is fast
+# in throughput but takes 4-12s for first token by design (batch-oriented),
+# which is too slow for interactive intent classification.
+groq_client = AsyncOpenAI(
+    api_key=settings.groq_api_key,
+    base_url=settings.groq_base_url,
+) if settings.groq_api_key else None
+
 # Tasks that use Claude (only OCR and complex analysis)
 USE_CLAUDE = {"ocr", "complex_analysis"}
 TASK_MAX_TOKENS = {
@@ -113,6 +122,8 @@ async def call_llm(
     use_cache: bool = True,
     shared_cache: bool = False,
     cache_ttl_days: int = 30,
+    timeout: float | None = None,
+    provider: str = "deepseek",
 ) -> str:
     """Call an LLM with optional caching.
 
@@ -122,6 +133,14 @@ async def call_llm(
     ``use_cache=True`` — enforced by a lint test, not runtime, so
     short-lived scripts and background jobs don't have to thread a
     user id through when they genuinely don't have one.
+
+    ``provider`` selects between ``"deepseek"`` (default, V4-Flash) and
+    ``"groq"`` (Llama 3.3 70B). Use Groq for latency-sensitive Tier 1
+    classification — V4-Flash is fast in throughput but takes 4-12s to
+    first token by design, which is too slow for interactive paths.
+
+    ``timeout`` overrides ``settings.llm_timeout_seconds`` per call. Tier 1
+    callers pass ~3s; OCR / batch jobs use the default ~8s.
 
     See docs/archive/scaling-refactor-B.md §B4 for rationale.
     """
@@ -139,9 +158,22 @@ async def call_llm(
             f"Task '{task_type}' requires Claude API — use ocr_service directly"
         )
 
-    # DeepSeek for everything else
-    if not deepseek_client:
-        raise LLMError("DEEPSEEK_API_KEY not configured")
+    if provider == "groq":
+        if not groq_client:
+            raise LLMError("GROQ_API_KEY not configured")
+        client = groq_client
+        model_name = settings.groq_model
+    elif provider == "deepseek":
+        if not deepseek_client:
+            raise LLMError("DEEPSEEK_API_KEY not configured")
+        client = deepseek_client
+        model_name = "deepseek-v4-flash"
+    else:
+        raise LLMError(f"Unknown LLM provider '{provider}'")
+
+    effective_timeout = (
+        timeout if timeout is not None else settings.llm_timeout_seconds
+    )
 
     # Phase 4.1 Story A.3 — wrap every API call in the cost-tracking
     # context manager. Preflight raises BudgetExceededError BEFORE the
@@ -153,29 +185,30 @@ async def call_llm(
     max_tokens = TASK_MAX_TOKENS.get(task_type, 500)
 
     async with tracked_call(
-        db, user_id, provider="deepseek", operation=task_type
+        db, user_id, provider=provider, operation=task_type
     ) as recorder:
         try:
-            response = await deepseek_client.chat.completions.create(
-                model="deepseek-chat",
+            response = await client.chat.completions.create(
+                model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=max_tokens,
+                timeout=effective_timeout,
             )
             result = response.choices[0].message.content.strip()
             tokens_used = response.usage.total_tokens if response.usage else None
             if response.usage:
                 recorder.tokens_in = response.usage.prompt_tokens or 0
                 recorder.tokens_out = response.usage.completion_tokens or 0
-            recorder.model_version = getattr(response, "model", "deepseek-chat")
+            recorder.model_version = getattr(response, "model", model_name)
         except Exception as e:
-            logger.error("DeepSeek API error: %s", e)
-            raise LLMError(f"DeepSeek API call failed: {e}") from e
+            logger.error("%s API error: %s", provider, e)
+            raise LLMError(f"{provider} API call failed: {e}") from e
 
     # Save to cache
     if use_cache and db:
         await _set_cache(
-            db, cache_key, "deepseek-chat", prompt_hash, result, tokens_used, ttl_days=cache_ttl_days
+            db, cache_key, model_name, prompt_hash, result, tokens_used, ttl_days=cache_ttl_days
         )
 
     return result

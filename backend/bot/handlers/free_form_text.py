@@ -26,6 +26,7 @@ patterns load exactly once per worker process.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -46,7 +47,7 @@ from backend.intent.dispatcher import (
 )
 from backend.intent.intents import IntentResult, IntentType
 from backend.models.user import User
-from backend.services.telegram_service import send_message
+from backend.services.telegram_service import send_chat_action, send_message
 
 logger = logging.getLogger(__name__)
 
@@ -353,6 +354,17 @@ async def _route_via_orchestrator(
         intent_dispatcher=_dispatcher,
     )
     streamer = TelegramStreamer(chat_id=chat_id)
+
+    # Fire-and-forget typing indicator so the user sees "đang nhập..."
+    # within ~50ms while Tier 1 (Groq Llama) and any downstream tiers
+    # run. Telegram clears the action after 5s; Tier 3 streamer
+    # re-sends on its own pulse, so we only need the one shot here.
+    async def _fire_typing(cid: int) -> None:
+        try:
+            await send_chat_action(cid, action="typing")
+        except Exception:
+            logger.debug("typing indicator failed", exc_info=True)
+    asyncio.create_task(_fire_typing(chat_id))
 
     route = await orchestrator.route(text, user, db, streamer=streamer)
     latency_ms = int((time.perf_counter() - started) * 1000)
