@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +19,7 @@ class Transaction(Base):
     source_asset_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"))
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_label: Mapped[str] = mapped_column(String(120), nullable=False)
-    amount: Mapped[int] = mapped_column(nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
     direction: Mapped[str] = mapped_column(String(16), nullable=False)
     note: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(100))
