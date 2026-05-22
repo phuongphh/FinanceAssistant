@@ -456,6 +456,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
 | #797 | Pre-Phase | [perf] Tier 1 intent classifier latency 10s+ — Groq llama-3.3-70b not actually used | [pre-phase/issue-797.md](by-phase/pre-phase/issue-797.md) |
 | #799 | Pre-Phase | [bug] Callback txsrc_wallet:* không gửi response — user stuck ở màn hình chọn nguồn | [pre-phase/issue-799.md](by-phase/pre-phase/issue-799.md) |
+| #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
 
-**Total:** 452 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 435 Pre-Phase)
+**Total:** 453 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 436 Pre-Phase)
