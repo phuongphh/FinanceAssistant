@@ -453,6 +453,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 | #791 | Pre-Phase | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [pre-phase/issue-791.md](by-phase/pre-phase/issue-791.md) |
 | #793 | Pre-Phase | Webhook returns 500 on non-JSON body — bot responds slowly | [pre-phase/issue-793.md](by-phase/pre-phase/issue-793.md) |
+| #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
 
-**Total:** 449 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 432 Pre-Phase)
+**Total:** 450 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 433 Pre-Phase)
