@@ -2558,7 +2558,10 @@ async def _post_mark_existing(
     """
     await wizard_service.clear(db, user.id)
 
-    breakdown = await net_worth_calculator.calculate(db, user.id)
+    # Stored-values sum keeps the wizard reply sub-second even for users
+    # with many live-quoted holdings. See ``_post_save`` for the same
+    # decision applied to asset creation.
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user.id, breakdown.total)
     # Mark first-asset onboarding step done if this somehow IS their
     # first interaction (rare — would mean they'd added a property
@@ -2576,7 +2579,16 @@ async def _post_save(db: AsyncSession, chat_id: int, user: User, asset) -> None:
     track analytics, and prompt for the next action."""
     await wizard_service.clear(db, user.id)
 
-    breakdown = await net_worth_calculator.calculate(db, user.id)
+    # Use the stored-values sum (no live stock/crypto re-quote) so the
+    # confirmation reply lands sub-second even when the user already has
+    # multi-coin / multi-stock holdings. The live-pricing variant of
+    # ``calculate`` issued one sequential HTTP call per stock/crypto
+    # asset on every wizard save — with cold provider caches that took
+    # 5-15s on the user-facing path. The edit-current-value flow at
+    # ``_handle_edit_current_value_input`` already follows this pattern
+    # for the same reason; the create / mark-existing / undo paths are
+    # being aligned with it.
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     new_level = await update_user_level(db, user.id, breakdown.total)
 
     asset_value = Decimal(str(asset.current_value or 0))
@@ -2640,7 +2652,9 @@ async def _handle_undo(
         await send_message(chat_id=chat_id, text="Không tìm thấy tài sản để huỷ.")
         return
 
-    breakdown = await net_worth_calculator.calculate(db, user.id)
+    # Stored-values sum: aligned with ``_post_save`` so the undo reply
+    # is also sub-second, not blocked on a live stock/crypto re-quote.
+    breakdown = await net_worth_calculator.calculate_stored_current(db, user.id)
     await update_user_level(db, user.id, breakdown.total)
 
     analytics.track(
