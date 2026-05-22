@@ -239,6 +239,13 @@ async def categorize_expense(
     description + amount, never user-identifying context, so caching
     "Highland coffee 45000" once serves every user. This keeps the
     cache hit rate high (it's our biggest LLM cost driver).
+
+    Provider routing: Groq (Llama 3.3 70B). This is a classifier-style
+    call — single-word output, classifier-style prompt — and was the
+    blocker on quick-transaction confirmations. DeepSeek V4-Flash's
+    4-12s first-token latency hit users every time they typed
+    ``"ăn trưa 50k"`` for an unfamiliar merchant (cold cache); Groq
+    returns the same answer in 300-700ms.
     """
     prompt = CATEGORIZE_PROMPT.format(
         merchant=merchant or "N/A",
@@ -247,7 +254,12 @@ async def categorize_expense(
     )
     try:
         result = await call_llm(
-            prompt, task_type="categorize", db=db, shared_cache=True
+            prompt,
+            task_type="categorize",
+            db=db,
+            shared_cache=True,
+            provider="groq",
+            timeout=3.0,
         )
         category = result.strip().lower().replace(" ", "_")
         valid = {

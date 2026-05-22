@@ -86,7 +86,7 @@ async def test_cash_amount_input_parses_label_and_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -395,7 +395,7 @@ async def test_crypto_current_price_same_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -557,7 +557,7 @@ async def test_gold_current_price_same_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("180000000"),
@@ -833,7 +833,7 @@ async def test_foreign_stock_save_persists_usd_and_fx_rate():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -903,7 +903,7 @@ async def test_foreign_stock_same_as_purchase_reuses_usd_avg_as_current():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -1053,7 +1053,7 @@ async def test_real_estate_rental_ask_no_creates_asset_no_rental():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1124,7 +1124,7 @@ async def test_real_estate_rental_full_flow_marks_with_metadata():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1190,7 +1190,7 @@ async def test_real_estate_rental_status_vacant_skips_extras():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("3_000_000_000"),
@@ -1397,7 +1397,7 @@ async def test_mark_existing_rental_does_not_expose_undo_button():
         ),
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1612,7 +1612,7 @@ async def test_callback_undo_hard_deletes_asset_and_recomputes_net_worth():
         ) as delete_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("0"),

@@ -154,8 +154,8 @@ async def test_query_assets_handler_crypto_uses_market_prices():
         ),
     }
 
-    async def fake_value_crypto_holding(asset):
-        return valuations[asset.extra["symbol"]]
+    async def fake_value_crypto_holdings(passed_assets):
+        return {a: valuations[a.extra["symbol"]] for a in passed_assets}
 
     with (
         patch(
@@ -163,8 +163,8 @@ async def test_query_assets_handler_crypto_uses_market_prices():
             AsyncMock(return_value=assets),
         ),
         patch(
-            "backend.intent.handlers.query_assets.value_crypto_holding",
-            AsyncMock(side_effect=fake_value_crypto_holding),
+            "backend.intent.handlers.query_assets.value_crypto_holdings",
+            AsyncMock(side_effect=fake_value_crypto_holdings),
         ) as value_mock,
     ):
         intent = IntentResult(
@@ -175,7 +175,10 @@ async def test_query_assets_handler_crypto_uses_market_prices():
         )
         response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
 
-    assert value_mock.await_count == 3
+    # The batched path must be a SINGLE provider-facing call regardless
+    # of how many crypto holdings the user owns — that's the whole
+    # point of the fix for issue #797.
+    assert value_mock.await_count == 1
     assert "Tiền số của An" in response
     assert "Tổng: *1,230,000,000đ*" in response
     assert "BTC: 0.5 × 2,000,000,000đ = 1,000,000,000đ" in response

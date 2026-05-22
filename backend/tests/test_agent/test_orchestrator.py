@@ -144,6 +144,7 @@ class TestCascade:
                 intent=IntentType.QUERY_ASSETS,
                 confidence=0.95,
                 raw_text="tài sản của tôi",
+                classifier_used="rule",
             )
         )
         orch.intent_dispatcher.dispatch = AsyncMock(  # type: ignore[assignment]
@@ -158,6 +159,13 @@ class TestCascade:
         )
         assert result.tier == TIER_1
         assert result.text == "tài sản: VNM, HPG"
+        # The classifier provenance + isolated latency must be surfaced
+        # via the RouteResult so the bot handler can emit them as
+        # separate analytics fields (issue #797 — keeps a slow
+        # dispatcher from masquerading as a slow Groq classifier).
+        assert result.classifier_used == "rule"
+        assert result.classifier_latency_ms is not None
+        assert result.classifier_latency_ms >= 0
 
     async def test_ambiguous_escalates_when_tier1_uncertain(self):
         orch = _orch_with_streamable()
