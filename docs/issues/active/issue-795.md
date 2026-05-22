@@ -17,10 +17,3 @@ intent_classify: {"latency_ms": 9894, "classifier": "agent_tier1"}
 1. Deepseek model `deepseek-chat` có latency cao từ phía API
 2. Không có timeout/caching cho intent classification
 3. User có thể tưởng bot bị treo và gửi lại message → gây thêm request
-
-**Gợi ý fix:**
-- Giảm model size / dùng model nhanh hơn cho tier-1 classification
-- Thêm timeout + fallback nếu API chậm
-- Cache intent cho các command phổ biến (tạo tài sản, xem tài sản...)
-- Gửi "typing..." indicator ngay khi nhận request để user biết bot đang xử lý
-
