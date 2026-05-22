@@ -455,6 +455,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #793 | Pre-Phase | Webhook returns 500 on non-JSON body — bot responds slowly | [pre-phase/issue-793.md](by-phase/pre-phase/issue-793.md) |
 | #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
 | #797 | Pre-Phase | [perf] Tier 1 intent classifier latency 10s+ — Groq llama-3.3-70b not actually used | [pre-phase/issue-797.md](by-phase/pre-phase/issue-797.md) |
+| #799 | Pre-Phase | [bug] Callback txsrc_wallet:* không gửi response — user stuck ở màn hình chọn nguồn | [pre-phase/issue-799.md](by-phase/pre-phase/issue-799.md) |
 
-**Total:** 451 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 434 Pre-Phase)
+**Total:** 452 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 435 Pre-Phase)
