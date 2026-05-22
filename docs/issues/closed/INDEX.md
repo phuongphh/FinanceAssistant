@@ -454,6 +454,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #791 | Pre-Phase | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [pre-phase/issue-791.md](by-phase/pre-phase/issue-791.md) |
 | #793 | Pre-Phase | Webhook returns 500 on non-JSON body — bot responds slowly | [pre-phase/issue-793.md](by-phase/pre-phase/issue-793.md) |
 | #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
+| #797 | Pre-Phase | [perf] Tier 1 intent classifier latency 10s+ — Groq llama-3.3-70b not actually used | [pre-phase/issue-797.md](by-phase/pre-phase/issue-797.md) |
 
-**Total:** 450 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 433 Pre-Phase)
+**Total:** 451 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 434 Pre-Phase)
