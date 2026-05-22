@@ -70,8 +70,9 @@ def estimate_cost_usd(
     ``model`` is matched as a prefix so ``deepseek-v4-flash`` /
     ``deepseek-reasoner`` all map to the same pricing. Groq's Llama
     family is matched by the ``llama`` substring; Anthropic's versioned
-    model IDs (``claude-sonnet-4-5-20250929``) match the ``claude``
-    substring.
+    model IDs (``claude-sonnet-4-6``, ``claude-sonnet-4-5-20250929``)
+    match the ``claude`` substring, and Sonnet 4.5 and 4.6 share the
+    same $3/$15 per-1M list price so the same constants apply.
     """
     m = (model or "").lower()
     if m.startswith("deepseek"):

@@ -96,6 +96,22 @@ def test_estimate_cost_usd_deepseek_prefix_unchanged():
 
 
 def test_estimate_cost_usd_claude_substring_unchanged():
+    # Sonnet 4.6 (current Tier 3) and 4.5 (legacy) share the same
+    # $3/$15-per-1M list price, so the substring matcher must route
+    # both IDs to the same constants.
+    cost = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    )
+    expected = CLAUDE_SONNET_PRICE_INPUT_PER_M + CLAUDE_SONNET_PRICE_OUTPUT_PER_M
+    assert cost == pytest.approx(expected)
+
+
+def test_estimate_cost_usd_sonnet_4_5_legacy_id_still_priced():
+    # Older audit rows reference the dated 4.5 ID; matcher must still
+    # route them to Sonnet pricing so historical spend totals don't
+    # silently drop to the $0 unknown-model branch.
     cost = estimate_cost_usd(
         model="claude-sonnet-4-5-20250929",
         input_tokens=1_000_000,
