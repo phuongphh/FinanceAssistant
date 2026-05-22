@@ -65,8 +65,13 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.3-70b-versatile"
 
     # Default per-call timeout for LLM HTTP requests (seconds). Tier 1
-    # callers override to ~3s; OCR / batch jobs use the default.
-    llm_timeout_seconds: float = 8.0
+    # callers override to ~3s; everything else (OCR parse, reports,
+    # storytelling, advisory, goal roadmaps) flows through DeepSeek
+    # V4-Flash, which is 4-12s to first token by design and can run
+    # 20-40s for long-context outputs. Default keeps 5x headroom over
+    # worst-case first-token so the slow tail doesn't false-alarm, while
+    # still capping runaway hangs.
+    llm_timeout_seconds: float = 60.0
 
     # Gmail OAuth2
     gmail_client_id: str = ""

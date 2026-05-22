@@ -139,8 +139,10 @@ async def call_llm(
     classification — V4-Flash is fast in throughput but takes 4-12s to
     first token by design, which is too slow for interactive paths.
 
-    ``timeout`` overrides ``settings.llm_timeout_seconds`` per call. Tier 1
-    callers pass ~3s; OCR / batch jobs use the default ~8s.
+    ``timeout`` overrides ``settings.llm_timeout_seconds`` per call.
+    Tier 1 callers pass ~3s (Groq is sub-second). Everything else uses
+    the ~60s default so the 4-12s first-token tail on DeepSeek V4-Flash
+    doesn't false-alarm.
 
     See docs/archive/scaling-refactor-B.md §B4 for rationale.
     """
