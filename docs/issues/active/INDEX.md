@@ -14,5 +14,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #785 | [Story 2] Add Bảo hiểm nhân thọ Button in Asset Menu | [issue-785.md](issue-785.md) |
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
+| #801 | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [issue-801.md](issue-801.md) |
 
-**Total active:** 10
+**Total active:** 11
