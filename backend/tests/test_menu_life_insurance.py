@@ -42,7 +42,7 @@ async def test_life_insurance_list_renders(monkeypatch):
     async def fake_send_message(**kwargs):
         sent.update(kwargs)
 
-    item = SimpleNamespace(name="AIA", extra={"company_name":"AIA", "monthly_payment_date":10, "monthly_amount":1000000, "contract_end_year":2035, "total_paid":5000000}, current_value=Decimal("5000000"))
+    item = SimpleNamespace(name="AIA", extra={"company_name":"AIA", "annual_settlement_day":26, "annual_settlement_month":6, "annual_premium":200000000, "contract_end_year":2035, "total_paid":5000000}, current_value=Decimal("5000000"))
     monkeypatch.setattr(menu_handler, "send_message", fake_send_message)
     monkeypatch.setattr(
         "backend.wealth.services.life_insurance_service.get_life_insurance_list", 
@@ -51,3 +51,5 @@ async def test_life_insurance_list_renders(monkeypatch):
     await menu_handler._action_assets_life_insurance(db=None, user=SimpleNamespace(id=1), chat_id=1, message_id=None)
     assert "Tổng BHNT" in sent["text"]
     assert "AIA" in sent["text"]
+    assert "Đóng ngày: 26/06 hàng năm" in sent["text"]
+    assert "Số tiền/năm: 200,000,000đ" in sent["text"]
