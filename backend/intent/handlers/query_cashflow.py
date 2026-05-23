@@ -34,6 +34,7 @@ from backend.wealth.income_types import (
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.expense import Expense
+from backend.models.recurring_pattern import PATTERN_TYPE_EXPENSE, RecurringPattern
 from backend.models.user import User
 from backend.wealth.models.income_stream import IncomeStream
 
@@ -57,7 +58,9 @@ def _strip_legacy_prefix(name: str) -> str:
 @dataclass(frozen=True)
 class CashflowPeriod:
     income: Decimal
-    spend: Decimal
+    spend_current: Decimal
+    spend_recurring: Decimal
+    spend_total: Decimal
     net: Decimal
     expenses: list[Expense]
 
@@ -97,7 +100,7 @@ class QueryCashflowHandler(IntentHandler):
     ) -> str:
         name = user.display_name or "bạn"
         label_vi = _cashflow_period_label(time_range)
-        if current.income <= 0 and current.spend <= 0:
+        if current.income <= 0 and current.spend_total <= 0:
             return (
                 f"{name} chưa có dữ liệu thu / chi {label_vi} 🌱\n"
                 "Mình cần ít nhất một nguồn thu và vài giao dịch để tính dòng tiền."
@@ -139,11 +142,13 @@ class QueryCashflowHandler(IntentHandler):
         return "\n".join(lines)
 
     def _expense_card(self, current: CashflowPeriod, previous: CashflowPeriod) -> str:
-        spend_delta = _delta_text(current.spend, previous.spend)
+        spend_delta = _delta_text(current.spend_total, previous.spend_total)
         lines = [
             "💸 *Chi tiêu tháng*",
-            f"Tổng: *{format_money_full(current.spend)}* "
+            f"Tổng: *{format_money_full(current.spend_total)}* "
             f"({spend_delta} vs tháng trước)",
+            f"• Chi tiêu hiện tại: {format_money_full(current.spend_current)}",
+            f"• Chi phí định kì: {format_money_full(current.spend_recurring)}",
         ]
         return "\n".join(lines)
 
@@ -160,7 +165,9 @@ class QueryCashflowHandler(IntentHandler):
         lines = [
             title,
             f"Thu: *{format_money_full(period.income)}*",
-            f"Chi: *{format_money_full(period.spend)}*",
+            f"Chi: *{format_money_full(period.spend_total)}*",
+            f"• Chi tiêu hiện tại: {format_money_full(period.spend_current)}",
+            f"• Chi phí định kì: {format_money_full(period.spend_recurring)}",
             f"Dư / thiếu: *{sign}{format_money_full(abs(period.net))}*",
             "",
             "💼 *Top nguồn thu*",
@@ -225,9 +232,33 @@ async def _build_period(
     expenses = await _fetch_expenses(
         db, user, start=time_range.start, end=time_range.end
     )
-    spend = sum(Decimal(tx.amount or 0) for tx in expenses)
-    net = income - spend
-    return CashflowPeriod(income=income, spend=spend, net=net, expenses=expenses)
+    spend_current = sum(Decimal(tx.amount or 0) for tx in expenses)
+    spend_recurring = await _recurring_expense_for_period(db, user, time_range)
+    spend_total = spend_current + spend_recurring
+    net = income - spend_total
+    return CashflowPeriod(
+        income=income,
+        spend_current=spend_current,
+        spend_recurring=spend_recurring,
+        spend_total=spend_total,
+        net=net,
+        expenses=expenses,
+    )
+
+
+async def _recurring_expense_for_period(
+    db: AsyncSession, user: User, time_range: TimeRange
+) -> Decimal:
+    if time_range.label not in {"this_month", "last_month", "previous_period"}:
+        return Decimal("0")
+    stmt = select(RecurringPattern.expected_amount).where(
+        RecurringPattern.user_id == user.id,
+        RecurringPattern.is_active.is_(True),
+        RecurringPattern.pattern_type == PATTERN_TYPE_EXPENSE,
+        RecurringPattern.user_confirmed.is_(True),
+    )
+    rows = (await db.execute(stmt)).all()
+    return sum((Decimal(amount or 0) for (amount,) in rows), Decimal("0"))
 
 
 def _income_for_period_from_streams(
