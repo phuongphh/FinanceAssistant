@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -353,19 +354,19 @@ async def test_callback_type_picker_routes_to_life_insurance_starter():
 
 
 @pytest.mark.asyncio
-async def test_start_life_insurance_create_clears_wizard_and_calls_action():
-    user = _user({"flow": asset_entry.FLOW_PICKER, "step": "type", "draft": {}})
+async def test_start_life_insurance_create_starts_inline_wizard():
+    user = _user()
     db = _db(user)
     with (
-        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
-        patch(
-            "backend.bot.handlers.menu_handler._action_assets_life_insurance",
-            AsyncMock(),
-        ) as life_action,
+        patch.object(asset_entry.wizard_service, "start_flow", AsyncMock()) as start_flow,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send_message,
     ):
         await asset_entry._start_life_insurance_create(db, 100, user)
-    clear.assert_awaited_once_with(db, user.id)
-    life_action.assert_awaited_once()
+    start_flow.assert_awaited_once()
+    args = start_flow.await_args.args
+    assert args[2] == asset_entry.FLOW_LIFE_INSURANCE
+    assert start_flow.await_args.kwargs["step"] == "company_name"
+    send_message.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -2152,7 +2153,7 @@ async def test_asset_manage_delete_empty_type_shows_empty_state():
         )
 
     assert consumed is True
-    assert "Không có tài sản loại Tiền số" in send.await_args.kwargs["text"]
+    assert "Không có tài sản Tiền số" in send.await_args.kwargs["text"]
 
 
 # -----------------------------------------------------------------
@@ -2289,3 +2290,27 @@ async def test_show_asset_delete_matches_list_builds_manage_callbacks():
     assert rows[1][0]["callback_data"] == f"asset_manage:delete_confirm:{second.id}"
     assert rows[-2][0]["callback_data"] == "asset_manage:delete_type"
     assert rows[-1][0]["callback_data"] == "asset_manage:cancel"
+
+
+@pytest.mark.asyncio
+async def test_life_insurance_flow_text_steps_and_create():
+    user = _user({"flow": asset_entry.FLOW_LIFE_INSURANCE, "step": "company_name", "draft": {"asset_type": "life_insurance", "extra": {}}})
+    db = _db(user)
+
+    with (
+        patch.object(asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
+        await asset_entry.handle_asset_text_input(db, {"text": "AIA", "chat": {"id": 100}, "from": {"id": 100}})
+    assert update_step.await_args.kwargs["step"] == "contract_end"
+
+    user.wizard_state = {"flow": asset_entry.FLOW_LIFE_INSURANCE, "step": "annual_settlement_date", "draft": {"name": "AIA", "extra": {"company_name": "AIA", "total_paid": 1000000}}}
+    with (
+        patch.object(asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)),
+        patch.object(asset_entry.asset_service, "create_asset", AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), asset_type="life_insurance", subtype="contract", name="AIA", current_value=1000000, extra={}))) as create_asset,
+        patch.object(asset_entry, "_post_save", AsyncMock()) as post_save,
+    ):
+        await asset_entry.handle_asset_text_input(db, {"text": "15/09", "chat": {"id": 100}, "from": {"id": 100}})
+    create_asset.assert_awaited_once()
+    post_save.assert_awaited_once()

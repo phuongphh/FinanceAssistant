@@ -167,6 +167,7 @@ FLOW_MARK_RENTAL = "asset_add_mark_rental"
 # Phase 3.9.5 — launched from dashboard:edit:<asset_id>.
 # Keep the asset_add prefix so existing wizard cancellation/auto-exit logic applies.
 FLOW_EDIT_ASSET = "asset_add_edit_asset"
+FLOW_LIFE_INSURANCE = "asset_add_life_insurance"
 
 
 # ---------- Entry point ----------------------------------------------
@@ -218,15 +219,21 @@ async def cancel_wizard(db: AsyncSession, chat_id: int, user: User) -> bool:
 async def _start_life_insurance_create(
     db: AsyncSession, chat_id: int, user: User
 ) -> None:
-    """Route BHNT button to the Life Assurance create/list action."""
-    await wizard_service.clear(db, user.id)
-    from backend.bot.handlers.menu_handler import _action_assets_life_insurance
-
-    await _action_assets_life_insurance(
-        db=db,
-        user=user,
+    """Start inline life-insurance create wizard (no menu redirect)."""
+    await wizard_service.start_flow(
+        db,
+        user.id,
+        FLOW_LIFE_INSURANCE,
+        step="company_name",
+        draft={"asset_type": AssetType.LIFE_INSURANCE.value, "extra": {}},
+    )
+    await send_message(
         chat_id=chat_id,
-        message_id=None,
+        text=(
+            "🛡️ <b>Tên công ty bảo hiểm?</b>\n"
+            "Ví dụ: <code>Bảo Việt Life</code>, <code>Prudential</code>, <code>AIA</code>"
+        ),
+        parse_mode="HTML",
     )
 
 
@@ -2545,6 +2552,96 @@ async def _handle_rental_pick(
     )
 
 
+
+def _parse_month_year(text: str) -> tuple[int, int] | None:
+    m = re.fullmatch(r"\s*(0?[1-9]|1[0-2])\s*/\s*(\d{4})\s*", text)
+    if not m:
+        return None
+    month = int(m.group(1))
+    year = int(m.group(2))
+    if year < date.today().year:
+        return None
+    return month, year
+
+
+def _parse_day_month(text: str) -> tuple[int, int] | None:
+    m = re.fullmatch(r"\s*(0?[1-9]|[12]\d|3[01])\s*/\s*(0?[1-9]|1[0-2])\s*", text)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2))
+
+
+async def _handle_life_company_input(db: AsyncSession, chat_id: int, user: User, text: str, draft: dict) -> None:
+    company = text.strip()
+    if not company:
+        await send_message(chat_id=chat_id, text="Bạn nhập tên công ty giúp mình nhé.")
+        return
+    await wizard_service.update_step(db, user.id, step="contract_end", draft_patch={"name": company, "extra": {"company_name": company}})
+    await send_message(chat_id=chat_id, text="📅 <b>Thời điểm kết thúc Hợp đồng?</b> (mm/yyyy)", parse_mode="HTML")
+
+
+async def _handle_life_contract_end_input(db: AsyncSession, chat_id: int, user: User, text: str, draft: dict) -> None:
+    parsed = _parse_month_year(text)
+    if parsed is None:
+        await send_message(chat_id=chat_id, text="Format đúng là <code>mm/yyyy</code>, ví dụ <code>08/2035</code>.", parse_mode="HTML")
+        return
+    month, year = parsed
+    extra = dict(draft.get("extra") or {})
+    extra["contract_end_month"] = month
+    extra["contract_end_year"] = year
+    await wizard_service.update_step(db, user.id, step="total_paid", draft_patch={"extra": extra})
+    await send_message(chat_id=chat_id, text="💰 <b>Số tiền đã đóng?</b> (Ví dụ: 123tr, 100 triệu...)", parse_mode="HTML")
+
+
+async def _handle_life_total_paid_input(db: AsyncSession, chat_id: int, user: User, text: str, draft: dict) -> None:
+    amount = parse_amount(text)
+    if amount is None or amount <= 0:
+        await send_message(chat_id=chat_id, text="Bạn nhập số tiền hợp lệ nhé. Ví dụ: <code>100tr</code>", parse_mode="HTML")
+        return
+    extra = dict(draft.get("extra") or {})
+    extra["total_paid"] = float(amount)
+    await wizard_service.update_step(db, user.id, step="annual_amount", draft_patch={"extra": extra})
+    await send_message(chat_id=chat_id, text="💳 <b>Số tiền phải đóng mỗi năm?</b> (Ví dụ: 23tr, 45 triệu...)", parse_mode="HTML")
+
+
+async def _handle_life_annual_amount_input(db: AsyncSession, chat_id: int, user: User, text: str, draft: dict) -> None:
+    amount = parse_amount(text)
+    if amount is None or amount <= 0:
+        await send_message(chat_id=chat_id, text="Bạn nhập số tiền hợp lệ nhé. Ví dụ: <code>23tr</code>", parse_mode="HTML")
+        return
+    extra = dict(draft.get("extra") or {})
+    extra["annual_premium"] = float(amount)
+    await wizard_service.update_step(db, user.id, step="annual_settlement_date", draft_patch={"extra": extra})
+    await send_message(chat_id=chat_id, text="📆 <b>Ngày tất toán theo năm?</b> (dd/mm)", parse_mode="HTML")
+
+
+async def _handle_life_annual_settlement_date_input(db: AsyncSession, chat_id: int, user: User, text: str, draft: dict) -> None:
+    parsed = _parse_day_month(text)
+    if parsed is None:
+        await send_message(chat_id=chat_id, text="Format đúng là <code>dd/mm</code>, ví dụ <code>15/09</code>.", parse_mode="HTML")
+        return
+    day, month = parsed
+    extra = dict(draft.get("extra") or {})
+    extra["annual_settlement_day"] = day
+    extra["annual_settlement_month"] = month
+    total_paid = Decimal(str(extra.get("total_paid") or 0))
+    if total_paid <= 0:
+        await send_message(chat_id=chat_id, text="Có lỗi dữ liệu. Bạn thử thêm lại giúp mình nhé.")
+        return
+    asset = await asset_service.create_asset(
+        db,
+        user.id,
+        asset_type=AssetType.LIFE_INSURANCE.value,
+        subtype="contract",
+        name=draft.get("name") or extra.get("company_name") or "Bảo hiểm nhân thọ",
+        initial_value=total_paid,
+        current_value=total_paid,
+        extra=extra,
+    )
+    await _post_save(db, chat_id, user, asset)
+
+
+
 # ---------- Save / cleanup --------------------------------------------
 
 
@@ -2716,6 +2813,11 @@ _TEXT_DISPATCH = {
     (FLOW_MARK_RENTAL, "rental_tenant_input"): _handle_rental_tenant_input,
     (FLOW_MARK_RENTAL, "rental_lease_input"): _handle_rental_lease_input,
     (FLOW_EDIT_ASSET, "current_value"): _handle_edit_current_value_input,
+    (FLOW_LIFE_INSURANCE, "company_name"): _handle_life_company_input,
+    (FLOW_LIFE_INSURANCE, "contract_end"): _handle_life_contract_end_input,
+    (FLOW_LIFE_INSURANCE, "total_paid"): _handle_life_total_paid_input,
+    (FLOW_LIFE_INSURANCE, "annual_amount"): _handle_life_annual_amount_input,
+    (FLOW_LIFE_INSURANCE, "annual_settlement_date"): _handle_life_annual_settlement_date_input,
 }
 
 
