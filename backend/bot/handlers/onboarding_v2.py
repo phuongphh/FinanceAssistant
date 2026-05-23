@@ -273,6 +273,51 @@ async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> Non
     analytics.track("onboarding_v2_goal_asked", user_id=user.id)
 
 
+async def _send_name_prompt(chat_id: int) -> None:
+    await send_message(
+        chat_id,
+        "Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨\n\n"
+        "(Bạn chỉ cần nhắn tên bạn vào đây)",
+        parse_mode="HTML",
+    )
+
+
+async def handle_name_text_input(
+    db: AsyncSession, chat_id: int, user: User, raw_text: str
+) -> bool:
+    """Consume free-text name input at the start of V2 onboarding."""
+    session = await onboarding_service.get_session(db, user.id)
+    if (
+        session is None
+        or session.current_step != STEP_GOAL_QUESTION
+        or session.goal_choice is not None
+        or (user.display_name and user.display_name.strip())
+    ):
+        return False
+
+    is_valid, name = legacy_onboarding_service.validate_display_name(raw_text)
+    if not is_valid:
+        await send_message(
+            chat_id,
+            "Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.",
+            parse_mode="HTML",
+        )
+        return True
+
+    await legacy_onboarding_service.set_display_name(db, user.id, name)
+    user.display_name = name
+    await db.flush()
+
+    await send_message(
+        chat_id,
+        f"Chào {name} 👋 Mình hỏi nhanh 1 câu để cá nhân hoá nhé:",
+        parse_mode="HTML",
+    )
+    await _send_goal_question(db, chat_id, user)
+    analytics.track("onboarding_v2_name_captured", user_id=user.id)
+    return True
+
+
 async def _on_goal_picked(
     db: AsyncSession,
     chat_id: int,
@@ -1060,7 +1105,7 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
                 )
             except Exception:
                 pass
-        await _send_goal_question(db, chat_id, user)
+        await _send_name_prompt(chat_id)
         return True
 
     if action == "goal" and len(parts) >= 3:
