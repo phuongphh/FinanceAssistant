@@ -1,7 +1,7 @@
 """Backfill life insurance payment/end date fields.
 
-Revision ID: 20260523_life_insurance_date_fields_backfill
-Revises: 20260522_fix_transactions_amount_numeric
+Revision ID: 20260523_insurance_backfill
+Revises: 20260522fixtxamt
 Create Date: 2026-05-23
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = "20260523_life_insurance_date_fields_backfill"
-down_revision = "20260522_fix_transactions_amount_numeric"
+revision = "20260523_insurance_backfill"
+down_revision = "20260522fixtxamt"
 branch_labels = None
 depends_on = None
 
