@@ -503,6 +503,7 @@ async def _save_onboarding_first_asset(
         current_value=value,
         is_placeholder_asset=demo,
         is_confirmed=True,
+        suppress_twin_event=demo,
         source_input_raw=raw_text,
         data_quality_warning_type=warning_type,
     )
