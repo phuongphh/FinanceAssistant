@@ -43,6 +43,7 @@ from backend.bot.keyboards.recurring_keyboard import (
     recurring_disable_confirm_keyboard,
     recurring_list_actions_keyboard,
     recurring_list_footer_keyboard,
+    recurring_add_success_keyboard,
     recurring_manage_list_keyboard,
     recurring_reminders_toggle_keyboard,
 )
@@ -386,6 +387,7 @@ async def _handle_reminders_pick(
             f"{bell_line}"
         ),
         parse_mode="HTML",
+        reply_markup=recurring_add_success_keyboard(),
     )
 
 

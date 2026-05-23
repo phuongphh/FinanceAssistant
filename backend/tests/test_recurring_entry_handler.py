@@ -160,7 +160,7 @@ class TestAddFlow:
                           AsyncMock(return_value=created)) as add_mock, \
              patch.object(recurring_entry.wizard_service, "clear", AsyncMock()), \
              patch.object(recurring_entry, "answer_callback", AsyncMock()), \
-             patch.object(recurring_entry, "send_message", AsyncMock()):
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
             await recurring_entry.handle_recurring_callback(
                 db,
                 {"id": "cb1", "data": "recurring:reminders:on",
@@ -174,6 +174,33 @@ class TestAddFlow:
         assert kwargs["expected_day_of_month"] == 5
         assert kwargs["enable_reminders"] is True
 
+        send_kwargs = send.await_args_list[-1].kwargs
+        labels = [button["text"] for row in send_kwargs["reply_markup"]["inline_keyboard"] for button in row]
+        assert labels == ["➕ Thêm khoản định kỳ", "◀️ Quay về Chi tiêu"]
+
+
+
+
+@pytest.mark.asyncio
+async def test_reminders_question_has_only_two_buttons():
+    user = _user({
+        "flow": recurring_entry.FLOW_ADD, "step": "schedule_day",
+        "draft": {"name": "x", "amount": 100, "category": "other"},
+    })
+    db = _db(user)
+    with patch.object(recurring_entry, "get_user_by_telegram_id",
+                      AsyncMock(return_value=user)), \
+         patch.object(recurring_entry.wizard_service, "update_step",
+                      AsyncMock()), \
+         patch.object(recurring_entry, "send_message", AsyncMock()) as send:
+        await recurring_entry.handle_recurring_text_input(
+            db,
+            {"text": "20", "chat": {"id": 100}, "from": {"id": 100}},
+        )
+
+    keyboard = send.await_args.kwargs["reply_markup"]["inline_keyboard"]
+    labels = [button["text"] for row in keyboard for button in row]
+    assert labels == ["🔔 Bật nhắc", "🔕 Không nhắc"]
 
 # ---------------------------------------------------------------------
 # Reminder action handlers (S10)
@@ -197,7 +224,7 @@ class TestReminderActions:
              patch.object(recurring_entry.recurring_service, "get_next_expected_date",
                           MagicMock(return_value=date(2026, 5, 5))), \
              patch.object(recurring_entry, "answer_callback", AsyncMock()), \
-             patch.object(recurring_entry, "send_message", AsyncMock()):
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
             await recurring_entry.handle_recurring_callback(
                 db,
                 {"id": "cb1", "data": f"reminder:paid:{pattern.id}",
@@ -215,7 +242,7 @@ class TestReminderActions:
              patch.object(recurring_entry.recurring_service, "snooze_pattern",
                           AsyncMock()) as snooze, \
              patch.object(recurring_entry, "answer_callback", AsyncMock()), \
-             patch.object(recurring_entry, "send_message", AsyncMock()):
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
             await recurring_entry.handle_recurring_callback(
                 db,
                 {"id": "cb1", "data": f"reminder:delay:{pid}",
@@ -235,7 +262,7 @@ class TestReminderActions:
              patch.object(recurring_entry.recurring_service, "disable_reminders",
                           AsyncMock()) as disable, \
              patch.object(recurring_entry, "answer_callback", AsyncMock()), \
-             patch.object(recurring_entry, "send_message", AsyncMock()):
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
             await recurring_entry.handle_recurring_callback(
                 db,
                 {"id": "cb1", "data": f"reminder:disable:{pid}",
@@ -356,7 +383,7 @@ class TestRecurringMenuUx:
              patch.object(recurring_entry.recurring_service, "update_pattern",
                           AsyncMock()) as update, \
              patch.object(recurring_entry, "answer_callback", AsyncMock()), \
-             patch.object(recurring_entry, "send_message", AsyncMock()):
+             patch.object(recurring_entry, "send_message", AsyncMock()) as send:
             await recurring_entry.handle_recurring_callback(
                 db,
                 {"id": "cb1", "data": f"recurring:reminder_on:{pid}",
