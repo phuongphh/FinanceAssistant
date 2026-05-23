@@ -66,10 +66,23 @@ def recurring_reminders_toggle_keyboard() -> InlineKeyboardMarkup:
                     "callback_data": build_callback(CB_RECURRING, "reminders", "off"),
                 },
             ],
-            [{"text": "❌ Hủy", "callback_data": build_callback(CB_RECURRING, "cancel")}],
         ]
     }
 
+
+
+
+def recurring_add_success_keyboard() -> InlineKeyboardMarkup:
+    """Footer actions right after successful recurring expense creation."""
+    return {
+        "inline_keyboard": [
+            [{
+                "text": "➕ Thêm khoản định kỳ",
+                "callback_data": build_callback(CB_RECURRING, "start"),
+            }],
+            [{"text": "◀️ Quay về Chi tiêu", "callback_data": "menu:expenses"}],
+        ]
+    }
 
 def recurring_list_actions_keyboard(
     pattern_id: uuid.UUID | str,
