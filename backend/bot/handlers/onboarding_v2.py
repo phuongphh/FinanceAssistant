@@ -291,7 +291,6 @@ async def handle_name_text_input(
         session is None
         or session.current_step != STEP_GOAL_QUESTION
         or session.goal_choice is not None
-        or (user.display_name and user.display_name.strip())
     ):
         return False
 
@@ -411,6 +410,15 @@ async def _send_first_asset_prompt(db: AsyncSession, chat_id: int, user: User) -
     }
     await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
 
+
+
+
+def _step3_header_text(*, demo: bool) -> str:
+    copy = onboarding_service.load_copy()
+    header = ((copy.get("step_3_twin") or {}).get("header") or "(3/3) Twin đầu tiên").strip()
+    if demo:
+        return f"<b>{header}</b>\n\n🎭 Dưới đây là bản demo để bạn hình dung trước."
+    return f"<b>{header}</b>"
 
 async def handle_asset_text_input(
     db: AsyncSession, chat_id: int, user: User, raw_text: str
@@ -684,18 +692,25 @@ async def _trigger_first_twin(
     """
     from backend.twin.services import twin_chart_service
 
-    # Narrative FIRST — sets context before the chart shows up.
-    await send_message(
-        chat_id,
-        twin_narrative_service_v2.narrative_text(demo=demo),
-        parse_mode="HTML",
-    )
-
     cone_data, horizon_years = await _resolve_twin_cone(db, user, demo=demo)
     if cone_data is None:
         await _send_twin_compute_failed(chat_id)
         # Do NOT mark twin_shown_at; the retry button drives recovery.
         return
+
+    await send_message(
+        chat_id,
+        _step3_header_text(demo=demo),
+        parse_mode="HTML",
+    )
+
+    # Narrative after successful compute resolution so users never read
+    # Twin-copy when compute actually failed (prevents UX contradiction).
+    await send_message(
+        chat_id,
+        twin_narrative_service_v2.narrative_text(demo=demo),
+        parse_mode="HTML",
+    )
 
     try:
         png = twin_chart_service.render_projection_chart(cone_data)

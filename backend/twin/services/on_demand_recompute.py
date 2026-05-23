@@ -148,6 +148,9 @@ async def _process_once(pending: PendingRecompute, *, attempt: int) -> TwinRecom
         elif len(_pending) > BACKPRESSURE_PENDING_LIMIT:
             skip_reason = "backpressure"
 
+        if skip_reason is None and not await _is_onboarding_ready_for_habit_loop(db, pending.user_id):
+            skip_reason = "onboarding_incomplete"
+
         if skip_reason is None:
             compute_start = time.perf_counter()
             previous_base = await _latest_base_net_worth(db, pending.user_id)
@@ -194,6 +197,20 @@ async def _process_once(pending: PendingRecompute, *, attempt: int) -> TwinRecom
         db.add(log)
         await db.commit()
         return log
+
+
+async def _is_onboarding_ready_for_habit_loop(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Only fire habit-loop push after onboarding has reached first-Twin.
+
+    Prevents noisy "Twin vừa nhích lên 0%"-style pushes while the user is
+    still entering their very first assets in onboarding.
+    """
+    from backend.models.onboarding_session import OnboardingSession
+
+    session = await db.get(OnboardingSession, user_id)
+    if session is None:
+        return True
+    return session.first_twin_shown_at is not None
 
 
 async def _latest_base_net_worth(db: AsyncSession, user_id: uuid.UUID) -> Decimal | None:
