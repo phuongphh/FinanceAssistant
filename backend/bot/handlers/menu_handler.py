@@ -943,7 +943,7 @@ async def _action_assets_life_insurance(
         pay_day = extra.get("monthly_payment_date") or extra.get("annual_settlement_day")
         pay_month = extra.get("monthly_payment_month") or extra.get("annual_settlement_month")
         day = f"{int(pay_day):02d}/{int(pay_month):02d}" if pay_day and pay_month else (str(pay_day) if pay_day else "-")
-        monthly = Decimal(str(extra.get("monthly_amount", 0)))
+        annual_amount = Decimal(str(extra.get("annual_premium") or extra.get("monthly_amount") or 0))
         end_month = extra.get("contract_end_month")
         end_year = extra.get("contract_end_year")
         end_text = f"{int(end_month):02d}/{int(end_year)}" if end_month and end_year else (str(end_year) if end_year else "-")
@@ -953,8 +953,8 @@ async def _action_assets_life_insurance(
             [
                 "",
                 f"🛡️ {company}",
-                f"📅 Đóng ngày: {day} hàng tháng",
-                f"💰 Số tiền/tháng: {format_money_full(monthly)}",
+                f"📅 Đóng ngày: {day} hàng năm",
+                f"💰 Số tiền/năm: {format_money_full(annual_amount)}",
                 f"📆 Tất toán: {end_text}",
                 f"💵 Tổng đã đóng: {format_money_full(paid)}",
             ]
