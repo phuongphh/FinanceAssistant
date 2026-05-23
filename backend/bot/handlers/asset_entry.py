@@ -2624,6 +2624,10 @@ async def _handle_life_annual_settlement_date_input(db: AsyncSession, chat_id: i
     extra = dict(draft.get("extra") or {})
     extra["annual_settlement_day"] = day
     extra["annual_settlement_month"] = month
+    # Backward/forward compatibility: menu + services historically read
+    # monthly_payment_date. Persist both shapes so old and new readers work.
+    extra["monthly_payment_date"] = day
+    extra["monthly_payment_month"] = month
     total_paid = Decimal(str(extra.get("total_paid") or 0))
     if total_paid <= 0:
         await send_message(chat_id=chat_id, text="Có lỗi dữ liệu. Bạn thử thêm lại giúp mình nhé.")
