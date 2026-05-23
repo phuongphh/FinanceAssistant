@@ -13,5 +13,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 | #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
+| #818 | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [issue-818.md](issue-818.md) |
 
-**Total active:** 9
+**Total active:** 10
