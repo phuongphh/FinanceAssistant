@@ -139,6 +139,40 @@ class TestCreateAsset:
         )
         assert asset.acquired_at == target
 
+    async def test_user_input_source_publishes_twin_event(self, monkeypatch):
+        db = _mock_session()
+        publish_mock = AsyncMock()
+        monkeypatch.setattr(asset_service, "_publish_twin_event", publish_mock)
+
+        await asset_service.create_asset(
+            db,
+            uuid.uuid4(),
+            asset_type="cash",
+            name="Ví tiền",
+            initial_value=Decimal("2_000_000"),
+            source=asset_service.SOURCE_USER_INPUT,
+        )
+
+        publish_mock.assert_awaited_once()
+        assert publish_mock.await_args.args[0] == "asset.created"
+
+    async def test_suppress_twin_event_skips_publish_even_for_user_input(self, monkeypatch):
+        db = _mock_session()
+        publish_mock = AsyncMock()
+        monkeypatch.setattr(asset_service, "_publish_twin_event", publish_mock)
+
+        await asset_service.create_asset(
+            db,
+            uuid.uuid4(),
+            asset_type="cash",
+            name="Demo onboarding",
+            initial_value=Decimal("2_000_000"),
+            source=asset_service.SOURCE_USER_INPUT,
+            suppress_twin_event=True,
+        )
+
+        publish_mock.assert_not_awaited()
+
 
 @pytest.mark.asyncio
 class TestGetAssetById:
