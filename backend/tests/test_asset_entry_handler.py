@@ -328,6 +328,47 @@ async def test_callback_type_picker_routes_to_crypto_starter():
 
 
 @pytest.mark.asyncio
+async def test_callback_type_picker_routes_to_life_insurance_starter():
+    user = _user()
+    db = _db(user)
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry, "_start_life_insurance_create", AsyncMock()
+        ) as starter,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+    ):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:type:life_insurance",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    starter.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_start_life_insurance_create_clears_wizard_and_calls_action():
+    user = _user({"flow": asset_entry.FLOW_PICKER, "step": "type", "draft": {}})
+    db = _db(user)
+    with (
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()) as clear,
+        patch(
+            "backend.bot.handlers.menu_handler._action_assets_life_insurance",
+            AsyncMock(),
+        ) as life_action,
+    ):
+        await asset_entry._start_life_insurance_create(db, 100, user)
+    clear.assert_awaited_once_with(db, user.id)
+    life_action.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_crypto_subtype_bitcoin_advances_to_quantity():
     user = _user(
         {

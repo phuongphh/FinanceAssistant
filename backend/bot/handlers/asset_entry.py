@@ -215,6 +215,21 @@ async def cancel_wizard(db: AsyncSession, chat_id: int, user: User) -> bool:
     return True
 
 
+async def _start_life_insurance_create(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Route BHNT button to the Life Assurance create/list action."""
+    await wizard_service.clear(db, user.id)
+    from backend.bot.handlers.menu_handler import _action_assets_life_insurance
+
+    await _action_assets_life_insurance(
+        db=db,
+        user=user,
+        chat_id=chat_id,
+        message_id=None,
+    )
+
+
 async def list_assets(db: AsyncSession, chat_id: int, user: User) -> None:
     """Handle /taisan — display all active assets for the user."""
     assets = await asset_service.get_user_assets(db, user.id)
@@ -2856,6 +2871,7 @@ async def _dispatch_asset_action(
             AssetType.CRYPTO.value: _start_crypto_subtype_pick,
             AssetType.GOLD.value: _start_gold_subtype_pick,
             AssetType.REAL_ESTATE.value: _start_real_estate_subtype_pick,
+            AssetType.LIFE_INSURANCE.value: _start_life_insurance_create,
         }
         starter = starters.get(arg)
         if starter is None:
@@ -2869,7 +2885,6 @@ async def _dispatch_asset_action(
             return
         await starter(db, chat_id, user)
         return
-
     if action == "cash_subtype" and arg:
         await _handle_cash_subtype_pick(db, chat_id, user, arg)
         return
