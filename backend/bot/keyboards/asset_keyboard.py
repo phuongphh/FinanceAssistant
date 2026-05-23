@@ -124,7 +124,7 @@ def _pagination_row(
 
 
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
-    """Layout 6 asset types in a 3×2 grid for thumb-friendly tapping."""
+    """Layout asset types for thumb-friendly tapping."""
     return {
         "inline_keyboard": [
             [
@@ -166,6 +166,14 @@ def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
                     "text": "📦 Khác",
                     "callback_data": build_callback(
                         CB_ASSET_ADD, "type", AssetType.OTHER.value
+                    ),
+                },
+            ],
+            [
+                {
+                    "text": "🛡️ Bảo hiểm nhân thọ (BHNT)",
+                    "callback_data": build_callback(
+                        CB_ASSET_ADD, "type", AssetType.LIFE_INSURANCE.value
                     ),
                 },
             ],
