@@ -452,6 +452,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
 | #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
 | #785 | Pre-Phase | [Story 2] Add Bảo hiểm nhân thọ Button in Asset Menu | [pre-phase/issue-785.md](by-phase/pre-phase/issue-785.md) |
+| #786 | Pre-Phase | [Story 3] Life Assurance Contract List View | [pre-phase/issue-786.md](by-phase/pre-phase/issue-786.md) |
 | #791 | Pre-Phase | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [pre-phase/issue-791.md](by-phase/pre-phase/issue-791.md) |
 | #793 | Pre-Phase | Webhook returns 500 on non-JSON body — bot responds slowly | [pre-phase/issue-793.md](by-phase/pre-phase/issue-793.md) |
 | #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
@@ -460,5 +461,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
 | #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
 
-**Total:** 455 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 438 Pre-Phase)
+**Total:** 456 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 439 Pre-Phase)

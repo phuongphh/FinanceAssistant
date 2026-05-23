@@ -11,7 +11,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
-| #786 | [Story 3] Life Assurance Contract List View | [issue-786.md](issue-786.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
 
-**Total active:** 9
+**Total active:** 8
