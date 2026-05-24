@@ -1,53 +1,66 @@
 #!/usr/bin/env bash
-# rebuild-finance-prod.sh — Production deploy: pull, migrate, build, restart, health-check.
+# =============================================================================
+# rebuild-finance-prod.sh — Production deploy (Docker-based)
+# =============================================================================
+# Pipeline:
+#   pre-flight → git pull → DB backup → docker compose down → build + up --wait
+#   → smoke test → admin SPA rebuild → cleanup → notify
 #
-# Usage: ./rebuild-finance-prod.sh
+# Khác với deploy/production/deploy.sh (minimal): script này bổ sung
+# safety guards: DB snapshot trước migrate, rollback handler, Telegram notify,
+# admin SPA rebuild, image prune. Đây là entry point mặc định cho prod deploy.
+#
+# Usage:
+#   bash scripts/rebuild-finance-prod.sh
 # Env overrides:
-#   PROJECT_DIR  (default: /home/evg-user/FinanceAssistant)
-#   BRANCH       (default: prod)
-#   PORT         (default: 8000)
-#   SKIP_MINIAPP (1 = skip Mini App build)
-#   SKIP_BACKUP  (1 = skip DB snapshot — not recommended)
+#   PROJECT_DIR       (default: /home/evg-user/FinanceAssistant)
+#   BRANCH            (default: prod)
+#   COMPOSE_FILE      (default: $PROJECT_DIR/deploy/production/docker-compose.yml)
+#   PROJECT_NAME      (default: financeassistant)
+#   BACKEND_PORT      (default: 8002, mapped on host)
+#   HEALTH_TIMEOUT    (default: 120s)
+#   SKIP_BACKUP       (1 = bỏ qua DB snapshot — KHÔNG khuyến nghị)
+#   SKIP_ADMIN_BUILD  (1 = bỏ qua rebuild admin SPA)
+#   SKIP_PRUNE        (1 = bỏ qua docker image prune)
+# =============================================================================
 
 set -Eeuo pipefail
 
 # ── config ─────────────────────────────────────────────────────
 PROJECT_DIR="${PROJECT_DIR:-/home/evg-user/FinanceAssistant}"
 BRANCH="${BRANCH:-prod}"
-PORT="${PORT:-8000}"
+COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_DIR/deploy/production/docker-compose.yml}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-financeassistant}"
+BACKEND_PORT="${BACKEND_PORT:-8002}"
+HEALTH_URL="http://localhost:${BACKEND_PORT}/health"
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 ENV_FILE="$PROJECT_DIR/.env"
-# Two venvs exist intentionally:
-#   venv/   — used by launchd services (backend + scheduler) — see launchd/*.plist.template
-#   .venv/  — used by tooling (alembic, scripts)
-# requirements.txt changes must be installed into BOTH.
-SERVICE_VENV="$PROJECT_DIR/venv"
-TOOLING_VENV="$PROJECT_DIR/.venv"
-REQUIREMENTS_FILE="$PROJECT_DIR/backend/requirements.txt"
 BACKUP_DIR="$PROJECT_DIR/.backups"
 LOCK_FILE="/tmp/rebuild-finance-prod.lock"
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="/tmp/rebuild-finance-${TS}.log"
 
-# Required env keys to validate before restart
 REQUIRED_ENV_KEYS=(
-    DATABASE_URL
+    POSTGRES_PASSWORD
     DEEPSEEK_API_KEY
-    GROQ_API_KEY
     ANTHROPIC_API_KEY
-    INTERNAL_API_KEY
-    FINANCE_API_KEY
     TELEGRAM_BOT_TOKEN
+    ADMIN_JWT_SECRET
 )
 
 # ── helpers ────────────────────────────────────────────────────
-log()   { printf '%s\n' "$*" | tee -a "$LOG_FILE"; }
-err()   { printf '❌ %s\n' "$*" | tee -a "$LOG_FILE" >&2; }
-step()  { log ""; log "=== $* ==="; }
+log()  { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG_FILE"; }
+err()  { printf '[%s] ❌ %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG_FILE" >&2; }
+step() { log ""; log "=== $* ==="; }
+
+dc() {
+    # --env-file explicit: compose mặc định tìm `.env` cạnh compose file (=
+    # deploy/production/.env, không tồn tại). Phải trỏ về repo-root `.env`.
+    docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+}
 
 notify() {
     # Best-effort Telegram notification to ADMIN_CHAT_ID (silent if not configured).
-    # Every step is guarded with `|| true` so a missing key never aborts the script
-    # under `set -euo pipefail`.
     local msg="$1"
     [[ -f "$ENV_FILE" ]] || return 0
     local token chat
@@ -61,43 +74,36 @@ notify() {
 }
 
 CURRENT_SHA=""
-BACKUP_FILE=""           # set in [3/7] when backup runs; referenced in rollback message
+NEW_SHA=""
+BACKUP_FILE=""
 DEPLOY_PHASE="init"
+DEPLOY_START=$(date +%s)
+
 cleanup_lock() { rm -f "$LOCK_FILE"; }
 
 do_rollback() {
-    # Best-effort restore to CURRENT_SHA: every command guarded so we always
-    # finish the sequence (services back up, deps reinstalled, notify sent).
-    err "Rolling back to ${CURRENT_SHA:0:7}"
-    git reset --hard "$CURRENT_SHA" 2>&1 | tee -a "$LOG_FILE" || true
-    # Drop files introduced by the failed deploy, but preserve generated
-    # state we want to keep: db backups + launchd service logs.
-    git clean -fd \
-        -e .backups \
-        -e 'backend*.log' \
-        -e 'scheduler*.log' \
-        2>&1 | tee -a "$LOG_FILE" || true
-    "$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
-    "$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
-    for label in com.financeassistant.backend com.financeassistant.scheduler; do
-        launchctl unload "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
-        launchctl load "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
-    done
-    err "Rolled back code. DB migration was NOT reverted — manually restore from ${BACKUP_FILE:-'(no backup taken)'} if needed."
+    # Best-effort: reset code về SHA cũ và rebuild stack.
+    # DB migration KHÔNG auto-revert — restore từ BACKUP_FILE thủ công nếu cần.
+    err "Rolling back code to ${CURRENT_SHA:0:7}"
+    git -C "$PROJECT_DIR" reset --hard "$CURRENT_SHA" 2>&1 | tee -a "$LOG_FILE" || true
+    log "Rebuilding stack với code cũ..."
+    dc build backend scheduler 2>&1 | tee -a "$LOG_FILE" || true
+    dc up -d 2>&1 | tee -a "$LOG_FILE" || true
+    err "Rollback xong. DB NOT reverted — restore từ ${BACKUP_FILE:-'(no backup taken)'} thủ công nếu schema bị break."
 }
 
 on_error() {
     local exit_code=$?
-    trap - ERR  # avoid re-entry if rollback itself trips ERR
+    trap - ERR
     err "Deploy FAILED at phase: $DEPLOY_PHASE (exit=$exit_code)"
     case "$DEPLOY_PHASE" in
-        service-restart|health-check)
-            # Past the point of no return — services were unloaded. Try to restore.
+        compose-up|smoke-test|health-check)
+            # Past point of no return — stack đã được tear down/recreate. Try restore.
             do_rollback
-            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Code rolled back to ${CURRENT_SHA:0:7}. DB needs manual review."
+            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Rolled back to ${CURRENT_SHA:0:7}. Check $LOG_FILE."
             ;;
         *)
-            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE] — see $LOG_FILE"
+            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Check $LOG_FILE."
             ;;
     esac
     cleanup_lock
@@ -108,17 +114,23 @@ trap cleanup_lock EXIT
 
 # ── pre-flight ─────────────────────────────────────────────────
 DEPLOY_PHASE="pre-flight"
-log "=== Bé Tiền — PRODUCTION rebuild @ $TS ==="
-log "    Project: $PROJECT_DIR  Branch: $BRANCH  Log: $LOG_FILE"
+log "================================================================"
+log " Bé Tiền — PRODUCTION rebuild @ $TS"
+log "================================================================"
+log " Project   : $PROJECT_DIR"
+log " Branch    : $BRANCH"
+log " Compose   : $COMPOSE_FILE"
+log " Health    : $HEALTH_URL"
+log " Log       : $LOG_FILE"
+log "----------------------------------------------------------------"
 
-# Concurrency lock (avoid two deploys racing).
-# If the lock file exists but its PID is dead (prior deploy crashed / kill -9 /
-# host reboot), take over — otherwise an outage stalls all future deploys.
+# Concurrency lock — nếu lock file tồn tại nhưng PID dead (deploy crash / kill -9 /
+# host reboot), take over thay vì stall mãi mãi.
 if ! ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then
     lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
     if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
-        err "Another deploy is in progress (lock: $LOCK_FILE held by PID $lock_pid)"
-        trap - EXIT  # don't remove the other deploy's lock
+        err "Another deploy đang chạy (lock: $LOCK_FILE held by PID $lock_pid)"
+        trap - EXIT
         exit 1
     fi
     log "⚠️  Stale lock found (PID ${lock_pid:-unknown} not alive) — taking over"
@@ -126,173 +138,202 @@ if ! ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then
     echo "$$" > "$LOCK_FILE"
 fi
 
-[[ -d "$PROJECT_DIR" ]]         || { err "PROJECT_DIR not found"; exit 1; }
-[[ -f "$ENV_FILE" ]]            || { err ".env not found at $ENV_FILE"; exit 1; }
-[[ -x "$SERVICE_VENV/bin/python" ]] || { err "service venv not found at $SERVICE_VENV (used by launchd)"; exit 1; }
-[[ -x "$TOOLING_VENV/bin/alembic" ]] || { err "tooling venv not found at $TOOLING_VENV (used for alembic)"; exit 1; }
-[[ -f "$REQUIREMENTS_FILE" ]]   || { err "requirements file not found at $REQUIREMENTS_FILE"; exit 1; }
+# Dependency checks
+command -v docker >/dev/null || { err "docker chưa cài đặt"; exit 1; }
+docker compose version >/dev/null 2>&1 || { err "docker compose plugin chưa cài đặt"; exit 1; }
+command -v curl >/dev/null || { err "curl chưa cài đặt"; exit 1; }
+command -v git >/dev/null || { err "git chưa cài đặt"; exit 1; }
 
-# Validate required env keys are present
+# Path checks
+[[ -d "$PROJECT_DIR" ]]  || { err "PROJECT_DIR không tồn tại: $PROJECT_DIR"; exit 1; }
+[[ -f "$ENV_FILE" ]]     || { err ".env không tồn tại: $ENV_FILE"; exit 1; }
+[[ -f "$COMPOSE_FILE" ]] || { err "compose file không tồn tại: $COMPOSE_FILE"; exit 1; }
+
+# Required env keys
 for key in "${REQUIRED_ENV_KEYS[@]}"; do
     grep -qE "^${key}=." "$ENV_FILE" || { err "Missing required key in .env: $key"; exit 1; }
 done
 
 cd "$PROJECT_DIR"
 
-# Refuse to deploy from a dirty working tree
+# Dirty tree refuse
 if [[ -n "$(git status --porcelain)" ]]; then
-    err "Working tree is dirty. Commit/stash changes before deploy:"
+    err "Working tree dirty — commit/stash trước khi deploy:"
     git status --short | tee -a "$LOG_FILE"
     exit 1
 fi
 
-# Make sure we're on the right branch
+# Right branch
 ACTUAL_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 if [[ "$ACTUAL_BRANCH" != "$BRANCH" ]]; then
-    err "Not on $BRANCH branch (currently on: $ACTUAL_BRANCH). Refusing to deploy."
+    err "Không phải branch $BRANCH (đang ở: $ACTUAL_BRANCH). Refuse deploy."
     exit 1
 fi
 
 CURRENT_SHA="$(git rev-parse HEAD)"
-log "Current SHA: $CURRENT_SHA"
+log "Current SHA: ${CURRENT_SHA:0:7}"
 
-# ── [1/7] pull ─────────────────────────────────────────────────
+# ── [1/7] git pull ─────────────────────────────────────────────
 DEPLOY_PHASE="git-pull"
-step "[1/7] Pull code mới nhất từ origin/$BRANCH"
+step "[1/7] Pull origin/$BRANCH"
 git fetch origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
+
+# Refuse nếu local ahead — origin = single source of truth.
+ahead=$(git rev-list --count "origin/$BRANCH..HEAD")
+if (( ahead > 0 )); then
+    err "Local ahead origin/$BRANCH bởi $ahead commit(s):"
+    git log --oneline "origin/$BRANCH..HEAD" | tee -a "$LOG_FILE"
+    err "Push hoặc revert local commits trước khi deploy."
+    exit 1
+fi
+
 git pull --ff-only origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
 NEW_SHA="$(git rev-parse HEAD)"
 if [[ "$CURRENT_SHA" == "$NEW_SHA" ]]; then
-    log "ℹ️  No new commits — rebuild will refresh deps/services anyway."
+    log "ℹ️  No new commits — rebuild sẽ vẫn refresh image (deps có thể đổi)."
 else
-    log "Updated: $CURRENT_SHA → $NEW_SHA"
+    log "Updated: ${CURRENT_SHA:0:7} → ${NEW_SHA:0:7}"
     log "Changed files:"
     git diff --name-only "$CURRENT_SHA..$NEW_SHA" | tee -a "$LOG_FILE"
 fi
 
-# ── [2/7] dependencies ─────────────────────────────────────────
-# Install into BOTH venvs — services run from venv/, tooling (alembic) from .venv/.
-DEPLOY_PHASE="pip-install"
-step "[2/7] Cài dependencies vào cả 2 venv"
-log "→ service venv ($SERVICE_VENV)"
-"$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE"
-log "→ tooling venv ($TOOLING_VENV)"
-"$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE"
-
-# ── [3/7] DB backup ────────────────────────────────────────────
+# ── [2/7] DB backup ────────────────────────────────────────────
 DEPLOY_PHASE="db-backup"
-step "[3/7] Backup database trước khi migrate"
+step "[2/7] Backup database trước khi migrate"
 if [[ "${SKIP_BACKUP:-0}" == "1" ]]; then
     log "⏭  SKIP_BACKUP=1 — bỏ qua backup (KHÔNG khuyến nghị)"
 else
     mkdir -p "$BACKUP_DIR"
-    DB_URL_RAW=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
-    # pg_dump/libpq chỉ chấp nhận scheme postgresql:// hoặc postgres://, KHÔNG hiểu
-    # postgresql+asyncpg:// (SQLAlchemy driver suffix). Strip suffix trước khi gọi.
-    DB_URL="${DB_URL_RAW/postgresql+asyncpg:/postgresql:}"
-    DB_URL="${DB_URL/postgres+asyncpg:/postgres:}"
     BACKUP_FILE="$BACKUP_DIR/pre-deploy-${TS}.sql.gz"
-    pg_dump "$DB_URL" 2>>"$LOG_FILE" | gzip > "$BACKUP_FILE"
-    log "Snapshot: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
-    # Keep last 10 snapshots, drop the rest
-    ls -1t "$BACKUP_DIR"/pre-deploy-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
-fi
 
-# ── [4/7] migration ────────────────────────────────────────────
-DEPLOY_PHASE="alembic-migrate"
-step "[4/7] Chạy DB migration (alembic)"
-ALEMBIC="$TOOLING_VENV/bin/alembic"
-log "Before:  $("$ALEMBIC" current 2>&1 | tail -1)"
+    # pg_dump chạy TRONG postgres container — host không cần postgres-client.
+    # Container postgres user/db lấy từ .env (defaults match compose file).
+    PG_USER=$(grep -E '^POSTGRES_USER=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || echo "finance")
+    PG_DB=$(grep -E '^POSTGRES_DB=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || echo "finance_db")
+    PG_USER="${PG_USER:-finance}"
+    PG_DB="${PG_DB:-finance_db}"
 
-HEADS_COUNT=$("$ALEMBIC" heads 2>/dev/null | grep -c '(head)' || true)
-if [[ "$HEADS_COUNT" -gt 1 ]]; then
-    err "Multiple alembic heads detected ($HEADS_COUNT). Refusing to auto-merge on prod."
-    "$ALEMBIC" heads 2>&1 | tee -a "$LOG_FILE"
-    err "Resolve locally with: alembic merge heads -m '...', then redeploy."
-    exit 1
-fi
-
-"$ALEMBIC" upgrade head 2>&1 | tee -a "$LOG_FILE"
-log "After:   $("$ALEMBIC" current 2>&1 | tail -1)"
-
-# ── [5/7] Mini App build ───────────────────────────────────────
-DEPLOY_PHASE="miniapp-build"
-step "[5/7] Build Mini App frontend"
-if [[ "${SKIP_MINIAPP:-0}" == "1" ]]; then
-    log "⏭  SKIP_MINIAPP=1 — bỏ qua build frontend"
-elif [[ -f "$PROJECT_DIR/miniapp/package.json" ]]; then
-    (
-        cd "$PROJECT_DIR/miniapp"
-        npm ci 2>&1 | tee -a "$LOG_FILE"
-        npm run build 2>&1 | tee -a "$LOG_FILE"
-    )
-    log "Mini App build OK"
-else
-    log "ℹ️  No miniapp/package.json — bỏ qua"
-fi
-
-# ── [6/7] restart services ─────────────────────────────────────
-DEPLOY_PHASE="service-restart"
-step "[6/7] Restart backend + scheduler (launchd)"
-DOWN_START=$(date +%s)
-for label in com.financeassistant.backend com.financeassistant.scheduler; do
-    plist="$HOME/Library/LaunchAgents/${label}.plist"
-    [[ -f "$plist" ]] || { err "Missing plist: $plist (run scripts/install-launchd.sh)"; exit 1; }
-    launchctl unload "$plist" 2>&1 | tee -a "$LOG_FILE" || true
-done
-sleep 2
-for label in com.financeassistant.backend com.financeassistant.scheduler; do
-    launchctl load "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE"
-done
-
-# Verify each service actually has a PID (load can "succeed" but process can crash)
-sleep 5
-for label in com.financeassistant.backend com.financeassistant.scheduler; do
-    pid=$(launchctl list | awk -v l="$label" '$3==l {print $1}')
-    if [[ -z "$pid" || "$pid" == "-" ]]; then
-        err "Service $label loaded but has no PID — crashed on startup. Check launchd stdout/stderr logs."
-        exit 1
+    # Verify postgres container running — nếu down (lần deploy đầu) thì skip backup.
+    if dc ps postgres 2>/dev/null | grep -q "Up\|running"; then
+        log "→ pg_dump $PG_DB từ container finance-postgres..."
+        dc exec -T postgres pg_dump -U "$PG_USER" "$PG_DB" 2>>"$LOG_FILE" | gzip > "$BACKUP_FILE"
+        log "Snapshot: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+        # Keep last 10
+        ls -1t "$BACKUP_DIR"/pre-deploy-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+    else
+        log "⚠️  postgres container chưa chạy — bỏ qua backup (first-time deploy?)"
+        BACKUP_FILE=""
     fi
-    log "  $label → PID $pid"
-done
+fi
 
-# ── [7/7] health check + rollback on failure ───────────────────
-DEPLOY_PHASE="health-check"
-step "[7/7] Health check"
+# ── [3/7] compose down ─────────────────────────────────────────
+DEPLOY_PHASE="compose-down"
+step "[3/7] Compose down (graceful)"
+dc down --remove-orphans 2>&1 | tee -a "$LOG_FILE"
 
+# ── [4/7] build + up --wait ────────────────────────────────────
+DEPLOY_PHASE="compose-up"
+step "[4/7] Build + up -d (chờ healthcheck với --wait)"
+DOWN_START=$(date +%s)
+dc build backend scheduler 2>&1 | tee -a "$LOG_FILE"
+# --wait: docker compose tự block đến khi tất cả services có healthcheck = healthy
+# (postgres + redis + backend). Timeout mặc định 600s — đủ thoải mái.
+dc up -d --wait 2>&1 | tee -a "$LOG_FILE"
+
+# ── [5/7] smoke test ───────────────────────────────────────────
+DEPLOY_PHASE="smoke-test"
+step "[5/7] Smoke test (health endpoint + DB + Redis)"
+
+# 5a. /health endpoint
 HEALTH_OK=0
-for attempt in 1 2 3 4 5; do
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://localhost:${PORT}/health" || true)
-    log "  attempt $attempt: HTTP $code"
+start_ts=$(date +%s)
+while true; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL" || true)
     if [[ "$code" == "200" ]]; then
         HEALTH_OK=1
+        log "  /health → HTTP 200"
         break
     fi
-    sleep 3
+    elapsed=$(($(date +%s) - start_ts))
+    if (( elapsed > HEALTH_TIMEOUT )); then
+        err "Health check TIMEOUT sau ${HEALTH_TIMEOUT}s (last code: $code)"
+        log "==== Last 50 lines: backend ===="
+        dc logs --tail=50 backend 2>&1 | tee -a "$LOG_FILE" || true
+        log "==== Last 50 lines: scheduler ===="
+        dc logs --tail=50 scheduler 2>&1 | tee -a "$LOG_FILE" || true
+        exit 1  # trap → do_rollback
+    fi
+    sleep 2
 done
 
 DOWN_END=$(date +%s)
 DOWNTIME=$((DOWN_END - DOWN_START))
 
-if [[ "$HEALTH_OK" != "1" ]]; then
-    err "Health check FAILED after 5 attempts"
-    exit 1  # on_error trap runs do_rollback because DEPLOY_PHASE=health-check
+# 5b. DB connectivity (alembic current chạm DB qua app config)
+log "→ DB connectivity (alembic current)..."
+if ! dc exec -T backend alembic current >/dev/null 2>&1; then
+    err "Backend không connect được DB"
+    dc exec -T backend alembic current 2>&1 | tee -a "$LOG_FILE" || true
+    exit 1
+fi
+log "  alembic current: $(dc exec -T backend alembic current 2>/dev/null | tail -1)"
+
+# 5c. Redis ping
+log "→ Redis ping..."
+if ! dc exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
+    err "Redis không respond"
+    exit 1
+fi
+log "  redis-cli ping → PONG"
+
+# ── [6/7] admin SPA rebuild ────────────────────────────────────
+DEPLOY_PHASE="admin-build"
+step "[6/7] Rebuild admin SPA"
+if [[ "${SKIP_ADMIN_BUILD:-0}" == "1" ]]; then
+    log "⏭  SKIP_ADMIN_BUILD=1 — bỏ qua admin rebuild"
+elif [[ -x "$PROJECT_DIR/scripts/deploy_admin.sh" ]]; then
+    # deploy_admin.sh tự lo: npm ci + vite build + copy static + reload caddy.
+    # Chạy trong subshell để env vars (ADMIN_JWT_SECRET, etc.) được export từ .env.
+    (
+        set -a
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+        set +a
+        bash "$PROJECT_DIR/scripts/deploy_admin.sh"
+    ) 2>&1 | tee -a "$LOG_FILE"
+    log "Admin SPA rebuild OK"
+else
+    log "ℹ️  scripts/deploy_admin.sh không tồn tại hoặc không executable — bỏ qua"
 fi
 
-# ── cleanup old logs (keep last 20) ────────────────────────────
+# ── [7/7] cleanup ──────────────────────────────────────────────
+DEPLOY_PHASE="cleanup"
+step "[7/7] Cleanup"
+if [[ "${SKIP_PRUNE:-0}" != "1" ]]; then
+    log "→ docker image prune (dangling)..."
+    docker image prune -f 2>&1 | tee -a "$LOG_FILE" || true
+fi
+# Keep last 20 deploy logs
 ls -1t /tmp/rebuild-finance-*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
 
 # ── done ───────────────────────────────────────────────────────
 DEPLOY_PHASE="done"
 trap - ERR
-log ""
-log "========================================"
-log "✅ REBUILD HOÀN TẤT (downtime: ${DOWNTIME}s)"
-log "   SHA:      ${NEW_SHA:0:7}"
-log "   Mini App: https://finance.nuitruc.ai/miniapp/wealth"
-log "   Admin:    https://finance.nuitruc.ai/admin/"
-log "   Docs:     https://finance.nuitruc.ai/docs"
-log "   Log:      $LOG_FILE"
-log "========================================"
+DEPLOY_END=$(date +%s)
+TOTAL=$((DEPLOY_END - DEPLOY_START))
 
-notify "✅ Prod deploy OK — ${NEW_SHA:0:7} (downtime ${DOWNTIME}s)"
+log ""
+log "================================================================"
+log " ✅ REBUILD HOÀN TẤT"
+log "    Total:    ${TOTAL}s   (downtime backend: ${DOWNTIME}s)"
+log "    SHA:      ${NEW_SHA:0:7}"
+log "    Mini App: https://finance.nuitruc.ai/miniapp/wealth"
+log "    Admin:    https://finance.nuitruc.ai/admin/"
+log "    Docs:     https://finance.nuitruc.ai/docs"
+log "    Log:      $LOG_FILE"
+log "================================================================"
+
+# Final service report
+dc ps 2>&1 | tee -a "$LOG_FILE" || true
+
+notify "✅ Prod deploy OK — ${NEW_SHA:0:7} (downtime ${DOWNTIME}s, total ${TOTAL}s)"
