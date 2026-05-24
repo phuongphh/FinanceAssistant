@@ -16,7 +16,13 @@ PROJECT_DIR="${PROJECT_DIR:-/home/evg-user/FinanceAssistant}"
 BRANCH="${BRANCH:-prod}"
 PORT="${PORT:-8000}"
 ENV_FILE="$PROJECT_DIR/.env"
-VENV_DIR="$PROJECT_DIR/.venv"
+# Two venvs exist intentionally:
+#   venv/   — used by launchd services (backend + scheduler) — see launchd/*.plist.template
+#   .venv/  — used by tooling (alembic, scripts)
+# requirements.txt changes must be installed into BOTH.
+SERVICE_VENV="$PROJECT_DIR/venv"
+TOOLING_VENV="$PROJECT_DIR/.venv"
+REQUIREMENTS_FILE="$PROJECT_DIR/backend/requirements.txt"
 BACKUP_DIR="$PROJECT_DIR/.backups"
 LOCK_FILE="/tmp/rebuild-finance-prod.lock"
 TS="$(date +%Y%m%d-%H%M%S)"
@@ -73,10 +79,11 @@ if ! ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then
     exit 1
 fi
 
-[[ -d "$PROJECT_DIR" ]]   || { err "PROJECT_DIR not found"; exit 1; }
-[[ -f "$ENV_FILE" ]]      || { err ".env not found at $ENV_FILE"; exit 1; }
-[[ -d "$VENV_DIR" ]]      || { err "venv not found at $VENV_DIR — run scripts/install-launchd.sh first"; exit 1; }
-command -v uv >/dev/null  || { err "uv not installed — see https://docs.astral.sh/uv/"; exit 1; }
+[[ -d "$PROJECT_DIR" ]]         || { err "PROJECT_DIR not found"; exit 1; }
+[[ -f "$ENV_FILE" ]]            || { err ".env not found at $ENV_FILE"; exit 1; }
+[[ -x "$SERVICE_VENV/bin/python" ]] || { err "service venv not found at $SERVICE_VENV (used by launchd)"; exit 1; }
+[[ -x "$TOOLING_VENV/bin/alembic" ]] || { err "tooling venv not found at $TOOLING_VENV (used for alembic)"; exit 1; }
+[[ -f "$REQUIREMENTS_FILE" ]]   || { err "requirements file not found at $REQUIREMENTS_FILE"; exit 1; }
 
 # Validate required env keys are present
 for key in "${REQUIRED_ENV_KEYS[@]}"; do
@@ -117,9 +124,13 @@ else
 fi
 
 # ── [2/7] dependencies ─────────────────────────────────────────
-DEPLOY_PHASE="uv-sync"
-step "[2/7] Cài dependencies (uv sync)"
-uv sync --frozen 2>&1 | tee -a "$LOG_FILE"
+# Install into BOTH venvs — services run from venv/, tooling (alembic) from .venv/.
+DEPLOY_PHASE="pip-install"
+step "[2/7] Cài dependencies vào cả 2 venv"
+log "→ service venv ($SERVICE_VENV)"
+"$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE"
+log "→ tooling venv ($TOOLING_VENV)"
+"$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE"
 
 # ── [3/7] DB backup ────────────────────────────────────────────
 DEPLOY_PHASE="db-backup"
@@ -139,7 +150,7 @@ fi
 # ── [4/7] migration ────────────────────────────────────────────
 DEPLOY_PHASE="alembic-migrate"
 step "[4/7] Chạy DB migration (alembic)"
-ALEMBIC="$VENV_DIR/bin/alembic"
+ALEMBIC="$TOOLING_VENV/bin/alembic"
 log "Before:  $("$ALEMBIC" current 2>&1 | tail -1)"
 
 HEADS_COUNT=$("$ALEMBIC" heads 2>/dev/null | grep -c '(head)' || true)
@@ -216,7 +227,8 @@ if [[ "$HEALTH_OK" != "1" ]]; then
     err "Health check FAILED after 5 attempts — rolling back to $CURRENT_SHA"
     DEPLOY_PHASE="rollback"
     git reset --hard "$CURRENT_SHA" 2>&1 | tee -a "$LOG_FILE"
-    uv sync --frozen 2>&1 | tee -a "$LOG_FILE" || true
+    "$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
+    "$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
     for label in com.financeassistant.backend com.financeassistant.scheduler; do
         launchctl unload "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
         launchctl load "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
