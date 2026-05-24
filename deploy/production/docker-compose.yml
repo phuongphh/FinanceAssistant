@@ -1,0 +1,91 @@
+# =============================================================================
+# Production Docker stack — FinanceAssistant
+# =============================================================================
+# File này nằm trong deploy/production/. Khi `docker compose -f <file>` chạy:
+#   - Build context dùng `../..` (= repo root) để image truy cập đầy đủ source.
+#   - env_file `../../.env` chỉ về file `.env` ở repo root (không commit).
+#
+# Volume names hardcoded để match prod hiện hữu (project name `financeassistant`).
+# Verify với: `docker volume ls | grep finance` trước lần deploy đầu tiên.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finance-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finance}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-finance_db}
+    # max_connections default 100 dưới ngưỡng workers × (pool_size + max_overflow).
+    # 4 workers × (20 + 30) = 200 — xem docs/archive/scaling-refactor-A.md §A2.
+    command: ["postgres", "-c", "max_connections=200"]
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance} -d ${POSTGRES_DB:-finance_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: finance-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    container_name: finance-backend
+    env_file:
+      - ../../.env
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    # Migration chạy trước uvicorn. Nếu migration fail → container restart loop → deploy.sh catch ở health check.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    container_name: finance-scheduler
+    env_file:
+      - ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: always
+    command: ["python", "-m", "backend.scheduler"]
+
+volumes:
+  postgres_data:
+    name: financeassistant_postgres_data
+  redis_data:
+    name: financeassistant_redis_data
