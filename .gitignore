@@ -43,6 +43,11 @@ alembic/versions/__pycache__/
 # launchd — generated plists are machine-specific; only track the template
 launchd/*.plist
 
+# Production deploy artefacts — db snapshots and service logs
+.backups/
+backend*.log
+scheduler*.log
+
 # Cloudflare Tunnel — credentials contain secret tunnel token
 .cloudflared/*.json
 .cloudflared/config.yml

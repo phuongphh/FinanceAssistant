@@ -41,26 +41,61 @@ err()   { printf '❌ %s\n' "$*" | tee -a "$LOG_FILE" >&2; }
 step()  { log ""; log "=== $* ==="; }
 
 notify() {
-    # Best-effort Telegram notification to ADMIN_CHAT_ID (silent if not configured)
+    # Best-effort Telegram notification to ADMIN_CHAT_ID (silent if not configured).
+    # Every step is guarded with `|| true` so a missing key never aborts the script
+    # under `set -euo pipefail`.
     local msg="$1"
     [[ -f "$ENV_FILE" ]] || return 0
     local token chat
-    token=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
-    chat=$(grep -E '^ADMIN_CHAT_ID=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
-    [[ -n "$token" && -n "$chat" ]] || return 0
+    token=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    chat=$(grep -E '^ADMIN_CHAT_ID=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    [[ -n "${token:-}" && -n "${chat:-}" ]] || return 0
     curl -s --max-time 5 -X POST \
         "https://api.telegram.org/bot${token}/sendMessage" \
         -d "chat_id=${chat}" \
-        -d "text=${msg}" >/dev/null || true
+        -d "text=${msg}" >/dev/null 2>&1 || true
 }
 
 CURRENT_SHA=""
+BACKUP_FILE=""           # set in [3/7] when backup runs; referenced in rollback message
 DEPLOY_PHASE="init"
 cleanup_lock() { rm -f "$LOCK_FILE"; }
+
+do_rollback() {
+    # Best-effort restore to CURRENT_SHA: every command guarded so we always
+    # finish the sequence (services back up, deps reinstalled, notify sent).
+    err "Rolling back to ${CURRENT_SHA:0:7}"
+    git reset --hard "$CURRENT_SHA" 2>&1 | tee -a "$LOG_FILE" || true
+    # Drop files introduced by the failed deploy, but preserve generated
+    # state we want to keep: db backups + launchd service logs.
+    git clean -fd \
+        -e .backups \
+        -e 'backend*.log' \
+        -e 'scheduler*.log' \
+        2>&1 | tee -a "$LOG_FILE" || true
+    "$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
+    "$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
+    for label in com.financeassistant.backend com.financeassistant.scheduler; do
+        launchctl unload "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
+        launchctl load "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
+    done
+    err "Rolled back code. DB migration was NOT reverted — manually restore from ${BACKUP_FILE:-'(no backup taken)'} if needed."
+}
+
 on_error() {
     local exit_code=$?
+    trap - ERR  # avoid re-entry if rollback itself trips ERR
     err "Deploy FAILED at phase: $DEPLOY_PHASE (exit=$exit_code)"
-    notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE] — see $LOG_FILE"
+    case "$DEPLOY_PHASE" in
+        service-restart|health-check)
+            # Past the point of no return — services were unloaded. Try to restore.
+            do_rollback
+            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Code rolled back to ${CURRENT_SHA:0:7}. DB needs manual review."
+            ;;
+        *)
+            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE] — see $LOG_FILE"
+            ;;
+    esac
     cleanup_lock
     exit "$exit_code"
 }
@@ -72,11 +107,19 @@ DEPLOY_PHASE="pre-flight"
 log "=== Bé Tiền — PRODUCTION rebuild @ $TS ==="
 log "    Project: $PROJECT_DIR  Branch: $BRANCH  Log: $LOG_FILE"
 
-# Concurrency lock (avoid two deploys racing)
+# Concurrency lock (avoid two deploys racing).
+# If the lock file exists but its PID is dead (prior deploy crashed / kill -9 /
+# host reboot), take over — otherwise an outage stalls all future deploys.
 if ! ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then
-    err "Another deploy is in progress (lock: $LOCK_FILE held by PID $(cat "$LOCK_FILE" 2>/dev/null || echo '?'))"
-    trap - EXIT  # don't remove the other deploy's lock
-    exit 1
+    lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+    if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+        err "Another deploy is in progress (lock: $LOCK_FILE held by PID $lock_pid)"
+        trap - EXIT  # don't remove the other deploy's lock
+        exit 1
+    fi
+    log "⚠️  Stale lock found (PID ${lock_pid:-unknown} not alive) — taking over"
+    rm -f "$LOCK_FILE"
+    echo "$$" > "$LOCK_FILE"
 fi
 
 [[ -d "$PROJECT_DIR" ]]         || { err "PROJECT_DIR not found"; exit 1; }
@@ -224,18 +267,8 @@ DOWN_END=$(date +%s)
 DOWNTIME=$((DOWN_END - DOWN_START))
 
 if [[ "$HEALTH_OK" != "1" ]]; then
-    err "Health check FAILED after 5 attempts — rolling back to $CURRENT_SHA"
-    DEPLOY_PHASE="rollback"
-    git reset --hard "$CURRENT_SHA" 2>&1 | tee -a "$LOG_FILE"
-    "$SERVICE_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
-    "$TOOLING_VENV/bin/pip" install -r "$REQUIREMENTS_FILE" -q 2>&1 | tee -a "$LOG_FILE" || true
-    for label in com.financeassistant.backend com.financeassistant.scheduler; do
-        launchctl unload "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
-        launchctl load "$HOME/Library/LaunchAgents/${label}.plist" 2>&1 | tee -a "$LOG_FILE" || true
-    done
-    err "Rolled back code. DB migration was NOT reverted — manually restore from $BACKUP_FILE if needed."
-    notify "❌ Prod deploy FAILED health check. Code rolled back to ${CURRENT_SHA:0:7}. DB needs manual review."
-    exit 1
+    err "Health check FAILED after 5 attempts"
+    exit 1  # on_error trap runs do_rollback because DEPLOY_PHASE=health-check
 fi
 
 # ── cleanup old logs (keep last 20) ────────────────────────────
