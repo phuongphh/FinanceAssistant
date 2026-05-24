@@ -48,6 +48,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -915,6 +916,63 @@ async def _action_assets_manage(
     )
 
 
+async def _action_assets_life_insurance(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    from backend.wealth.services.life_insurance_service import get_life_insurance_list
+
+    contracts = await get_life_insurance_list(db, user.id)
+    if not contracts:
+        await send_message(
+            chat_id=chat_id,
+            text="🛡️ Chưa có hợp đồng bảo hiểm nhân thọ nào.\n\nThêm mới?",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "⚙️ Quản lý hợp đồng BHNT", "callback_data": "menu:assets:manage"}],
+                    [{"text": "🔙 Quay về", "callback_data": "menu:assets"}],
+                ]
+            },
+        )
+        return
+
+    lines = ["🛡️ *Bảo hiểm nhân thọ*"]
+    total = Decimal(0)
+    for item in contracts:
+        extra = item.extra or {}
+        company = extra.get("company_name") or item.name
+        pay_day = extra.get("monthly_payment_date") or extra.get("annual_settlement_day")
+        pay_month = extra.get("monthly_payment_month") or extra.get("annual_settlement_month")
+        day = f"{int(pay_day):02d}/{int(pay_month):02d}" if pay_day and pay_month else (str(pay_day) if pay_day else "-")
+        annual_amount = Decimal(str(extra.get("annual_premium") or extra.get("monthly_amount") or 0))
+        end_month = extra.get("contract_end_month")
+        end_year = extra.get("contract_end_year")
+        end_text = f"{int(end_month):02d}/{int(end_year)}" if end_month and end_year else (str(end_year) if end_year else "-")
+        paid = Decimal(str(extra.get("total_paid", item.current_value or 0)))
+        total += paid
+        lines.extend(
+            [
+                "",
+                f"🛡️ {company}",
+                f"📅 Đóng ngày: {day} hàng năm",
+                f"💰 Số tiền/năm: {format_money_full(annual_amount)}",
+                f"📆 Tất toán: {end_text}",
+                f"💵 Tổng đã đóng: {format_money_full(paid)}",
+            ]
+        )
+    lines.extend(["", f"*Tổng BHNT: {format_money_full(total)}*"])
+    await send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup={
+            "inline_keyboard": [
+                [{"text": "⚙️ Quản lý hợp đồng BHNT", "callback_data": "menu:assets:manage"}],
+                [{"text": "🔙 Quay về", "callback_data": "menu:assets"}],
+            ]
+        },
+    )
+
+
 async def _action_expenses_report(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
@@ -1041,6 +1099,38 @@ async def _action_expenses_ocr_prompt(
         properties={"category": "expenses", "action": "ocr_prompt"},
     )
 
+
+
+
+async def _action_expenses_credit_cards(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Guide user to use the new credit-card source flow safely and quickly."""
+    title = get_action_copy("action_expenses_credit_cards", "title")
+    body = get_action_copy("action_expenses_credit_cards", "body")
+    text = f"{title}\n\n{body}"
+    await send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="Markdown",
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": get_action_copy(
+                            "action_expenses_credit_cards", "back_button"
+                        ),
+                        "callback_data": "menu:expenses",
+                    }
+                ]
+            ]
+        },
+    )
+    analytics.track(
+        "menu_action",
+        user_id=user.id,
+        properties={"category": "expenses", "action": "credit_cards"},
+    )
 
 async def _action_expenses_recurring(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
@@ -1787,6 +1877,7 @@ _DIRECT_HANDLERS = {
     ("assets", "add"): _action_assets_manage,
     ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
+    ("assets", "life_insurance"): _action_assets_life_insurance,
     ("expenses", "report"): _action_expenses_report,
     ("expenses", "manage"): _action_expenses_manage,
     ("expenses", "ocr_prompt"): _action_expenses_ocr_prompt,
@@ -1798,6 +1889,7 @@ _DIRECT_HANDLERS = {
     ("expenses", "ocr"): _action_expenses_manage,
     ("expenses", "by_category"): _action_expenses_manage,
     ("expenses", "recurring"): _action_expenses_recurring,
+    ("expenses", "credit_cards"): _action_expenses_credit_cards,
     ("cashflow", "income"): _action_cashflow_income,
     ("cashflow", "goals"): _action_cashflow_goals,
     # Phase 3.8 Epic 5 — full CRUD via direct handlers (Phase 3A had

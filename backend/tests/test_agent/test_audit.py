@@ -19,7 +19,7 @@ def _audit() -> RouteAudit:
         routing_reason="heuristic_tier2",
         tools_called=[{"name": "get_assets", "args": {"limit": 3}}],
         tool_call_count=1,
-        llm_model="deepseek-chat",
+        llm_model="deepseek-v4-flash",
         input_tokens=120,
         output_tokens=40,
         cost_usd=0.000128,

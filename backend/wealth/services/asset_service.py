@@ -74,6 +74,7 @@ async def create_asset(
     extra: dict | None = None,
     description: str | None = None,
     source: str = SOURCE_USER_INPUT,
+    suppress_twin_event: bool = False,
     is_placeholder_asset: bool = False,
     is_confirmed: bool = True,
     source_input_raw: str | None = None,
@@ -125,7 +126,7 @@ async def create_asset(
     # TRANSACTION_OWNED_BY_CALLER — worker/router commits at the boundary.
     await db.flush()
 
-    if source == SOURCE_USER_INPUT:
+    if source == SOURCE_USER_INPUT and not suppress_twin_event:
         await _publish_twin_event(
             "asset.created",
             user_id,

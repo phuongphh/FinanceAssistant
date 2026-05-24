@@ -122,13 +122,32 @@ async def _handle_source_selection_callback(
         "zalopay": "Ví ZaloPay",
         "viettelpay": "Ví ViettelPay",
     }.get(wallet_provider or source_type, "không liên kết nguồn")
-    await edit_message_text(
-        chat_id=chat_id,
-        message_id=message_id,
-        text=f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}",
-        parse_mode=None,
-        reply_markup={"inline_keyboard": []},
+    confirmation_text = (
+        f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}"
     )
+    # Issue #799: ``editMessageText`` silently returns ``None`` when the
+    # source-picker message is unreachable (deleted by the user, older
+    # than Telegram's 48h edit window, etc.). Without a fallback the
+    # user is stranded on the picker screen with no confirmation that
+    # the transaction landed. Always send a fresh ``sendMessage`` when
+    # the edit can't be confirmed so the user gets feedback either way.
+    edit_result = None
+    if chat_id is not None and message_id is not None:
+        edit_result = await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=confirmation_text,
+            parse_mode=None,
+            reply_markup={"inline_keyboard": []},
+        )
+    if edit_result is None and chat_id is not None:
+        logger.warning(
+            "txsrc confirmation edit returned None; sending fallback message "
+            "(chat_id=%s message_id=%s)",
+            chat_id,
+            message_id,
+        )
+        await send_message(chat_id, confirmation_text, parse_mode=None)
     if expense.transaction_type == "expense" and (expense.raw_data or {}).get(
         "source_warning"
     ):
@@ -403,7 +422,7 @@ async def _handle_undo_transaction(*, db, user, args, callback_id, chat_id, mess
     if age > UNDO_WINDOW_SECONDS:
         await answer_callback(
             callback_id,
-            text="Quá muộn để hủy — dùng nút 🗑 Xóa nhé",
+            text="Hết hạn huỷ nhanh — mở Mini App rồi bấm ↩️ Huỷ giao dịch nhé",
             show_alert=True,
         )
         return
@@ -457,7 +476,7 @@ async def _handle_undo_transaction_batch(
     if age > UNDO_WINDOW_SECONDS:
         await answer_callback(
             callback_id,
-            text="Quá muộn để hủy — dùng nút 🗑 Xóa nhé",
+            text="Hết hạn huỷ nhanh — mở Mini App rồi bấm ↩️ Huỷ giao dịch nhé",
             show_alert=True,
         )
         return

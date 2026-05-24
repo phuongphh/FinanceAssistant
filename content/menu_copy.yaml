@@ -187,6 +187,9 @@ submenu_assets:
     - label: "✏️ Quản lý tài sản"
       callback: "menu:assets:manage"
       description: "Hướng dẫn 3 cách quản lý tài sản"
+    - label: "🛡️ Bảo hiểm nhân thọ"
+      callback: "menu:assets:life_insurance"
+      description: "Xem danh sách hợp đồng BHNT và tổng đã đóng"
 
     - label: "🏠 Cho thuê BĐS"
       callback: "menu:assets:mark_rental"
@@ -292,6 +295,10 @@ submenu_expenses:
       callback: "menu:expenses:recurring"
       description: "Thuê nhà, internet, gym… + nhắc nhở"
 
+    - label: "💳 Thẻ tín dụng"
+      callback: "menu:expenses:credit_cards"
+      description: "Quản lý nguồn chi bằng thẻ và dư nợ hiện tại"
+
     - label: "◀️ Quay về"
       callback: "menu:main"
 
@@ -312,6 +319,19 @@ action_expenses_report:
   miniapp_button: "Mở Dashboard"
   not_configured: |-
     📊 Dashboard chưa sẵn sàng — admin cần cấu hình `MINIAPP_BASE_URL` trước nhé.
+
+action_expenses_credit_cards:
+  title: "💳 *THẺ TÍN DỤNG*"
+  body: |-
+    Bạn có thể khai báo thẻ để gắn nguồn chi tiêu chính xác hơn.
+
+    Cách dùng nhanh:
+    • Khi ghi chi tiêu, thêm cụm: *trả bằng thẻ <tên ngân hàng>*
+    • Ví dụ: "-450k ăn tối trả bằng thẻ Techcombank"
+
+    Sau khi thẻ đã có trong hệ thống, Bé Tiền sẽ tự map đúng nguồn chi.
+    Nếu chưa nhận ra thẻ, bạn nhắn lại đúng tên ngân hàng trên thẻ nhé.
+  back_button: "◀️ Quay về menu"
 
 action_expenses_manage:
   title: "✏️ *THÊM / SỬA / XOÁ CHI TIÊU*"

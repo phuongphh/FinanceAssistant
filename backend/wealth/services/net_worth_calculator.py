@@ -11,6 +11,7 @@ CLAUDE.md § 13.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -21,8 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import asset_service
-from backend.wealth.valuation.crypto import value_crypto_holding
-from backend.wealth.valuation.stock import value_stock_holding
+from backend.wealth.valuation.crypto import (
+    value_crypto_holding,
+    value_crypto_holdings,
+)
+from backend.wealth.valuation.stock import (
+    value_stock_holding,
+    value_stock_holdings,
+)
 
 PERIOD_DAY = "day"
 PERIOD_WEEK = "week"
@@ -81,12 +88,26 @@ class NetWorthChange:
 async def calculate(db: AsyncSession, user_id: uuid.UUID) -> NetWorthBreakdown:
     """Sum every active asset's ``current_value`` and break down by type.
 
+    Stock and crypto holdings are live-quoted. We fan the two asset
+    classes out via batched provider calls (``value_stock_holdings`` /
+    ``value_crypto_holdings``) and run the two classes in parallel —
+    they hit different providers (stock dispatcher vs CoinGecko), so
+    a portfolio with N stocks + M coins costs ``max(stock_call, crypto_call)``
+    rather than the N+M sequential awaits this function used to issue.
+    Cache hits stay cheap; the difference is dramatic on cold caches
+    where each missing per-symbol HTTP request was a multi-second tail.
+
     Edge case: user with 0 assets returns an empty breakdown — never
     raises, never divides by zero.
     """
     assets: list[Asset] = await asset_service.get_user_assets(db, user_id)
     if not assets:
         return NetWorthBreakdown()
+
+    stock_valuations, crypto_valuations = await asyncio.gather(
+        value_stock_holdings(assets),
+        value_crypto_holdings(assets),
+    )
 
     by_type: dict[str, Decimal] = {}
     total = Decimal(0)
@@ -95,11 +116,19 @@ async def calculate(db: AsyncSession, user_id: uuid.UUID) -> NetWorthBreakdown:
 
     for a in assets:
         if a.asset_type == "stock":
-            valuation = await value_stock_holding(a)
-            value = valuation.current_value
+            valuation = stock_valuations.get(a)
+            value = (
+                valuation.current_value
+                if valuation is not None
+                else Decimal(a.current_value or 0)
+            )
         elif a.asset_type == "crypto":
-            valuation = await value_crypto_holding(a)
-            value = valuation.current_value
+            valuation = crypto_valuations.get(a)
+            value = (
+                valuation.current_value
+                if valuation is not None
+                else Decimal(a.current_value or 0)
+            )
         else:
             value = Decimal(a.current_value or 0)
         total += value

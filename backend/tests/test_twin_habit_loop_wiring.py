@@ -182,3 +182,34 @@ def test_habit_loop_copy_has_all_required_keys():
         direction=copy["push_direction_up"], pct="1.23", causality="X"
     )
     assert "1.23" in rendered
+
+
+@pytest.mark.asyncio
+async def test_process_once_skips_notify_when_onboarding_not_ready():
+    pending = on_demand_recompute.PendingRecompute(
+        user_id=uuid.uuid4(),
+        event_id="e1",
+        event_type="asset.updated",
+        amount_vnd=Decimal("30000000"),
+    )
+    db = AsyncMock()
+    user = _user()
+    user.id = pending.user_id
+    db.get = AsyncMock(side_effect=[user, MagicMock(first_twin_shown_at=None)])
+    db.flush = AsyncMock()
+    db.add = MagicMock()
+    db.commit = AsyncMock()
+
+    class _Ctx:
+        async def __aenter__(self):
+            return db
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("backend.twin.services.on_demand_recompute.get_session_factory", return_value=lambda: _Ctx()), \
+         patch("backend.twin.services.on_demand_recompute.threshold_service.get_threshold_config", new=AsyncMock(return_value={})), \
+         patch("backend.twin.services.on_demand_recompute.compute_and_store", new=AsyncMock()) as compute_mock:
+        log = await on_demand_recompute._process_once(pending, attempt=1)
+
+    assert log.skip_reason == "onboarding_incomplete"
+    compute_mock.assert_not_awaited()

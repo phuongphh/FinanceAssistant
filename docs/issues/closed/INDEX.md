@@ -48,6 +48,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #83 | Pre-Phase | [P3A-25] User testing protocol — 7 users, 7 days validation | [pre-phase/issue-83.md](by-phase/pre-phase/issue-83.md) |
 | #84 | Pre-Phase | [P3A-26] Bug fixes & Phase 3A exit review | [pre-phase/issue-84.md](by-phase/pre-phase/issue-84.md) |
 | #91 | Pre-Phase | [Epic 3 / Phase 3A] Storytelling Expense | [pre-phase/issue-91.md](by-phase/pre-phase/issue-91.md) |
+| #92 | Pre-Phase | [Epic 4 / Phase 3A] Visualization & Testing | [pre-phase/issue-92.md](by-phase/pre-phase/issue-92.md) |
 | #110 | Pre-Phase | [Epic] Phase 3.5 — Epic 1: Intent Foundation & Patterns | [pre-phase/issue-110.md](by-phase/pre-phase/issue-110.md) |
 | #111 | Pre-Phase | [Epic] Phase 3.5 — Epic 2: LLM Fallback & Clarification | [pre-phase/issue-111.md](by-phase/pre-phase/issue-111.md) |
 | #112 | Pre-Phase | [Epic] Phase 3.5 — Epic 3: Personality & Advisory | [pre-phase/issue-112.md](by-phase/pre-phase/issue-112.md) |
@@ -225,9 +226,30 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #400 | Pre-Phase | [Story] P4A-S26: Performance benchmarks | [pre-phase/issue-400.md](by-phase/pre-phase/issue-400.md) |
 | #401 | Pre-Phase | [Story] P4A-S27: Test suite + quality gates | [pre-phase/issue-401.md](by-phase/pre-phase/issue-401.md) |
 | #412 | Pre-Phase | [Feature] Dashboard Enhancement — VN wealth level labels, inline edit/delete buttons, sortable asset list | [pre-phase/issue-412.md](by-phase/pre-phase/issue-412.md) |
+| #414 | Pre-Phase | [Epic] Phase 4B — Epic 1: Twin Polish | [pre-phase/issue-414.md](by-phase/pre-phase/issue-414.md) |
+| #415 | Pre-Phase | [Epic] Phase 4B — Epic 2: Life Event Simulator | [pre-phase/issue-415.md](by-phase/pre-phase/issue-415.md) |
+| #416 | Pre-Phase | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [pre-phase/issue-416.md](by-phase/pre-phase/issue-416.md) |
 | #417 | Pre-Phase | [Epic] Phase 4B — Epic 4: Zalo Adapter Foundation | [pre-phase/issue-417.md](by-phase/pre-phase/issue-417.md) |
+| #418 | Pre-Phase | [Story] P4B-S1: Historical Accuracy Tracking | [pre-phase/issue-418.md](by-phase/pre-phase/issue-418.md) |
+| #419 | Pre-Phase | [Story] P4B-S2: On-Demand Recompute Trigger | [pre-phase/issue-419.md](by-phase/pre-phase/issue-419.md) |
+| #420 | Pre-Phase | [Story] P4B-S3: LLM Narrative v2 | [pre-phase/issue-420.md](by-phase/pre-phase/issue-420.md) |
 | #421 | Pre-Phase | [Story] P4B-S4: Scenario Comparison UX Enhancement | [pre-phase/issue-421.md](by-phase/pre-phase/issue-421.md) |
+| #422 | Pre-Phase | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [pre-phase/issue-422.md](by-phase/pre-phase/issue-422.md) |
 | #423 | Pre-Phase | [Story] P4B-S6: Life Event Data Model + Migration | [pre-phase/issue-423.md](by-phase/pre-phase/issue-423.md) |
+| #424 | Pre-Phase | [Story] P4B-S7: Vietnamese Life Event Presets | [pre-phase/issue-424.md](by-phase/pre-phase/issue-424.md) |
+| #425 | Pre-Phase | [Story] P4B-S8: Monte Carlo Integration — Life Events | [pre-phase/issue-425.md](by-phase/pre-phase/issue-425.md) |
+| #426 | Pre-Phase | [Story] P4B-S9: Telegram Interface — Life Events | [pre-phase/issue-426.md](by-phase/pre-phase/issue-426.md) |
+| #427 | Pre-Phase | [Story] P4B-S10: Life Event Impact Visualization | [pre-phase/issue-427.md](by-phase/pre-phase/issue-427.md) |
+| #428 | Pre-Phase | [Story] P4B-S11: Mini App Life Events Panel | [pre-phase/issue-428.md](by-phase/pre-phase/issue-428.md) |
+| #429 | Pre-Phase | [Story] P4B-S12: LLM Narrative for Life Events | [pre-phase/issue-429.md](by-phase/pre-phase/issue-429.md) |
+| #430 | Pre-Phase | [Story] P4B-S13: Life Events Tests + Benchmarks | [pre-phase/issue-430.md](by-phase/pre-phase/issue-430.md) |
+| #431 | Pre-Phase | [Story] P4B-S14: Recurring Transaction Detector | [pre-phase/issue-431.md](by-phase/pre-phase/issue-431.md) |
+| #432 | Pre-Phase | [Story] P4B-S15: User Review Flow for Detected Patterns | [pre-phase/issue-432.md](by-phase/pre-phase/issue-432.md) |
+| #433 | Pre-Phase | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [pre-phase/issue-433.md](by-phase/pre-phase/issue-433.md) |
+| #434 | Pre-Phase | [Story] P4B-S17: Low-Balance Alert Engine | [pre-phase/issue-434.md](by-phase/pre-phase/issue-434.md) |
+| #435 | Pre-Phase | [Story] P4B-S18: Cashflow Waterfall Chart | [pre-phase/issue-435.md](by-phase/pre-phase/issue-435.md) |
+| #436 | Pre-Phase | [Story] P4B-S19: Morning Briefing Cashflow Summary | [pre-phase/issue-436.md](by-phase/pre-phase/issue-436.md) |
+| #437 | Pre-Phase | [Story] P4B-S20: Cashflow Tab in Mini App | [pre-phase/issue-437.md](by-phase/pre-phase/issue-437.md) |
 | #438 | Pre-Phase | [Story] P4B-S21: Zalo Official Account Setup + SDK | [pre-phase/issue-438.md](by-phase/pre-phase/issue-438.md) |
 | #439 | Pre-Phase | [Story] P4B-S22: ZaloNotifier implementing Notifier Port | [pre-phase/issue-439.md](by-phase/pre-phase/issue-439.md) |
 | #440 | Pre-Phase | [Story] P4B-S23: User Zalo Linking Flow | [pre-phase/issue-440.md](by-phase/pre-phase/issue-440.md) |
@@ -404,14 +426,20 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #686 | Pre-Phase | [Story 4.2] Twin Loop Health Section — Phase 4.3 | [pre-phase/issue-686.md](by-phase/pre-phase/issue-686.md) |
 | #687 | Pre-Phase | [Story 4.3] Twin Comprehension Signals Section — Phase 4.3 | [pre-phase/issue-687.md](by-phase/pre-phase/issue-687.md) |
 | #688 | Pre-Phase | [Story 4.4] Twin Delta Distribution Section — Phase 4.3 | [pre-phase/issue-688.md](by-phase/pre-phase/issue-688.md) |
+| #703 | Pre-Phase | Bug: ModuleNotFoundError backend.adapters.telegram_service — import path sai | [pre-phase/issue-703.md](by-phase/pre-phase/issue-703.md) |
 | #706 | Pre-Phase | Stock market data: VNDIRECT 403 (missing User-Agent), SSI 502 | [pre-phase/issue-706.md](by-phase/pre-phase/issue-706.md) |
 | #711 | Pre-Phase | Delete asset: multiple matches with no asset_type shows wrong screen | [pre-phase/issue-711.md](by-phase/pre-phase/issue-711.md) |
 | #715 | Pre-Phase | bug(action_delete_asset): NameError — build_callback not imported in asset_entry.py | [pre-phase/issue-715.md](by-phase/pre-phase/issue-715.md) |
 | #719 | Pre-Phase | [Epic] Enhance Expense Flow — Transaction-based Architecture | [pre-phase/issue-719.md](by-phase/pre-phase/issue-719.md) |
+| #720 | Pre-Phase | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [pre-phase/issue-720.md](by-phase/pre-phase/issue-720.md) |
+| #721 | Pre-Phase | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [pre-phase/issue-721.md](by-phase/pre-phase/issue-721.md) |
+| #722 | Pre-Phase | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [pre-phase/issue-722.md](by-phase/pre-phase/issue-722.md) |
 | #723 | Pre-Phase | [Story 4] Edit Transaction with Reverse Logic — Expense Flow | [pre-phase/issue-723.md](by-phase/pre-phase/issue-723.md) |
 | #725 | Pre-Phase | [Epic] Enhance Twin Dashboard — UI/UX Improvements | [pre-phase/issue-725.md](by-phase/pre-phase/issue-725.md) |
+| #726 | Pre-Phase | [Story 1] Fix milestone card color contrast — Twin Dashboard | [pre-phase/issue-726.md](by-phase/pre-phase/issue-726.md) |
 | #727 | Pre-Phase | [Story 2] Bold/colorize suggestion text in Current vs Optimal card — Twin Dashboard | [pre-phase/issue-727.md](by-phase/pre-phase/issue-727.md) |
 | #728 | Pre-Phase | [Story 3] Fix uniform spacing in Main Uncertainty Source card — Twin Dashboard | [pre-phase/issue-728.md](by-phase/pre-phase/issue-728.md) |
+| #729 | Pre-Phase | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [pre-phase/issue-729.md](by-phase/pre-phase/issue-729.md) |
 | #730 | Pre-Phase | [Story 5] Always show tech detail card + friendly labels — Twin Dashboard | [pre-phase/issue-730.md](by-phase/pre-phase/issue-730.md) |
 | #740 | Pre-Phase | 🐌 /chitieu command: slow response (16s+) and import error failures | [pre-phase/issue-740.md](by-phase/pre-phase/issue-740.md) |
 | #750 | Pre-Phase | Add foreign stock provider (NVDA, IBM, ETF) — current providers only support VN stocks | [pre-phase/issue-750.md](by-phase/pre-phase/issue-750.md) |
@@ -419,6 +447,19 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #765 | Pre-Phase | Telegram WebView cache ignores query-string parameters — JS served stale after deploy | [pre-phase/issue-765.md](by-phase/pre-phase/issue-765.md) |
 | #770 | Pre-Phase | Internal dashboard navigation does not reload CSS — WebView uses cached styles | [pre-phase/issue-770.md](by-phase/pre-phase/issue-770.md) |
 | #774 | Pre-Phase | [Epic] Credit Card Management — Create, Expense, Menu | [pre-phase/issue-774.md](by-phase/pre-phase/issue-774.md) |
+| #775 | Pre-Phase | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [pre-phase/issue-775.md](by-phase/pre-phase/issue-775.md) |
+| #776 | Pre-Phase | [Story 2] Expense Transaction with Credit Card Source | [pre-phase/issue-776.md](by-phase/pre-phase/issue-776.md) |
+| #777 | Pre-Phase | [Story 3] Credit Card Menu in Chi Tiêu | [pre-phase/issue-777.md](by-phase/pre-phase/issue-777.md) |
+| #783 | Pre-Phase | [Epic] Life Assurance — Bảo hiểm nhân thọ | [pre-phase/issue-783.md](by-phase/pre-phase/issue-783.md) |
+| #785 | Pre-Phase | [Story 2] Add Bảo hiểm nhân thọ Button in Asset Menu | [pre-phase/issue-785.md](by-phase/pre-phase/issue-785.md) |
+| #786 | Pre-Phase | [Story 3] Life Assurance Contract List View | [pre-phase/issue-786.md](by-phase/pre-phase/issue-786.md) |
+| #791 | Pre-Phase | Admin portal SPA routes return 404 — Starlette StaticFiles html=True does not fallback to index.html | [pre-phase/issue-791.md](by-phase/pre-phase/issue-791.md) |
+| #793 | Pre-Phase | Webhook returns 500 on non-JSON body — bot responds slowly | [pre-phase/issue-793.md](by-phase/pre-phase/issue-793.md) |
+| #795 | Pre-Phase | Intent classifier slow — Deepseek API takes ~10 seconds per classify call | [pre-phase/issue-795.md](by-phase/pre-phase/issue-795.md) |
+| #797 | Pre-Phase | [perf] Tier 1 intent classifier latency 10s+ — Groq llama-3.3-70b not actually used | [pre-phase/issue-797.md](by-phase/pre-phase/issue-797.md) |
+| #799 | Pre-Phase | [bug] Callback txsrc_wallet:* không gửi response — user stuck ở màn hình chọn nguồn | [pre-phase/issue-799.md](by-phase/pre-phase/issue-799.md) |
+| #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
+| #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
 
-**Total:** 415 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 398 Pre-Phase)
+**Total:** 456 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 439 Pre-Phase)

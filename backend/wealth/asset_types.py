@@ -22,6 +22,7 @@ class AssetType(str, Enum):
     CRYPTO = "crypto"
     GOLD = "gold"
     OTHER = "other"
+    LIFE_INSURANCE = "life_insurance"
 
 
 _ASSET_CATEGORIES_PATH = (
@@ -78,6 +79,9 @@ ASSET_TYPE_ALIASES: dict[str, str] = {
     "crypto": "crypto",
     "gold": "gold",
     "other": "other",
+    "life_insurance": "life_insurance",
+    "life-assurance": "life_insurance",
+    "bao_hiem_nhan_tho": "life_insurance",
 }
 
 

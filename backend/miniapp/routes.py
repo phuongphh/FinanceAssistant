@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import time
 from pathlib import Path
@@ -29,6 +30,8 @@ from backend.services import (
     intent_metrics,
     wealth_dashboard_service,
 )
+
+logger = logging.getLogger(__name__)
 
 _HERE = Path(__file__).parent
 _TEMPLATES_DIR = _HERE / "templates"
@@ -644,6 +647,11 @@ def _serialize_expense_item(expense) -> dict:
             if getattr(expense, "source_asset_id", None)
             else None
         ),
+        "source_credit_card_id": (
+            str(expense.source_credit_card_id)
+            if getattr(expense, "source_credit_card_id", None)
+            else None
+        ),
     }
 
 
@@ -773,6 +781,17 @@ async def get_expense_dashboard_overview(
                 "money_in_total": sum(float(e.amount or 0) for e in money_in),
             }
         except Exception as exc:  # noqa: BLE001
+            # Log the underlying DB / ORM error before flattening to a
+            # generic 500. The Mini App only renders the localized
+            # message ("Không tải được dữ liệu chi tiêu, thử lại nhé."),
+            # so without this log a schema drift (e.g. PR #778 adding
+            # ``expenses.source_credit_card_id`` to the ORM with no
+            # matching Alembic migration) is invisible — exactly the
+            # failure mode that motivated this catch.
+            logger.exception(
+                "expense_dashboard.overview failed",
+                extra={"user_id": str(user.id), "month": month_key},
+            )
             raise HTTPException(
                 status_code=500,
                 detail="Không tải được dữ liệu chi tiêu, thử lại nhé.",

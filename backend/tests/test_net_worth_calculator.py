@@ -64,6 +64,76 @@ class TestCalculate:
         assert b.by_type["real_estate"] == Decimal("2_000_000_000")
         assert b.largest_asset == ("Nhà Mỹ Đình", Decimal("2_000_000_000"))
 
+    async def test_live_valuation_batches_stock_and_crypto_calls(self, monkeypatch):
+        # Issue #797 follow-up: ``calculate`` must NOT issue one HTTP
+        # call per holding. The two batched helpers should be invoked
+        # exactly once each, and the live stock/crypto valuations
+        # should override the stored ``current_value`` in the total.
+        stock_calls = 0
+        crypto_calls = 0
+
+        async def fake_stock_holdings(assets):
+            nonlocal stock_calls
+            stock_calls += 1
+            stocks = [a for a in assets if a.asset_type == "stock"]
+            # Pretend the live quote doubled the stored value for each
+            # stock; the total should reflect the live value.
+            from backend.wealth.valuation.stock import HoldingValuation
+            return {
+                a: HoldingValuation(
+                    current_price=Decimal(a.current_value or 0) * 2,
+                    quantity=Decimal(1),
+                    cost_basis=Decimal(a.current_value or 0),
+                    current_value=Decimal(a.current_value or 0) * 2,
+                    pnl_pct=Decimal(100),
+                    is_stale=False,
+                )
+                for a in stocks
+            }
+
+        async def fake_crypto_holdings(assets):
+            nonlocal crypto_calls
+            crypto_calls += 1
+            cryptos = [a for a in assets if a.asset_type == "crypto"]
+            from backend.wealth.valuation.crypto import HoldingValuation
+            return {
+                a: HoldingValuation(
+                    current_price=Decimal(a.current_value or 0) * 3,
+                    quantity=Decimal(1),
+                    cost_basis=Decimal(a.current_value or 0),
+                    current_value=Decimal(a.current_value or 0) * 3,
+                    pnl_pct=Decimal(200),
+                    is_stale=False,
+                )
+                for a in cryptos
+            }
+
+        monkeypatch.setattr(nwc, "value_stock_holdings", fake_stock_holdings)
+        monkeypatch.setattr(nwc, "value_crypto_holdings", fake_crypto_holdings)
+        monkeypatch.setattr(
+            "backend.wealth.services.asset_service.get_user_assets",
+            AsyncMock(
+                return_value=[
+                    _asset("stock", "VNM", 10_000_000),
+                    _asset("stock", "HPG", 20_000_000),
+                    _asset("crypto", "BTC", 30_000_000),
+                    _asset("cash", "VCB", 50_000_000),
+                ]
+            ),
+        )
+
+        breakdown = await nwc.calculate(MagicMock(), uuid.uuid4())
+
+        # One batched call per asset class, regardless of holding count.
+        assert stock_calls == 1
+        assert crypto_calls == 1
+        # Stocks doubled, crypto tripled by the fake live valuation;
+        # cash uses stored value.
+        assert breakdown.by_type["stock"] == Decimal("60_000_000")
+        assert breakdown.by_type["crypto"] == Decimal("90_000_000")
+        assert breakdown.by_type["cash"] == Decimal("50_000_000")
+        assert breakdown.total == Decimal("200_000_000")
+
     async def test_stored_current_skips_live_market_valuation(self, monkeypatch):
         async def fail_live_valuation(*_args, **_kwargs):
             raise AssertionError("stored-current path must not call live valuation")

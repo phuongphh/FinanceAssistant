@@ -273,6 +273,50 @@ async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> Non
     analytics.track("onboarding_v2_goal_asked", user_id=user.id)
 
 
+async def _send_name_prompt(chat_id: int) -> None:
+    await send_message(
+        chat_id,
+        "Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨\n\n"
+        "(Bạn chỉ cần nhắn tên bạn vào đây)",
+        parse_mode="HTML",
+    )
+
+
+async def handle_name_text_input(
+    db: AsyncSession, chat_id: int, user: User, raw_text: str
+) -> bool:
+    """Consume free-text name input at the start of V2 onboarding."""
+    session = await onboarding_service.get_session(db, user.id)
+    if (
+        session is None
+        or session.current_step != STEP_GOAL_QUESTION
+        or session.goal_choice is not None
+    ):
+        return False
+
+    is_valid, name = legacy_onboarding_service.validate_display_name(raw_text)
+    if not is_valid:
+        await send_message(
+            chat_id,
+            "Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.",
+            parse_mode="HTML",
+        )
+        return True
+
+    await legacy_onboarding_service.set_display_name(db, user.id, name)
+    user.display_name = name
+    await db.flush()
+
+    await send_message(
+        chat_id,
+        f"Chào {name} 👋 Mình hỏi nhanh 1 câu để cá nhân hoá nhé:",
+        parse_mode="HTML",
+    )
+    await _send_goal_question(db, chat_id, user)
+    analytics.track("onboarding_v2_name_captured", user_id=user.id)
+    return True
+
+
 async def _on_goal_picked(
     db: AsyncSession,
     chat_id: int,
@@ -367,6 +411,15 @@ async def _send_first_asset_prompt(db: AsyncSession, chat_id: int, user: User) -
     await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
 
 
+
+
+def _step3_header_text(*, demo: bool) -> str:
+    copy = onboarding_service.load_copy()
+    header = ((copy.get("step_3_twin") or {}).get("header") or "(3/3) Twin đầu tiên").strip()
+    if demo:
+        return f"<b>{header}</b>\n\n🎭 Dưới đây là bản demo để bạn hình dung trước."
+    return f"<b>{header}</b>"
+
 async def handle_asset_text_input(
     db: AsyncSession, chat_id: int, user: User, raw_text: str
 ) -> bool:
@@ -450,6 +503,7 @@ async def _save_onboarding_first_asset(
         current_value=value,
         is_placeholder_asset=demo,
         is_confirmed=True,
+        suppress_twin_event=demo,
         source_input_raw=raw_text,
         data_quality_warning_type=warning_type,
     )
@@ -639,18 +693,25 @@ async def _trigger_first_twin(
     """
     from backend.twin.services import twin_chart_service
 
-    # Narrative FIRST — sets context before the chart shows up.
-    await send_message(
-        chat_id,
-        twin_narrative_service_v2.narrative_text(demo=demo),
-        parse_mode="HTML",
-    )
-
     cone_data, horizon_years = await _resolve_twin_cone(db, user, demo=demo)
     if cone_data is None:
         await _send_twin_compute_failed(chat_id)
         # Do NOT mark twin_shown_at; the retry button drives recovery.
         return
+
+    await send_message(
+        chat_id,
+        _step3_header_text(demo=demo),
+        parse_mode="HTML",
+    )
+
+    # Narrative after successful compute resolution so users never read
+    # Twin-copy when compute actually failed (prevents UX contradiction).
+    await send_message(
+        chat_id,
+        twin_narrative_service_v2.narrative_text(demo=demo),
+        parse_mode="HTML",
+    )
 
     try:
         png = twin_chart_service.render_projection_chart(cone_data)
@@ -1060,7 +1121,7 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
                 )
             except Exception:
                 pass
-        await _send_goal_question(db, chat_id, user)
+        await _send_name_prompt(chat_id)
         return True
 
     if action == "goal" and len(parts) >= 3:

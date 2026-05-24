@@ -489,6 +489,12 @@ async def _handle_message(
     if text and resolved_user is not None and not command.startswith("/"):
         from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
 
+        consumed = await onboarding_v2_handlers.handle_name_text_input(
+            db, chat_id, resolved_user, text
+        )
+        if consumed:
+            return resolved_user.id
+
         consumed = await onboarding_v2_handlers.handle_asset_text_input(
             db, chat_id, resolved_user, text
         )

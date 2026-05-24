@@ -87,6 +87,9 @@ async def test_starter_gets_simple_message_no_jargon():
         "backend.intent.handlers.query_cashflow._fetch_expenses",
         AsyncMock(return_value=[expense]),
     ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("0")),
+    ), patch(
         "backend.intent.handlers.query_cashflow.resolve_style",
         AsyncMock(return_value=style),
     ):
@@ -116,6 +119,9 @@ async def test_mass_affluent_gets_savings_rate_breakdown():
         "backend.intent.handlers.query_cashflow._fetch_expenses",
         AsyncMock(return_value=expenses),
     ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("0")),
+    ), patch(
         "backend.intent.handlers.query_cashflow.resolve_style",
         AsyncMock(return_value=style),
     ):
@@ -142,6 +148,9 @@ async def test_no_data_message():
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
         AsyncMock(return_value=[]),
+    ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("0")),
     ), patch(
         "backend.intent.handlers.query_cashflow.resolve_style",
         AsyncMock(return_value=style),
@@ -172,6 +181,9 @@ async def test_cashflow_overview_splits_income_and_expense_cards():
         "backend.intent.handlers.query_cashflow._fetch_expenses",
         AsyncMock(return_value=[food, shopping]),
     ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("500000")),
+    ), patch(
         "backend.intent.handlers.query_cashflow.resolve_style",
         AsyncMock(return_value=style),
     ):
@@ -183,6 +195,8 @@ async def test_cashflow_overview_splits_income_and_expense_cards():
     )
     assert "💼 *Thu nhập tháng*" in response
     assert "💸 *Chi tiêu tháng*" in response
+    assert "Chi tiêu hiện tại" in response
+    assert "Chi phí định kì" in response
     assert "💎 *Tỷ lệ tiết kiệm*" in response
     assert "So sánh" not in response
 
@@ -218,6 +232,9 @@ async def test_cashflow_current_month_detail_report():
         "backend.intent.handlers.query_cashflow._fetch_expenses",
         AsyncMock(return_value=[tx1, tx2]),
     ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("3000000")),
+    ), patch(
         "backend.intent.handlers.query_cashflow.resolve_style",
         AsyncMock(return_value=style),
     ):
@@ -233,6 +250,8 @@ async def test_cashflow_current_month_detail_report():
     assert "💸 *Top nhóm chi*" in response
     assert "📈 *Nhịp chi tiêu theo ngày*" in response
     assert "🔎 *3 giao dịch lớn nhất*" in response
+    assert "Chi tiêu hiện tại" in response
+    assert "Chi phí định kì" in response
     assert "Tiền nhà" in response
 
 

@@ -269,7 +269,7 @@ async def _create_transaction_record(db: AsyncSession, user_id: uuid.UUID, expen
         source_asset_id=expense.source_asset_id,
         source_type=expense.source_type or "expense_category",
         source_label=_source_label(expense.source_type),
-        amount=int(Decimal(str(expense.amount or 0))),
+        amount=Decimal(str(expense.amount or 0)),
         direction="inflow" if expense.transaction_type == TRANSACTION_TYPE_MONEY_IN else "outflow",
         note=expense.note or expense.merchant,
         category=expense.category,

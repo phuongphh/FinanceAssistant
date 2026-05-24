@@ -11,6 +11,7 @@ See docs/archive/scaling-refactor-A.md §A1 and §A3.
 import asyncio
 import hmac
 import logging
+from json import JSONDecodeError
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -80,7 +81,19 @@ async def telegram_webhook(
 ):
     _verify_webhook_request(request)
 
-    data = await request.json()
+    try:
+        data = await request.json()
+    except (JSONDecodeError, UnicodeDecodeError, ValueError):
+        # Health checks / tunnel probes may hit this endpoint with an
+        # empty or non-JSON body. Return 400 (not 500) so the route is
+        # resilient and doesn't create noisy retry/backoff behavior.
+        logger.warning("Telegram webhook received invalid JSON body")
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not isinstance(data, dict):
+        logger.warning("Telegram webhook body must be JSON object, got %s", type(data).__name__)
+        raise HTTPException(status_code=400, detail="JSON body must be an object")
+
     update_id = data.get("update_id")
     if update_id is None:
         # Malformed update — ack so Telegram stops retrying, but do nothing.

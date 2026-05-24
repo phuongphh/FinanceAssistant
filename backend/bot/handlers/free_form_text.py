@@ -26,6 +26,7 @@ patterns load exactly once per worker process.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -46,7 +47,7 @@ from backend.intent.dispatcher import (
 )
 from backend.intent.intents import IntentResult, IntentType
 from backend.models.user import User
-from backend.services.telegram_service import send_message
+from backend.services.telegram_service import send_chat_action, send_message
 
 logger = logging.getLogger(__name__)
 
@@ -144,17 +145,29 @@ def _build_confirm_keyboard() -> dict:
 
 
 async def _track_classification(
-    user: User, result: IntentResult, latency_ms: int
+    user: User,
+    result: IntentResult,
+    latency_ms: int,
+    *,
+    classifier_latency_ms: int | None = None,
 ) -> None:
+    # ``latency_ms`` is the full webhook-to-reply window (classifier +
+    # dispatch + any handler-level network I/O). ``classifier_latency_ms``
+    # is the classify-only slice when the caller can isolate it — added
+    # for issue #797 so a slow dispatcher (e.g. portfolio crypto fetch)
+    # is no longer mistaken for a slow Groq classifier.
+    properties: dict[str, object] = {
+        "intent": result.intent.value,
+        "confidence": round(result.confidence, 3),
+        "classifier": result.classifier_used,
+        "latency_ms": latency_ms,
+    }
+    if classifier_latency_ms is not None:
+        properties["classifier_latency_ms"] = classifier_latency_ms
     analytics.track(
         EVENT_INTENT_CLASSIFIED,
         user_id=user.id,
-        properties={
-            "intent": result.intent.value,
-            "confidence": round(result.confidence, 3),
-            "classifier": result.classifier_used,
-            "latency_ms": latency_ms,
-        },
+        properties=properties,
     )
 
     # If the LLM ran, surface its cost to a dedicated event so the
@@ -354,6 +367,17 @@ async def _route_via_orchestrator(
     )
     streamer = TelegramStreamer(chat_id=chat_id)
 
+    # Fire-and-forget typing indicator so the user sees "đang nhập..."
+    # within ~50ms while Tier 1 (Groq Llama) and any downstream tiers
+    # run. Telegram clears the action after 5s; Tier 3 streamer
+    # re-sends on its own pulse, so we only need the one shot here.
+    async def _fire_typing(cid: int) -> None:
+        try:
+            await send_chat_action(cid, action="typing")
+        except Exception:
+            logger.debug("typing indicator failed", exc_info=True)
+    asyncio.create_task(_fire_typing(chat_id))
+
     route = await orchestrator.route(text, user, db, streamer=streamer)
     latency_ms = int((time.perf_counter() - started) * 1000)
 
@@ -361,14 +385,24 @@ async def _route_via_orchestrator(
         # Preserve the original Phase 3.5 behaviour exactly: same
         # outcome object, same analytics events, same keyboard.
         outcome = route.dispatch_outcome
-        # Synthesise an IntentResult-shaped object for analytics.
+        # Synthesise an IntentResult-shaped object for analytics. Use
+        # the real classifier name from the route ("rule" / "llm") so
+        # downstream filters (``EVENT_LLM_CLASSIFIER_CALL`` fires only
+        # when LLM actually ran) keep working — issue #797 traced a
+        # missing-Groq-call false alarm to this field being hardcoded
+        # to ``agent_tier1`` regardless of which classifier matched.
         synthetic = IntentResult(
             intent=outcome.intent,
             confidence=outcome.confidence,
             raw_text=text,
-            classifier_used="agent_tier1",
+            classifier_used=route.classifier_used or "agent_tier1",
         )
-        await _track_classification(user, synthetic, latency_ms)
+        await _track_classification(
+            user,
+            synthetic,
+            latency_ms,
+            classifier_latency_ms=route.classifier_latency_ms,
+        )
         await _send_outcome(chat_id, outcome)
         await _track_outcome(user, outcome)
         return outcome

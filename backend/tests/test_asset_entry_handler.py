@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -86,7 +87,7 @@ async def test_cash_amount_input_parses_label_and_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -328,6 +329,47 @@ async def test_callback_type_picker_routes_to_crypto_starter():
 
 
 @pytest.mark.asyncio
+async def test_callback_type_picker_routes_to_life_insurance_starter():
+    user = _user()
+    db = _db(user)
+    with (
+        patch.object(
+            asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            asset_entry, "_start_life_insurance_create", AsyncMock()
+        ) as starter,
+        patch.object(asset_entry, "answer_callback", AsyncMock()),
+    ):
+        await asset_entry.handle_asset_callback(
+            db,
+            {
+                "id": "cb1",
+                "data": "asset_add:type:life_insurance",
+                "message": {"chat": {"id": 100}, "message_id": 1},
+                "from": {"id": 100},
+            },
+        )
+    starter.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_start_life_insurance_create_starts_inline_wizard():
+    user = _user()
+    db = _db(user)
+    with (
+        patch.object(asset_entry.wizard_service, "start_flow", AsyncMock()) as start_flow,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send_message,
+    ):
+        await asset_entry._start_life_insurance_create(db, 100, user)
+    start_flow.assert_awaited_once()
+    args = start_flow.await_args.args
+    assert args[2] == asset_entry.FLOW_LIFE_INSURANCE
+    assert start_flow.await_args.kwargs["step"] == "company_name"
+    send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_crypto_subtype_bitcoin_advances_to_quantity():
     user = _user(
         {
@@ -395,7 +437,7 @@ async def test_crypto_current_price_same_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -557,7 +599,7 @@ async def test_gold_current_price_same_creates_asset():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("180000000"),
@@ -833,7 +875,7 @@ async def test_foreign_stock_save_persists_usd_and_fx_rate():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -903,7 +945,7 @@ async def test_foreign_stock_same_as_purchase_reuses_usd_avg_as_current():
         ) as create_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("100_000_000"),
@@ -1053,7 +1095,7 @@ async def test_real_estate_rental_ask_no_creates_asset_no_rental():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1124,7 +1166,7 @@ async def test_real_estate_rental_full_flow_marks_with_metadata():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1190,7 +1232,7 @@ async def test_real_estate_rental_status_vacant_skips_extras():
         ) as mark_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("3_000_000_000"),
@@ -1397,7 +1439,7 @@ async def test_mark_existing_rental_does_not_expose_undo_button():
         ),
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("2_500_000_000"),
@@ -1612,7 +1654,7 @@ async def test_callback_undo_hard_deletes_asset_and_recomputes_net_worth():
         ) as delete_mock,
         patch.object(
             asset_entry.net_worth_calculator,
-            "calculate",
+            "calculate_stored_current",
             AsyncMock(
                 return_value=MagicMock(
                     total=Decimal("0"),
@@ -2111,7 +2153,7 @@ async def test_asset_manage_delete_empty_type_shows_empty_state():
         )
 
     assert consumed is True
-    assert "Không có tài sản loại Tiền số" in send.await_args.kwargs["text"]
+    assert "Không có tài sản Tiền số" in send.await_args.kwargs["text"]
 
 
 # -----------------------------------------------------------------
@@ -2248,3 +2290,27 @@ async def test_show_asset_delete_matches_list_builds_manage_callbacks():
     assert rows[1][0]["callback_data"] == f"asset_manage:delete_confirm:{second.id}"
     assert rows[-2][0]["callback_data"] == "asset_manage:delete_type"
     assert rows[-1][0]["callback_data"] == "asset_manage:cancel"
+
+
+@pytest.mark.asyncio
+async def test_life_insurance_flow_text_steps_and_create():
+    user = _user({"flow": asset_entry.FLOW_LIFE_INSURANCE, "step": "company_name", "draft": {"asset_type": "life_insurance", "extra": {}}})
+    db = _db(user)
+
+    with (
+        patch.object(asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)),
+        patch.object(asset_entry.wizard_service, "update_step", AsyncMock()) as update_step,
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
+        await asset_entry.handle_asset_text_input(db, {"text": "AIA", "chat": {"id": 100}, "from": {"id": 100}})
+    assert update_step.await_args.kwargs["step"] == "contract_end"
+
+    user.wizard_state = {"flow": asset_entry.FLOW_LIFE_INSURANCE, "step": "annual_settlement_date", "draft": {"name": "AIA", "extra": {"company_name": "AIA", "total_paid": 1000000}}}
+    with (
+        patch.object(asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)),
+        patch.object(asset_entry.asset_service, "create_asset", AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), asset_type="life_insurance", subtype="contract", name="AIA", current_value=1000000, extra={}))) as create_asset,
+        patch.object(asset_entry, "_post_save", AsyncMock()) as post_save,
+    ):
+        await asset_entry.handle_asset_text_input(db, {"text": "15/09", "chat": {"id": 100}, "from": {"id": 100}})
+    create_asset.assert_awaited_once()
+    post_save.assert_awaited_once()

@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 # Cost / latency caps. Hard-coded here rather than pulled from
 # settings because changing them is a code review event — they shape
 # the worst case of every query.
-_DEEPSEEK_MODEL = "deepseek-chat"
+_DEEPSEEK_MODEL = "deepseek-v4-flash"
 _MAX_TOKENS = 500
 _TEMPERATURE = 0.0
 _TIMEOUT_SECONDS = 15.0

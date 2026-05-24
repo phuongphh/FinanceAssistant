@@ -9,37 +9,8 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #73 | [P3A-15] Analytics tracking for morning briefing events | [issue-73.md](issue-73.md) |
 | #75 | [P3A-17] Write & test storytelling LLM prompt (accuracy ≥80%) | [issue-75.md](issue-75.md) |
 | #90 | [Epic 2 / Phase 3A] Morning Briefing Infrastructure | [issue-90.md](issue-90.md) |
-| #92 | [Epic 4 / Phase 3A] Visualization & Testing | [issue-92.md](issue-92.md) |
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
-| #414 | [Epic] Phase 4B — Epic 1: Twin Polish | [issue-414.md](issue-414.md) |
-| #415 | [Epic] Phase 4B — Epic 2: Life Event Simulator | [issue-415.md](issue-415.md) |
-| #416 | [Epic] Phase 4B — Epic 3: Cashflow Forecasting v2 | [issue-416.md](issue-416.md) |
-| #418 | [Story] P4B-S1: Historical Accuracy Tracking | [issue-418.md](issue-418.md) |
-| #419 | [Story] P4B-S2: On-Demand Recompute Trigger | [issue-419.md](issue-419.md) |
-| #420 | [Story] P4B-S3: LLM Narrative v2 | [issue-420.md](issue-420.md) |
-| #422 | [Story] P4B-S5: Twin Cone Uncertainty Breakdown | [issue-422.md](issue-422.md) |
-| #424 | [Story] P4B-S7: Vietnamese Life Event Presets | [issue-424.md](issue-424.md) |
-| #425 | [Story] P4B-S8: Monte Carlo Integration — Life Events | [issue-425.md](issue-425.md) |
-| #426 | [Story] P4B-S9: Telegram Interface — Life Events | [issue-426.md](issue-426.md) |
-| #427 | [Story] P4B-S10: Life Event Impact Visualization | [issue-427.md](issue-427.md) |
-| #428 | [Story] P4B-S11: Mini App Life Events Panel | [issue-428.md](issue-428.md) |
-| #429 | [Story] P4B-S12: LLM Narrative for Life Events | [issue-429.md](issue-429.md) |
-| #430 | [Story] P4B-S13: Life Events Tests + Benchmarks | [issue-430.md](issue-430.md) |
-| #431 | [Story] P4B-S14: Recurring Transaction Detector | [issue-431.md](issue-431.md) |
-| #432 | [Story] P4B-S15: User Review Flow for Detected Patterns | [issue-432.md](issue-432.md) |
-| #433 | [Story] P4B-S16: 3-Month Cashflow Forecast Model | [issue-433.md](issue-433.md) |
-| #434 | [Story] P4B-S17: Low-Balance Alert Engine | [issue-434.md](issue-434.md) |
-| #435 | [Story] P4B-S18: Cashflow Waterfall Chart | [issue-435.md](issue-435.md) |
-| #436 | [Story] P4B-S19: Morning Briefing Cashflow Summary | [issue-436.md](issue-436.md) |
-| #437 | [Story] P4B-S20: Cashflow Tab in Mini App | [issue-437.md](issue-437.md) |
-| #703 | Bug: ModuleNotFoundError backend.adapters.telegram_service — import path sai | [issue-703.md](issue-703.md) |
-| #720 | [Story 1] Transaction Data Model & DB Migration — Expense Flow | [issue-720.md](issue-720.md) |
-| #721 | [Story 2] Record Transactions from Expense & Money-In — Expense Flow | [issue-721.md](issue-721.md) |
-| #722 | [Story 3] Expense Dashboard — Display Transactions + Reverse Button — Expense Flow | [issue-722.md](issue-722.md) |
-| #726 | [Story 1] Fix milestone card color contrast — Twin Dashboard | [issue-726.md](issue-726.md) |
-| #729 | [Story 4] Remove 5-slide intro carousel — Twin Dashboard | [issue-729.md](issue-729.md) |
-| #775 | [Story 1] Create & Manage Credit Cards — Data Model + CRUD | [issue-775.md](issue-775.md) |
-| #776 | [Story 2] Expense Transaction with Credit Card Source | [issue-776.md](issue-776.md) |
-| #777 | [Story 3] Credit Card Menu in Chi Tiêu | [issue-777.md](issue-777.md) |
+| #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
+| #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
 
-**Total active:** 37
+**Total active:** 8

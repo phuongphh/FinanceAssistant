@@ -44,10 +44,12 @@ from backend.wealth.services import net_worth_calculator
 
 logger = logging.getLogger(__name__)
 
-# Use the Sonnet model named in the phase doc. Kept as a module
-# constant so swapping models is a one-line change, and so the
-# audit log's ``llm_model`` field has a single source of truth.
-_CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+# Latest Sonnet — bumped 4.5 → 4.6 once the new model shipped. Kept
+# as a module constant so swapping is a one-line change and the audit
+# log's ``llm_model`` field has a single source of truth. Pricing is
+# unchanged at $3/$15 per 1M tokens, so the daily cost ceilings in
+# ``limits.py`` and the per-user rate limit still hold.
+_CLAUDE_MODEL = "claude-sonnet-4-6"
 _MAX_TOKENS_PER_TURN = 2000
 
 

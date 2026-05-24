@@ -97,6 +97,18 @@ class RouteResult:
     # keyboard / track the right kind without reaching back into
     # the dispatcher themselves.
     dispatch_outcome: DispatchOutcome | None = None
+    # Wall-clock time the Tier 1 ``IntentPipeline.classify`` call took
+    # (rule + optional Groq LLM). Surfaced so the analytics layer can
+    # separate classifier latency from dispatch latency — without this,
+    # a slow dispatcher (e.g. a portfolio-wide market-data fetch) looks
+    # indistinguishable from a slow classifier in the ``intent_classified``
+    # event, which was the misdiagnosis behind issue #797.
+    classifier_latency_ms: int | None = None
+    # Name of the classifier that produced the intent ("rule" / "llm" /
+    # "none"). Mirrors ``IntentResult.classifier_used`` so callers don't
+    # have to thread the IntentResult through. ``None`` when no Tier 1
+    # classify ran (e.g. Tier 2/3 hit straight from the heuristic).
+    classifier_used: str | None = None
 
 
 class Orchestrator:
@@ -295,7 +307,16 @@ class Orchestrator:
         handles the clarify/confirm flow for medium-confidence cases.
         Bypassing it for "low confidence" would skip those flows and
         send confusing answers to Tier 2."""
+        # Time the classifier in isolation so the analytics layer can
+        # tell classifier vs dispatch latency apart. Issue #797 traced a
+        # 10s+ ``intent_classified.latency_ms`` to the dispatcher's
+        # crypto-quote fetch, not to the classifier — surface both
+        # numbers so the next person hitting that pattern can see it.
+        classifier_start = time.monotonic()
         intent_result = await self.intent_pipeline.classify(query)
+        classifier_latency_ms = int(
+            (time.monotonic() - classifier_start) * 1000
+        )
         if intent_result.intent != IntentType.UNCLEAR:
             outcome = await self.intent_dispatcher.dispatch(
                 intent_result, user, db
@@ -308,6 +329,8 @@ class Orchestrator:
                 intent=outcome.intent,
                 confidence=outcome.confidence,
                 dispatch_outcome=outcome,
+                classifier_latency_ms=classifier_latency_ms,
+                classifier_used=intent_result.classifier_used,
             )
 
         # Tier 1 didn't converge — escalate.
@@ -517,7 +540,7 @@ class Orchestrator:
         from backend.agent.limits import estimate_cost_usd
 
         cost = estimate_cost_usd(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             input_tokens=result.input_tokens or 0,
             output_tokens=result.output_tokens or 0,
         )
@@ -636,7 +659,7 @@ class Orchestrator:
                 tools_called = [
                     {"name": r.tool_called, "args": r.tool_args or {}}
                 ]
-            llm_model = "deepseek-chat"
+            llm_model = "deepseek-v4-flash"
             input_tokens = r.input_tokens
             output_tokens = r.output_tokens
             from backend.agent.limits import estimate_cost_usd

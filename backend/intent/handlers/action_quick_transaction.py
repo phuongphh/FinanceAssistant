@@ -354,6 +354,12 @@ class ActionQuickTransactionHandler(IntentHandler):
         user: User,
     ) -> list[ParsedExpenseItem]:
         try:
+            # Groq Llama 3.3 70B handles the structured-JSON parse in
+            # sub-second; DeepSeek V4-Flash took 4-12s for the same
+            # call, which dominated the wait for batch-typing users
+            # ("tiền xăng 50k, ăn trưa 50k, cà phê 20k"). 5s timeout
+            # leaves headroom for the slightly longer JSON output
+            # compared to single-token intent classify.
             raw = await call_llm(
                 _MULTI_PARSE_PROMPT.format(text=text),
                 task_type="parse_manual_multi",
@@ -361,6 +367,8 @@ class ActionQuickTransactionHandler(IntentHandler):
                 user_id=user.id,
                 use_cache=True,
                 shared_cache=False,
+                provider="groq",
+                timeout=5.0,
             )
             parsed = _load_json_response(raw)
         except Exception:
@@ -382,6 +390,8 @@ class ActionQuickTransactionHandler(IntentHandler):
     ) -> ParsedExpenseItem | None:
         # Classifier didn't give us a usable amount — fall back to the
         # legacy parser. Cached by raw text, so retries are free.
+        # Groq (same rationale as the multi-item variant): sub-second
+        # vs DeepSeek's 4-12s tail.
         try:
             raw = await call_llm(
                 _SINGLE_PARSE_PROMPT.format(text=text),
@@ -390,6 +400,8 @@ class ActionQuickTransactionHandler(IntentHandler):
                 user_id=user.id,
                 use_cache=True,
                 shared_cache=False,
+                provider="groq",
+                timeout=5.0,
             )
             parsed = _load_json_response(raw)
         except Exception:

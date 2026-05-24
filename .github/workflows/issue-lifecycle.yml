@@ -30,7 +30,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if [ -n "${GH_TOKEN}" ]; then
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          fi
 
           # Each attempt resets to the latest origin/main, re-runs the
           # idempotent sync script (writes our issue file from the event
@@ -38,8 +40,13 @@ jobs:
           # push. This avoids merge conflicts on docs/issues/INDEX.md when
           # many issue events fire concurrently (e.g. bulk issue creation).
           attempt_sync() {
-            git fetch origin main || return 1
-            git reset --hard origin/main || return 1
+            # Best-effort fetch: in some contexts token is unavailable.
+            git fetch origin main --depth=1 2>/dev/null || true
+            if git show-ref --verify --quiet refs/remotes/origin/main; then
+              git reset --hard origin/main || return 1
+            else
+              git reset --hard HEAD || return 1
+            fi
 
             node .github/scripts/issue-lifecycle.js || return 1
 
