@@ -102,12 +102,13 @@ Script sẽ tự động:
 |---|---|
 | 1 | Check `docker`, `docker compose`, `curl`, `.env` tồn tại |
 | 2 | Đảm bảo working tree sạch (refuse nếu dirty) |
-| 3 | `git fetch + checkout + pull --ff-only origin/prod` |
+| 3 | `git fetch` + check local KHÔNG ahead origin (refuse nếu có commit chưa push) + fast-forward merge |
 | 4 | `docker compose build backend scheduler` (cache pip layer nếu requirements không đổi) |
 | 5 | `docker compose up -d` → recreate `backend` + `scheduler` (~5-15s downtime), postgres/redis giữ nguyên |
 | 6 | Migration `alembic upgrade head` chạy bên trong backend container startup |
 | 7 | Health check `http://localhost:8002/health` (timeout 60s, configurable) |
-| 8 | In status + 10 dòng log cuối của backend + scheduler |
+| 8 | Smoke test sâu: `alembic current` từ backend container + `redis-cli ping` (verify runtime deps thật sự reachable, không chỉ static `/health`) |
+| 9 | In status + 10 dòng log cuối của backend + scheduler |
 
 ### Deploy branch khác `prod` (vd hotfix test)
 
@@ -157,8 +158,9 @@ docker exec -it finance-backend alembic downgrade -1
 ## 6. Stop / start / restart từng phần
 
 ```bash
-# Tất cả lệnh đều dùng prefix dưới đây:
-DC="docker compose -p financeassistant -f deploy/production/docker-compose.yml"
+# Tất cả lệnh đều dùng prefix dưới đây (lưu ý `--env-file` BẮT BUỘC vì compose mặc định
+# tìm `.env` cạnh compose file, không phải repo root):
+DC="docker compose --env-file .env -p financeassistant -f deploy/production/docker-compose.yml"
 
 # Dừng tất cả (giữ volume)
 $DC down
@@ -184,6 +186,24 @@ $DC exec backend alembic upgrade head
 ---
 
 ## 7. Troubleshooting
+
+### Deploy refuse "Local branch ahead origin"
+
+Local có commit chưa push lên `origin/$BRANCH`. Hai cách xử lý:
+- `git push origin $BRANCH` → đẩy commit lên review trước (đường đúng).
+- `git reset --hard origin/$BRANCH` → vứt commit local (CHỈ làm nếu chắc chắn).
+
+### Smoke test fail (`alembic current` không chạy được)
+
+Sau khi `/health` pass nhưng `alembic current` từ container fail → backend không kết nối được DB. Nguyên nhân hay gặp:
+- `DATABASE_URL` override sai trong `deploy/production/docker-compose.yml` `environment:` block (vd typo `postgres:5432`).
+- Postgres container chưa healthy (check `$DC ps`).
+- `POSTGRES_PASSWORD` không match giữa pg container và app config.
+
+```bash
+$DC exec backend python -c "from backend.config import get_settings; print(get_settings().database_url)"
+$DC exec backend alembic current   # xem error message đầy đủ
+```
 
 ### Health check fail sau deploy
 

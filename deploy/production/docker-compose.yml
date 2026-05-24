@@ -54,6 +54,13 @@ services:
     container_name: finance-backend
     env_file:
       - ../../.env
+    environment:
+      # Container-network overrides: app trong container phải nói chuyện với postgres/redis
+      # qua service-name (DNS nội bộ của Docker), KHÔNG dùng localhost từ .env (vốn trỏ về
+      # 5433/6380 trên host). Postgres lắng nghe port nội bộ 5432, Redis 6379.
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}"
+      REDIS_URL: "redis://redis:6379/0"
+      ADMIN_REDIS_URL: "redis://redis:6379/1"
     ports:
       - "8002:8000"
     depends_on:
@@ -74,6 +81,11 @@ services:
     container_name: finance-scheduler
     env_file:
       - ../../.env
+    environment:
+      # Cùng lý do như backend: container-network hostnames thay vì localhost từ .env.
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}"
+      REDIS_URL: "redis://redis:6379/0"
+      ADMIN_REDIS_URL: "redis://redis:6379/1"
     depends_on:
       postgres:
         condition: service_healthy

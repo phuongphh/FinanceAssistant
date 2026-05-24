@@ -28,7 +28,9 @@ log()  { echo "[$(date +%H:%M:%S)] $*"; }
 fail() { echo "[FAIL] $*" >&2; exit 1; }
 
 dc() {
-  docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+  # --env-file: compose mặc định tìm `.env` cạnh compose file (= deploy/production/.env, không tồn tại).
+  # Phải explicit trỏ về repo-root `.env` để interpolation `${POSTGRES_PASSWORD}` v.v. trong compose work.
+  docker compose --env-file "$REPO_ROOT/.env" -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
 cd "$REPO_ROOT"
@@ -61,11 +63,24 @@ fi
 if [[ "$SKIP_PULL" == "1" ]]; then
   log "Bỏ qua git pull (SKIP_PULL=1). Đang ở: $(git log -1 --oneline)"
 else
-  log "Fetch + checkout + pull origin/$BRANCH..."
+  log "Fetch origin/$BRANCH..."
   git fetch origin "$BRANCH"
   git checkout "$BRANCH"
-  git pull --ff-only origin "$BRANCH"
-  log "Sau pull: $(git log -1 --oneline)"
+
+  # Refuse nếu local có commit chưa push — tránh deploy code chưa qua review.
+  # `git pull --ff-only` không catch case này (no-op nếu local ahead).
+  ahead=$(git rev-list --count "origin/$BRANCH..HEAD")
+  behind=$(git rev-list --count "HEAD..origin/$BRANCH")
+  if (( ahead > 0 )); then
+    log "Local branch ahead origin/$BRANCH bởi $ahead commit(s):"
+    git log --oneline "origin/$BRANCH..HEAD"
+    fail "Push hoặc revert local commits trước khi deploy (origin = single source of truth)"
+  fi
+  if (( behind > 0 )); then
+    log "Local behind $behind commit(s) — fast-forward merge..."
+    git merge --ff-only "origin/$BRANCH"
+  fi
+  log "Sync với origin/$BRANCH: $(git log -1 --oneline)"
 fi
 
 # --- 4. Build images ---
@@ -98,6 +113,22 @@ while true; do
   fi
   sleep 2
 done
+
+# --- 6b. Deep smoke test (DB + Redis từ trong container) ---
+# `/health` chỉ trả static OK (backend/main.py) → không phát hiện được runtime dep failure.
+# Hai check dưới: alembic current chạm DB qua app config; redis-cli ping verify cache.
+log "Smoke test: backend → DB (alembic current)..."
+if ! dc exec -T backend alembic current >/dev/null 2>&1; then
+  log "==== Smoke test FAIL — backend không connect được DB ===="
+  dc exec -T backend alembic current 2>&1 || true
+  dc logs --tail=30 backend || true
+  fail "DB connectivity broken. Check DATABASE_URL override (compose environment block)."
+fi
+log "Smoke test: redis container ping..."
+if ! dc exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
+  fail "Redis không respond — check redis container status."
+fi
+log "Smoke tests PASS"
 
 # --- 7. Status report ---
 log "----------------------------------------------------------------"
