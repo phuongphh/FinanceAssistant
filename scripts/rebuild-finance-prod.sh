@@ -186,7 +186,11 @@ if [[ "${SKIP_BACKUP:-0}" == "1" ]]; then
     log "⏭  SKIP_BACKUP=1 — bỏ qua backup (KHÔNG khuyến nghị)"
 else
     mkdir -p "$BACKUP_DIR"
-    DB_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
+    DB_URL_RAW=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
+    # pg_dump/libpq chỉ chấp nhận scheme postgresql:// hoặc postgres://, KHÔNG hiểu
+    # postgresql+asyncpg:// (SQLAlchemy driver suffix). Strip suffix trước khi gọi.
+    DB_URL="${DB_URL_RAW/postgresql+asyncpg:/postgresql:}"
+    DB_URL="${DB_URL/postgres+asyncpg:/postgres:}"
     BACKUP_FILE="$BACKUP_DIR/pre-deploy-${TS}.sql.gz"
     pg_dump "$DB_URL" 2>>"$LOG_FILE" | gzip > "$BACKUP_FILE"
     log "Snapshot: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
