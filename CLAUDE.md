@@ -31,7 +31,20 @@ For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-stat
 | Speech | OpenAI Whisper API |
 | Market data | SSI/VNDIRECT (VN stocks), CoinGecko (crypto), SJC/PNJ (gold), bank-rate scrapers, RSS news |
 | Dashboard | Notion (one-way read sync from PostgreSQL) |
-| Package manager | uv |
+| Package manager | pip + `backend/requirements.txt` (see note below) |
+
+> **Package manager — reality vs. aspiration (as of 2026-05-24):**
+> Production và CI hiện đang dùng **pip** với `backend/requirements.txt`. Prod server có **2 venv tách biệt**:
+> - `venv/` — services (backend + scheduler chạy từ launchd plist, xem `launchd/*.plist.template`)
+> - `.venv/` — tooling (alembic migration, scripts)
+>
+> Mỗi lần `requirements.txt` đổi phải `pip install` vào **cả hai** venv (xem `scripts/rebuild-finance-prod.sh`).
+> Repo **không có** `pyproject.toml` hay `uv.lock`.
+>
+> **Khả năng migrate sang `uv` — nên cân nhắc khi có thời gian:**
+> - ✅ *Lợi*: install nhanh hơn 10-100×, lock file đảm bảo reproducibility, gộp 2 venv thành 1 `.venv/`, bỏ rủi ro quên install vào 1 venv, modern tooling (workspace, dep groups).
+> - ❌ *Chi phí*: convert `requirements.txt` → `pyproject.toml` + sinh `uv.lock`, sửa launchd plist templates trỏ `.venv/`, cập nhật `scripts/install-launchd.sh` + `scripts/rebuild-finance-prod.sh` + `.github/workflows/*.yml`, cài `uv` trên prod server, smoke test toàn bộ flow deploy.
+> - 🎯 *Khi nào nên làm*: lúc cần thêm dep groups (dev/test/prod tách biệt) hoặc khi deploy time/dep drift trở thành pain point. Trước đó: giữ pip + dual venv vì đang work.
 
 **Deprecated (V1 → V2):** Gmail API, SMS forwarding — replaced by AI Storytelling (threshold-based capture).
 
@@ -114,16 +127,22 @@ webhook → claim update_id → asyncio.create_task → worker → handler → s
 ## Test & Build Commands
 
 ```bash
-uv sync                                     # Install dependencies
-uv run pytest                               # Run all tests
-uv run pytest tests/services/wealth/        # Run specific suite
-uv run pytest tests/prompts/                # Run LLM prompt tests
-uv run ruff check .                         # Lint
-uv run ruff format .                        # Format
+# Local setup (one-time) — create venv and install backend deps
+python -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+
+# Daily commands (assume .venv activated, or prefix with `.venv/bin/`)
+pytest                                      # Run all tests
+pytest tests/services/wealth/               # Run specific suite
+pytest tests/prompts/                       # Run LLM prompt tests
+ruff check .                                # Lint
+ruff format .                               # Format
 alembic upgrade head                        # Apply migrations
 alembic revision --autogenerate -m "msg"    # Create migration
 docker-compose up -d                        # Start PostgreSQL + Redis
 ```
+
+> Prod deploy script (`scripts/rebuild-finance-prod.sh`) installs into both `venv/` (service) and `.venv/` (tooling). See _Package manager_ note in Tech Stack section.
 
 ---
 
