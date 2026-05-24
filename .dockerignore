@@ -1,0 +1,46 @@
+# --- Critical: chặn secret leak vào image ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Git / IDE / OS ---
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+.DS_Store
+
+# --- Tests, docs, build infra (không cần trong runtime image) ---
+tests/
+docs/
+deploy/
+launchd/
+
+# --- Logs ---
+logs/
+*.log
+
+# --- OpenClaw / Node (không cần cho backend image) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# --- Build artifacts ---
+dist/
+build/
