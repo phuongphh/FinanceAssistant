@@ -44,3 +44,10 @@ yarn-debug.log*
 # --- Build artifacts ---
 dist/
 build/
+
+# --- Admin SPA: artifacts dựng lại trong Docker (stage admin-build) ---
+# Patterns trên (`node_modules/`, `dist/`) chỉ match ở root context, KHÔNG
+# match nested. Loại tường minh để `COPY betien-admin/ ./` không kéo
+# node_modules/dist của host đè lên layer `npm install` đã cache.
+betien-admin/node_modules/
+betien-admin/dist/
