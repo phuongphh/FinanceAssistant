@@ -3,12 +3,13 @@
 # rebuild-finance-prod.sh — Production deploy (Docker-based)
 # =============================================================================
 # Pipeline:
-#   pre-flight → git pull → DB backup → docker compose down → build + up --wait
-#   → smoke test → admin SPA rebuild → cleanup → notify
+#   pre-flight → git pull → DB backup → admin-build check → docker compose down
+#   → build (admin SPA build TRONG image) + up --wait → smoke test → cleanup → notify
 #
 # Khác với deploy/production/deploy.sh (minimal): script này bổ sung
 # safety guards: DB snapshot trước migrate, rollback handler, Telegram notify,
-# admin SPA rebuild, image prune. Đây là entry point mặc định cho prod deploy.
+# image prune. Admin SPA được build trong Docker multi-stage (host không cần
+# npm). Đây là entry point mặc định cho prod deploy.
 #
 # Usage:
 #   bash scripts/rebuild-finance-prod.sh
@@ -20,7 +21,6 @@
 #   BACKEND_PORT      (default: 8002, mapped on host)
 #   HEALTH_TIMEOUT    (default: 120s)
 #   SKIP_BACKUP       (1 = bỏ qua DB snapshot — KHÔNG khuyến nghị)
-#   SKIP_ADMIN_BUILD  (1 = bỏ qua rebuild admin SPA)
 #   SKIP_PRUNE        (1 = bỏ qua docker image prune)
 # =============================================================================
 
@@ -226,38 +226,22 @@ else
     fi
 fi
 
-# ── [3/7] admin SPA build (PHẢI trước docker build) ────────────
-# backend/Dockerfile dùng `COPY . .` → SPA chỉ vào image nếu đã build SẴN vào
-# backend/static/admin TRƯỚC `docker build`. Build sau sẽ không lọt vào image.
-# KHÔNG dùng deploy_admin.sh: script đó cho kiến trúc systemctl+caddy cũ
-# (`systemctl restart betien-api`, `caddy reload`) — không áp dụng cho prod
-# Docker, nơi container ở bước [5] tự serve static. Migration + seed cũng chạy
-# trong container (alembic ở startup; seed_admin ở bước [6]).
-DEPLOY_PHASE="admin-build"
-step "[3/7] Build admin SPA → backend/static/admin (trước docker build)"
+# ── [3/7] admin SPA — build TRONG Docker (host không cần npm) ──
+# SPA build bằng multi-stage trong backend/Dockerfile (stage `admin-build`) rồi
+# COPY vào image ở bước [5]. Host CHỈ cần docker — KHÔNG cần node/npm (deploy
+# chạy trong namespace không có npm → cách build-trên-host cũ fail "npm: command
+# not found"). VITE_API_BASE truyền vào build qua compose build.args, nội suy từ
+# .env (dc dùng `--env-file`). Migration + seed vẫn chạy trong container
+# (alembic ở startup; seed_admin ở bước [6]).
+DEPLOY_PHASE="admin-build-check"
+step "[3/7] Admin SPA build trong Docker (host không cần npm)"
 ADMIN_SRC_DIR="$PROJECT_DIR/betien-admin"
-ADMIN_STATIC_DIR="$PROJECT_DIR/backend/static/admin"
-if [[ "${SKIP_ADMIN_BUILD:-0}" == "1" ]]; then
-    log "⏭  SKIP_ADMIN_BUILD=1 — bỏ qua admin build (image sẽ giữ SPA hiện có)"
-elif [[ -f "$ADMIN_SRC_DIR/package.json" ]]; then
-    (
-        # VITE_API_BASE là build-time config DUY NHẤT frontend cần (vite chỉ
-        # inline biến prefix VITE_). KHÔNG `source .env`: file theo định dạng
-        # docker-compose env-file — chứa string tiếng Việt có dấu cách/không
-        # quote, nên bash sẽ cố thực thi chúng như lệnh (".env: line N: 'Tài':
-        # command not found" → exit 127). Trích đúng 1 key, an toàn mọi nội dung.
-        VITE_API_BASE_ENV="$(grep -E '^VITE_API_BASE=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '\r')"
-        export VITE_API_BASE="${VITE_API_BASE_ENV:-https://admin.betien.vn/api/admin}"
-        log "  VITE_API_BASE=$VITE_API_BASE"
-        npm --prefix "$ADMIN_SRC_DIR" install
-        npm --prefix "$ADMIN_SRC_DIR" run build
-    ) 2>&1 | tee -a "$LOG_FILE"
-    rm -rf "${ADMIN_STATIC_DIR:?}"/*
-    mkdir -p "$ADMIN_STATIC_DIR"
-    cp -R "$ADMIN_SRC_DIR/dist/." "$ADMIN_STATIC_DIR/"
-    log "Admin SPA → $ADMIN_STATIC_DIR (sẽ được COPY vào image ở bước [5])"
+if [[ -f "$ADMIN_SRC_DIR/package.json" ]]; then
+    VITE_API_BASE_ENV="$(grep -E '^VITE_API_BASE=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '\r')"
+    log "  betien-admin/ sẽ được build trong image ở bước [5]"
+    log "  VITE_API_BASE=${VITE_API_BASE_ENV:-https://admin.betien.vn/api/admin} (truyền qua compose build.args)"
 else
-    log "ℹ️  $ADMIN_SRC_DIR/package.json không tồn tại — bỏ qua admin build"
+    log "ℹ️  $ADMIN_SRC_DIR/package.json không tồn tại — image sẽ không có admin SPA"
 fi
 
 # ── [4/7] compose down ─────────────────────────────────────────
