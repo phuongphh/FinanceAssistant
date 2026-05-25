@@ -1028,7 +1028,7 @@ async def _handle_cash_existing_confirm(
 
     draft = wizard_service.get_draft(user.wizard_state)
     subtype = str(draft.get("subtype") or "cash")
-    if subtype == "bank_checking":
+    if subtype in {"bank_checking", "e_wallet"}:
         merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
         pending_amount_raw = draft.get("pending_amount")
         if merge_asset_id_raw and pending_amount_raw is not None:
@@ -1136,6 +1136,45 @@ async def _handle_cash_amount_input(
             )
             return
 
+    if draft.get("subtype") == "e_wallet" and label:
+        normalized_label = label.strip().casefold()
+        existing_assets = await asset_service.get_user_assets(
+            db,
+            user.id,
+            asset_type=AssetType.CASH.value,
+        )
+        existing_wallet = next(
+            (
+                a
+                for a in existing_assets
+                if str(getattr(a, "subtype", "")) == "e_wallet"
+                and str((a.name or "")).strip().casefold() == normalized_label
+            ),
+            None,
+        )
+        if existing_wallet is not None:
+            wallet_name = html.escape(str(existing_wallet.name).strip())
+            await wizard_service.update_step(
+                db,
+                user.id,
+                step="cash_existing_confirm",
+                draft_patch={
+                    "merge_asset_id": str(existing_wallet.id),
+                    "merge_wallet_name": str(existing_wallet.name).strip(),
+                    "pending_amount": str(amount),
+                },
+            )
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    f"💳 Bạn đã có ví điện tử <b>{wallet_name}</b>.\n"
+                    "Bạn có muốn cộng thêm vào không?"
+                ),
+                parse_mode="HTML",
+                reply_markup=cash_existing_confirm_keyboard(),
+            )
+            return
+
     name = label or {
         "bank_savings": "Tài khoản tiết kiệm",
         "bank_checking": "Tài khoản thanh toán",
@@ -1144,7 +1183,7 @@ async def _handle_cash_amount_input(
     }.get(draft.get("subtype", ""), "Tài khoản")
 
     merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
-    if draft.get("subtype") == "bank_checking" and merge_asset_id_raw:
+    if draft.get("subtype") in {"bank_checking", "e_wallet"} and merge_asset_id_raw:
         try:
             merge_asset_id = uuid.UUID(merge_asset_id_raw)
         except ValueError:
