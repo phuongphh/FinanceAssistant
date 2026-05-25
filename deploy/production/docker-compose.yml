@@ -51,6 +51,10 @@ services:
     build:
       context: ../..
       dockerfile: backend/Dockerfile
+      args:
+        # Build-time config cho admin SPA (stage `admin-build`). Nội suy từ
+        # repo-root .env vì `dc` chạy compose với `--env-file ../../.env`.
+        VITE_API_BASE: ${VITE_API_BASE:-https://admin.betien.vn/api/admin}
     container_name: finance-backend
     env_file:
       - ../../.env
@@ -78,6 +82,9 @@ services:
     build:
       context: ../..
       dockerfile: backend/Dockerfile
+      args:
+        # Cùng args với backend để chia sẻ build cache (cùng Dockerfile/context).
+        VITE_API_BASE: ${VITE_API_BASE:-https://admin.betien.vn/api/admin}
     container_name: finance-scheduler
     env_file:
       - ../../.env
