@@ -5,6 +5,10 @@ on:
     branches:
       - "claude/**"
       - "codex/**"
+      # Release branches promote main → prod via a PR opened manually (base
+      # prod). Chúng bằng đúng main nên auto-pr's `gh pr create --base main`
+      # luôn fail "no commits between" → CI đỏ giả. Exclude để không kích hoạt.
+      - "!claude/merge-prod-release-**"
 
 permissions:
   contents: write
