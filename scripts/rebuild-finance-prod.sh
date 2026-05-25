@@ -226,23 +226,57 @@ else
     fi
 fi
 
-# ── [3/7] compose down ─────────────────────────────────────────
+# ── [3/7] admin SPA build (PHẢI trước docker build) ────────────
+# backend/Dockerfile dùng `COPY . .` → SPA chỉ vào image nếu đã build SẴN vào
+# backend/static/admin TRƯỚC `docker build`. Build sau sẽ không lọt vào image.
+# KHÔNG dùng deploy_admin.sh: script đó cho kiến trúc systemctl+caddy cũ
+# (`systemctl restart betien-api`, `caddy reload`) — không áp dụng cho prod
+# Docker, nơi container ở bước [5] tự serve static. Migration + seed cũng chạy
+# trong container (alembic ở startup; seed_admin ở bước [6]).
+DEPLOY_PHASE="admin-build"
+step "[3/7] Build admin SPA → backend/static/admin (trước docker build)"
+ADMIN_SRC_DIR="$PROJECT_DIR/betien-admin"
+ADMIN_STATIC_DIR="$PROJECT_DIR/backend/static/admin"
+if [[ "${SKIP_ADMIN_BUILD:-0}" == "1" ]]; then
+    log "⏭  SKIP_ADMIN_BUILD=1 — bỏ qua admin build (image sẽ giữ SPA hiện có)"
+elif [[ -f "$ADMIN_SRC_DIR/package.json" ]]; then
+    (
+        set -a
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+        set +a
+        # VITE_API_BASE là build-time config của frontend — lấy từ .env nếu có,
+        # nếu không dùng default. Operator nên set trong .env cho đúng domain prod.
+        export VITE_API_BASE="${VITE_API_BASE:-https://admin.betien.vn/api/admin}"
+        log "  VITE_API_BASE=$VITE_API_BASE"
+        npm --prefix "$ADMIN_SRC_DIR" install
+        npm --prefix "$ADMIN_SRC_DIR" run build
+    ) 2>&1 | tee -a "$LOG_FILE"
+    rm -rf "${ADMIN_STATIC_DIR:?}"/*
+    mkdir -p "$ADMIN_STATIC_DIR"
+    cp -R "$ADMIN_SRC_DIR/dist/." "$ADMIN_STATIC_DIR/"
+    log "Admin SPA → $ADMIN_STATIC_DIR (sẽ được COPY vào image ở bước [5])"
+else
+    log "ℹ️  $ADMIN_SRC_DIR/package.json không tồn tại — bỏ qua admin build"
+fi
+
+# ── [4/7] compose down ─────────────────────────────────────────
 DEPLOY_PHASE="compose-down"
-step "[3/7] Compose down (graceful)"
+step "[4/7] Compose down (graceful)"
 dc down --remove-orphans 2>&1 | tee -a "$LOG_FILE"
 
-# ── [4/7] build + up --wait ────────────────────────────────────
+# ── [5/7] build + up --wait ────────────────────────────────────
 DEPLOY_PHASE="compose-up"
-step "[4/7] Build + up -d (chờ healthcheck với --wait)"
+step "[5/7] Build + up -d (chờ healthcheck với --wait)"
 DOWN_START=$(date +%s)
 dc build backend scheduler 2>&1 | tee -a "$LOG_FILE"
 # --wait: docker compose tự block đến khi tất cả services có healthcheck = healthy
 # (postgres + redis + backend). Timeout mặc định 600s — đủ thoải mái.
 dc up -d --wait 2>&1 | tee -a "$LOG_FILE"
 
-# ── [5/7] smoke test ───────────────────────────────────────────
+# ── [6/7] smoke test ───────────────────────────────────────────
 DEPLOY_PHASE="smoke-test"
-step "[5/7] Smoke test (health endpoint + DB + Redis)"
+step "[6/7] Smoke test (health endpoint + DB + Redis)"
 
 # 5a. /health endpoint
 HEALTH_OK=0
@@ -286,24 +320,14 @@ if ! dc exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
 fi
 log "  redis-cli ping → PONG"
 
-# ── [6/7] admin SPA rebuild ────────────────────────────────────
-DEPLOY_PHASE="admin-build"
-step "[6/7] Rebuild admin SPA"
-if [[ "${SKIP_ADMIN_BUILD:-0}" == "1" ]]; then
-    log "⏭  SKIP_ADMIN_BUILD=1 — bỏ qua admin rebuild"
-elif [[ -x "$PROJECT_DIR/scripts/deploy_admin.sh" ]]; then
-    # deploy_admin.sh tự lo: npm ci + vite build + copy static + reload caddy.
-    # Chạy trong subshell để env vars (ADMIN_JWT_SECRET, etc.) được export từ .env.
-    (
-        set -a
-        # shellcheck disable=SC1090
-        source "$ENV_FILE"
-        set +a
-        bash "$PROJECT_DIR/scripts/deploy_admin.sh"
-    ) 2>&1 | tee -a "$LOG_FILE"
-    log "Admin SPA rebuild OK"
+# 6d. Seed initial admin (idempotent — no-op nếu admin đã tồn tại). Chạy TRONG
+# container (host có thể không có venv/deps). Non-fatal: lỗi seed không nên
+# rollback một deploy đã healthy — chỉ cảnh báo để operator kiểm tra.
+log "→ Seed admin (idempotent, trong container)..."
+if dc exec -T backend python -m scripts.seed_admin 2>&1 | tee -a "$LOG_FILE"; then
+    log "  seed_admin OK"
 else
-    log "ℹ️  scripts/deploy_admin.sh không tồn tại hoặc không executable — bỏ qua"
+    log "⚠️  seed_admin lỗi (non-fatal) — kiểm tra ADMIN_JWT_SECRET / DB. Deploy vẫn tiếp tục."
 fi
 
 # ── [7/7] cleanup ──────────────────────────────────────────────
