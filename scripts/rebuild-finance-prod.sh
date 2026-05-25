@@ -241,13 +241,13 @@ if [[ "${SKIP_ADMIN_BUILD:-0}" == "1" ]]; then
     log "⏭  SKIP_ADMIN_BUILD=1 — bỏ qua admin build (image sẽ giữ SPA hiện có)"
 elif [[ -f "$ADMIN_SRC_DIR/package.json" ]]; then
     (
-        set -a
-        # shellcheck disable=SC1090
-        source "$ENV_FILE"
-        set +a
-        # VITE_API_BASE là build-time config của frontend — lấy từ .env nếu có,
-        # nếu không dùng default. Operator nên set trong .env cho đúng domain prod.
-        export VITE_API_BASE="${VITE_API_BASE:-https://admin.betien.vn/api/admin}"
+        # VITE_API_BASE là build-time config DUY NHẤT frontend cần (vite chỉ
+        # inline biến prefix VITE_). KHÔNG `source .env`: file theo định dạng
+        # docker-compose env-file — chứa string tiếng Việt có dấu cách/không
+        # quote, nên bash sẽ cố thực thi chúng như lệnh (".env: line N: 'Tài':
+        # command not found" → exit 127). Trích đúng 1 key, an toàn mọi nội dung.
+        VITE_API_BASE_ENV="$(grep -E '^VITE_API_BASE=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '\r')"
+        export VITE_API_BASE="${VITE_API_BASE_ENV:-https://admin.betien.vn/api/admin}"
         log "  VITE_API_BASE=$VITE_API_BASE"
         npm --prefix "$ADMIN_SRC_DIR" install
         npm --prefix "$ADMIN_SRC_DIR" run build
