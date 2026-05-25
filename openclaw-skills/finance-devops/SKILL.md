@@ -114,8 +114,14 @@ Services:
 | pre-flight | env keys, dirty tree, branch check | abort, no changes |
 | git-pull | fetch + ff-only merge | abort, no changes |
 | db-backup | pg_dump qua docker exec → `.backups/` | abort, no changes |
+| admin-build | npm + vite build → `backend/static/admin` (**trước** docker build, để `COPY . .` bake vào image) | abort, services running |
 | compose-down | graceful tear down | abort, manual recovery |
 | compose-up | build + `up -d --wait` | **rollback** (rebuild old SHA) |
-| smoke-test | /health, alembic current, redis ping | **rollback** |
-| admin-build | deploy_admin.sh (npm + vite + caddy reload) | abort, services running |
+| smoke-test | /health, alembic current, redis ping, seed_admin (idempotent) | **rollback** |
 | cleanup | docker image prune, log rotation | warn only |
+
+> **Lưu ý kiến trúc:** admin SPA phải build **trước** `docker build` (không
+> phải sau), vì `backend/Dockerfile` dùng `COPY . .` để đưa
+> `backend/static/admin` vào image. Script **không** dùng `deploy_admin.sh`
+> (script đó cho kiến trúc systemctl+caddy cũ). `backend/static/admin/` đã được
+> gitignore nên build artifact không làm bẩn working tree.
