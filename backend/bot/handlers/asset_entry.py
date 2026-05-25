@@ -1001,7 +1001,6 @@ async def _handle_cash_subtype_pick(
                 reply_markup=cash_existing_confirm_keyboard(),
             )
             return
-
     await wizard_service.update_step(
         db,
         user.id,
@@ -1027,12 +1026,40 @@ async def _handle_cash_existing_confirm(
         await send_message(chat_id=chat_id, text="Lựa chọn không hợp lệ.")
         return
 
+    draft = wizard_service.get_draft(user.wizard_state)
+    subtype = str(draft.get("subtype") or "cash")
+    if subtype == "bank_checking":
+        merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
+        pending_amount_raw = draft.get("pending_amount")
+        if merge_asset_id_raw and pending_amount_raw is not None:
+            try:
+                merge_asset_id = uuid.UUID(merge_asset_id_raw)
+                pending_amount = Decimal(str(pending_amount_raw))
+            except (ValueError, ArithmeticError):
+                merge_asset_id = None
+                pending_amount = Decimal("0")
+            if merge_asset_id is not None and pending_amount > 0:
+                existing_asset = await asset_service.get_asset_by_id(
+                    db, user.id, merge_asset_id
+                )
+                if existing_asset is not None and existing_asset.is_active:
+                    new_total = Decimal(str(existing_asset.current_value or 0)) + pending_amount
+                    asset = await asset_service.update_current_value(
+                        db,
+                        user.id,
+                        existing_asset.id,
+                        new_total,
+                    )
+                    await _post_save(db, chat_id, user, asset)
+                    return
     await wizard_service.update_step(
         db,
         user.id,
         step="amount",
     )
-    label_prompt, example = _CASH_SUBTYPE_PROMPTS["cash"]
+    label_prompt, example = _CASH_SUBTYPE_PROMPTS.get(
+        subtype, _CASH_SUBTYPE_PROMPTS["cash"]
+    )
     await send_message(
         chat_id=chat_id,
         text=f"💬 {label_prompt}\n\n{example}",
@@ -1070,12 +1097,70 @@ async def _handle_cash_amount_input(
         await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
+    if draft.get("subtype") == "bank_checking" and label:
+        normalized_label = label.strip().casefold()
+        existing_assets = await asset_service.get_user_assets(
+            db,
+            user.id,
+            asset_type=AssetType.CASH.value,
+        )
+        existing_bank = next(
+            (
+                a
+                for a in existing_assets
+                if str(getattr(a, "subtype", "")) == "bank_checking"
+                and str((a.name or "")).strip().casefold() == normalized_label
+            ),
+            None,
+        )
+        if existing_bank is not None:
+            bank_name = html.escape(str(existing_bank.name).strip())
+            await wizard_service.update_step(
+                db,
+                user.id,
+                step="cash_existing_confirm",
+                draft_patch={
+                    "merge_asset_id": str(existing_bank.id),
+                    "merge_bank_name": str(existing_bank.name).strip(),
+                    "pending_amount": str(amount),
+                },
+            )
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    f"💳 Bạn đã có tài khoản thanh toán ở <b>{bank_name}</b>.\n"
+                    "Bạn có muốn cộng thêm vào không?"
+                ),
+                parse_mode="HTML",
+                reply_markup=cash_existing_confirm_keyboard(),
+            )
+            return
+
     name = label or {
         "bank_savings": "Tài khoản tiết kiệm",
         "bank_checking": "Tài khoản thanh toán",
         "cash": "Tiền mặt",
         "e_wallet": "Ví điện tử",
     }.get(draft.get("subtype", ""), "Tài khoản")
+
+    merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
+    if draft.get("subtype") == "bank_checking" and merge_asset_id_raw:
+        try:
+            merge_asset_id = uuid.UUID(merge_asset_id_raw)
+        except ValueError:
+            merge_asset_id = None
+        if merge_asset_id is not None:
+            existing_asset = await asset_service.get_asset_by_id(db, user.id, merge_asset_id)
+            if existing_asset is not None and existing_asset.is_active:
+                new_total = Decimal(str(existing_asset.current_value or 0)) + amount
+                asset = await asset_service.update_current_value(
+                    db,
+                    user.id,
+                    existing_asset.id,
+                    new_total,
+                )
+                await _post_save(db, chat_id, user, asset)
+                return
 
     asset = await asset_service.create_asset(
         db,
