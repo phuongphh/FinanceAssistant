@@ -1105,27 +1105,10 @@ async def _action_expenses_ocr_prompt(
 async def _action_expenses_credit_cards(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Guide user to use the new credit-card source flow safely and quickly."""
-    title = get_action_copy("action_expenses_credit_cards", "title")
-    body = get_action_copy("action_expenses_credit_cards", "body")
-    text = f"{title}\n\n{body}"
-    await send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode="Markdown",
-        reply_markup={
-            "inline_keyboard": [
-                [
-                    {
-                        "text": get_action_copy(
-                            "action_expenses_credit_cards", "back_button"
-                        ),
-                        "callback_data": "menu:expenses",
-                    }
-                ]
-            ]
-        },
-    )
+    """Render all credit cards + actions to add or go back."""
+    from backend.bot.handlers.credit_card_entry import show_credit_cards_list
+
+    await show_credit_cards_list(db, chat_id, user)
     analytics.track(
         "menu_action",
         user_id=user.id,
