@@ -74,6 +74,7 @@ async def route_update(data: dict) -> None:
     from backend.bot.handlers import about_handler as about_handlers
     from backend.bot.handlers import asset_entry as asset_entry_handlers
     from backend.bot.handlers import briefing as briefing_handlers
+    from backend.bot.handlers import credit_card_entry as credit_card_entry_handlers
     from backend.bot.handlers import goal_entry as goal_entry_handlers
     from backend.bot.handlers import income_entry as income_entry_handlers
     from backend.bot.handlers import life_event_entry as life_event_entry_handlers
@@ -118,6 +119,7 @@ async def route_update(data: dict) -> None:
                     dashboard_service=dashboard_service,
                     handle_report_command=handle_report_command,
                     handle_text_message=handle_text_message,
+                    credit_card_entry_handlers=credit_card_entry_handlers,
                     OnboardingStep=OnboardingStep,
                     analytics=analytics,
                 )
@@ -194,6 +196,7 @@ async def _handle_message(
     dashboard_service,
     handle_report_command,
     handle_text_message,
+    credit_card_entry_handlers,
     OnboardingStep,
     analytics,
 ):
@@ -575,6 +578,11 @@ async def _handle_message(
         # year / amount / duration replies while a life_event_* flow is
         # active so the user's "2028" doesn't reach the NL expense parser.
         consumed = await life_event_entry_handlers.handle_life_event_text_input(
+            db, message
+        )
+        if consumed:
+            return resolved_user.id
+        consumed = await credit_card_entry_handlers.handle_credit_card_text_input(
             db, message
         )
         if consumed:
