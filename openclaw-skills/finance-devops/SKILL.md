@@ -33,6 +33,20 @@ Script tự verify `OPENCLAW_USER_ID` (Telegram user_id do OpenClaw inject) matc
 SSH dùng key-based auth (không password). Key chỉ tồn tại trên server chạy
 OpenClaw bot, không bao giờ commit vào repo.
 
+## ⛔ Guardrails — thao tác file trên prod
+
+- **TUYỆT ĐỐI KHÔNG đụng `$PROD_PROJECT_DIR/.env`** — chứa secrets prod thật và
+  **KHÔNG có backup ở đâu cả**. Đè hoặc xóa = mất secrets vĩnh viễn.
+  - ❌ KHÔNG `cp .env.example .env`, `> .env`, `rm .env`, `mv … .env` — kể cả
+    để "khởi tạo" project. (Đây đúng là cách `.env` prod từng bị phá.)
+  - ✅ Nếu `.env` thiếu / giống template → **DỪNG, báo admin**, đừng tự tạo lại.
+    `.env.example` chỉ là tham chiếu tên key (placeholder, không có giá trị thật).
+- Chỉ chạy thao tác prod qua các script trong skill này (`deploy.sh`,
+  `status.sh`, `logs.sh`, `rollback.sh`). KHÔNG chạy lệnh ad-hoc làm thay đổi
+  state prod (xóa file/container/volume, sửa config) ngoài các script đó.
+- Hành động destructive (`rm -rf`, xóa container/volume, force-push) → confirm
+  với admin trước. Xem [AGENTS.md](../../AGENTS.md) cho quy tắc đầy đủ.
+
 ### Required env vars (set trên OpenClaw host)
 
 | Var | Ví dụ | Ghi chú |
@@ -50,8 +64,8 @@ OpenClaw bot, không bao giờ commit vào repo.
 bash scripts/deploy.sh
 ```
 SSH vào prod → chạy `scripts/rebuild-finance-prod.sh` → stream output về Telegram.
-Script đó tự lo: git pull, DB backup, docker compose down + build + up --wait,
-smoke test, admin SPA rebuild, rollback nếu fail.
+Script đó tự lo: git pull, DB backup, docker compose down + build + up --wait
+(admin SPA build TRONG Docker multi-stage ở bước build), smoke test, rollback nếu fail.
 
 **Lưu ý**: deploy chỉ chạy từ branch `prod` trên prod server. Nếu code chưa
 merge vào `prod`, deploy sẽ refuse.
@@ -114,14 +128,15 @@ Services:
 | pre-flight | env keys, dirty tree, branch check | abort, no changes |
 | git-pull | fetch + ff-only merge | abort, no changes |
 | db-backup | pg_dump qua docker exec → `.backups/` | abort, no changes |
-| admin-build | npm + vite build → `backend/static/admin` (**trước** docker build, để `COPY . .` bake vào image) | abort, services running |
+| admin-build | check/log (SPA build TRONG Docker, không build trên host) | abort, services running |
 | compose-down | graceful tear down | abort, manual recovery |
-| compose-up | build + `up -d --wait` | **rollback** (rebuild old SHA) |
+| compose-up | build (gồm admin SPA build trong image) + `up -d --wait` | **rollback** (rebuild old SHA) |
 | smoke-test | /health, alembic current, redis ping, seed_admin (idempotent) | **rollback** |
 | cleanup | docker image prune, log rotation | warn only |
 
-> **Lưu ý kiến trúc:** admin SPA phải build **trước** `docker build` (không
-> phải sau), vì `backend/Dockerfile` dùng `COPY . .` để đưa
-> `backend/static/admin` vào image. Script **không** dùng `deploy_admin.sh`
-> (script đó cho kiến trúc systemctl+caddy cũ). `backend/static/admin/` đã được
-> gitignore nên build artifact không làm bẩn working tree.
+> **Lưu ý kiến trúc:** admin SPA được build **trong Docker multi-stage**
+> (`backend/Dockerfile` stage `admin-build`: `node:22-slim` chạy `npm install`
+> + `vite build`, rồi `COPY --from` dist vào `backend/static/admin`). Host
+> **chỉ cần docker** — không cần node/npm (deploy chạy trong namespace không có
+> npm). `VITE_API_BASE` truyền build-time qua compose `build.args` (nội suy từ
+> `.env`). Script **không** dùng `deploy_admin.sh` (kiến trúc systemctl+caddy cũ).

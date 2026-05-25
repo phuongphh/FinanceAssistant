@@ -62,7 +62,8 @@
 ### 1. Clone & setup env
 
 ```bash
-cp .env.example .env
+# KHÔNG đè .env đã tồn tại — .env chứa secrets thật và KHÔNG có backup ở đâu cả.
+[ -f .env ] || cp .env.example .env
 # Điền credentials vào .env
 ```
 
