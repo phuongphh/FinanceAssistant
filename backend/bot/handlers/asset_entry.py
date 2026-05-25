@@ -70,7 +70,6 @@ from backend.bot.keyboards.asset_keyboard import (
     asset_market_manage_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
-    cash_existing_confirm_keyboard,
     crypto_current_price_keyboard,
     crypto_subtype_keyboard,
     gold_current_price_keyboard,
@@ -973,49 +972,6 @@ async def _handle_cash_subtype_pick(
         await send_message(chat_id=chat_id, text="Loại không hợp lệ.")
         return
 
-    if subtype == "cash":
-        existing_cash_assets = await asset_service.get_user_assets(
-            db,
-            user.id,
-            asset_type=AssetType.CASH.value,
-        )
-        has_cash_asset = any(
-            (a.subtype == "cash")
-            or (str((a.name or "")).strip().casefold() == "tiền mặt")
-            for a in existing_cash_assets
-        )
-        if has_cash_asset:
-            existing_cash_asset = next(
-                (
-                    a
-                    for a in existing_cash_assets
-                    if (a.subtype == "cash")
-                    or (str((a.name or "")).strip().casefold() == "tiền mặt")
-                ),
-                None,
-            )
-            await wizard_service.update_step(
-                db,
-                user.id,
-                step="cash_existing_confirm",
-                draft_patch={
-                    "subtype": subtype,
-                    "existing_cash_asset_id": (
-                        str(existing_cash_asset.id) if existing_cash_asset else None
-                    ),
-                },
-            )
-            await send_message(
-                chat_id=chat_id,
-                text=(
-                    "💵 Bạn đã có <b>Tiền mặt</b> rồi.\n"
-                    "Bạn có muốn cộng thêm vào không?"
-                ),
-                parse_mode="HTML",
-                reply_markup=cash_existing_confirm_keyboard(),
-            )
-            return
-
     await wizard_service.update_step(
         db,
         user.id,
@@ -1023,30 +979,6 @@ async def _handle_cash_subtype_pick(
         draft_patch={"subtype": subtype},
     )
     label_prompt, example = _CASH_SUBTYPE_PROMPTS[subtype]
-    await send_message(
-        chat_id=chat_id,
-        text=f"💬 {label_prompt}\n\n{example}",
-        parse_mode="HTML",
-    )
-
-
-async def _handle_cash_existing_confirm(
-    db: AsyncSession, chat_id: int, user: User, choice: str
-) -> None:
-    if choice == "cancel":
-        await start_asset_wizard(db, chat_id, user)
-        return
-
-    if choice != "add":
-        await send_message(chat_id=chat_id, text="Lựa chọn không hợp lệ.")
-        return
-
-    await wizard_service.update_step(
-        db,
-        user.id,
-        step="amount",
-    )
-    label_prompt, example = _CASH_SUBTYPE_PROMPTS["cash"]
     await send_message(
         chat_id=chat_id,
         text=f"💬 {label_prompt}\n\n{example}",
@@ -1100,9 +1032,11 @@ async def _handle_cash_amount_input(
         if existing_uuid is not None:
             existing_asset = await asset_service.get_asset_by_id(db, user.id, existing_uuid)
             if existing_asset is not None:
-                new_total = Decimal(existing_asset.current_value or 0) + Decimal(amount)
                 asset = await asset_service.update_current_value(
-                    db, user.id, existing_uuid, new_total
+                    db,
+                    user.id,
+                    existing_uuid,
+                    Decimal(existing_asset.current_value or 0) + Decimal(amount),
                 )
             else:
                 asset = await asset_service.create_asset(
@@ -3093,9 +3027,6 @@ async def _dispatch_asset_action(
         return
     if action == "cash_subtype" and arg:
         await _handle_cash_subtype_pick(db, chat_id, user, arg)
-        return
-    if action == "cash_existing" and arg:
-        await _handle_cash_existing_confirm(db, chat_id, user, arg)
         return
 
     if action == "stock_subtype" and arg:

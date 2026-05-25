@@ -230,26 +230,6 @@ def cash_subtype_keyboard() -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
-def cash_existing_confirm_keyboard() -> InlineKeyboardMarkup:
-    """Prompt when user already has a ``Tiền mặt`` asset."""
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "Thêm",
-                    "callback_data": build_callback(CB_ASSET_ADD, "cash_existing", "add"),
-                },
-                {
-                    "text": "Hủy",
-                    "callback_data": build_callback(
-                        CB_ASSET_ADD, "cash_existing", "cancel"
-                    ),
-                },
-            ]
-        ]
-    }
-
-
 def stock_subtype_keyboard() -> InlineKeyboardMarkup:
     subs = get_subtypes(AssetType.STOCK.value)
     rows = [
