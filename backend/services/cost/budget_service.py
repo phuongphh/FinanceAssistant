@@ -24,6 +24,12 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.agent.limits import (
+    DEEPSEEK_PRICE_INPUT_PER_M,
+    DEEPSEEK_PRICE_OUTPUT_PER_M,
+    GROQ_PRICE_INPUT_PER_M,
+    GROQ_PRICE_OUTPUT_PER_M,
+)
 from backend.models.cost_budget import (
     DEFAULT_BUDGET_VND,
     LLMCostLog,
@@ -34,21 +40,34 @@ from backend.models.cost_budget import (
 logger = logging.getLogger(__name__)
 
 
-# Pricing — VND per call/unit. Conservative for v1; refined post-launch.
-# DeepSeek is OpenAI-compatible; tokens_in + tokens_out get the same
-# rate to keep math simple (the diff is < 5% of the call cost).
+# Pricing — VND per call/unit. Token rates are sourced from
+# ``backend.agent.limits`` (the single source of truth shared with the
+# USD daily kill-switch) and converted to VND here, so the two ledgers
+# can never quote a different per-token rate. We build Decimal per-token
+# rates from those floats via ``str()`` to stay in exact Decimal math
+# (money is always Decimal, never float).
 USD_VND_RATE = Decimal(os.environ.get("USD_VND_RATE", "25000"))
 
-# DeepSeek V4-Flash: roughly $0.27 per 1M tokens (blended in+out for v1).
-# Cache-hit prices not modeled — LLMCache returns cached responses
-# without hitting the API (zero upstream cost).
-_DEEPSEEK_USD_PER_TOKEN = Decimal("0.27") / Decimal("1_000_000")
+# DeepSeek V4-Flash — split input/output ($0.14 / $0.28 per 1M), matching
+# the USD kill-switch. Cache-hit prices not modeled — LLMCache returns
+# cached responses without hitting the API (zero upstream cost).
+_DEEPSEEK_INPUT_USD_PER_TOKEN = (
+    Decimal(str(DEEPSEEK_PRICE_INPUT_PER_M)) / Decimal("1_000_000")
+)
+_DEEPSEEK_OUTPUT_USD_PER_TOKEN = (
+    Decimal(str(DEEPSEEK_PRICE_OUTPUT_PER_M)) / Decimal("1_000_000")
+)
 # Groq Llama 3.3 70B — $0.59 input / $0.79 output per 1M tokens. Track
 # input + output separately because the split matters for Tier 1
 # (short prompts, very short JSON responses).
-_GROQ_INPUT_USD_PER_TOKEN = Decimal("0.59") / Decimal("1_000_000")
-_GROQ_OUTPUT_USD_PER_TOKEN = Decimal("0.79") / Decimal("1_000_000")
-# Claude Sonnet OCR — ~$0.03 per page using p50 token counts.
+_GROQ_INPUT_USD_PER_TOKEN = (
+    Decimal(str(GROQ_PRICE_INPUT_PER_M)) / Decimal("1_000_000")
+)
+_GROQ_OUTPUT_USD_PER_TOKEN = (
+    Decimal(str(GROQ_PRICE_OUTPUT_PER_M)) / Decimal("1_000_000")
+)
+# Claude Sonnet OCR — ~$0.03 per page using p50 token counts. This is a
+# per-page cost model (not token-based), so it lives only here.
 _CLAUDE_PER_PAGE_USD = Decimal("0.03")
 # Whisper at $0.006 per minute → per-second.
 _WHISPER_PER_SECOND_USD = Decimal("0.006") / Decimal("60")
@@ -90,7 +109,8 @@ def estimate_call_cost_vnd(
     """Best-effort VND cost estimate from raw call params.
 
     Operations:
-      - DeepSeek: (tokens_in + tokens_out) at one rate; OK for budget.
+      - DeepSeek: split input/output rates ($0.14 / $0.28 per 1M).
+      - Groq: split input/output rates ($0.59 / $0.79 per 1M).
       - Claude OCR: per-page rate × page_count.
       - Whisper: per-second × audio_seconds.
 
@@ -99,8 +119,10 @@ def estimate_call_cost_vnd(
     """
     p = provider.lower()
     if p == "deepseek":
-        total_tokens = Decimal(tokens_in + tokens_out)
-        cost_usd = total_tokens * _DEEPSEEK_USD_PER_TOKEN
+        cost_usd = (
+            Decimal(tokens_in) * _DEEPSEEK_INPUT_USD_PER_TOKEN
+            + Decimal(tokens_out) * _DEEPSEEK_OUTPUT_USD_PER_TOKEN
+        )
         return (cost_usd * USD_VND_RATE).quantize(Decimal("0.0001"))
     if p == "groq":
         cost_usd = (

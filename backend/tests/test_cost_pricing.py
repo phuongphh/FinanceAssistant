@@ -47,13 +47,16 @@ def test_estimate_call_cost_vnd_groq_zero_tokens_is_zero():
     assert estimate_call_cost_vnd(provider="groq") == Decimal("0.0000")
 
 
-def test_estimate_call_cost_vnd_deepseek_path_unchanged():
-    # DeepSeek uses a blended single rate; verify it still computes
-    # against tokens_in + tokens_out and the existing rate.
+def test_estimate_call_cost_vnd_deepseek_splits_input_output():
+    # DeepSeek now uses split input/output rates ($0.14 / $0.28 per 1M),
+    # matching the USD kill-switch — no more blended $0.27.
     cost = estimate_call_cost_vnd(
         provider="deepseek", tokens_in=1000, tokens_out=500
     )
-    expected_usd = Decimal(1500) * (Decimal("0.27") / Decimal("1_000_000"))
+    expected_usd = (
+        Decimal(1000) * (Decimal("0.14") / Decimal("1_000_000"))
+        + Decimal(500) * (Decimal("0.28") / Decimal("1_000_000"))
+    )
     expected_vnd = (expected_usd * USD_VND_RATE).quantize(Decimal("0.0001"))
     assert cost == expected_vnd
 
@@ -123,3 +126,50 @@ def test_estimate_cost_usd_sonnet_4_5_legacy_id_still_priced():
 
 def test_estimate_cost_usd_unknown_model_returns_zero():
     assert estimate_cost_usd(model="mystery", input_tokens=999, output_tokens=999) == 0.0
+
+
+# ----- cross-system consistency -------------------------------------
+# These guard the whole point of the unification: the per-user VND
+# ledger (System B) and the USD daily kill-switch (System A) must never
+# quote a different per-token rate for the same provider.
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [
+        ("deepseek", "deepseek-v4-flash"),
+        ("groq", "llama-3.3-70b-versatile"),
+    ],
+)
+def test_vnd_ledger_matches_usd_killswitch(provider, model):
+    tokens_in, tokens_out = 1234, 567
+    vnd_direct = estimate_call_cost_vnd(
+        provider=provider, tokens_in=tokens_in, tokens_out=tokens_out
+    )
+    usd = estimate_cost_usd(
+        model=model, input_tokens=tokens_in, output_tokens=tokens_out
+    )
+    vnd_from_usd = Decimal(str(usd)) * USD_VND_RATE
+    # Both derive from the same per-1M constants; any gap is sub-VND
+    # float/Decimal rounding, not a rate divergence.
+    assert abs(vnd_direct - vnd_from_usd) < Decimal("0.01")
+
+
+# ----- live model-string coverage -----------------------------------
+# Every model identifier actually wired into the agent stack must
+# resolve to a non-zero rate, or its spend silently drops to the $0
+# unknown-model branch. Update this list when a tier swaps models.
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "deepseek-v4-flash",
+        "llama-3.3-70b-versatile",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5-20250929",
+    ],
+)
+def test_every_live_model_string_is_priced(model):
+    cost = estimate_cost_usd(model=model, input_tokens=1000, output_tokens=1000)
+    assert cost > 0.0

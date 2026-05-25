@@ -31,6 +31,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.agent.limits import estimate_cost_usd
 from backend.config import get_settings
 from backend.intent.intents import (
     CLASSIFIER_LLM,
@@ -42,13 +43,6 @@ from backend.services.llm_service import LLMError, call_llm
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-
-# Groq pricing (USD per 1M tokens) — used to attribute cost to the
-# ``llm_classifier_call`` analytics event. Pricing as of 2026-05 for
-# llama-3.3-70b-versatile. Update here when Groq changes their rate
-# card; the test for max-cost-per-call will catch silent drift.
-_GROQ_INPUT_USD_PER_1M = 0.59
-_GROQ_OUTPUT_USD_PER_1M = 0.79
 
 # Tier 1 has to respond in <2s wall-clock from the pipeline's perspective.
 # Groq Llama 3.3 70B typically returns in 300-700ms; we cap at 3s to give
@@ -281,12 +275,18 @@ class LLMClassifier:
         # Vietnamese mixed-script text in practice.
         input_tokens = max(1, len(prompt) // 4)
         output_tokens = max(1, len(response) // 4)
+        # Cost comes from the shared pricing table (Groq rates) rather
+        # than redeclaring per-1M constants here — keeps the analytics
+        # attribution in lockstep with the budget/kill-switch ledgers.
         cost = (
-            input_tokens * _GROQ_INPUT_USD_PER_1M / 1_000_000
-            + output_tokens * _GROQ_OUTPUT_USD_PER_1M / 1_000_000
+            0.0
+            if cache_hit
+            else estimate_cost_usd(
+                model=settings.groq_model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
         )
-        if cache_hit:
-            cost = 0.0
         return LLMCallStats(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
