@@ -985,11 +985,23 @@ async def _handle_cash_subtype_pick(
             for a in existing_cash_assets
         )
         if has_cash_asset:
+            existing_cash = next(
+                (
+                    a
+                    for a in existing_cash_assets
+                    if (a.subtype == "cash")
+                    or (str((a.name or "")).strip().casefold() == "tiền mặt")
+                ),
+                None,
+            )
             await wizard_service.update_step(
                 db,
                 user.id,
                 step="cash_existing_confirm",
-                draft_patch={"subtype": subtype},
+                draft_patch={
+                    "subtype": subtype,
+                    "merge_asset_id": str(existing_cash.id) if existing_cash else None,
+                },
             )
             await send_message(
                 chat_id=chat_id,
@@ -1144,7 +1156,7 @@ async def _handle_cash_amount_input(
     }.get(draft.get("subtype", ""), "Tài khoản")
 
     merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
-    if draft.get("subtype") == "bank_checking" and merge_asset_id_raw:
+    if draft.get("subtype") in {"bank_checking", "cash"} and merge_asset_id_raw:
         try:
             merge_asset_id = uuid.UUID(merge_asset_id_raw)
         except ValueError:

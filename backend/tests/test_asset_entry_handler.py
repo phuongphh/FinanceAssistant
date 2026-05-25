@@ -293,6 +293,42 @@ async def test_cash_existing_confirm_add_merges_existing_bank_checking():
     assert update_current.await_args.args[3] == Decimal("12000000")
 
 
+@pytest.mark.asyncio
+async def test_cash_amount_input_merges_existing_cash_after_confirm_add():
+    existing = _asset(asset_type="cash", value=10_000_000)
+    existing.subtype = "cash"
+    existing.name = "Tiền mặt"
+    user = _user(
+        {
+            "flow": asset_entry.FLOW_CASH,
+            "step": "amount",
+            "draft": {
+                "asset_type": "cash",
+                "subtype": "cash",
+                "merge_asset_id": str(existing.id),
+            },
+        }
+    )
+    db = _db(user)
+    with (
+        patch.object(asset_entry, "get_user_by_telegram_id", AsyncMock(return_value=user)),
+        patch.object(asset_entry.asset_service, "get_asset_by_id", AsyncMock(return_value=existing)),
+        patch.object(asset_entry.asset_service, "update_current_value", AsyncMock(return_value=existing)) as update_current,
+        patch.object(asset_entry.asset_service, "create_asset", AsyncMock()) as create_asset,
+        patch.object(asset_entry.net_worth_calculator, "calculate_stored_current", AsyncMock(return_value=MagicMock(total=Decimal("12000000"), asset_count=1))),
+        patch.object(asset_entry, "update_user_level", AsyncMock(return_value=None)),
+        patch.object(asset_entry.wizard_service, "clear", AsyncMock()),
+        patch.object(asset_entry, "send_message", AsyncMock()),
+    ):
+        consumed = await asset_entry.handle_asset_text_input(
+            db, {"text": "2 triệu", "chat": {"id": 100}, "from": {"id": 100}}
+        )
+    assert consumed is True
+    update_current.assert_awaited_once()
+    assert update_current.await_args.args[3] == Decimal("12000000")
+    create_asset.assert_not_awaited()
+
+
 # -----------------------------------------------------------------
 # Stock flow — ticker step
 # -----------------------------------------------------------------
