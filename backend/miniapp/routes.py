@@ -30,6 +30,8 @@ from backend.services import (
     intent_metrics,
     wealth_dashboard_service,
 )
+from backend.services.credit_card_service import list_credit_cards
+from backend.services.portfolio_service import list_assets
 
 logger = logging.getLogger(__name__)
 
@@ -811,11 +813,25 @@ async def get_expense_dashboard_overview(
     return {"data": payload, "error": None}
 
 
-
-
 async def _build_source_options(db: AsyncSession, user_id):
-    assets = await list_assets(db, user_id, asset_type="cash", limit=500, offset=0)
-    cards = await list_credit_cards(db, user_id)
+    """Source-picker options for the add/edit transaction modal.
+
+    Auxiliary enrichment only — the modal's source dropdown. A failure here
+    (e.g. schema drift in ``assets``/``credit_cards``) must never blank the
+    whole Expense Dashboard, so we degrade to the base "no source" option
+    and let the frontend's ``FALLBACK_SOURCE_OPTIONS`` fill the static
+    choices. The primary spending payload is always returned.
+    """
+    base = [{"value": "", "label": "Không liên kết nguồn"}]
+    try:
+        assets = await list_assets(db, user_id, asset_type="cash", limit=500, offset=0)
+        cards = await list_credit_cards(db, user_id)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "expense_dashboard.source_options failed",
+            extra={"user_id": str(user_id)},
+        )
+        return {"expense": list(base), "money_in": list(base)}
 
     def _asset_label(a):
         subtype = (a.subtype or "").lower()
@@ -827,8 +843,8 @@ async def _build_source_options(db: AsyncSession, user_id):
             return f"Tiền mặt · {a.name}"
         return None
 
-    expense = [{"value": "", "label": "Không liên kết nguồn"}]
-    money_in = [{"value": "", "label": "Không liên kết nguồn"}]
+    expense = list(base)
+    money_in = list(base)
     for a in assets:
         label = _asset_label(a)
         if not label:
@@ -837,8 +853,12 @@ async def _build_source_options(db: AsyncSession, user_id):
         expense.append(opt)
         money_in.append(opt)
     for c in cards:
-        expense.append({"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng · {c.bank_name}"})
+        expense.append(
+            {"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng · {c.bank_name}"}
+        )
     return {"expense": expense, "money_in": money_in}
+
+
 def _previous_month_key(month_key: str) -> str:
     """Return YYYY-MM for the calendar month immediately before ``month_key``."""
     year, month = month_key.split("-")
