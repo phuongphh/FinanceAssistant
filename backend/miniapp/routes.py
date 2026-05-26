@@ -779,6 +779,7 @@ async def get_expense_dashboard_overview(
                 "expenses": [_serialize_expense_item(e) for e in expenses],
                 "money_in": [_serialize_expense_item(e) for e in money_in],
                 "money_in_total": sum(float(e.amount or 0) for e in money_in),
+                "source_options": await _build_source_options(db, user.id),
             }
         except Exception as exc:  # noqa: BLE001
             # Log the underlying DB / ORM error before flattening to a
@@ -810,6 +811,34 @@ async def get_expense_dashboard_overview(
     return {"data": payload, "error": None}
 
 
+
+
+async def _build_source_options(db: AsyncSession, user_id):
+    assets = await list_assets(db, user_id, asset_type="cash", limit=500, offset=0)
+    cards = await list_credit_cards(db, user_id)
+
+    def _asset_label(a):
+        subtype = (a.subtype or "").lower()
+        if subtype in ("bank_checking", "bank_account"):
+            return f"Tài khoản thanh toán · {a.name}"
+        if subtype in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet"):
+            return f"Ví điện tử · {a.name}"
+        if subtype == "cash":
+            return f"Tiền mặt · {a.name}"
+        return None
+
+    expense = [{"value": "", "label": "Không liên kết nguồn"}]
+    money_in = [{"value": "", "label": "Không liên kết nguồn"}]
+    for a in assets:
+        label = _asset_label(a)
+        if not label:
+            continue
+        opt = {"value": f"asset:{a.id}", "label": label}
+        expense.append(opt)
+        money_in.append(opt)
+    for c in cards:
+        expense.append({"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng · {c.bank_name}"})
+    return {"expense": expense, "money_in": money_in}
 def _previous_month_key(month_key: str) -> str:
     """Return YYYY-MM for the calendar month immediately before ``month_key``."""
     year, month = month_key.split("-")

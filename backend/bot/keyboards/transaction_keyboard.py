@@ -128,16 +128,31 @@ def transaction_source_keyboard(transaction_type: str) -> InlineKeyboardMarkup:
     skip_label = (
         "Bỏ qua nguồn" if transaction_type == "expense" else "Ghi nhận không liên kết"
     )
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
-                {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_account"},
-            ],
-            [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:e_wallet"}],
-            [{"text": f"↪️ {skip_label}", "callback_data": f"{prefix}:skip"}],
-        ]
-    }
+    rows = [
+        [
+            {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
+            {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_pick"},
+        ],
+        [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:ewallet_pick"}],
+    ]
+    if transaction_type == "expense":
+        rows.append([{"text": "💳 Thẻ tín dụng", "callback_data": f"{prefix}:credit_card"}])
+    rows.append([{"text": f"↪️ {skip_label}", "callback_data": f"{prefix}:skip"}])
+    return {"inline_keyboard": rows}
+
+
+def credit_card_source_keyboard(cards: list) -> InlineKeyboardMarkup:
+    rows: list[list[dict]] = []
+    for card in cards:
+        rows.append([
+            {
+                "text": f"💳 {card.bank_name}",
+                "callback_data": f"txsrc_card:{card.id}",
+            }
+        ])
+    rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
+    rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
+    return {"inline_keyboard": rows}
 
 
 def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
@@ -154,3 +169,13 @@ def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
             [{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}],
         ]
     }
+
+
+def source_asset_keyboard(assets: list, kind: str) -> InlineKeyboardMarkup:
+    rows: list[list[dict]] = []
+    for a in assets:
+        icon = "🏦" if kind == "bank" else "👛"
+        rows.append([{"text": f"{icon} {a.name}", "callback_data": f"txsrc_asset:{a.id}"}])
+    rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
+    rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
+    return {"inline_keyboard": rows}

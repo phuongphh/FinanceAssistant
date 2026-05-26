@@ -315,3 +315,52 @@ async def test_stale_wizard_state_does_not_call_create_expense():
     create.assert_not_awaited()
     answer.assert_awaited_once()
     assert "hết hạn" in answer.await_args.kwargs["text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_txsrc_credit_card_shows_all_cards_for_expense_only():
+    user = _user(state={
+        "flow": "transaction_source_select",
+        "step": "source_type",
+        "draft": {"amount": 200000.0, "transaction_type": "expense"},
+    })
+    db = MagicMock()
+    cards = [
+        SimpleNamespace(id=uuid.uuid4(), bank_name="VCB"),
+        SimpleNamespace(id=uuid.uuid4(), bank_name="ACB"),
+    ]
+    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks, "list_credit_cards", AsyncMock(return_value=cards)),          patch.object(callbacks, "edit_message_reply_markup", AsyncMock()) as edit_markup,          patch.object(callbacks, "answer_callback", AsyncMock()):
+        handled = await callbacks._handle_source_selection_callback(db, _callback("txsrc:credit_card"))
+
+    assert handled is True
+    kb = edit_markup.await_args.kwargs["reply_markup"]["inline_keyboard"]
+    labels = [row[0]["text"] for row in kb[:2]]
+    assert labels == ["💳 VCB", "💳 ACB"]
+
+
+@pytest.mark.asyncio
+async def test_txsrc_card_select_creates_expense_with_credit_card_source():
+    user = _user(state={
+        "flow": "transaction_source_select",
+        "step": "source_type",
+        "draft": {"amount": 200000.0, "transaction_type": "expense", "merchant": "test"},
+    })
+    db = MagicMock()
+    expense = _expense(transaction_type="expense", amount=200000.0)
+    card_id = uuid.uuid4()
+    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks.expense_service, "create_expense", AsyncMock(return_value=expense)) as create,          patch.object(callbacks, "edit_message_text", AsyncMock(return_value={"ok": True})),          patch.object(callbacks, "answer_callback", AsyncMock()),          patch("backend.services.wizard_service.clear", AsyncMock()):
+        handled = await callbacks._handle_source_selection_callback(db, _callback(f"txsrc_card:{card_id}"))
+
+    assert handled is True
+    payload = create.await_args.args[2]
+    assert payload.source_type == "credit_card"
+    assert str(payload.source_credit_card_id) == str(card_id)
+from backend.bot.keyboards.transaction_keyboard import transaction_source_keyboard
+
+def test_tx_source_keyboard_expense_includes_credit_card():
+    kb = transaction_source_keyboard("expense")["inline_keyboard"]
+    assert any(btn["callback_data"] == "txsrc:credit_card" for row in kb for btn in row)
+
+def test_tx_source_keyboard_money_in_excludes_credit_card():
+    kb = transaction_source_keyboard("money_in")["inline_keyboard"]
+    assert all(btn["callback_data"] != "txsrc:credit_card" for row in kb for btn in row)
