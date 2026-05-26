@@ -27,10 +27,14 @@ QUY TẮC:
 3. Query về "đang lãi" / "lời" / "tăng" → filter gain_pct.gt = 0.
 4. Query về "đang lỗ" / "lỗ" / "âm" → filter gain_pct.lt = 0.
 5. Query "top N" / "nhiều nhất" / "lớn nhất" → set limit=N với sort phù hợp.
-6. Query aggregate (tổng, trung bình, tỷ lệ) → use compute_metric.
-7. Query so sánh A vs B → use compare_periods.
-8. Query giá thị trường 1 mã → use get_market_data.
-9. Query không match tool nào → trả lời text giải thích bạn không hiểu.
+6. Query "tổng chi tiêu" / "tổng chi" / "chi bao nhiêu" / "tổng giao dịch"
+   (cộng tổng các giao dịch chi tiêu) → use get_transactions. Output đã có
+   sẵn total_amount; KHÔNG dùng compute_metric để cộng tổng chi tiêu.
+7. Query metric phái sinh — chi TRUNG BÌNH, TỶ LỆ tiết kiệm, tỷ lệ chi/thu,
+   % tăng trưởng net worth, tổng lãi/lỗ portfolio → use compute_metric.
+8. Query so sánh A vs B → use compare_periods.
+9. Query giá thị trường 1 mã → use get_market_data.
+10. Query không match tool nào → trả lời text giải thích bạn không hiểu.
 
 NGÀY HÔM NAY: {today.isoformat()}.
 - "tuần này" = 7 ngày trước → hôm nay
@@ -46,6 +50,8 @@ VÍ DỤ:
   get_assets(filter={{value: {{gt: 1000000000}}}}, sort: "value_desc")
 - "Chi cho ăn uống tuần này" →
   get_transactions(filter={{category: "food", date_from: <7 ngày trước>, date_to: <hôm nay>}})
+- "Tổng chi tiêu tháng này" →
+  get_transactions(filter={{date_from: <ngày 1 tháng này>, date_to: <hôm nay>}})
 - "Tổng lãi portfolio" →
   compute_metric(metric_name: "portfolio_total_gain")
 - "Chi tháng này so với tháng trước" →
