@@ -214,6 +214,50 @@ def test_fetch_api_includes_telegram_init_data_header() -> None:
     assert captured["data"] == {"ok": 1}
 
 
+def test_fetch_api_waits_for_late_init_data_before_fallback() -> None:
+    """Telegram WebApp can hydrate initData a tick late on cold loads.
+    fetchAPI should wait briefly so first request is authenticated.
+    """
+    captured = _evaluate("""
+        let calls = 0;
+        ctx.Telegram.WebApp.initData = '';
+        ctx.fetch = (url, opts) => {
+            calls += 1;
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({ data: { ok: calls, hdr: opts && opts.headers && opts.headers['X-Telegram-Init-Data'] } }),
+            });
+        };
+        setTimeout(() => { ctx.Telegram.WebApp.initData = 'late-stub'; }, 20);
+        const data = await DC.fetchAPI('/expense-dashboard/overview');
+        return data;
+    """)
+    assert captured["ok"] == 1
+    assert captured["hdr"] == "late-stub"
+
+
+def test_fetch_api_uses_query_initdata_without_double_decode_breakage() -> None:
+    """URLSearchParams already decodes values; decode again can crash on `%`."""
+    captured = _evaluate("""
+        let seenHeader = '';
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { search: '?tgWebAppData=query%25signed%3Dabc' };
+        ctx.fetch = (url, opts) => {
+            seenHeader = opts && opts.headers && opts.headers['X-Telegram-Init-Data'];
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({ data: { ok: 1 } }),
+            });
+        };
+        const data = await DC.fetchAPI('/expense-dashboard/overview');
+        return { data, seenHeader };
+    """)
+    assert captured["data"] == {"ok": 1}
+    assert captured["seenHeader"] == "query%signed=abc"
+
+
 def test_fetch_api_surfaces_payload_error() -> None:
     """When the API responds 200 with a structured error envelope the
     helper must throw so callers' catch blocks fire.
