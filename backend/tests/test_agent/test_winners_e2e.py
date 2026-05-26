@@ -22,8 +22,26 @@ import pytest
 from backend.agent.orchestrator import TIER_2, Orchestrator
 from backend.agent.rate_limit import DailyCostTracker, RateLimiter
 from backend.agent.tier2.db_agent import DBAgentResult
+from backend.intent.intents import IntentResult, IntentType
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import asset_service
+
+
+def _unclear_pipeline() -> MagicMock:
+    """Intent pipeline whose sync rule classifier reports UNCLEAR.
+
+    The tier-2 rule guard consults ``rule_classifier.classify`` before
+    paying for the cascade; an unconfigured ``MagicMock`` would make the
+    guard's ``confidence < threshold`` comparison raise ``TypeError``.
+    These filter queries genuinely belong to Tier 2, so UNCLEAR makes
+    the guard decline and the tier-2 path runs as the tests expect."""
+    pipeline = MagicMock()
+    pipeline.rule_classifier.classify = MagicMock(
+        return_value=IntentResult(
+            intent=IntentType.UNCLEAR, confidence=0.0, raw_text=""
+        )
+    )
+    return pipeline
 
 
 def _stock(name: str, current: int, initial: int) -> Asset:
@@ -119,7 +137,7 @@ class TestWinnersOnlyE2E:
         db = _mock_db(rows)
 
         orch = Orchestrator(
-            intent_pipeline=MagicMock(),  # not used; tier-2 short-circuits
+            intent_pipeline=_unclear_pipeline(),  # guard declines → tier-2
             intent_dispatcher=MagicMock(),
             db_agent=_stub_db_agent_picks_winners_filter(),
             reasoning_agent=MagicMock(),
@@ -188,7 +206,7 @@ class TestWinnersOnlyE2E:
         agent = MagicMock()
         agent.answer = loser_answer
         orch = Orchestrator(
-            intent_pipeline=MagicMock(),
+            intent_pipeline=_unclear_pipeline(),
             intent_dispatcher=MagicMock(),
             db_agent=agent,
             reasoning_agent=MagicMock(),
@@ -238,7 +256,7 @@ class TestWinnersOnlyE2E:
         agent = MagicMock()
         agent.answer = top3_answer
         orch = Orchestrator(
-            intent_pipeline=MagicMock(),
+            intent_pipeline=_unclear_pipeline(),
             intent_dispatcher=MagicMock(),
             db_agent=agent,
             reasoning_agent=MagicMock(),

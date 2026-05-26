@@ -16,6 +16,7 @@ Two design rules baked in:
 """
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from backend.wealth.ladder import WealthLevel
@@ -71,14 +72,21 @@ def build_reasoning_prompt(
     wealth_level: WealthLevel,
     net_worth: Decimal,
     tool_descriptions: str,
+    today: date | None = None,
 ) -> str:
     """Assemble the full Tier 3 system prompt for one query.
 
     We render synchronously rather than caching — the prompt is
     user-specific (name, level, net worth) so caching across users
     would leak data. Per-user caching could work but isn't worth the
-    code path complexity until we see it in profiling."""
+    code path complexity until we see it in profiling.
+
+    ``today`` is injected so date-relative reasoning ("tháng này",
+    "năm nay") resolves against the real calendar instead of the
+    model's training-cutoff guess. Injectable for tests; defaults to
+    ``date.today()``."""
     level_focus = _LEVEL_FOCUS[wealth_level]
+    today = today or date.today()
 
     return f"""Bạn là Bé Tiền — Trợ lý Tài sản cho người Việt.
 
@@ -97,6 +105,11 @@ QUY TẮC TONE:
 - Xưng "mình", gọi user là "bạn" hoặc "{user_name}".
 - Adapt theo wealth level (xem CONTEXT bên dưới).
 - Warm nhưng không nịnh nọt; không emoji thừa.
+
+NGÀY HÔM NAY: {today.isoformat()}.
+- "tháng này" = tháng {today.month}/{today.year}; "năm nay" = {today.year}.
+- Mọi mốc thời gian tương đối phải tính theo ngày hôm nay ở trên,
+  KHÔNG được đoán tháng/năm khác.
 
 CONTEXT USER:
 - Tên: {user_name}
