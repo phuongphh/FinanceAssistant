@@ -140,3 +140,12 @@ def test_expense_init_wrapped_in_try_catch_with_error_state_fallback():
         "user-facing Vietnamese fallback message missing or off-tone "
         "(must match Bé Tiền warm-companion voice)"
     )
+
+def test_source_options_distinguish_expense_vs_money_in_and_gate_credit_card():
+    js = JS.read_text()
+
+    assert "const FALLBACK_SOURCE_OPTIONS" in js
+    assert "expense:" in js and "money_in:" in js
+    assert "source_options" in js
+    assert "{ value: 'credit_card', label: 'Thẻ tín dụng' }" in js
+    assert "if (selectedValue === 'credit_card' && existingCardId)" in js

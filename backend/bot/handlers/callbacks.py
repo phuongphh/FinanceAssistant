@@ -36,13 +36,18 @@ from backend.bot.keyboards.common import CallbackPrefix, parse_callback
 from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
     confirm_delete_keyboard,
+    credit_card_source_keyboard,
     e_wallet_provider_keyboard,
+    source_asset_keyboard,
     transaction_actions_keyboard,
+    transaction_source_keyboard,
 )
 from backend.config.categories import get_all_categories
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
+from backend.services.credit_card_service import list_credit_cards
+from backend.services.portfolio_service import list_assets
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
     answer_callback,
@@ -84,6 +89,24 @@ async def _handle_source_selection_callback(
 
     source_type = None
     wallet_provider = None
+    if data == "txsrc:ewallet_pick":
+        assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
+        ewallet_assets = [a for a in assets if (a.subtype or "").lower() in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet")]
+        if not ewallet_assets:
+            await answer_callback(callback_id, text="Bạn chưa có ví điện tử nào 🌱", show_alert=True)
+            return True
+        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(ewallet_assets, "ewallet"))
+        await answer_callback(callback_id)
+        return True
+    if data == "txsrc:bank_pick":
+        assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
+        bank_assets = [a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")]
+        if not bank_assets:
+            await answer_callback(callback_id, text="Bạn chưa có tài khoản thanh toán nào 🌱", show_alert=True)
+            return True
+        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(bank_assets, "bank"))
+        await answer_callback(callback_id)
+        return True
     if data == "txsrc:e_wallet":
         await edit_message_reply_markup(
             chat_id=chat_id,
@@ -92,9 +115,36 @@ async def _handle_source_selection_callback(
         )
         await answer_callback(callback_id)
         return True
+    if data == "txsrc:back":
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=transaction_source_keyboard(draft.get("transaction_type", "expense")),
+        )
+        await answer_callback(callback_id)
+        return True
+    if data == "txsrc:credit_card":
+        cards = await list_credit_cards(db, user.id)
+        if not cards:
+            await answer_callback(callback_id, text="Bạn chưa có thẻ tín dụng nào 🌱", show_alert=True)
+            return True
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=credit_card_source_keyboard(cards),
+        )
+        await answer_callback(callback_id)
+        return True
+    source_credit_card_id = None
+    source_asset_id = None
     if data.startswith("txsrc_wallet:"):
         source_type = "e_wallet"
         wallet_provider = data.split(":", 1)[1]
+    elif data.startswith("txsrc_card:"):
+        source_type = "credit_card"
+        source_credit_card_id = data.split(":", 1)[1]
+    elif data.startswith("txsrc_asset:"):
+        source_asset_id = data.split(":", 1)[1]
     elif data.startswith("txsrc:"):
         chosen = data.split(":", 1)[1]
         if chosen != "skip":
@@ -108,6 +158,8 @@ async def _handle_source_selection_callback(
         source="manual",
         source_type=source_type,
         e_wallet_provider=wallet_provider,
+        source_credit_card_id=source_credit_card_id,
+        source_asset_id=source_asset_id,
     )
     expense = await expense_service.create_expense(db, user.id, expense_data)
     from backend.services import wizard_service
@@ -121,6 +173,7 @@ async def _handle_source_selection_callback(
         "vnpay": "Ví VNPay",
         "zalopay": "Ví ZaloPay",
         "viettelpay": "Ví ViettelPay",
+        "credit_card": "Thẻ tín dụng",
     }.get(wallet_provider or source_type, "không liên kết nguồn")
     confirmation_text = (
         f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}"

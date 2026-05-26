@@ -106,7 +106,29 @@
     let currentCategoryFilter = '';
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
-    const SOURCE = new URLSearchParams(window.location.search).get('source');
+    
+    const FALLBACK_SOURCE_OPTIONS = {
+        expense: [
+            { value: '', label: 'Không liên kết nguồn' },
+            { value: 'cash', label: 'Tiền mặt' },
+            { value: 'bank_account', label: 'Tài khoản thanh toán' },
+            { value: 'e_wallet:momo', label: 'Ví Momo' },
+            { value: 'e_wallet:vnpay', label: 'Ví VNPay' },
+            { value: 'e_wallet:zalopay', label: 'Ví ZaloPay' },
+            { value: 'e_wallet:viettelpay', label: 'Ví ViettelPay' },
+            { value: 'credit_card', label: 'Thẻ tín dụng' },
+        ],
+        money_in: [
+            { value: '', label: 'Không liên kết nguồn' },
+            { value: 'cash', label: 'Tiền mặt' },
+            { value: 'bank_account', label: 'Tài khoản thanh toán' },
+            { value: 'e_wallet:momo', label: 'Ví Momo' },
+            { value: 'e_wallet:vnpay', label: 'Ví VNPay' },
+            { value: 'e_wallet:zalopay', label: 'Ví ZaloPay' },
+            { value: 'e_wallet:viettelpay', label: 'Ví ViettelPay' },
+        ],
+    };
+const SOURCE = new URLSearchParams(window.location.search).get('source');
     let refreshInFlight = false;
     let lastRefreshAt = 0;
     let activeRequestId = 0;
@@ -128,6 +150,7 @@
         if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
         els.modalCancel.addEventListener('click', closeModal);
         els.modalSave.addEventListener('click', onSave);
+        els.modalType.addEventListener('change', () => applySourceOptions(els.modalType.value, '', null));
         els.modalDelete.addEventListener('click', onDelete);
         els.modal.addEventListener('click', (e) => {
             if (e.target === els.modal) closeModal();
@@ -672,17 +695,32 @@
         els.categoryFilter.innerHTML = '<option value="">Tất cả</option>';
     }
 
+
+    function applySourceOptions(txType, selectedValue = '', existingCardId = null) {
+        const key = txType === 'money_in' ? 'money_in' : 'expense';
+        const sourceOptions = (lastOverview && lastOverview.source_options && lastOverview.source_options[key]) || FALLBACK_SOURCE_OPTIONS[key];
+        const opts = [...sourceOptions];
+        if (selectedValue === 'credit_card' && existingCardId) {
+            opts.push({ value: `credit_card:${existingCardId}`, label: 'Thẻ tín dụng (đã chọn)' });
+        }
+        els.modalSource.innerHTML = opts
+            .map((it) => `<option value="${escapeHtml(it.value)}">${escapeHtml(it.label)}</option>`)
+            .join('');
+        els.modalSource.value = selectedValue || '';
+        if (els.modalSource.value !== (selectedValue || '')) els.modalSource.value = '';
+    }
+
     function openModal(item, forcedType) {
         editingExpenseId = item?.id || null;
         const txType = item?.transaction_type || forcedType || 'expense';
         els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
         els.modalType.value = txType;
+        applySourceOptions(txType, sourceValue(item), item?.source_credit_card_id || null);
         els.modalAmount.value = item ? Math.round(item.amount || 0) : '';
         els.modalCategory.value = item?.category || 'other';
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
         els.modalNote.value = item?.merchant || item?.note || '';
         els.modalPayment.value = item?.payment_method || '';
-        els.modalSource.value = sourceValue(item);
         els.modalDelete.hidden = !editingExpenseId;
         els.modalSave.disabled = false;
         els.modalDelete.disabled = false;
@@ -698,16 +736,27 @@
 
     function sourceValue(item) {
         if (!item || !item.source_type) return '';
+        if (item.source_credit_card_id) return `credit_card:${item.source_credit_card_id}`;
+        if (item.source_asset_id) return `asset:${item.source_asset_id}`;
         if (item.source_type === 'e_wallet') return `e_wallet:${item.e_wallet_provider || 'momo'}`;
         return item.source_type;
     }
 
-    function parseSourceValue(value) {
-        if (!value) return { source_type: null, e_wallet_provider: null };
+    function parseSourceValue(value, editingItem = null) {
+        if (!value) return { source_type: null, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
         if (value.startsWith('e_wallet:')) {
-            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo' };
+            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo', source_credit_card_id: null, source_asset_id: null };
         }
-        return { source_type: value, e_wallet_provider: null };
+        if (value.startsWith('credit_card:')) return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: value.split(':')[1] || null, source_asset_id: null };
+        if (value.startsWith('asset:')) return { source_type: null, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: value.split(':')[1] || null };
+        if (value === 'credit_card') return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: editingItem?.source_credit_card_id || null, source_asset_id: null };
+        return { source_type: value, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
+    }
+
+
+    function findById(id) {
+        const all = [...(lastOverview.expenses || []), ...(lastOverview.money_in || [])];
+        return all.find((it) => it.id === id) || null;
     }
 
     async function onSave() {
@@ -726,7 +775,7 @@
             note: note || null,
             merchant: note || null,
             payment_method: els.modalPayment.value.trim() || null,
-            ...parseSourceValue(els.modalSource.value),
+            ...parseSourceValue(els.modalSource.value, editingExpenseId ? findById(editingExpenseId) : null),
         };
         els.modalSave.disabled = true;
         let saved;
