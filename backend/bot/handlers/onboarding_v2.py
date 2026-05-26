@@ -73,13 +73,7 @@ def _trust_keyboard(copy: dict[str, Any]) -> dict:
                     "text": copy["buttons"]["ok_label"],
                     "callback_data": copy["callbacks"]["ok"],
                 }
-            ],
-            [
-                {
-                    "text": copy["buttons"]["question_label"],
-                    "callback_data": copy["callbacks"]["question"],
-                }
-            ],
+            ]
         ]
     }
 
@@ -373,25 +367,6 @@ async def _on_trust_ok(db: AsyncSession, chat_id: int, callback_id: str, user: U
     await answer_callback(callback_id, text="Cảm ơn bạn 💚")
     analytics.track("onboarding_trust_accepted", user_id=user.id)
     await _send_first_asset_prompt(db, chat_id, user)
-
-
-async def _on_trust_question(db: AsyncSession, chat_id: int, callback_id: str, user: User) -> None:
-    before = await onboarding_service.get_session(db, user.id)
-    should_create_feedback = before is not None and before.trust_question_raised_at is None
-    await onboarding_service.mark_trust_question_raised(db, user.id)
-    if should_create_feedback:
-        db.add(Feedback(
-            user_id=user.id,
-            content="[trust_question] User asked a question before entering assets",
-            trigger="onboarding_trust_card",
-            status=FEEDBACK_STATUS_NEW,
-            priority="high",
-        ))
-    await db.flush()
-    copy = _load_trust_copy()
-    await answer_callback(callback_id, text="Đã ghi nhận")
-    await send_message(chat_id, copy["question_ack"], parse_mode="HTML")
-    analytics.track("onboarding_trust_question_raised", user_id=user.id)
 
 
 # ---------- Step 2 ----------------------------------------------------
@@ -1130,10 +1105,6 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
 
     if action == "trust_ok":
         await _on_trust_ok(db, chat_id, callback_id, user)
-        return True
-
-    if action == "trust_question":
-        await _on_trust_question(db, chat_id, callback_id, user)
         return True
 
     if action == "asset_confirm" and len(parts) >= 3:

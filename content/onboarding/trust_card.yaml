@@ -7,11 +7,5 @@ bullets:
   - "🎭 Chưa sẵn sàng? Dùng số ước tính hoặc chọn Twin demo trước."
 buttons:
   ok_label: "✅ OK, Bé Tiền đi tiếp"
-  question_label: "💬 Tôi có câu hỏi"
 callbacks:
   ok: "onboarding_v2:trust_ok"
-  question: "onboarding_v2:trust_question"
-question_ack: |
-  Bé Tiền đã ghi nhận câu hỏi của bạn để founder ưu tiên trả lời.
-
-  Trong lúc chờ, bạn có thể nhập số ước tính hoặc chọn Twin demo — không cần nhập quá chi tiết ngay lúc này.
