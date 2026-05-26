@@ -2,7 +2,6 @@
 # 3 asset states × 3 onboarding goals. Keep copy short and action-led.
 
 prefix: "💡 Bước tiếp theo dành cho bạn:"
-soft_prompt: "...hoặc hỏi Bé Tiền bất cứ điều gì về Twin"
 
 buttons:
   add_asset:

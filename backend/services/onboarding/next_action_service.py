@@ -43,11 +43,13 @@ class NextActionCTA:
     callback_data: str
     action_type: str
     prefix: str
-    soft_prompt: str
+    soft_prompt: str = ""
 
     @property
     def message_text(self) -> str:
-        return f"{self.prefix}\n\n{self.text}\n\n💬 {self.soft_prompt}"
+        if self.soft_prompt.strip():
+            return f"{self.prefix}\n\n{self.text}\n\n💬 {self.soft_prompt}"
+        return f"{self.prefix}\n\n{self.text}"
 
     @property
     def reply_markup(self) -> dict[str, Any]:
@@ -125,7 +127,7 @@ async def compute(db: AsyncSession, user_id: uuid.UUID) -> NextActionCTA:
         callback_data=button["callback"],
         action_type=button["action_type"],
         prefix=copy["prefix"],
-        soft_prompt=copy["soft_prompt"],
+        soft_prompt=copy.get("soft_prompt", ""),
     )
 
 
