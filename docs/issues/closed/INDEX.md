@@ -460,6 +460,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #799 | Pre-Phase | [bug] Callback txsrc_wallet:* không gửi response — user stuck ở màn hình chọn nguồn | [pre-phase/issue-799.md](by-phase/pre-phase/issue-799.md) |
 | #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
 | #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
+| #845 | Pre-Phase | [bug] Expense mini-app 'Không tải được dữ liệu' — không gọi được API sau khi load | [pre-phase/issue-845.md](by-phase/pre-phase/issue-845.md) |
 
-**Total:** 456 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 439 Pre-Phase)
+**Total:** 457 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 440 Pre-Phase)
