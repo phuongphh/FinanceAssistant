@@ -236,6 +236,103 @@ class TestCascade:
 
 
 # ---------------------------------------------------------------------------
+# Tier-2 rule guard — keep simple summary queries on Tier 1.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestTier2RuleGuard:
+    """Regression for the production bug where "tổng chi tiêu tháng này"
+    was hijacked by the broad ``"tổng "`` tier-2 heuristic into the LLM
+    cascade, which then hallucinated (wrong month, fake "no transactions"
+    answer, investment-advice disclaimer). The free rule classifier
+    recognises it as ``query_expenses`` with high confidence, so the
+    guard must short-circuit such queries to Tier 1 — without hijacking
+    genuine tier-2 aggregates the rule layer can't classify."""
+
+    async def test_real_classifier_rescues_monthly_expense_total(self):
+        from backend.intent.classifier.pipeline import IntentPipeline
+
+        orch = _orch_with_streamable()
+        # Use the REAL rule classifier so this is a true end-to-end
+        # regression of the reported query, not a mock tautology.
+        orch.intent_pipeline = IntentPipeline()
+        # Precondition: the heuristic really does flag this Tier 2.
+        assert orch._heuristic_classify("tổng chi tiêu tháng này") == TIER_2
+        orch.intent_dispatcher.dispatch = AsyncMock(  # type: ignore[assignment]
+            return_value=MagicMock(
+                text="💸 Chi tiêu tháng này: 5tr",
+                intent=IntentType.QUERY_EXPENSES,
+                confidence=0.9,
+            )
+        )
+
+        result = await orch.route(
+            "tổng chi tiêu tháng này", _user(), MagicMock(), streamer=None
+        )
+
+        assert result.tier == TIER_1
+        assert result.routing_reason == "heuristic_tier2_rule_guard"
+        assert result.intent == IntentType.QUERY_EXPENSES
+        assert result.text == "💸 Chi tiêu tháng này: 5tr"
+        assert result.classifier_latency_ms is not None
+        # The expensive LLM DB-agent must never have been consulted.
+        orch.db_agent.answer.assert_not_called()
+
+    async def test_real_classifier_keeps_genuine_tier2_aggregate(self):
+        from backend.intent.classifier.pipeline import IntentPipeline
+
+        orch = _orch_with_streamable()
+        orch.intent_pipeline = IntentPipeline()
+        orch.db_agent.answer = AsyncMock(  # type: ignore[assignment]
+            return_value=_ok_db_result()
+        )
+        async def fake_format(_a, _b, _c, _d): return "tier2 aggregate text"
+        import backend.agent.orchestrator as orch_mod
+        orig = orch_mod.format_db_agent_response
+        orch_mod.format_db_agent_response = fake_format  # type: ignore[assignment]
+        try:
+            result = await orch.route(
+                "tổng lãi portfolio của tôi", _user(), MagicMock(), streamer=None
+            )
+        finally:
+            orch_mod.format_db_agent_response = orig  # type: ignore[assignment]
+
+        # The rule classifier doesn't recognise this aggregate, so the
+        # guard declines and the tier-2 cascade owns it.
+        assert result.tier == TIER_2
+        orch.db_agent.answer.assert_awaited_once()
+
+    async def test_guard_declines_on_low_confidence(self):
+        orch = _orch_with_streamable()
+        # A weakly-confident rule match must NOT short-circuit Tier 1 —
+        # we don't answer a billing-relevant query off a guess.
+        orch.intent_pipeline.rule_classifier.classify = MagicMock(
+            return_value=IntentResult(
+                intent=IntentType.QUERY_EXPENSES,
+                confidence=0.5,
+                raw_text="tổng chi tiêu tháng này",
+            )
+        )
+        orch.db_agent.answer = AsyncMock(  # type: ignore[assignment]
+            return_value=_ok_db_result()
+        )
+        async def fake_format(_a, _b, _c, _d): return "tier2 text"
+        import backend.agent.orchestrator as orch_mod
+        orig = orch_mod.format_db_agent_response
+        orch_mod.format_db_agent_response = fake_format  # type: ignore[assignment]
+        try:
+            result = await orch.route(
+                "tổng chi tiêu tháng này", _user(), MagicMock(), streamer=None
+            )
+        finally:
+            orch_mod.format_db_agent_response = orig  # type: ignore[assignment]
+
+        assert result.tier == TIER_2
+        orch.intent_dispatcher.dispatch.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # Rate limit + cost gates
 # ---------------------------------------------------------------------------
 
@@ -352,8 +449,16 @@ def _ok_db_result():
 
 def _orch_skeleton() -> Orchestrator:
     """Build an orchestrator with no-op agents for heuristic tests."""
+    intent_pipeline = MagicMock()
+    # Tier-2 rule guard reads the sync rule classifier; default UNCLEAR
+    # so the guard declines and heuristic routing is unchanged.
+    intent_pipeline.rule_classifier.classify = MagicMock(
+        return_value=IntentResult(
+            intent=IntentType.UNCLEAR, confidence=0.0, raw_text=""
+        )
+    )
     return Orchestrator(
-        intent_pipeline=MagicMock(),
+        intent_pipeline=intent_pipeline,
         intent_dispatcher=MagicMock(),
         db_agent=MagicMock(),
         reasoning_agent=MagicMock(),
@@ -376,6 +481,14 @@ def _orch_with_streamable(
     paths replace the relevant method explicitly."""
     intent_pipeline = MagicMock()
     intent_pipeline.classify = AsyncMock(
+        return_value=IntentResult(
+            intent=IntentType.UNCLEAR, confidence=0.0, raw_text=""
+        )
+    )
+    # The tier-2 rule guard consults the SYNC rule classifier directly.
+    # Default it to UNCLEAR so the guard declines and the cascade runs;
+    # tests exercising the rescue path override this explicitly.
+    intent_pipeline.rule_classifier.classify = MagicMock(
         return_value=IntentResult(
             intent=IntentType.UNCLEAR, confidence=0.0, raw_text=""
         )

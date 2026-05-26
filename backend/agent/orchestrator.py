@@ -52,7 +52,10 @@ from backend.agent.tier2.formatters import format_db_agent_response
 from backend.agent.tier3.reasoning_agent import ReasoningAgent, ReasoningTrace
 from backend.agent.tools import build_default_registry
 from backend.agent.tools.base import ToolRegistry
-from backend.intent.classifier.pipeline import IntentPipeline
+from backend.intent.classifier.pipeline import (
+    HIGH_CONFIDENCE_THRESHOLD,
+    IntentPipeline,
+)
 from backend.intent.dispatcher import (
     DispatchOutcome,
     IntentDispatcher,
@@ -239,6 +242,17 @@ class Orchestrator:
                 reason="heuristic_tier3", history=history,
             )
         if tier_hint == TIER_2:
+            # A broad tier-2 keyword ("tổng ", "liệt kê", ...) can hijack
+            # a simple summary query that Tier 1 answers directly from the
+            # DB — e.g. "tổng chi tiêu tháng này" is just query_expenses.
+            # Before paying for the LLM cascade (and risking an LLM
+            # hallucination), consult the free rule classifier: a
+            # high-confidence intent means Tier 1 owns this query.
+            guarded = await self._tier1_rule_guard(
+                query, user, db, reason="heuristic_tier2_rule_guard"
+            )
+            if guarded is not None:
+                return guarded
             return await self._cascade_tier2_then_3(
                 query, user, db, streamer,
                 reason="heuristic_tier2", history=history,
@@ -289,6 +303,50 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # Cascade implementations
     # ------------------------------------------------------------------
+
+    async def _tier1_rule_guard(
+        self,
+        query: str,
+        user: User,
+        db: AsyncSession,
+        *,
+        reason: str,
+    ) -> RouteResult | None:
+        """Rescue a query the tier-2 heuristic claimed but the rule
+        classifier recognises with high confidence.
+
+        Returns a Tier 1 ``RouteResult`` when the *free* rule classifier
+        yields a non-UNCLEAR intent at ``>= HIGH_CONFIDENCE_THRESHOLD``;
+        otherwise ``None`` so the caller proceeds with the tier-2
+        cascade. Uses the rule classifier ONLY (no LLM call) so the
+        guard stays free and instant — we don't want to spend a classify
+        token on a query the heuristic already flagged as Tier 2 unless
+        the rule layer is sure enough to short-circuit.
+        """
+        classifier_start = time.monotonic()
+        rule_result = self.intent_pipeline.rule_classifier.classify(query)
+        classifier_latency_ms = int(
+            (time.monotonic() - classifier_start) * 1000
+        )
+        if (
+            rule_result is None
+            or rule_result.intent == IntentType.UNCLEAR
+            or rule_result.confidence < HIGH_CONFIDENCE_THRESHOLD
+        ):
+            return None
+
+        outcome = await self.intent_dispatcher.dispatch(rule_result, user, db)
+        await self.rate_limiter.record(user.id, tier=TIER_1)
+        return RouteResult(
+            tier=TIER_1,
+            routing_reason=reason,
+            text=outcome.text,
+            intent=outcome.intent,
+            confidence=outcome.confidence,
+            dispatch_outcome=outcome,
+            classifier_latency_ms=classifier_latency_ms,
+            classifier_used=rule_result.classifier_used,
+        )
 
     async def _cascade_tier1_then_up(
         self,
