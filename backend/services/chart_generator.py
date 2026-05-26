@@ -20,6 +20,8 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
+from backend.wealth.asset_types import get_label
+
 logger = logging.getLogger(__name__)
 
 # ── Palette ─────────────────────────────────────────────────────────────────
@@ -38,7 +40,7 @@ _ASSET_CFG: dict[str, dict] = {
     "stocks":         {"label": "Chứng khoán",    "color": "#F28E2B"},  # V1 legacy
     "mutual_fund":    {"label": "Chứng chỉ quỹ", "color": "#E15759"},  # V1 legacy
     "crypto":         {"label": "Tiền số",         "color": "#76B7B2"},
-    "life_insurance": {"label": "Bảo hiểm",       "color": "#59A14F"},
+    "life_insurance": {"label": "Bảo hiểm nhân thọ", "color": "#59A14F"},
     "gold":           {"label": "Vàng",            "color": "#EDC948"},
     "cash":           {"label": "Tiền mặt",        "color": "#B07AA1"},
     "other":          {"label": "Khác",            "color": "#BAB0AC"},
@@ -64,9 +66,11 @@ def _fmt(amount: float) -> str:
 
 def _cfg_for(asset_type: str, extra_idx: int) -> dict:
     if asset_type in _ASSET_CFG:
-        return _ASSET_CFG[asset_type]
+        cfg = dict(_ASSET_CFG[asset_type])
+        cfg["label"] = get_label(asset_type)
+        return cfg
     return {
-        "label": asset_type.replace("_", " ").title(),
+        "label": get_label(asset_type),
         "color": _EXTRA_COLORS[extra_idx % len(_EXTRA_COLORS)],
     }
 
@@ -109,13 +113,8 @@ def generate_portfolio_chart(
     extra_idx = 0
     cfg_map: dict[str, dict] = {}
     for t in sorted_types:
-        if t in _ASSET_CFG:
-            cfg_map[t] = _ASSET_CFG[t]
-        else:
-            cfg_map[t] = {
-                "label": t.replace("_", " ").title(),
-                "color": _EXTRA_COLORS[extra_idx % len(_EXTRA_COLORS)],
-            }
+        cfg_map[t] = _cfg_for(t, extra_idx)
+        if t not in _ASSET_CFG:
             extra_idx += 1
 
     sizes  = [totals[t] / grand_total * 100 for t in sorted_types]

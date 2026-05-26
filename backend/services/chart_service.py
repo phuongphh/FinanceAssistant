@@ -14,6 +14,8 @@ matplotlib.use("Agg")  # Non-interactive backend for server-side rendering
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
+from backend.wealth.asset_types import get_label
+
 logger = logging.getLogger(__name__)
 
 # Asset type display config: label, color, emoji
@@ -22,7 +24,7 @@ ASSET_TYPE_CONFIG: dict[str, dict] = {
     "stocks": {"label": "Chứng khoán", "color": "#F28E2B", "emoji": "📈"},
     "mutual_fund": {"label": "Chứng chỉ quỹ", "color": "#E15759", "emoji": "🏦"},
     "crypto": {"label": "Tiền số", "color": "#76B7B2", "emoji": "₿"},
-    "life_insurance": {"label": "Bảo hiểm", "color": "#59A14F", "emoji": "🛡️"},
+    "life_insurance": {"label": "Bảo hiểm nhân thọ", "color": "#59A14F", "emoji": "🛡️"},
     "gold": {"label": "Vàng", "color": "#EDC948", "emoji": "🥇"},
     "cash": {"label": "Tiền mặt", "color": "#B07AA1", "emoji": "💵"},
 }
@@ -76,11 +78,12 @@ def render_donut_chart(
         if pct <= 0:
             continue
         cfg = ASSET_TYPE_CONFIG.get(asset_type, _DEFAULT_CONFIG)
-        labels.append(cfg["label"])
+        label = get_label(asset_type)
+        labels.append(label)
         sizes.append(pct)
         colors.append(cfg["color"])
         value = allocation_values.get(asset_type, 0)
-        legend_labels.append(f'{cfg["emoji"]} {cfg["label"]}: {_format_vnd(value)} ({pct:.1f}%)')
+        legend_labels.append(f'{cfg["emoji"]} {label}: {_format_vnd(value)} ({pct:.1f}%)')
 
     if not sizes:
         return _render_empty_chart()
