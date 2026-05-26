@@ -187,6 +187,32 @@ async def test_query_assets_handler_crypto_uses_market_prices():
 
 
 @pytest.mark.asyncio
+async def test_query_assets_handler_life_insurance_uses_vietnamese_label():
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+
+    assets = [
+        _fake_asset(
+            name="AIA hợp đồng",
+            asset_type="life_insurance",
+            current_value=Decimal("50000000"),
+        ),
+    ]
+    with patch(
+        "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+        AsyncMock(return_value=assets),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="tài sản của tôi",
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    assert "Bảo hiểm nhân thọ" in response
+    assert "life_insurance" not in response
+
+
+@pytest.mark.asyncio
 async def test_query_assets_handler_empty_state():
     from backend.intent.handlers.query_assets import QueryAssetsHandler
 

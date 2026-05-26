@@ -10,6 +10,7 @@ from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
+from backend.wealth.asset_types import get_icon, get_label
 from backend.wealth.services import asset_service
 from backend.wealth.valuation.crypto import (
     HoldingValuation,
@@ -51,7 +52,7 @@ class QueryAssetsHandler(IntentHandler):
         )
 
     def _no_match_for_type(self, asset_type: str, user: User) -> str:
-        label = _ASSET_LABELS.get(asset_type, asset_type)
+        label = get_label(asset_type)
         name = user.display_name or "bạn"
         return (
             f"{name} chưa có {label} nào cả 🤔\n\n"
@@ -84,7 +85,7 @@ class QueryAssetsHandler(IntentHandler):
 
         name = user.display_name or "bạn"
         if filtered_type:
-            label = _ASSET_LABELS.get(filtered_type, filtered_type)
+            label = get_label(filtered_type)
             header = f"💎 {label} của {name}:"
         else:
             header = f"💎 Tài sản hiện tại của {name}:"
@@ -103,8 +104,8 @@ class QueryAssetsHandler(IntentHandler):
             reverse=True,
         )
         for asset_type, items in ordered:
-            icon = _ASSET_ICONS.get(asset_type, "📌")
-            label = _ASSET_LABELS.get(asset_type, asset_type)
+            icon = get_icon(asset_type)
+            label = get_label(asset_type)
             type_total = sum(display_values[a] for a in items)
             # Show allocation % only for Mass Affluent + HNW. Starter and
             # Young Pro see the raw amount only — fewer numbers to scan.
@@ -149,28 +150,6 @@ class QueryAssetsHandler(IntentHandler):
         # the dominant contributor to the 10s+ tail latency on the
         # interactive ``query_assets`` reply (issue #797).
         return await value_crypto_holdings(assets)
-
-
-# Inline tables — kept here rather than re-loading asset_categories.yaml
-# for every reply. If the YAML changes we update both; the reverse risk
-# (yaml drift) is caught by Phase 3A's keyboard test.
-_ASSET_LABELS = {
-    "cash": "Tiền mặt & Tài khoản",
-    "stock": "Chứng khoán",
-    "real_estate": "Bất động sản",
-    "crypto": "Tiền số",
-    "gold": "Vàng",
-    "other": "Khác",
-}
-
-_ASSET_ICONS = {
-    "cash": "💵",
-    "stock": "📈",
-    "real_estate": "🏠",
-    "crypto": "₿",
-    "gold": "🥇",
-    "other": "📦",
-}
 
 
 def _crypto_symbol(asset) -> str:

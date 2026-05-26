@@ -24,6 +24,7 @@ from backend.market_data.client import get_crypto_quote, get_gold_quote
 from backend.models.bank_rate import BankRateSnapshot
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
+from backend.wealth.asset_types import get_label
 from backend.wealth.ladder import WealthLevel, detect_level
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import net_worth_calculator
@@ -135,7 +136,10 @@ _ASSET_TYPE_LABELS = {
 
 
 def _asset_type_label(asset_type: str) -> str:
-    return _ASSET_TYPE_LABELS.get(str(asset_type), str(asset_type).replace("_", " ").title())
+    # Briefing keeps a few shortened labels (e.g. "Tiền mặt", "Cổ phiếu/Quỹ");
+    # fall back to the YAML-backed label so types absent from the local map
+    # (life_insurance, etc.) render their Vietnamese name, not the raw key.
+    return _ASSET_TYPE_LABELS.get(str(asset_type), get_label(asset_type))
 
 async def _portfolio_assets(db: AsyncSession, user_id) -> list[Asset]:
     result = await db.execute(select(Asset).where(Asset.user_id == user_id, Asset.is_active.is_(True)))
