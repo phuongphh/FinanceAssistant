@@ -15,9 +15,31 @@
 // at the top of their IIFE so call sites stay unchanged.
 (function () {
     'use strict';
+    let resolvedInitData = null;
 
     function getTelegram() {
         return (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) || null;
+    }
+
+    function resolveInitDataFromUrl() {
+        if (typeof window === 'undefined') return '';
+        const qs = new URLSearchParams(window.location.search || '');
+        return qs.get('tgWebAppData') || qs.get('initData') || '';
+    }
+
+    async function resolveInitData(maxWaitMs = 250) {
+        if (resolvedInitData) return resolvedInitData;
+        const startedAt = Date.now();
+        while ((Date.now() - startedAt) <= maxWaitMs) {
+            const tg = getTelegram();
+            if (tg && tg.initData) {
+                resolvedInitData = tg.initData;
+                return resolvedInitData;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        resolvedInitData = resolveInitDataFromUrl();
+        return resolvedInitData;
     }
 
     function applyTheme(theme) {
@@ -67,12 +89,12 @@
     // enough for cold market-data fetches on a poor 3G uplink, short
     // enough that the retry button fires before the user closes the app.
     async function fetchAPI(endpoint, options = {}) {
-        const tg = getTelegram();
         const controller = new AbortController();
         const tid = setTimeout(() => controller.abort(), 12000);
         const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
         try {
+            const initData = await resolveInitData();
+            if (initData) headers['X-Telegram-Init-Data'] = initData;
             const response = await fetch('/miniapp/api' + endpoint, {
                 ...options,
                 headers: { ...headers, ...(options.headers || {}) },
