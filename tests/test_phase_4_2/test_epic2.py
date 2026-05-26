@@ -49,7 +49,7 @@ async def test_next_action_matrix_has_9_unique_ctas(
     assert cta.button_key == button_key
     assert cta.text
     assert cta.message_text.startswith("💡 Bước tiếp theo dành cho bạn:")
-    assert "hỏi Bé Tiền" in cta.message_text
+    assert "hỏi Bé Tiền" not in cta.message_text
 
 
 def test_next_action_yaml_contains_unique_copy_for_each_cell():

@@ -86,6 +86,8 @@ def test_trust_card_header_carries_one_of_three_label():
 
 def test_trust_card_body_introduces_three_promises():
     copy = _load_yaml("trust_card.yaml")
+    body = copy.get("body") or ""
+    assert "Twin (bản đồ tài chính)" in body
     bullets = copy.get("bullets") or []
     assert len(bullets) == 3, "trust card must list exactly 3 promises"
     # All three should be short, action-oriented, and end on '.'
