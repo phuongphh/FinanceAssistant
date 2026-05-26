@@ -818,9 +818,13 @@ async def _build_source_options(db: AsyncSession, user_id):
 
     Auxiliary enrichment only — the modal's source dropdown. A failure here
     (e.g. schema drift in ``assets``/``credit_cards``) must never blank the
-    whole Expense Dashboard, so we degrade to the base "no source" option
-    and let the frontend's ``FALLBACK_SOURCE_OPTIONS`` fill the static
-    choices. The primary spending payload is always returned.
+    whole Expense Dashboard, so we degrade to ``None``. The frontend treats a
+    *present* ``source_options`` as authoritative, so returning a degenerate
+    "no source"-only list would actually suppress its static
+    ``FALLBACK_SOURCE_OPTIONS`` (cash/bank/e-wallet/card) — leaving the user
+    unable to pick a normal source. Returning ``None`` lets the frontend fall
+    through to those static choices. The primary spending payload is always
+    returned.
     """
     base = [{"value": "", "label": "Không liên kết nguồn"}]
     try:
@@ -831,7 +835,7 @@ async def _build_source_options(db: AsyncSession, user_id):
             "expense_dashboard.source_options failed",
             extra={"user_id": str(user_id)},
         )
-        return {"expense": list(base), "money_in": list(base)}
+        return None
 
     def _asset_label(a):
         subtype = (a.subtype or "").lower()

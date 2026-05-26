@@ -125,8 +125,10 @@ class TestExpenseOverviewSourceOptions:
 
     def test_source_option_failure_does_not_blank_dashboard(self):
         """Resilience: if the assets query blows up, the primary spending
-        payload must still load (200) with the base "no source" option —
-        never a 500 that blanks the whole dashboard."""
+        payload must still load (200) with ``source_options: null`` — never a
+        500 that blanks the whole dashboard, and never a degenerate
+        "no source"-only list (which the frontend treats as authoritative,
+        suppressing its static FALLBACK_SOURCE_OPTIONS)."""
         from contextlib import ExitStack
 
         _override_auth()
@@ -152,9 +154,10 @@ class TestExpenseOverviewSourceOptions:
             )
 
         assert resp.status_code == 200
-        opts = resp.json()["data"]["source_options"]
-        assert opts["expense"] == [{"value": "", "label": "Không liên kết nguồn"}]
-        assert opts["money_in"] == [{"value": "", "label": "Không liên kết nguồn"}]
+        # ``null`` (not a degenerate list) so the frontend falls through to its
+        # static FALLBACK_SOURCE_OPTIONS instead of treating this as the
+        # authoritative — and only — choice.
+        assert resp.json()["data"]["source_options"] is None
 
     def test_requires_auth(self):
         app.dependency_overrides[get_db] = _stub_db
