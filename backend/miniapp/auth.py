@@ -105,14 +105,20 @@ def verify_init_data(
 
 
 async def require_miniapp_auth(
-    x_telegram_init_data: str = Header(
-        ...,
+    x_telegram_init_data: str | None = Header(
+        None,
         alias="X-Telegram-Init-Data",
         description="Telegram Mini App initData (querystring)",
     ),
 ) -> dict:
-    """FastAPI dependency — return verified user info or raise 401."""
-    verified = verify_init_data(x_telegram_init_data)
+    """FastAPI dependency — return verified user info or raise 401.
+
+    The header is declared Optional so a *missing* header yields a clean
+    401 (auth required) instead of FastAPI's default 422 for a missing
+    required header. The client treats 401/403 as "re-auth"; a 422 leaks
+    as an opaque "không tải được dữ liệu" with no recovery path.
+    """
+    verified = verify_init_data(x_telegram_init_data) if x_telegram_init_data else None
     if not verified or not verified.get("user_id"):
         raise HTTPException(status_code=401, detail="Invalid Telegram auth")
     return verified

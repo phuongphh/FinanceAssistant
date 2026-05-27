@@ -108,6 +108,8 @@ def test_dashboard_common_exposes_expected_helpers() -> None:
         "formatMoneyFull",
         "escapeHtml",
         "fetchAPI",
+        "resolveInitData",
+        "authHeaders",
         "formatDate",
         "resolveDateFormat",
     ])
@@ -256,6 +258,36 @@ def test_fetch_api_uses_query_initdata_without_double_decode_breakage() -> None:
     """)
     assert captured["data"] == {"ok": 1}
     assert captured["seenHeader"] == "query%signed=abc"
+
+
+def test_resolve_init_data_reads_hash_fragment() -> None:
+    """Root-cause regression guard (issue #865): Telegram puts launch
+    params in the URL *hash* (#tgWebAppData=…), not the query string. When
+    tg.initData hasn't hydrated, resolveInitData must recover auth from the
+    hash so the page-load GET still authenticates instead of 401-ing.
+    """
+    captured = _evaluate("""
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '#tgWebAppData=hash%25signed%3Dxyz&tgWebAppVersion=7.0', search: '' };
+        const resolved = await DC.resolveInitData(0);
+        return { resolved };
+    """)
+    assert captured["resolved"] == "hash%signed=xyz"
+
+
+def test_auth_headers_attach_resolved_init_data() -> None:
+    """Mutation guard: POST/PATCH headers must carry the same resolved
+    initData the page-load GET sent. Without this, a page that recovered
+    auth from the hash would load but silently 401 on every mutation.
+    """
+    captured = _evaluate("""
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '#tgWebAppData=from-hash', search: '' };
+        const headers = await DC.authHeaders();
+        return headers;
+    """)
+    assert captured["X-Telegram-Init-Data"] == "from-hash"
+    assert captured["Content-Type"] == "application/json"
 
 
 def test_fetch_api_surfaces_payload_error() -> None:

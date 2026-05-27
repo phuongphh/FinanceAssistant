@@ -16,9 +16,23 @@
 
 const tg = window.Telegram?.WebApp;
 const API_BASE = "";     // same origin as the HTML
+
+// Telegram injects launch params into the URL HASH fragment
+// (#tgWebAppData=…); when telegram-web-app.js hasn't populated
+// tg.initData yet, the hash is the authoritative fallback so the
+// request still carries auth instead of triggering a 401. This bundle
+// is standalone (no dashboard_common.js), so the helper is inlined.
+function resolveInitData() {
+    if (tg?.initData) return tg.initData;
+    const fromHash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    const fromSearch = new URLSearchParams(window.location.search || "");
+    return fromHash.get("tgWebAppData") || fromHash.get("initData")
+        || fromSearch.get("tgWebAppData") || fromSearch.get("initData") || "";
+}
+
 const HEADERS = () => ({
     "Content-Type": "application/json",
-    "X-Telegram-Init-Data": tg?.initData ?? "",
+    "X-Telegram-Init-Data": resolveInitData(),
 });
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────

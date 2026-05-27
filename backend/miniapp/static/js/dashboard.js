@@ -5,7 +5,7 @@
     // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
     // first via the template. Destructure at IIFE top so bindings exit
     // TDZ before any caller (per the smoke-harness contract).
-    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate, authHeaders } = window.DashboardCommon;
 
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
@@ -112,12 +112,11 @@
         }
     }
 
-    function reportLoaded() {
+    async function reportLoaded() {
         if (loadBeaconSent) return;
         loadBeaconSent = true;
         const loadTimeMs = Math.round(performance.now() - pageStartedAt);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const headers = await authHeaders();
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
             headers,

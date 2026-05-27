@@ -13,7 +13,7 @@
     // the IIFE so the bindings are out of TDZ before any init-phase
     // caller (cf. the UI_KEYWORDS regression that motivated the smoke
     // harness).
-    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate, authHeaders } = window.DashboardCommon;
 
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
@@ -856,12 +856,11 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         return 'Không tải được dữ liệu, thử lại nhé.';
     }
 
-    function reportLoaded() {
+    async function reportLoaded() {
         if (loadBeaconSent) return;
         loadBeaconSent = true;
         const loadTimeMs = Math.round(performance.now() - pageStartedAt);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const headers = await authHeaders();
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
             headers,
