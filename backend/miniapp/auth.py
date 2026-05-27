@@ -39,6 +39,7 @@ def verify_init_data(
     Returns parsed user info dict on success; None on any failure.
     """
     if not init_data:
+        logger.warning("miniapp auth fail: empty initData")
         return None
 
     token = bot_token if bot_token is not None else get_settings().telegram_bot_token
@@ -52,6 +53,7 @@ def verify_init_data(
     try:
         pairs = parse_qsl(init_data, strict_parsing=True, keep_blank_values=True)
     except ValueError:
+        logger.warning("miniapp auth fail: initData not a valid querystring")
         return None
 
     fields = dict(pairs)
@@ -62,11 +64,11 @@ def verify_init_data(
     # the data-check-string makes the HMAC mismatch and every request 401s.
     fields.pop("signature", None)
     if not received_hash:
+        logger.warning("miniapp auth fail: no hash field in initData")
         return None
 
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(fields.items(), key=lambda kv: kv[0])
-    )
+    sorted_keys = sorted(fields.keys())
+    data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted_keys)
 
     secret_key = hmac.new(
         key=b"WebAppData",
@@ -81,15 +83,30 @@ def verify_init_data(
     ).hexdigest()
 
     if not hmac.compare_digest(received_hash, expected_hash):
+        # Log only hash prefixes (derived, not the secret token) and the field
+        # KEYS (not values, which carry user PII) so an unexpected field
+        # polluting the check string is visible without leaking data.
+        logger.warning(
+            "miniapp auth fail: HMAC mismatch (recv=%s… expected=%s… keys=%s)",
+            received_hash[:8],
+            expected_hash[:8],
+            sorted_keys,
+        )
         return None
 
     # Freshness check — auth_date is seconds since epoch, UTC.
     try:
         auth_date = int(fields.get("auth_date", "0"))
     except ValueError:
+        logger.warning("miniapp auth fail: auth_date not an integer")
         return None
 
     if auth_date <= 0 or (time.time() - auth_date) > max_age_seconds:
+        logger.warning(
+            "miniapp auth fail: initData stale (auth_date age=%ss, max=%ss)",
+            int(time.time() - auth_date),
+            max_age_seconds,
+        )
         return None
 
     user_payload = fields.get("user")
@@ -124,7 +141,13 @@ async def require_miniapp_auth(
     required header. The client treats 401/403 as "re-auth"; a 422 leaks
     as an opaque "không tải được dữ liệu" with no recovery path.
     """
-    verified = verify_init_data(x_telegram_init_data) if x_telegram_init_data else None
-    if not verified or not verified.get("user_id"):
+    if not x_telegram_init_data:
+        logger.warning("miniapp auth fail: missing X-Telegram-Init-Data header")
+        raise HTTPException(status_code=401, detail="Invalid Telegram auth")
+    verified = verify_init_data(x_telegram_init_data)
+    if not verified:
+        raise HTTPException(status_code=401, detail="Invalid Telegram auth")
+    if not verified.get("user_id"):
+        logger.warning("miniapp auth fail: HMAC valid but initData has no user.id")
         raise HTTPException(status_code=401, detail="Invalid Telegram auth")
     return verified
