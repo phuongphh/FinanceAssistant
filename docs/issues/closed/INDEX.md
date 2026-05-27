@@ -463,6 +463,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #845 | Pre-Phase | [bug] Expense mini-app 'Không tải được dữ liệu' — không gọi được API sau khi load | [pre-phase/issue-845.md](by-phase/pre-phase/issue-845.md) |
 | #854 | Pre-Phase | OCR receipt flow drops transfer note and skips category selection | [pre-phase/issue-854.md](by-phase/pre-phase/issue-854.md) |
 | #861 | Pre-Phase | [Bug] Twin dashboard status pill shows "Story 3.2" placeholder instead of causality explanation | [pre-phase/issue-861.md](by-phase/pre-phase/issue-861.md) |
+| #865 | Pre-Phase | Mini App wealth dashboard không mở được (404 JS + 422 API) | [pre-phase/issue-865.md](by-phase/pre-phase/issue-865.md) |
 
-**Total:** 459 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 442 Pre-Phase)
+**Total:** 460 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 443 Pre-Phase)
