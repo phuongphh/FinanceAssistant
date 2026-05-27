@@ -43,10 +43,13 @@ def _fake_client(text: str, model: str):
 
 
 def test_default_max_tokens_is_generous():
-    # The 500-token default truncated Vietnamese prose mid-sentence. A
-    # generous default is the root-cause fix (max_tokens is a ceiling, not a
-    # target) so new generative task_types are safe without registration.
-    assert DEFAULT_MAX_TOKENS >= 1000
+    # The 500-token default truncated Vietnamese prose mid-sentence; 1200
+    # still truncated intermittently because V4-Flash's hidden reasoning
+    # trace is billed inside max_tokens and competes with the visible answer.
+    # The default must hold reasoning (~1000) + a full Vietnamese answer
+    # (~1000), so the floor is 2000. Dropping back below this re-opens the
+    # mid-sentence-cut regression on advisory / investment / report tasks.
+    assert DEFAULT_MAX_TOKENS >= 2000
 
 
 def test_report_text_falls_back_to_generous_default():
@@ -79,7 +82,9 @@ async def test_advisory_tasks_get_generous_token_ceiling(task_type):
             use_cache=False,
             shared_cache=True,
         )
-    assert client.chat.completions.create.await_args.kwargs["max_tokens"] >= 1000
+    # Headroom must cover V4-Flash's hidden reasoning trace AND a full
+    # ~200-từ Vietnamese answer — 1200 was not enough (reasoning ate it).
+    assert client.chat.completions.create.await_args.kwargs["max_tokens"] >= 2000
 
 
 @pytest.mark.asyncio
