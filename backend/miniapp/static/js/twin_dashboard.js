@@ -9,6 +9,19 @@
         applyTheme(tg.themeParams || {});
     }
 
+    // Telegram injects launch params into the URL HASH fragment
+    // (#tgWebAppData=…); when telegram-web-app.js hasn't populated
+    // tg.initData yet, the hash is the authoritative fallback so requests
+    // still carry auth instead of triggering a 401. This bundle is
+    // standalone (no dashboard_common.js), so the helper is inlined.
+    function resolveInitData() {
+        if (tg && tg.initData) return tg.initData;
+        const fromHash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+        const fromSearch = new URLSearchParams(window.location.search || '');
+        return fromHash.get('tgWebAppData') || fromHash.get('initData')
+            || fromSearch.get('tgWebAppData') || fromSearch.get('initData') || '';
+    }
+
     const els = {
         loading: document.getElementById('loading'),
         error: document.getElementById('error'),
@@ -122,7 +135,8 @@
 
     function buildHeaders(scenario) {
         const headers = { 'Accept': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const initData = resolveInitData();
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
         if (etags[scenario]) headers['If-None-Match'] = etags[scenario];
         return headers;
     }
@@ -159,7 +173,8 @@
 
     function postTwinEvent(eventType, screenId) {
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const initData = resolveInitData();
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
         fetch('/api/twin/events', {
             method: 'POST',
             headers,
@@ -409,7 +424,8 @@
         }
         causalityInFlight = true;
         const headers = { 'Accept': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const initData = resolveInitData();
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
         fetch('/api/twin/causality', { headers })
             .then((response) => {
                 if (!response.ok) throw new Error('causality fetch failed');
@@ -462,10 +478,11 @@
     }
 
     function reportLoaded() {
-        if (!tg || !tg.initData) return;
+        const initData = resolveInitData();
+        if (!initData) return;
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
             body: JSON.stringify({ page: 'twin', scenario: currentScenario }),
         }).catch(() => {});
     }

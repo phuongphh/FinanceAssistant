@@ -106,9 +106,13 @@ class TestWealthOverviewAuth:
         _clear_overrides()
 
     def test_missing_init_data_returns_401(self):
-        # No header → FastAPI raises 422 (Header(...) is required).
+        # No header → clean 401. The dependency declares the header Optional
+        # so a missing header is treated as "auth required" (401) rather than
+        # FastAPI's default "unprocessable entity" (422). The client maps
+        # 401/403 to a re-auth path; a 422 would surface as an opaque,
+        # unrecoverable "không tải được dữ liệu".
         resp = client.get("/miniapp/api/wealth/overview")
-        assert resp.status_code in {401, 422}
+        assert resp.status_code == 401
 
     def test_invalid_init_data_returns_401(self):
         resp = client.get(

@@ -21,8 +21,18 @@
         return (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) || null;
     }
 
+    // Telegram injects launch params into the URL HASH fragment
+    // (#tgWebAppData=…&tgWebAppVersion=…), NOT the query string. When
+    // telegram-web-app.js hasn't populated `tg.initData` yet (slow CDN,
+    // cache miss), the hash is the authoritative fallback. We also check
+    // `search` for the rare desktop/manual-link case where a host appends
+    // `?tgWebAppData=` or `?initData=` directly.
     function resolveInitDataFromUrl() {
         if (typeof window === 'undefined') return '';
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        const hashParams = new URLSearchParams(hash);
+        const fromHash = hashParams.get('tgWebAppData') || hashParams.get('initData');
+        if (fromHash) return fromHash;
         const qs = new URLSearchParams(window.location.search || '');
         return qs.get('tgWebAppData') || qs.get('initData') || '';
     }
@@ -109,6 +119,17 @@
         }
     }
 
+    // Build headers for a POST mutation with the resolved initData
+    // attached. Mirrors fetchAPI's auth handling so a mutation can't omit
+    // the header that the page-load GET sent — critical when the page
+    // recovered initData from the URL hash (empty tg.initData).
+    async function authHeaders(extra = {}) {
+        const headers = { 'Content-Type': 'application/json', ...extra };
+        const initData = await resolveInitData();
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
+        return headers;
+    }
+
     const DATE_FORMAT_BY_LANGUAGE = {
         vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
         en: { locale: 'en-GB', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
@@ -136,6 +157,8 @@
         formatMoneyFull,
         escapeHtml,
         fetchAPI,
+        resolveInitData,
+        authHeaders,
         formatDate,
         resolveDateFormat,
     };
