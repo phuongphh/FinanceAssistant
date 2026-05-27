@@ -452,10 +452,10 @@
         if (value >= 1_000_000_000) return `${trim(value / 1_000_000_000)} tỷ`;
         if (value >= 1_000_000) return `${trim(value / 1_000_000)}tr`;
         if (value >= 1_000) return `${trim(value / 1_000)}k`;
-        return `${Math.round(value).toLocaleString('vi-VN')}đ`;
+        return `${Math.round(value).toLocaleString('en-US')}đ`;
     }
 
-    function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('vi-VN')}đ`; }
+    function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('en-US')}đ`; }
     function trim(value) { return value.toFixed(value >= 10 ? 0 : 1).replace('.0', ''); }
 
     const DATE_FORMAT_BY_LANGUAGE = {
