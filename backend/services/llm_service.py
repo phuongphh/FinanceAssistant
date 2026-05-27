@@ -35,6 +35,11 @@ TASK_MAX_TOKENS = {
     # Monthly reports contain multiple sections + bullets and were
     # getting cut mid-sentence at 500 tokens in production.
     "report_text": 900,
+    # Receipt structuring returns a JSON object (amount, merchant, date,
+    # note, items[]). At 500 tokens V4-Flash spent the budget reasoning
+    # before the answer and truncated the JSON mid-object (cut right after
+    # "date"), so json.loads failed and the bot rejected valid receipts.
+    "parse_receipt": 1500,
 }
 
 
@@ -198,6 +203,14 @@ async def call_llm(
                 timeout=effective_timeout,
             )
             result = response.choices[0].message.content.strip()
+            if getattr(response.choices[0], "finish_reason", None) == "length":
+                logger.warning(
+                    "%s response truncated at max_tokens=%d (task=%s) — "
+                    "raise TASK_MAX_TOKENS if downstream parsing fails",
+                    provider,
+                    max_tokens,
+                    task_type,
+                )
             tokens_used = response.usage.total_tokens if response.usage else None
             if response.usage:
                 recorder.tokens_in = response.usage.prompt_tokens or 0

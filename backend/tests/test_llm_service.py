@@ -45,6 +45,11 @@ def test_report_text_has_higher_token_budget():
     assert TASK_MAX_TOKENS.get("report_text") == 900
 
 
+def test_parse_receipt_has_higher_token_budget():
+    # 500 truncated the structuring JSON mid-object in production.
+    assert TASK_MAX_TOKENS.get("parse_receipt", 500) > 500
+
+
 @pytest.mark.asyncio
 async def test_call_llm_groq_provider_uses_groq_client():
     client = _fake_client("ok", "llama-3.3-70b-versatile")
