@@ -12,5 +12,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
+| #865 | Mini App wealth dashboard không mở được (404 JS + 422 API) | [issue-865.md](issue-865.md) |
 
-**Total active:** 8
+**Total active:** 9
