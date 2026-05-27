@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.services.llm_service import (
+    DEFAULT_MAX_TOKENS,
     TASK_MAX_TOKENS,
     LLMError,
     call_llm,
@@ -41,13 +42,44 @@ def _fake_client(text: str, model: str):
     return client
 
 
-def test_report_text_has_higher_token_budget():
-    assert TASK_MAX_TOKENS.get("report_text") == 900
+def test_default_max_tokens_is_generous():
+    # The 500-token default truncated Vietnamese prose mid-sentence. A
+    # generous default is the root-cause fix (max_tokens is a ceiling, not a
+    # target) so new generative task_types are safe without registration.
+    assert DEFAULT_MAX_TOKENS >= 1000
+
+
+def test_report_text_falls_back_to_generous_default():
+    # report_text used to need an explicit 900 entry just to beat the old
+    # 500 default; the generous default now covers it (and all prose tasks),
+    # so it no longer needs a dedicated entry.
+    assert TASK_MAX_TOKENS.get("report_text", DEFAULT_MAX_TOKENS) >= 900
 
 
 def test_parse_receipt_has_higher_token_budget():
-    # 500 truncated the structuring JSON mid-object in production.
-    assert TASK_MAX_TOKENS.get("parse_receipt", 500) > 500
+    # 500 truncated the structuring JSON mid-object in production. This one
+    # genuinely needs MORE than the default, so it stays registered.
+    assert TASK_MAX_TOKENS["parse_receipt"] > DEFAULT_MAX_TOKENS
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "task_type", ["advisory", "investment_advice", "roadmap_advisory"]
+)
+async def test_advisory_tasks_get_generous_token_ceiling(task_type):
+    """Regression: the 500-token default cut Bé Tiền's advisory replies
+    mid-sentence (the 'Tư vấn tối ưu' / 'Cơ hội đầu tư' buttons). Every
+    generative advisory task must reach the model with a ceiling well above
+    500 — assert against the real wiring, not just the lookup table."""
+    client = _fake_client("ok", "deepseek-v4-flash")
+    with patch("backend.services.llm_service.deepseek_client", client):
+        await call_llm(
+            "prompt",
+            task_type=task_type,
+            use_cache=False,
+            shared_cache=True,
+        )
+    assert client.chat.completions.create.await_args.kwargs["max_tokens"] >= 1000
 
 
 @pytest.mark.asyncio

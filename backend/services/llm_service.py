@@ -31,10 +31,24 @@ groq_client = AsyncOpenAI(
 
 # Tasks that use Claude (only OCR and complex analysis)
 USE_CLAUDE = {"ocr", "complex_analysis"}
+
+# max_tokens is a CEILING, not a target. Billing and latency track the
+# ACTUAL completion tokens the model emits, so a high cap costs nothing for
+# a short reply — it only stops the model being cut off mid-sentence.
+#
+# Vietnamese is the trap: diacritic-dense text tokenizes 2-4x heavier than
+# English, so a "max 200 từ" advisory reply routinely runs 700-1000 tokens.
+# A 500-token default silently truncated EVERY generative Vietnamese task
+# (advisory, investment_advice, roadmap_advisory, report_text, the twin /
+# life-event narratives, news summaries…) mid-sentence. We rediscovered this
+# twice via whack-a-mole — bumping report_text, then parse_receipt — before
+# fixing the root cause here: a default generous enough to hold any prose
+# reply, so a new generative task_type is safe without touching this file.
+#
+# Only register a task below when it needs MORE than the default (JSON
+# structuring), never less — capping below the default re-introduces the bug.
+DEFAULT_MAX_TOKENS = 1200
 TASK_MAX_TOKENS = {
-    # Monthly reports contain multiple sections + bullets and were
-    # getting cut mid-sentence at 500 tokens in production.
-    "report_text": 900,
     # Receipt structuring returns a JSON object (amount, merchant, date,
     # note, items[]). At 500 tokens V4-Flash spent the budget reasoning
     # before the answer and truncated the JSON mid-object (cut right after
@@ -189,7 +203,7 @@ async def call_llm(
     # via content/cost/budget_messages.yaml.
     from backend.adapters.llm.cost_tracking_adapter import tracked_call
 
-    max_tokens = TASK_MAX_TOKENS.get(task_type, 500)
+    max_tokens = TASK_MAX_TOKENS.get(task_type, DEFAULT_MAX_TOKENS)
 
     async with tracked_call(
         db, user_id, provider=provider, operation=task_type
