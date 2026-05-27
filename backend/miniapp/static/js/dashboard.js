@@ -139,6 +139,7 @@
 
     function buildErrorMessage(err) {
         if (err && err.name === 'AbortError') return 'Kết nối quá chậm — thử lại nhé.';
+        if (err && err.message === 'NO_INIT_DATA') return 'Hãy mở lại trang này từ trong Telegram nhé.';
         if (err && err.message === 'API 401') return 'Phiên đăng nhập Telegram không hợp lệ.';
         if (err && err.message === 'API 404') return 'Chưa có dữ liệu — hãy ghi giao dịch đầu tiên.';
         return 'Không tải được dữ liệu, thử lại nhé.';

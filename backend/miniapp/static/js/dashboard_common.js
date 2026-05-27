@@ -104,7 +104,15 @@
         const headers = { 'Content-Type': 'application/json' };
         try {
             const initData = await resolveInitData();
-            if (initData) headers['X-Telegram-Init-Data'] = initData;
+            // No initData (tg.initData empty AND no URL-hash/query fallback)
+            // means the page carries no Telegram session — opened in a plain
+            // browser, or a launch that delivered nothing. The server would
+            // 401, but that 401 is indistinguishable from a *rejected* session
+            // (wrong bot token). Throw a distinct error so the UI can say
+            // "open from inside Telegram" instead of conflating both as one
+            // opaque "phiên không hợp lệ".
+            if (!initData) throw new Error('NO_INIT_DATA');
+            headers['X-Telegram-Init-Data'] = initData;
             const response = await fetch('/miniapp/api' + endpoint, {
                 ...options,
                 headers: { ...headers, ...(options.headers || {}) },
