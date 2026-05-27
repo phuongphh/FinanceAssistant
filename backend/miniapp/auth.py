@@ -5,7 +5,9 @@ Docs: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mi
 Flow:
     1. Mini App JS sends `tg.initData` as header `X-Telegram-Init-Data`.
     2. Parse querystring, pop `hash`, build data-check-string by joining the
-       remaining key=value pairs sorted alphabetically with `\n`.
+       remaining key=value pairs sorted alphabetically with `\n`. Because
+       clients disagree on whether the Ed25519 `signature` field belongs in
+       this string, we try both (excluded / included) and accept either.
     3. secret_key = HMAC-SHA256(key="WebAppData", msg=bot_token)
     4. expected_hash = HMAC-SHA256(key=secret_key, msg=data_check_string)
     5. Constant-time compare with received hash.
@@ -58,39 +60,60 @@ def verify_init_data(
 
     fields = dict(pairs)
     received_hash = fields.pop("hash", None)
-    # The Ed25519 `signature` field (used for third-party validation) is NOT
-    # part of the bot-token HMAC check string — Telegram excludes both `hash`
-    # and `signature`. Recent clients always send `signature`; leaving it in
-    # the data-check-string makes the HMAC mismatch and every request 401s.
-    fields.pop("signature", None)
     if not received_hash:
         logger.warning("miniapp auth fail: no hash field in initData")
         return None
 
-    sorted_keys = sorted(fields.keys())
-    data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted_keys)
-
+    # The Ed25519 `signature` field (third-party validation) is sent by recent
+    # clients. There is genuine ambiguity across Telegram clients/libraries over
+    # whether `signature` belongs in the bot-token HMAC check string. Rather
+    # than guess, accept whichever variant the client actually signed — both
+    # require the real bot token to forge, so accepting either is exactly as
+    # secure as accepting one. We log which variant won so the truth is visible.
     secret_key = hmac.new(
         key=b"WebAppData",
         msg=token.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).digest()
 
-    expected_hash = hmac.new(
-        key=secret_key,
-        msg=data_check_string.encode("utf-8"),
-        digestmod=hashlib.sha256,
-    ).hexdigest()
+    def _expected(keys: list[str]) -> str:
+        data_check_string = "\n".join(f"{k}={fields[k]}" for k in keys)
+        return hmac.new(
+            key=secret_key,
+            msg=data_check_string.encode("utf-8"),
+            digestmod=hashlib.sha256,
+        ).hexdigest()
 
-    if not hmac.compare_digest(received_hash, expected_hash):
-        # Log only hash prefixes (derived, not the secret token) and the field
-        # KEYS (not values, which carry user PII) so an unexpected field
-        # polluting the check string is visible without leaking data.
+    signature_present = "signature" in fields
+    keys_excl = sorted(k for k in fields if k != "signature")
+    keys_incl = sorted(fields.keys())
+
+    expected_excl = _expected(keys_excl)
+    expected_incl = _expected(keys_incl) if signature_present else expected_excl
+
+    if hmac.compare_digest(received_hash, expected_excl):
+        pass  # canonical: signature excluded
+    elif signature_present and hmac.compare_digest(received_hash, expected_incl):
         logger.warning(
-            "miniapp auth fail: HMAC mismatch (recv=%s… expected=%s… keys=%s)",
+            "miniapp auth: initData verified only with `signature` INCLUDED in "
+            "the HMAC check string — this client signs differently than #867 "
+            "assumed."
+        )
+    else:
+        # Neither variant matched → the bot token we hash with is not the token
+        # that signed this initData (stale process or wrong bot). Log the PUBLIC
+        # bot_id (digits before ':', not the secret) so the operator can confirm
+        # bot identity, plus hash prefixes and field KEYS (never values/PII).
+        logger.warning(
+            "miniapp auth fail: HMAC mismatch on BOTH variants — token problem. "
+            "bot_id=%s had_signature=%s recv=%s… expected_excl=%s… "
+            "expected_incl=%s… keys=%s",
+            token.split(":", 1)[0],
+            signature_present,
             received_hash[:8],
-            expected_hash[:8],
-            sorted_keys,
+            expected_excl[:8],
+            expected_incl[:8] if signature_present else "n/a",
+            keys_excl,
         )
         return None
 
