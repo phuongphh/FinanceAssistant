@@ -59,15 +59,18 @@ Hãy trả về DUY NHẤT một JSON theo schema sau, không kèm giải thích
   "date": "YYYY-MM-DD" | null,
   "items": [{{"name": <string>, "price": <số>}}],
   "note": <string hoặc null>,
-  "category_suggestion": "food_drink"|"transport"|"shopping"|"health"|"entertainment"|"utilities"|"other",
+  "category_suggestion": "food_drink"|"transport"|"shopping"|"health"|"entertainment"|"utilities"|"other"|null,
   "confidence": "high"|"medium"|"low",
   "error": null | "not_a_receipt"
 }}
 
 Quy tắc:
-- CHỈ đặt "error": "not_a_receipt" khi text hoàn toàn KHÔNG phải chứng từ tài chính (không tìm thấy bất kỳ số tiền giao dịch nào). Ảnh chuyển tiền / giao dịch ngân hàng VẪN HỢP LỆ, dù không có "merchant" kiểu cửa hàng — đừng đặt not_a_receipt chỉ vì thiếu merchant.
+- Luồng này CHỈ ghi nhận khoản CHI (tiền ra). Đặt "error": "not_a_receipt" khi:
+  - text hoàn toàn KHÔNG phải chứng từ tài chính (không tìm thấy số tiền giao dịch nào), HOẶC
+  - là giao dịch TIỀN VÀO / nhận tiền (dấu "+", "Nhận tiền", "Ghi có", "Tiền vào", "Hoàn tiền") — KHÔNG ghi nhận như một khoản chi.
+  Ảnh chuyển tiền ĐI (tiền ra) VẪN HỢP LỆ dù không có "merchant" kiểu cửa hàng — đừng đặt not_a_receipt chỉ vì thiếu merchant.
 - Hoá đơn mua hàng: ``total_amount`` chọn dòng tổng cuối cùng (TỔNG CỘNG / TOTAL / THÀNH TIỀN), KHÔNG cộng dồn các dòng item.
-- Ảnh chuyển tiền / giao dịch: ``total_amount`` lấy từ dòng "Số tiền giao dịch" / "Số tiền"; bỏ dấu "-" và "VND" (ví dụ "-800,000 VND" → 800000). ``merchant_name`` = tên người/đơn vị nhận nếu rõ, nếu không → null. ``category_suggestion`` = "other" khi không rõ mục đích.
+- Ảnh chuyển tiền ĐI / giao dịch tiền ra: ``total_amount`` lấy từ dòng "Số tiền giao dịch" / "Số tiền"; bỏ dấu "-" và "VND" (ví dụ "-800,000 VND" → 800000). ``merchant_name`` = tên người/đơn vị nhận nếu rõ, nếu không → null. ``category_suggestion`` = null khi không rõ mục đích chi (đừng mặc định "other") để hệ thống tự phân loại.
 - Bỏ dấu phân cách hàng nghìn khi parse số. Ví dụ "150.000" → 150000.
 - ``note``: nội dung/diễn giải giao dịch — lấy NGUYÊN VĂN dòng "Lời nhắn", "Nội dung chuyển khoản", "Nội dung giao dịch", "Diễn giải", "Nội dung", "payment reference" hoặc "memo" nếu có. KHÔNG tóm tắt, KHÔNG thêm chữ. Nếu không có → null.
 - ``confidence``: "high" nếu thấy rõ số tiền + (merchant hoặc nội dung giao dịch); "medium" nếu thiếu 1 field; "low" nếu nhiều field phải đoán.
