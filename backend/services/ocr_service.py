@@ -111,6 +111,65 @@ def _strip_code_fence(text: str) -> str:
     return text
 
 
+def _repair_truncated_json(text: str) -> str | None:
+    """Close a JSON object the LLM cut off at the token cap.
+
+    V4-Flash occasionally truncates mid-object (e.g. right after ``"date"``).
+    The prefix is still valid JSON, so we trim back to the last completed
+    field/element boundary and append the brackets needed to close every
+    open structure — preserving the fields we *did* receive instead of
+    discarding the whole receipt. Returns ``None`` if nothing salvageable.
+    """
+    stack: list[str] = []
+    in_string = False
+    escape = False
+    best_cut: tuple[int, str] | None = None  # (cut_index, closing_brackets)
+    for i, ch in enumerate(text):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if stack:
+                stack.pop()
+            # Boundary just after a completed structure.
+            best_cut = (i + 1, "".join(reversed(stack)))
+        elif ch == ",":
+            # Boundary just before a separator (drops the partial field).
+            best_cut = (i, "".join(reversed(stack)))
+    if best_cut is None:
+        return None
+    cut_index, closers = best_cut
+    return text[:cut_index] + closers
+
+
+def _loads_receipt_json(text: str) -> dict | None:
+    """Parse the structuring response, salvaging a truncated object."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    repaired = _repair_truncated_json(text)
+    if repaired is None:
+        return None
+    try:
+        parsed = json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    logger.warning("Salvaged truncated structuring JSON (%d fields)", len(parsed))
+    return parsed
+
+
 async def _call_external_ocr(image_bytes: bytes, mime_type: str) -> str:
     """POST image to the external OCR endpoint, return extracted text."""
     headers: dict[str, str] = {"accept": "application/json"}
@@ -194,11 +253,10 @@ async def parse_receipt_image(
         raise ValueError(f"Receipt parser unavailable: {exc}") from exc
 
     response_text = _strip_code_fence(response_text)
-    try:
-        result = json.loads(response_text)
-    except json.JSONDecodeError as exc:
+    result = _loads_receipt_json(response_text)
+    if result is None:
         logger.error("Failed to parse structuring LLM response: %s", response_text[:300])
-        raise ValueError(f"Invalid JSON from receipt parser: {exc}") from exc
+        raise ValueError("Invalid JSON from receipt parser")
 
     logger.info(
         "OCR parsed: merchant=%s amount=%s confidence=%s error=%s",
