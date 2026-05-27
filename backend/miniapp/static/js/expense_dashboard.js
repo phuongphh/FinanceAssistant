@@ -683,6 +683,22 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         els.modalCategory.innerHTML = CATEGORIES.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
+        els.modalAmount.addEventListener('input', onAmountInput);
+    }
+
+    function parseMoneyInput(raw) {
+        const digits = String(raw || '').replace(/[^\d]/g, '');
+        return digits ? Number(digits) : 0;
+    }
+
+    function formatMoneyInput(raw) {
+        const amount = parseMoneyInput(raw);
+        return amount ? amount.toLocaleString('en-US') : '';
+    }
+
+    function onAmountInput() {
+        const formatted = formatMoneyInput(els.modalAmount.value);
+        if (els.modalAmount.value !== formatted) els.modalAmount.value = formatted;
     }
 
     function applyLocalizedKeywords() {
@@ -716,7 +732,7 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
         els.modalType.value = txType;
         applySourceOptions(txType, sourceValue(item), item?.source_credit_card_id || null);
-        els.modalAmount.value = item ? Math.round(item.amount || 0) : '';
+        els.modalAmount.value = item ? formatMoneyInput(Math.round(item.amount || 0)) : '';
         els.modalCategory.value = item?.category || 'other';
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
         els.modalNote.value = item?.merchant || item?.note || '';
@@ -760,7 +776,7 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
     }
 
     async function onSave() {
-        const amount = parseFloat(els.modalAmount.value);
+        const amount = parseMoneyInput(els.modalAmount.value);
         if (!amount || amount < 1000) {
             if (tg && tg.showAlert) tg.showAlert('Số tiền phải từ 1.000đ.');
             else window.alert('Số tiền phải từ 1.000đ.');

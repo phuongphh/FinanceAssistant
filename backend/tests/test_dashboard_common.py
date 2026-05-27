@@ -148,9 +148,9 @@ def test_format_money_full_uses_vi_locale_grouping() -> None:
             'rounded': DC.formatMoneyFull(1500.7),
         };
     """)
-    assert cases["1000"] == "1.000đ"
-    assert cases["1234567"] == "1.234.567đ"
-    assert cases["rounded"] == "1.501đ"
+    assert cases["1000"] == "1,000đ"
+    assert cases["1234567"] == "1,234,567đ"
+    assert cases["rounded"] == "1,501đ"
 
 
 def test_escape_html_blocks_xss_vectors() -> None:

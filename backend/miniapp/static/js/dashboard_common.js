@@ -74,7 +74,7 @@
     }
 
     function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
+        return new Intl.NumberFormat('en-US').format(Math.round(amount)) + 'đ';
     }
 
     function escapeHtml(value) {

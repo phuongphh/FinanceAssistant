@@ -149,3 +149,16 @@ def test_source_options_distinguish_expense_vs_money_in_and_gate_credit_card():
     assert "source_options" in js
     assert "{ value: 'credit_card', label: 'Thẻ tín dụng' }" in js
     assert "if (selectedValue === 'credit_card' && existingCardId)" in js
+
+
+def test_expense_amount_input_uses_localized_grouping_and_safe_numeric_parse():
+    html = HTML.read_text()
+    js = JS.read_text()
+
+    assert '<input id="expense-amount" type="text" inputmode="numeric" autocomplete="off" />' in html
+    assert "function parseMoneyInput(raw)" in js
+    assert "replace(/[^\\d]/g, '')" in js
+    assert "function formatMoneyInput(raw)" in js
+    assert "toLocaleString('en-US')" in js
+    assert "els.modalAmount.addEventListener('input', onAmountInput);" in js
+    assert "const amount = parseMoneyInput(els.modalAmount.value);" in js

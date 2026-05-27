@@ -80,7 +80,7 @@ function Kpi({ label, value }: { label: string; value?: string }) {
 }
 
 function money(raw: string) {
-  return `${Number(raw).toLocaleString('vi-VN')}đ`;
+  return `${Number(raw).toLocaleString('en-US')}đ`;
 }
 
 function labelAsset(name: string) {
