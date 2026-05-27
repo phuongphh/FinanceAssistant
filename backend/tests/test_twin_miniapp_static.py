@@ -21,6 +21,7 @@ def test_twin_dashboard_asset_labels_are_vietnamese():
     for source in (js, preact):
         assert "cash: 'Tiền mặt'" in source
         assert "crypto: 'Tiền mã hóa'" in source
+        assert "life_insurance: 'Bảo hiểm nhân thọ'" in source
         assert "real_estate: 'Bất động sản'" in source
         assert "stock: 'Cổ phiếu VN'" in source
 
