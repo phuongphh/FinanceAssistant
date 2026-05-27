@@ -46,8 +46,10 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
-_STRUCTURE_PROMPT = """Bạn là trợ lý phân tích hoá đơn tiếng Việt.
-Dưới đây là text trích xuất từ ảnh hoá đơn (có thể nhiễu OCR).
+_STRUCTURE_PROMPT = """Bạn là trợ lý phân tích chứng từ chi tiêu tiếng Việt.
+Dưới đây là text trích xuất từ ảnh (có thể nhiễu OCR). Ảnh có thể là:
+- Hoá đơn / biên lai mua hàng, HOẶC
+- Ảnh chụp xác nhận giao dịch / chuyển tiền (app ngân hàng, ví điện tử).
 Hãy trả về DUY NHẤT một JSON theo schema sau, không kèm giải thích:
 
 {{
@@ -63,11 +65,12 @@ Hãy trả về DUY NHẤT một JSON theo schema sau, không kèm giải thích
 }}
 
 Quy tắc:
-- Nếu text không giống hoá đơn (không có tổng tiền, không có merchant rõ ràng) → đặt "error": "not_a_receipt" và các field khác để null/0.
-- ``total_amount`` chọn dòng tổng cuối cùng (TỔNG CỘNG / TOTAL / THÀNH TIỀN), KHÔNG cộng dồn các dòng item.
+- CHỈ đặt "error": "not_a_receipt" khi text hoàn toàn KHÔNG phải chứng từ tài chính (không tìm thấy bất kỳ số tiền giao dịch nào). Ảnh chuyển tiền / giao dịch ngân hàng VẪN HỢP LỆ, dù không có "merchant" kiểu cửa hàng — đừng đặt not_a_receipt chỉ vì thiếu merchant.
+- Hoá đơn mua hàng: ``total_amount`` chọn dòng tổng cuối cùng (TỔNG CỘNG / TOTAL / THÀNH TIỀN), KHÔNG cộng dồn các dòng item.
+- Ảnh chuyển tiền / giao dịch: ``total_amount`` lấy từ dòng "Số tiền giao dịch" / "Số tiền"; bỏ dấu "-" và "VND" (ví dụ "-800,000 VND" → 800000). ``merchant_name`` = tên người/đơn vị nhận nếu rõ, nếu không → null. ``category_suggestion`` = "other" khi không rõ mục đích.
 - Bỏ dấu phân cách hàng nghìn khi parse số. Ví dụ "150.000" → 150000.
 - ``note``: nội dung/diễn giải giao dịch — lấy NGUYÊN VĂN dòng "Lời nhắn", "Nội dung chuyển khoản", "Nội dung giao dịch", "Diễn giải", "Nội dung", "payment reference" hoặc "memo" nếu có. KHÔNG tóm tắt, KHÔNG thêm chữ. Nếu không có → null.
-- ``confidence``: "high" nếu thấy rõ total + merchant; "medium" nếu thiếu 1 field; "low" nếu nhiều field phải đoán.
+- ``confidence``: "high" nếu thấy rõ số tiền + (merchant hoặc nội dung giao dịch); "medium" nếu thiếu 1 field; "low" nếu nhiều field phải đoán.
 
 === OCR TEXT ===
 {text}
