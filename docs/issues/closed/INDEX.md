@@ -464,6 +464,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #854 | Pre-Phase | OCR receipt flow drops transfer note and skips category selection | [pre-phase/issue-854.md](by-phase/pre-phase/issue-854.md) |
 | #861 | Pre-Phase | [Bug] Twin dashboard status pill shows "Story 3.2" placeholder instead of causality explanation | [pre-phase/issue-861.md](by-phase/pre-phase/issue-861.md) |
 | #865 | Pre-Phase | Mini App wealth dashboard không mở được (404 JS + 422 API) | [pre-phase/issue-865.md](by-phase/pre-phase/issue-865.md) |
+| #867 | Pre-Phase | Mini App wealth dashboard API trả về 401 Unauthorized | [pre-phase/issue-867.md](by-phase/pre-phase/issue-867.md) |
 
-**Total:** 460 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 443 Pre-Phase)
+**Total:** 461 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 444 Pre-Phase)
