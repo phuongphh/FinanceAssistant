@@ -270,6 +270,7 @@ async def handle_transaction_callback(
         CallbackPrefix.UNDO_TRANSACTION: _handle_undo_transaction,
         CallbackPrefix.UNDO_TRANSACTION_BATCH: _handle_undo_transaction_batch,
         CallbackPrefix.EDIT_TRANSACTION: _handle_edit_transaction,
+        CallbackPrefix.RECEIPT_CATEGORY: _handle_receipt_category,
     }
 
     handler = handlers.get(prefix)
@@ -389,6 +390,42 @@ async def _handle_delete_transaction(
         reply_markup=confirm_delete_keyboard(str(expense.id)),
     )
     await answer_callback(callback_id)
+
+
+async def _handle_receipt_category(
+    *, db, user, args, callback_id, chat_id, message_id
+):
+    """User picked a category on a pending OCR receipt (before confirming).
+
+    Updates the in-memory pending payload and re-renders the confirmation
+    message in place so the chosen category is ticked and reflected in the
+    body. The expense itself is only written on the later ``confirm`` tap.
+    """
+    if len(args) < 2:
+        await answer_callback(callback_id)
+        return
+
+    token, code = args[0], str(args[1]).strip().lower()
+    rendered = photo_receipt.set_pending_receipt_category(
+        token=token, user=user, category=code
+    )
+    if rendered is None:
+        await answer_callback(
+            callback_id,
+            text="Phiên xác nhận đã hết hạn — bạn chụp lại hoá đơn giúp mình nhé.",
+            show_alert=True,
+        )
+        return
+
+    text, keyboard = rendered
+    await edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=text,
+        parse_mode=None,
+        reply_markup=keyboard,
+    )
+    await answer_callback(callback_id, text="Đã chọn danh mục 👌")
 
 
 async def _handle_confirm_action(*, db, user, args, callback_id, chat_id, message_id):

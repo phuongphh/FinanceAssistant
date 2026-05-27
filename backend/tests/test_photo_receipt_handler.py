@@ -113,7 +113,7 @@ async def test_handle_photo_returns_false_when_no_image():
 
 
 @pytest.mark.asyncio
-async def test_handle_photo_happy_path_shows_two_button_confirm():
+async def test_handle_photo_happy_path_shows_category_grid_and_confirm():
 
     user = _user()
     msg = _photo_message(photos=[
@@ -144,6 +144,7 @@ async def test_handle_photo_happy_path_shows_two_button_confirm():
 
     assert ok is True
     ocr.assert_awaited_once()
+    # Nothing is persisted until the user taps Đồng ý.
     create.assert_not_awaited()
     # Confirmation rendered with dd/mm/yyyy date and an inline keyboard.
     edit.assert_awaited()
@@ -153,9 +154,19 @@ async def test_handle_photo_happy_path_shows_two_button_confirm():
     assert "2026-05-13" not in final_text
     keyboard = edit.await_args.kwargs["reply_markup"]
     assert keyboard and keyboard["inline_keyboard"]
-    # OCR flow now has only two actions: Đồng ý / Huỷ.
     flat_buttons = [b for row in keyboard["inline_keyboard"] for b in row]
-    assert [b["text"] for b in flat_buttons] == ["✅ Đồng ý", "❌ Huỷ"]
+    button_texts = [b["text"] for b in flat_buttons]
+    # The picker now prepends a category grid before the confirm/cancel row.
+    assert "✅ Đồng ý" in button_texts
+    assert "❌ Huỷ" in button_texts
+    assert len(button_texts) > 2
+    # A confident OCR category (food_drink → food/Ăn uống) is pre-ticked.
+    assert any(t.startswith("✓ ") for t in button_texts)
+    # The confirm/cancel pair is the final row, kept together.
+    assert [b["text"] for b in keyboard["inline_keyboard"][-1]] == [
+        "✅ Đồng ý",
+        "❌ Huỷ",
+    ]
 
 
 @pytest.mark.asyncio
@@ -315,6 +326,311 @@ async def test_handle_photo_download_failure():
     assert ok is True
     ocr.assert_not_awaited()
     assert "không tải được ảnh" in edit.await_args.kwargs["text"]
+
+
+# ---------------------------------------------------------------------------
+# Task 1 — transaction note ("Lời nhắn" / "Nội dung chuyển khoản") extraction
+# ---------------------------------------------------------------------------
+
+
+def test_clean_note_collapses_whitespace():
+    assert photo_receipt._clean_note("  Link  power\nchuyển   tiền ") == (
+        "Link power chuyển tiền"
+    )
+
+
+def test_clean_note_returns_none_for_empty_or_non_string():
+    assert photo_receipt._clean_note("") is None
+    assert photo_receipt._clean_note("   \n\t ") is None
+    assert photo_receipt._clean_note(None) is None
+    assert photo_receipt._clean_note(12345) is None
+
+
+def test_clean_note_bounds_length():
+    long = "x" * (photo_receipt._MAX_NOTE_LEN + 50)
+    out = photo_receipt._clean_note(long)
+    assert out is not None
+    assert out.endswith("…")
+    # The ellipsis replaces the overflow, so the body stays within the cap.
+    assert len(out) <= photo_receipt._MAX_NOTE_LEN + 1
+
+
+def test_item_name_preview_joins_first_three_with_overflow():
+    items = [
+        {"name": "Cà phê"},
+        {"name": "Bánh mì"},
+        {"name": "Trà"},
+        {"name": "Nước"},
+        {"name": "Kẹo"},
+    ]
+    assert photo_receipt._item_name_preview(items) == "Cà phê, Bánh mì, Trà +2"
+
+
+def test_item_name_preview_none_when_no_named_items():
+    assert photo_receipt._item_name_preview([]) is None
+    assert photo_receipt._item_name_preview([{"price": 1000}]) is None
+    assert photo_receipt._item_name_preview([{"name": "   "}]) is None
+
+
+@pytest.mark.asyncio
+async def test_autosave_prefers_ocr_note_over_item_preview():
+    """A transfer memo must survive into the pending payload and the message."""
+    user = _user()
+    msg = _photo_message(photos=[{"file_id": "good", "width": 1280, "height": 960}])
+    parsed = {
+        "total_amount": 2700000,
+        "currency": "VND",
+        "merchant_name": "NGUYEN THI THUY",
+        "date": "2026-04-22",
+        "items": [{"name": "Chuyển khoản", "price": 2700000}],
+        "category_suggestion": None,
+        "note": "Link power chuyển tiền so do thua dat 841",
+        "confidence": "high",
+        "error": None,
+    }
+    photo_receipt._pending_receipt_confirms.clear()
+    with patch.object(photo_receipt, "send_message",
+                       AsyncMock(return_value={"result": {"message_id": 5}})), \
+         patch.object(photo_receipt, "edit_message_text", AsyncMock()) as edit, \
+         patch.object(photo_receipt, "send_chat_action", AsyncMock()), \
+         patch.object(photo_receipt, "download_file", AsyncMock(return_value=b"img")), \
+         patch.object(photo_receipt.expense_service, "create_expense", AsyncMock()), \
+         patch.object(photo_receipt, "parse_receipt_image",
+                       AsyncMock(return_value=parsed)):
+        ok = await photo_receipt.handle_photo_message(MagicMock(), msg, user)
+
+    assert ok is True
+    # The OCR memo (not the item name) is echoed back to the user...
+    final_text = edit.await_args.kwargs["text"]
+    assert "Link power chuyển tiền so do thua dat 841" in final_text
+    # ...and stored verbatim on the pending payload for the eventual save.
+    (payload,) = photo_receipt._pending_receipt_confirms.values()
+    assert payload["note"] == "Link power chuyển tiền so do thua dat 841"
+    photo_receipt._pending_receipt_confirms.clear()
+
+
+@pytest.mark.asyncio
+async def test_autosave_falls_back_to_item_preview_without_note():
+    user = _user()
+    msg = _photo_message(photos=[{"file_id": "good", "width": 1280, "height": 960}])
+    parsed = {
+        "total_amount": 95000,
+        "currency": "VND",
+        "merchant_name": "Highlands",
+        "date": "2026-05-13",
+        "items": [{"name": "Cà phê"}, {"name": "Bánh"}],
+        "category_suggestion": "food_drink",
+        "note": None,
+        "confidence": "high",
+        "error": None,
+    }
+    photo_receipt._pending_receipt_confirms.clear()
+    with patch.object(photo_receipt, "send_message",
+                       AsyncMock(return_value={"result": {"message_id": 5}})), \
+         patch.object(photo_receipt, "edit_message_text", AsyncMock()), \
+         patch.object(photo_receipt, "send_chat_action", AsyncMock()), \
+         patch.object(photo_receipt, "download_file", AsyncMock(return_value=b"img")), \
+         patch.object(photo_receipt.expense_service, "create_expense", AsyncMock()), \
+         patch.object(photo_receipt, "parse_receipt_image",
+                       AsyncMock(return_value=parsed)):
+        await photo_receipt.handle_photo_message(MagicMock(), msg, user)
+
+    (payload,) = photo_receipt._pending_receipt_confirms.values()
+    assert payload["note"] == "Cà phê, Bánh"
+    photo_receipt._pending_receipt_confirms.clear()
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — inline category picker before confirm
+# ---------------------------------------------------------------------------
+
+
+def test_render_receipt_confirmation_uncertain_invites_pick():
+    payload = {
+        "user_id": "u1",
+        "amount": 2700000.0,
+        "currency": "VND",
+        "merchant": "NGUYEN THI THUY",
+        "category": "needs_review",
+        "expense_date": "2026-04-22",
+        "note": "Link power",
+        "confidence": "high",
+        "items": [],
+    }
+    text, keyboard = photo_receipt._render_receipt_confirmation(payload, "tok")
+    # Invitation copy, not a concrete (possibly wrong) "Khác" label.
+    assert "bạn chọn" in text
+    button_texts = [
+        b["text"] for row in keyboard["inline_keyboard"] for b in row
+    ]
+    # Nothing pre-ticked while the category is still uncertain.
+    assert not any(t.startswith("✓ ") for t in button_texts)
+    assert [b["text"] for b in keyboard["inline_keyboard"][-1]] == [
+        "✅ Đồng ý",
+        "❌ Huỷ",
+    ]
+
+
+def test_render_receipt_confirmation_confident_ticks_category():
+    payload = {
+        "user_id": "u1",
+        "amount": 95000.0,
+        "currency": "VND",
+        "merchant": "Highlands",
+        "category": "food",
+        "expense_date": "2026-05-13",
+        "note": None,
+        "confidence": "high",
+        "items": [],
+    }
+    text, keyboard = photo_receipt._render_receipt_confirmation(payload, "tok")
+    assert "Ăn uống" in text
+    button_texts = [
+        b["text"] for row in keyboard["inline_keyboard"] for b in row
+    ]
+    ticked = [t for t in button_texts if t.startswith("✓ ")]
+    assert len(ticked) == 1
+    assert "Ăn uống" in ticked[0]
+
+
+def test_set_pending_receipt_category_records_valid_pick():
+    user = _user()
+    token = "tok_pick"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 100.0,
+        "user_id": str(user.id),
+        "amount": 2700000.0,
+        "currency": "VND",
+        "merchant": "NGUYEN THI THUY",
+        "category": "needs_review",
+        "expense_date": "2026-04-22",
+        "note": "Link power",
+        "confidence": "high",
+        "items": [],
+    }
+    with patch.object(photo_receipt, "time") as t:
+        t.monotonic.return_value = 150.0
+        rendered = photo_receipt.set_pending_receipt_category(
+            token=token, user=user, category="transfer"
+        )
+
+    assert rendered is not None
+    text, keyboard = rendered
+    # Pick is persisted on the payload and the TTL is refreshed.
+    payload = photo_receipt._pending_receipt_confirms[token]
+    assert payload["category"] == "transfer"
+    assert payload["created_at"] == 150.0
+    # The chosen category is now ticked in the re-rendered keyboard.
+    ticked = [
+        b["text"]
+        for row in keyboard["inline_keyboard"]
+        for b in row
+        if b["text"].startswith("✓ ")
+    ]
+    assert len(ticked) == 1
+    assert "Chuyển khoản" in ticked[0]
+    del photo_receipt._pending_receipt_confirms[token]
+
+
+def test_set_pending_receipt_category_rejects_wrong_user():
+    user = _user()
+    other = _user()
+    token = "tok_owner"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 100.0,
+        "user_id": str(other.id),
+        "amount": 1000.0,
+        "currency": "VND",
+        "category": "needs_review",
+        "expense_date": "2026-04-22",
+    }
+    with patch.object(photo_receipt, "time") as t:
+        t.monotonic.return_value = 101.0
+        assert photo_receipt.set_pending_receipt_category(
+            token=token, user=user, category="food"
+        ) is None
+    del photo_receipt._pending_receipt_confirms[token]
+
+
+def test_set_pending_receipt_category_rejects_expired():
+    user = _user()
+    token = "tok_old"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 10.0,
+        "user_id": str(user.id),
+        "amount": 1000.0,
+        "currency": "VND",
+        "category": "needs_review",
+        "expense_date": "2026-04-22",
+    }
+    with patch.object(photo_receipt, "time") as t:
+        t.monotonic.return_value = 10.0 + photo_receipt._PENDING_RECEIPT_TTL_S + 1
+        assert photo_receipt.set_pending_receipt_category(
+            token=token, user=user, category="food"
+        ) is None
+    del photo_receipt._pending_receipt_confirms[token]
+
+
+def test_set_pending_receipt_category_rejects_invalid_code():
+    """A spoofed callback carrying an unknown code must be ignored."""
+    user = _user()
+    token = "tok_bad_code"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 100.0,
+        "user_id": str(user.id),
+        "amount": 1000.0,
+        "currency": "VND",
+        "category": "needs_review",
+        "expense_date": "2026-04-22",
+    }
+    with patch.object(photo_receipt, "time") as t:
+        t.monotonic.return_value = 101.0
+        assert photo_receipt.set_pending_receipt_category(
+            token=token, user=user, category="not_a_real_category"
+        ) is None
+    # Payload is left untouched on rejection.
+    assert photo_receipt._pending_receipt_confirms[token]["category"] == "needs_review"
+    del photo_receipt._pending_receipt_confirms[token]
+
+
+def test_set_pending_receipt_category_unknown_token_returns_none():
+    user = _user()
+    assert photo_receipt.set_pending_receipt_category(
+        token="nope", user=user, category="food"
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_confirm_pending_receipt_persists_picked_category():
+    """A user-picked display category is the one written to the expense."""
+    user = _user()
+    token = "tok_picked"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 100.0,
+        "user_id": str(user.id),
+        "amount": 2700000.0,
+        "currency": "VND",
+        "merchant": "NGUYEN THI THUY",
+        "category": "transfer",
+        "expense_date": "2026-04-22",
+        "note": "Link power chuyển tiền",
+        "confidence": "high",
+        "items": [],
+        "category_suggestion": None,
+    }
+    create = AsyncMock()
+    with patch.object(photo_receipt, "time") as t, \
+         patch.object(photo_receipt.expense_service, "create_expense", create):
+        t.monotonic.return_value = 101.0
+        ok = await photo_receipt.confirm_pending_receipt(
+            db=MagicMock(), user=user, token=token
+        )
+
+    assert ok is True
+    create.assert_awaited_once()
+    expense_create = create.await_args.args[2]
+    assert expense_create.category == "transfer"
+    assert expense_create.note == "Link power chuyển tiền"
 
 
 @pytest.mark.asyncio

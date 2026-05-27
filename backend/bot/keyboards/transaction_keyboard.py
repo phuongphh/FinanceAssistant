@@ -101,6 +101,47 @@ def category_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
+def receipt_confirm_keyboard(
+    token: str, selected_code: str | None = None
+) -> InlineKeyboardMarkup:
+    """Keyboard xác nhận hoá đơn OCR: lưới danh mục + 2 nút Đồng ý/Huỷ.
+
+    Layout:
+        [🍜 Ăn uống] [🚗 Di chuyển]
+        ... (2 cột danh mục) ...
+        [✅ Đồng ý]  [❌ Huỷ]
+
+    ``selected_code`` (display code) được đánh dấu "✓ " để user thấy lựa
+    chọn hiện tại. Khi chưa chọn (None) không cột nào được tick.
+    """
+    categories = get_all_categories()
+    rows: list[list[dict]] = []
+
+    for i in range(0, len(categories), 2):
+        row = []
+        for cat in categories[i : i + 2]:
+            label = f"{cat.emoji} {cat.name_vi}"
+            if selected_code and cat.code == selected_code:
+                label = f"✓ {label}"
+            row.append(
+                {
+                    "text": label,
+                    "callback_data": build_callback(
+                        CallbackPrefix.RECEIPT_CATEGORY, token, cat.code
+                    ),
+                }
+            )
+        rows.append(row)
+
+    rows.append(
+        [
+            {"text": "✅ Đồng ý", "callback_data": f"confirm:receipt:{token}"},
+            {"text": "❌ Huỷ", "callback_data": f"cancel:receipt:{token}"},
+        ]
+    )
+    return {"inline_keyboard": rows}
+
+
 def confirm_delete_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
     """Xác nhận trước khi xóa giao dịch."""
     tx = str(transaction_id)
