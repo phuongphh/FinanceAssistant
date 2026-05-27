@@ -41,17 +41,26 @@ class FakeDB:
     async def refresh(self, _obj):
         self.refreshed = True
 
+    async def delete(self, _obj):
+        return None
+
 
 @pytest.mark.asyncio
 async def test_create_credit_card_success():
     db = FakeDB([None])
     user_id = uuid.uuid4()
-    data = CreditCardCreate(bank_name="  Techcombank ", closing_date=25, debt_balance=1500000)
+    data = CreditCardCreate(
+        bank_name="  Techcombank ",
+        credit_limit=10000000,
+        closing_date=25,
+        debt_balance=1500000,
+    )
 
     got = await credit_card_service.create_credit_card(db, user_id, data)
 
     assert got.user_id == user_id
     assert got.bank_name == "Techcombank"
+    assert float(got.credit_limit) == 10000000
     assert float(got.debt_balance) == 1500000
     assert db.flushed is True
     assert db.refreshed is True
@@ -61,7 +70,7 @@ async def test_create_credit_card_success():
 async def test_create_credit_card_duplicate_bank_name_raises():
     db = FakeDB([SimpleNamespace(id=uuid.uuid4())])
     user_id = uuid.uuid4()
-    data = CreditCardCreate(bank_name="techcombank", closing_date=25, debt_balance=0)
+    data = CreditCardCreate(bank_name="techcombank", credit_limit=0, closing_date=25, debt_balance=0)
 
     with pytest.raises(ValueError, match="Tên ngân hàng đã tồn tại"):
         await credit_card_service.create_credit_card(db, user_id, data)

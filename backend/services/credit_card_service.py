@@ -26,6 +26,7 @@ async def create_credit_card(
     card = CreditCard(
         user_id=user_id,
         bank_name=normalized_name,
+        credit_limit=Decimal(str(data.credit_limit)),
         closing_date=data.closing_date,
         debt_balance=Decimal(str(data.debt_balance)),
     )
@@ -57,3 +58,14 @@ async def get_credit_card(
             )
         )
     ).scalar_one_or_none()
+
+
+async def delete_credit_card(
+    db: AsyncSession, user_id: uuid.UUID, card_id: uuid.UUID
+) -> CreditCard | None:
+    card = await get_credit_card(db, user_id, card_id)
+    if card is None:
+        return None
+    await db.delete(card)
+    await db.flush()
+    return card

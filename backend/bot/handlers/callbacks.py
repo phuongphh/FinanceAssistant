@@ -259,6 +259,19 @@ async def handle_transaction_callback(
         await start_credit_card_create(db, chat_id, user)
         await answer_callback(callback_query["id"])
         return True
+    if data.startswith("expense:credit:undo:"):
+        from backend.bot.handlers.credit_card_entry import undo_credit_card_create
+
+        from_user = callback_query.get("from") or {}
+        telegram_id = from_user.get("id")
+        message = callback_query.get("message") or {}
+        chat_id = message.get("chat", {}).get("id")
+        user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+        if not user or chat_id is None:
+            return True
+        await undo_credit_card_create(db, chat_id, user, data.split(":")[-1])
+        await answer_callback(callback_query["id"])
+        return True
 
     prefix, args = parse_callback(data)
 
