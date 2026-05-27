@@ -56,6 +56,7 @@ Hãy trả về DUY NHẤT một JSON theo schema sau, không kèm giải thích
   "merchant_name": <string hoặc null>,
   "date": "YYYY-MM-DD" | null,
   "items": [{{"name": <string>, "price": <số>}}],
+  "note": <string hoặc null>,
   "category_suggestion": "food_drink"|"transport"|"shopping"|"health"|"entertainment"|"utilities"|"other",
   "confidence": "high"|"medium"|"low",
   "error": null | "not_a_receipt"
@@ -65,6 +66,7 @@ Quy tắc:
 - Nếu text không giống hoá đơn (không có tổng tiền, không có merchant rõ ràng) → đặt "error": "not_a_receipt" và các field khác để null/0.
 - ``total_amount`` chọn dòng tổng cuối cùng (TỔNG CỘNG / TOTAL / THÀNH TIỀN), KHÔNG cộng dồn các dòng item.
 - Bỏ dấu phân cách hàng nghìn khi parse số. Ví dụ "150.000" → 150000.
+- ``note``: nội dung/diễn giải giao dịch — lấy NGUYÊN VĂN dòng "Lời nhắn", "Nội dung chuyển khoản", "Nội dung giao dịch", "Diễn giải", "Nội dung", "payment reference" hoặc "memo" nếu có. KHÔNG tóm tắt, KHÔNG thêm chữ. Nếu không có → null.
 - ``confidence``: "high" nếu thấy rõ total + merchant; "medium" nếu thiếu 1 field; "low" nếu nhiều field phải đoán.
 
 === OCR TEXT ===
@@ -161,6 +163,7 @@ async def parse_receipt_image(
             "merchant_name": None,
             "date": None,
             "items": [],
+            "note": None,
             "category_suggestion": "other",
             "confidence": "low",
             "error": "not_a_receipt",

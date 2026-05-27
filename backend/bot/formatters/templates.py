@@ -75,24 +75,34 @@ def format_receipt_confirmation(
     receipt_date: date | None = None,
     items: list[tuple[str, float | None]] | None = None,
     confidence: str = "high",
-    auto_categorized: bool = True,
+    note: str | None = None,
+    category_uncertain: bool = False,
 ) -> str:
-    """Confirmation message sent after auto-saving an OCR receipt.
+    """Body of the confirmation message for an OCR receipt pending confirm.
 
-    Mirrors `format_transaction_confirmation` aesthetic but adds the
-    receipt-specific date (dd/mm/yyyy) and a compact item list. Pairs
-    with `transaction_actions_keyboard` so the user can re-categorize,
-    edit, or undo within the 5s window.
+    Renders the parsed facts (merchant, amount, date, category, note,
+    item list). The caller owns the trailing call-to-action and the
+    inline keyboard so the prompt always matches the buttons shown.
+
+    ``note`` surfaces the receipt's "Lời nhắn"/transfer memo so it isn't
+    silently dropped. ``category_uncertain`` switches the category line to
+    an invitation to pick when we couldn't confidently auto-categorize.
     """
     cat = get_category(category_code)
 
-    lines: list[str] = ["🧾 Đã ghi hoá đơn!", ""]
+    lines: list[str] = ["🧾 Đã đọc hoá đơn!", ""]
     lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
 
     if receipt_date:
         lines.append(f"📅 {receipt_date.strftime('%d/%m/%Y')}")
 
-    lines.append(f"🏷 Danh mục: {cat.name_vi}")
+    if category_uncertain:
+        lines.append("🏷 Danh mục: bạn chọn giúp mình bên dưới nhé 👇")
+    else:
+        lines.append(f"🏷 Danh mục: {cat.name_vi}")
+
+    if note:
+        lines.append(f"📝 Nội dung: {note}")
 
     if items:
         lines.append("")
@@ -111,12 +121,6 @@ def format_receipt_confirmation(
     if confidence == "low":
         lines.append("")
         lines.append("⚠️ Mình đọc chưa chắc — bạn rà lại số tiền giúp nhé.")
-
-    lines.append("")
-    if auto_categorized:
-        lines.append("Tap 🏷 nếu cần đổi danh mục, hoặc ↶ để hủy.")
-    else:
-        lines.append("Tap ↶ trong 5s nếu bạn muốn hủy nhé.")
 
     return "\n".join(lines)
 

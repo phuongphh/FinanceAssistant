@@ -26,6 +26,7 @@ class CallbackPrefix:
     UNDO_TRANSACTION_BATCH = "undo_batch"
     VIEW_REPORT = "view_report"
     SELECT_CATEGORY = "sel_cat"
+    RECEIPT_CATEGORY = "rcat"
     CONFIRM_ACTION = "confirm"
     CANCEL_ACTION = "cancel"
 
