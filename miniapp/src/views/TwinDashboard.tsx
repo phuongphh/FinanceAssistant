@@ -89,6 +89,7 @@ function labelAsset(name: string) {
     cash_savings: 'Tiền mặt',
     crypto: 'Tiền mã hóa',
     gold: 'Vàng',
+    life_insurance: 'Bảo hiểm nhân thọ',
     real_estate: 'Bất động sản',
     real_estate_vn: 'Bất động sản',
     stock: 'Cổ phiếu VN',
