@@ -462,6 +462,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
 | #845 | Pre-Phase | [bug] Expense mini-app 'Không tải được dữ liệu' — không gọi được API sau khi load | [pre-phase/issue-845.md](by-phase/pre-phase/issue-845.md) |
 | #854 | Pre-Phase | OCR receipt flow drops transfer note and skips category selection | [pre-phase/issue-854.md](by-phase/pre-phase/issue-854.md) |
+| #861 | Pre-Phase | [Bug] Twin dashboard status pill shows "Story 3.2" placeholder instead of causality explanation | [pre-phase/issue-861.md](by-phase/pre-phase/issue-861.md) |
 
-**Total:** 458 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 441 Pre-Phase)
+**Total:** 459 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 442 Pre-Phase)
