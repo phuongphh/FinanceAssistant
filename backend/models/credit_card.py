@@ -19,6 +19,7 @@ class CreditCard(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     bank_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    credit_limit: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False, default=Decimal("0"))
     closing_date: Mapped[int] = mapped_column(Integer, nullable=False)
     debt_balance: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False, default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
