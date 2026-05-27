@@ -15,7 +15,11 @@ BOT_TOKEN = "1234567:TEST-BOT-TOKEN"
 
 
 def _sign(fields: dict[str, str], token: str = BOT_TOKEN) -> str:
-    """Helper — produce a valid Telegram initData query string."""
+    """Helper — produce a valid Telegram initData query string.
+
+    Signs over exactly the `fields` passed in, so callers control whether a
+    `signature` field is part of the HMAC check string.
+    """
     data_check_string = "\n".join(
         f"{k}={v}" for k, v in sorted(fields.items(), key=lambda kv: kv[0])
     )
@@ -121,13 +125,32 @@ class TestVerifyInitData:
         assert verify_init_data(init_data, bot_token=BOT_TOKEN) is None
 
     def test_signature_field_excluded_from_hmac(self):
-        """Recent Telegram clients append an Ed25519 `signature` field that is
-        NOT part of the bot-token HMAC check string. Signing without it (as
-        Telegram does) and then attaching `signature` must still verify.
+        """Client signs WITHOUT `signature` in the check string, then attaches
+        it (the variant #867 assumed). Must still verify.
         """
         fields = _base_fields()
-        init_data = _sign(fields)  # signed without `signature`, like Telegram
+        init_data = _sign(fields)  # signed without `signature`
         with_signature = init_data + "&signature=" + "Ed25519_base64url_blob"
         result = verify_init_data(with_signature, bot_token=BOT_TOKEN)
         assert result is not None
         assert result["user_id"] == 12345
+
+    def test_signature_field_included_in_hmac(self):
+        """Other clients sign WITH `signature` inside the check string. The
+        verifier must accept this variant too — both prove bot-token possession.
+        """
+        fields = _base_fields()
+        fields["signature"] = "Ed25519_base64url_blob"
+        init_data = _sign(fields)  # signed WITH `signature` in the string
+        result = verify_init_data(init_data, bot_token=BOT_TOKEN)
+        assert result is not None
+        assert result["user_id"] == 12345
+
+    def test_wrong_token_rejected_even_with_signature(self):
+        """Dual-variant acceptance must not weaken auth: a wrong token still
+        fails both variants.
+        """
+        fields = _base_fields()
+        fields["signature"] = "Ed25519_base64url_blob"
+        init_data = _sign(fields, token="real-token")
+        assert verify_init_data(init_data, bot_token="different-token") is None
