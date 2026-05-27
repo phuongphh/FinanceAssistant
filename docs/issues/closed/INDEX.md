@@ -461,6 +461,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
 | #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
 | #845 | Pre-Phase | [bug] Expense mini-app 'Không tải được dữ liệu' — không gọi được API sau khi load | [pre-phase/issue-845.md](by-phase/pre-phase/issue-845.md) |
+| #854 | Pre-Phase | OCR receipt flow drops transfer note and skips category selection | [pre-phase/issue-854.md](by-phase/pre-phase/issue-854.md) |
 
-**Total:** 457 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 440 Pre-Phase)
+**Total:** 458 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 441 Pre-Phase)
