@@ -48,6 +48,14 @@
     const etags = Object.create(null);
     const cache = Object.create(null);
 
+    // Causality ("why did Twin change?") is lazy-loaded on status-pill tap and
+    // scenario-independent (always the current projection's delta), so a single
+    // cached string is enough. Reset whenever fresh dashboard data arrives — a
+    // new projection can change the delta the explanation describes.
+    const CAUSALITY_FALLBACK = 'Bé Tiền chưa tổng hợp được thay đổi lúc này. Anh quay lại sau ít phút giúp Bé nhé 💚';
+    let causalityText = null;
+    let causalityInFlight = false;
+
     // See expense_dashboard.js: bootstrap guard so a sync throw (DOM
     // mismatch, TDZ, Telegram shim drift) doesn't leave the user stuck
     // on the initial "Đang tải Bé Tiền tương lai…" skeleton forever.
@@ -57,7 +65,7 @@
         els.scenarioBtns.forEach((btn) => btn.addEventListener('click', () => switchScenario(btn.dataset.scenario)));
         if (els.optimalInfoBtn) els.optimalInfoBtn.addEventListener('click', showOptimalTooltip);
         if (els.presentAnchorBtn) els.presentAnchorBtn.addEventListener('click', toggleBreakdown);
-        if (els.deltaPill) els.deltaPill.addEventListener('click', showCausalityPlaceholder);
+        if (els.deltaPill) els.deltaPill.addEventListener('click', showCausality);
         if (els.growthRate) els.growthRate.addEventListener('click', showMaintainedProjection);
         if (els.lifeOutcomeRefresh) els.lifeOutcomeRefresh.addEventListener('click', refreshLifeOutcome);
         switchScenario(currentScenario);
@@ -101,6 +109,7 @@
             const body = await response.json();
             if (body.error) throw new Error(body.error);
             cache[scenario] = body.data;
+            causalityText = null;
             render(body.data);
             preloadOtherScenario(scenario);
         } catch (err) {
@@ -392,9 +401,31 @@
         els.presentAnchorBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
     }
 
-    function showCausalityPlaceholder() {
-        const msg = 'Bé Tiền sẽ giải thích nguyên nhân thay đổi ở Story 3.2.';
-        if (tg && tg.showAlert) tg.showAlert(msg); else alert(msg);
+    function showCausality() {
+        if (causalityInFlight) return;
+        if (causalityText) {
+            if (tg && tg.showAlert) tg.showAlert(causalityText); else alert(causalityText);
+            return;
+        }
+        causalityInFlight = true;
+        const headers = { 'Accept': 'application/json' };
+        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        fetch('/api/twin/causality', { headers })
+            .then((response) => {
+                if (!response.ok) throw new Error('causality fetch failed');
+                return response.json();
+            })
+            .then((body) => {
+                if (body.error) throw new Error(body.error);
+                causalityText = (body.data && body.data.text) || CAUSALITY_FALLBACK;
+                if (tg && tg.showAlert) tg.showAlert(causalityText); else alert(causalityText);
+                postTwinEvent('screen_viewed', 'causality');
+            })
+            .catch((err) => {
+                console.error(err);
+                if (tg && tg.showAlert) tg.showAlert(CAUSALITY_FALLBACK); else alert(CAUSALITY_FALLBACK);
+            })
+            .finally(() => { causalityInFlight = false; });
     }
 
     function showMaintainedProjection() {
