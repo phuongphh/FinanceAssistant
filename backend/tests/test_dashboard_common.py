@@ -310,6 +310,29 @@ def test_fetch_api_surfaces_payload_error() -> None:
     assert threw == {"threw": True, "message": "no funds"}
 
 
+def test_fetch_api_throws_no_init_data_when_session_absent() -> None:
+    """Root-cause guard (menu-button 401): when no initData can be resolved
+    anywhere (tg.initData empty, no URL hash, no query), fetchAPI must throw a
+    distinct NO_INIT_DATA error WITHOUT firing the doomed request — so the UI
+    can tell "opened outside Telegram / launch delivered nothing" apart from a
+    server-*rejected* session (wrong bot token), instead of conflating both as
+    an opaque 'API 401'.
+    """
+    result = _evaluate("""
+        let calls = 0;
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '', search: '' };
+        ctx.fetch = () => { calls += 1; return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: {} }) }); };
+        try {
+            await DC.fetchAPI('/wealth/overview');
+            return { threw: false, calls };
+        } catch (err) {
+            return { threw: true, message: String(err.message), calls };
+        }
+    """)
+    assert result == {"threw": True, "message": "NO_INIT_DATA", "calls": 0}
+
+
 def test_fetch_api_throws_on_http_failure() -> None:
     """Non-2xx must surface as an Error with 'API <status>' so per-
     dashboard buildErrorMessage can map 401/422/404 to localized copy.
