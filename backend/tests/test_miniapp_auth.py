@@ -119,3 +119,15 @@ class TestVerifyInitData:
         fields["auth_date"] = "not-a-number"
         init_data = _sign(fields)
         assert verify_init_data(init_data, bot_token=BOT_TOKEN) is None
+
+    def test_signature_field_excluded_from_hmac(self):
+        """Recent Telegram clients append an Ed25519 `signature` field that is
+        NOT part of the bot-token HMAC check string. Signing without it (as
+        Telegram does) and then attaching `signature` must still verify.
+        """
+        fields = _base_fields()
+        init_data = _sign(fields)  # signed without `signature`, like Telegram
+        with_signature = init_data + "&signature=" + "Ed25519_base64url_blob"
+        result = verify_init_data(with_signature, bot_token=BOT_TOKEN)
+        assert result is not None
+        assert result["user_id"] == 12345

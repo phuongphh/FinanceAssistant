@@ -46,8 +46,9 @@ def verify_init_data(
         logger.warning("verify_init_data called without telegram_bot_token")
         return None
 
-    # parse_qsl preserves the original-encoded values, which is what we need
-    # for the HMAC — Telegram signs the URL-encoded string, not the decoded one.
+    # parse_qsl URL-decodes each value, which is exactly what the HMAC
+    # check needs — Telegram builds its data-check-string from the decoded
+    # field values, then URL-encodes the whole querystring for transport.
     try:
         pairs = parse_qsl(init_data, strict_parsing=True, keep_blank_values=True)
     except ValueError:
@@ -55,6 +56,11 @@ def verify_init_data(
 
     fields = dict(pairs)
     received_hash = fields.pop("hash", None)
+    # The Ed25519 `signature` field (used for third-party validation) is NOT
+    # part of the bot-token HMAC check string — Telegram excludes both `hash`
+    # and `signature`. Recent clients always send `signature`; leaving it in
+    # the data-check-string makes the HMAC mismatch and every request 401s.
+    fields.pop("signature", None)
     if not received_hash:
         return None
 
