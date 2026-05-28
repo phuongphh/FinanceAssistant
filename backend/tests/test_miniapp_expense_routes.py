@@ -116,10 +116,9 @@ class TestExpenseOverviewSourceOptions:
         # Base "no source" choice is always first.
         assert opts["expense"][0]["value"] == ""
         assert opts["money_in"][0]["value"] == ""
-        # The bank asset appears in both expense and money-in pickers.
-        assert any(o["value"] == f"asset:{asset.id}" for o in opts["expense"])
-        assert any(o["value"] == f"asset:{asset.id}" for o in opts["money_in"])
-        # Credit cards are expense-only.
+        # Bank/checking and credit-card provider pickers include item ids.
+        assert any(o["value"] == f"bank_account:{asset.id}" for o in opts["expense"])
+        assert any(o["value"] == f"bank_account:{asset.id}" for o in opts["money_in"])
         assert any(o["value"] == f"credit_card:{card.id}" for o in opts["expense"])
         assert all(not o["value"].startswith("credit_card:") for o in opts["money_in"])
 
