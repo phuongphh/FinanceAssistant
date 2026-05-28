@@ -89,22 +89,13 @@ async def _handle_source_selection_callback(
 
     source_type = None
     wallet_provider = None
-    if data == "txsrc:ewallet_pick":
-        assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
-        ewallet_assets = [a for a in assets if (a.subtype or "").lower() in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet")]
-        if not ewallet_assets:
-            await answer_callback(callback_id, text="Bạn chưa có ví điện tử nào 🌱", show_alert=True)
-            return True
-        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(ewallet_assets, "ewallet"))
-        await answer_callback(callback_id)
-        return True
     if data == "txsrc:bank_pick":
         assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
         bank_assets = [a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")]
         if not bank_assets:
             await answer_callback(callback_id, text="Bạn chưa có tài khoản thanh toán nào 🌱", show_alert=True)
             return True
-        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(bank_assets, "bank"))
+        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(bank_assets))
         await answer_callback(callback_id)
         return True
     if data == "txsrc:e_wallet":
@@ -158,7 +149,8 @@ async def _handle_source_selection_callback(
             return True
         source_credit_card_id = selected_card.id
         selected_card_bank_name = selected_card.bank_name
-    elif data.startswith("txsrc_asset:"):
+    elif data.startswith("txsrc_bank:"):
+        source_type = "bank_account"
         source_asset_id = data.split(":", 1)[1]
     elif data.startswith("txsrc:"):
         chosen = data.split(":", 1)[1]
@@ -263,7 +255,12 @@ async def handle_transaction_callback(
     if not data:
         return False
 
-    if data.startswith("txsrc:") or data.startswith("txsrc_wallet:"):
+    if (
+        data.startswith("txsrc:")
+        or data.startswith("txsrc_wallet:")
+        or data.startswith("txsrc_card:")
+        or data.startswith("txsrc_bank:")
+    ):
         return await _handle_source_selection_callback(db, callback_query)
     if data == "expense:credit:add":
         from backend.bot.handlers.credit_card_entry import start_credit_card_create

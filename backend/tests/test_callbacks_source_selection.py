@@ -401,3 +401,18 @@ def test_tx_source_keyboard_expense_includes_credit_card():
 def test_tx_source_keyboard_money_in_excludes_credit_card():
     kb = transaction_source_keyboard("money_in")["inline_keyboard"]
     assert all(btn["callback_data"] != "txsrc:credit_card" for row in kb for btn in row)
+
+
+@pytest.mark.asyncio
+async def test_handle_transaction_callback_routes_txsrc_bank_prefix():
+    db = MagicMock()
+    cb = _callback(f"txsrc_bank:{uuid.uuid4()}")
+    with patch.object(
+        callbacks,
+        "_handle_source_selection_callback",
+        AsyncMock(return_value=True),
+    ) as source_handler:
+        handled = await callbacks.handle_transaction_callback(db, cb)
+
+    assert handled is True
+    source_handler.assert_awaited_once_with(db, cb)
