@@ -466,6 +466,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #865 | Pre-Phase | Mini App wealth dashboard không mở được (404 JS + 422 API) | [pre-phase/issue-865.md](by-phase/pre-phase/issue-865.md) |
 | #867 | Pre-Phase | Mini App wealth dashboard API trả về 401 Unauthorized | [pre-phase/issue-867.md](by-phase/pre-phase/issue-867.md) |
 | #869 | Pre-Phase | Dashboard API vẫn trả về 401 sau khi fix signature field | [pre-phase/issue-869.md](by-phase/pre-phase/issue-869.md) |
+| #882 | Pre-Phase | Migration fails: 20260528_default_expense_source_profile references wrong down_revision | [pre-phase/issue-882.md](by-phase/pre-phase/issue-882.md) |
 
-**Total:** 462 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 445 Pre-Phase)
+**Total:** 463 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 446 Pre-Phase)
