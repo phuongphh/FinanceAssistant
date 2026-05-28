@@ -93,7 +93,8 @@ class FollowUp:
 # how cross-navigation works ("after seeing assets, suggest net worth").
 _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
     IntentType.QUERY_ASSETS: (
-        FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH),
+        FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
+        FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH, {"time_range": "month_vs_previous"}),
         FollowUp("🏠 Chỉ BĐS", IntentType.QUERY_ASSETS, {"asset_type": "real_estate"}),
         FollowUp("💎 Tổng net worth", IntentType.QUERY_NET_WORTH),
         FollowUp("📈 Cổ phiếu", IntentType.QUERY_PORTFOLIO),
@@ -156,16 +157,16 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
 # HNW gets analytics-first prompts. Missing entries fall back to base.
 _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     (IntentType.QUERY_ASSETS, WealthLevel.STARTER): (
+        FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
         FollowUp("💎 Net worth tổng", IntentType.QUERY_NET_WORTH),
-        FollowUp("🎯 Đặt mục tiêu", IntentType.QUERY_GOALS),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.STARTER): (
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
     (IntentType.QUERY_ASSETS, WealthLevel.HIGH_NET_WORTH): (
-        FollowUp("📈 YTD return", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("💼 Portfolio detail", IntentType.QUERY_PORTFOLIO),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.HIGH_NET_WORTH): (
@@ -175,7 +176,7 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     # Đỉnh Cao (VIP) gets the same analytics-first surface as HNW —
     # the persona/copy difference lives in prompts, not in follow-ups.
     (IntentType.QUERY_ASSETS, WealthLevel.VIP): (
-        FollowUp("📈 YTD return", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("💼 Portfolio detail", IntentType.QUERY_PORTFOLIO),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.VIP): (
