@@ -116,12 +116,12 @@ class TestExpenseOverviewSourceOptions:
         # Base "no source" choice is always first.
         assert opts["expense"][0]["value"] == ""
         assert opts["money_in"][0]["value"] == ""
-        # The bank asset appears in both expense and money-in pickers.
-        assert any(o["value"] == f"asset:{asset.id}" for o in opts["expense"])
-        assert any(o["value"] == f"asset:{asset.id}" for o in opts["money_in"])
-        # Credit cards are expense-only.
-        assert any(o["value"] == f"credit_card:{card.id}" for o in opts["expense"])
-        assert all(not o["value"].startswith("credit_card:") for o in opts["money_in"])
+        # Only canonical source types appear in pickers.
+        assert any(o["value"] == "bank_account" for o in opts["expense"])
+        assert any(o["value"] == "bank_account" for o in opts["money_in"])
+        # Credit-card source is expense-only (category-level, not per-card id).
+        assert any(o["value"] == "credit_card" for o in opts["expense"])
+        assert all(o["value"] != "credit_card" for o in opts["money_in"])
 
     def test_source_option_failure_does_not_blank_dashboard(self):
         """Resilience: if the assets query blows up, the primary spending

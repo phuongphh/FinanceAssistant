@@ -174,7 +174,7 @@ def transaction_source_keyboard(transaction_type: str) -> InlineKeyboardMarkup:
             {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
             {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_pick"},
         ],
-        [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:ewallet_pick"}],
+        [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:e_wallet"}],
     ]
     if transaction_type == "expense":
         rows.append([{"text": "💳 Thẻ tín dụng", "callback_data": f"{prefix}:credit_card"}])
@@ -212,11 +212,10 @@ def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
     }
 
 
-def source_asset_keyboard(assets: list, kind: str) -> InlineKeyboardMarkup:
+def source_asset_keyboard(assets: list) -> InlineKeyboardMarkup:
     rows: list[list[dict]] = []
     for a in assets:
-        icon = "🏦" if kind == "bank" else "👛"
-        rows.append([{"text": f"{icon} {a.name}", "callback_data": f"txsrc_asset:{a.id}"}])
+        rows.append([{"text": f"🏦 {a.name}", "callback_data": f"txsrc_bank:{a.id}"}])
     rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
     rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
     return {"inline_keyboard": rows}

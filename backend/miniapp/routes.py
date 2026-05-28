@@ -838,29 +838,29 @@ async def _build_source_options(db: AsyncSession, user_id):
         )
         return None
 
-    def _asset_label(a):
-        subtype = (a.subtype or "").lower()
-        if subtype in ("bank_checking", "bank_account"):
-            return f"Tài khoản thanh toán · {a.name}"
-        if subtype in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet"):
-            return f"Ví điện tử · {a.name}"
-        if subtype == "cash":
-            return f"Tiền mặt · {a.name}"
-        return None
+    has_bank = any((a.subtype or "").lower() in ("bank_checking", "bank_account") for a in assets)
+    has_ewallet = any((a.subtype or "").lower() in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet") for a in assets)
+    has_cash = any((a.subtype or "").lower() == "cash" for a in assets)
 
     expense = list(base)
     money_in = list(base)
-    for a in assets:
-        label = _asset_label(a)
-        if not label:
-            continue
-        opt = {"value": f"asset:{a.id}", "label": label}
-        expense.append(opt)
-        money_in.append(opt)
-    for c in cards:
-        expense.append(
-            {"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng · {c.bank_name}"}
-        )
+    if has_cash:
+        expense.append({"value": "cash", "label": "Tiền mặt"})
+        money_in.append({"value": "cash", "label": "Tiền mặt"})
+    if has_bank:
+        expense.append({"value": "bank_account", "label": "Tài khoản thanh toán"})
+        money_in.append({"value": "bank_account", "label": "Tài khoản thanh toán"})
+    if has_ewallet:
+        for provider, label in (
+            ("momo", "Ví Momo"),
+            ("vnpay", "Ví VNPay"),
+            ("zalopay", "Ví ZaloPay"),
+            ("viettelpay", "Ví ViettelPay"),
+        ):
+            expense.append({"value": f"e_wallet:{provider}", "label": label})
+            money_in.append({"value": f"e_wallet:{provider}", "label": label})
+    if cards:
+        expense.append({"value": "credit_card", "label": "Thẻ tín dụng"})
     return {"expense": expense, "money_in": money_in}
 
 
