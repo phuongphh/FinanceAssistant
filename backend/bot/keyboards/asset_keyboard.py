@@ -932,7 +932,7 @@ def asset_dashboard_edit_keyboard(
                     "callback_data": build_callback(CB_ASSET_ROW, "edit", asset_id),
                 },
                 {
-                    "text": "🗑️",
+                    "text": "🗑",
                     "callback_data": build_callback(CB_ASSET_ROW, "delete", asset_id),
                 },
             ]

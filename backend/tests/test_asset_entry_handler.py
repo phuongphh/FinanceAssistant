@@ -2423,6 +2423,35 @@ async def test_grouped_dashboard_picker_uses_one_user_scoped_asset_query():
 
 
 @pytest.mark.asyncio
+async def test_show_asset_edit_picker_for_all_assets_renders_only_picker_list():
+    user = _user()
+    db = _db(user)
+    first = _asset(value=10_000_000)
+    second = _asset(value=20_000_000)
+    first.user_id = second.user_id = user.id
+
+    with (
+        patch.object(
+            asset_entry.asset_service,
+            "get_user_assets",
+            AsyncMock(return_value=[first, second]),
+        ) as get_assets,
+        patch.object(asset_entry, "send_message", AsyncMock()) as send,
+    ):
+        await asset_entry.show_asset_edit_picker_for_all_assets(db, 100, user)
+
+    get_assets.assert_awaited_once_with(db, user.id)
+    assert "Báo cáo" not in send.await_args.kwargs["text"]
+    callbacks = [
+        button["callback_data"]
+        for row in send.await_args.kwargs["reply_markup"]["inline_keyboard"]
+        for button in row
+    ]
+    assert f"asset:edit:{first.id}" in callbacks
+    assert f"asset:edit:{second.id}" in callbacks
+
+
+@pytest.mark.asyncio
 async def test_show_asset_delete_matches_list_builds_manage_callbacks():
     first = _asset()
     second = _asset()
