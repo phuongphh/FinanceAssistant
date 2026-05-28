@@ -112,40 +112,75 @@ async def main() -> int:
     _summarize("scope=default (bot-wide)", default_resp)
     _summarize(f"scope=chat({args.chat_id})", chat_resp)
 
-    def _url_of(resp: dict | None) -> str | None:
-        if not isinstance(resp, dict):
+    def _button_of(resp: dict | None) -> dict | None:
+        """Return the ``result`` dict if the API call succeeded, else None.
+        Telegram's response shape: ``{"ok": true, "result": {"type": "...", ...}}``.
+        We distinguish ``None`` (API failure) from ``{"type": "default"}``
+        (chat inherits the bot-wide button) — collapsing both into ``None``
+        was the bug that made the previous diagnosis logic misleading."""
+        if not isinstance(resp, dict) or not resp.get("ok"):
             return None
         r = resp.get("result")
-        if not isinstance(r, dict):
-            return None
-        return (r.get("web_app") or {}).get("url")
+        return r if isinstance(r, dict) else None
 
-    default_url = _url_of(default_resp)
-    chat_url = _url_of(chat_resp)
+    default_button = _button_of(default_resp)
+    chat_button = _button_of(chat_resp)
     print("\n=== diagnosis ===")
-    if default_url == chat_url:
+
+    if default_button is None or chat_button is None:
+        # Either API call failed — comparing URLs would be meaningless
+        # (None == None would falsely report "NO per-chat override").
         print(
-            "  Per-chat URL == default URL. NO per-chat override.\n"
-            "  → Telegram is serving the SAME URL to this chat as everyone else.\n"
-            "  → Root cause is NOT a stale override. Next suspects: WebView per-user\n"
-            "    cookie/cache that survived all client-side clears (try a different\n"
-            "    Telegram account on the same device to confirm), or a network-layer\n"
-            "    rewrite on this user's connection."
+            "  *** INCONCLUSIVE *** — one or both getChatMenuButton calls returned\n"
+            f"  no usable result (default_button={default_button!r},\n"
+            f"  chat_button={chat_button!r}). Check the preceding 'Telegram API error'\n"
+            "  log line; common causes: wrong/expired bot token, network blocked,\n"
+            "  Telegram 5xx. Do NOT run --fix or --clear until both calls succeed."
+        )
+    elif chat_button.get("type") == "default":
+        # Per Bot API: ``MenuButtonDefault`` means the chat inherits whatever
+        # the bot-wide default is — i.e. NO per-chat override exists. Reporting
+        # this as an override would push the operator to run --fix, which
+        # CREATES a real per-chat web_app override that future bot-wide
+        # syncs would never update — the exact stale-menu class we're hunting.
+        print(
+            "  Chat menu button type = 'default' → chat INHERITS the bot-wide button.\n"
+            "  NO per-chat override exists.\n"
+            "  → Telegram is serving the bot-wide default URL to this chat:\n"
+            f"    {(default_button.get('web_app') or {}).get('url')}\n"
+            "  → Root cause is NOT a stale override. Do NOT run --fix (it would\n"
+            "    CREATE the very override class we're trying to avoid). Next\n"
+            "    suspects: WebView per-user cookie/cache that survived all\n"
+            "    client-side clears (try a different Telegram account on the\n"
+            "    same device to confirm), or a network-layer rewrite on this\n"
+            "    user's connection."
         )
     else:
-        print(
-            f"  *** PER-CHAT OVERRIDE FOUND ***\n"
-            f"  default: {default_url}\n"
-            f"  chat:    {chat_url}\n"
-            f"  → This chat has been pinned to a different URL — Telegram is opening\n"
-            f"    THIS URL on every menu-button tap, ignoring the bot-wide default\n"
-            f"    that the lifespan hook re-syncs each boot."
-        )
-        if not (args.fix or args.clear):
+        default_url = (default_button.get("web_app") or {}).get("url")
+        chat_url = (chat_button.get("web_app") or {}).get("url")
+        if default_url == chat_url and chat_button.get("type") == default_button.get("type"):
             print(
-                "  → Re-run with --clear (drop the override, fall back to default)\n"
-                "    or --fix (overwrite with current build URL)."
+                "  Per-chat URL == default URL (both web_app, same href).\n"
+                "  Telegram registered an explicit per-chat copy but it happens to\n"
+                "  match the bot-wide default — functionally no override.\n"
+                "  → Root cause is NOT a stale URL. Next suspects: WebView per-user\n"
+                "    cookie/cache that survived all client-side clears, or a\n"
+                "    network-layer rewrite on this user's connection."
             )
+        else:
+            print(
+                f"  *** PER-CHAT OVERRIDE FOUND ***\n"
+                f"  default ({default_button.get('type')}): {default_url}\n"
+                f"  chat    ({chat_button.get('type')}): {chat_url}\n"
+                f"  → This chat has been pinned to a different button — Telegram is\n"
+                f"    opening THIS on every menu-button tap, ignoring the bot-wide\n"
+                f"    default that the lifespan hook re-syncs each boot."
+            )
+            if not (args.fix or args.clear):
+                print(
+                    "  → Re-run with --clear (drop the override, fall back to default)\n"
+                    "    or --fix (overwrite with current build URL)."
+                )
 
     if args.fix:
         build_hash = _get_build_hash()
