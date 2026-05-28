@@ -35,7 +35,7 @@ from backend.intent.dispatcher import (
     OUTCOME_UNCLEAR,
 )
 from backend.intent.intents import IntentType
-from backend.schemas.expense import ExpenseCreate
+from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 from backend.services import expense_service, report_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.expense_source_resolver import apply_default_source
@@ -226,6 +226,55 @@ async def _send_report(
     await send_message(chat_id, result)
 
 
+async def _maybe_handle_amount_edit(
+    db: AsyncSession, user, chat_id: int, text: str
+) -> bool:
+    """If user is in the transaction_amount_edit wizard, apply the new amount."""
+    state = user.wizard_state or {}
+    if state.get("flow") != "transaction_amount_edit":
+        return False
+    draft = dict(state.get("draft") or {})
+    expense_id = draft.get("expense_id")
+    if not expense_id:
+        await wizard_service.clear(db, user.id)
+        return False
+
+    try:
+        amount = parse_amount(text)
+    except Exception:
+        amount = None
+    if amount is None or amount <= 0:
+        await send_message(
+            chat_id,
+            "Mình chưa hiểu số tiền — bạn nhập lại giúp mình nhé (ví dụ: 45k, 1.2tr).",
+        )
+        return True
+
+    updated = await expense_service.update_expense(
+        db, user.id, expense_id, ExpenseUpdate(amount=float(amount))
+    )
+    await wizard_service.clear(db, user.id)
+    if updated is None:
+        await send_message(chat_id, "Giao dịch này mình không thấy nữa 🫣")
+        return True
+
+    original_message_id = draft.get("message_id")
+    original_chat_id = draft.get("chat_id", chat_id)
+    if original_message_id is not None:
+        from backend.bot.handlers.callbacks import _rerender_transaction_message
+
+        await _rerender_transaction_message(
+            original_chat_id,
+            original_message_id,
+            updated,
+            edited=True,
+            db=db,
+        )
+    else:
+        await send_message(chat_id, f"Đã cập nhật số tiền thành {float(amount):,.0f}đ")
+    return True
+
+
 async def handle_report_command(db: AsyncSession, message: dict) -> None:
     """Handle /report command — extracts Telegram data, delegates to service."""
     chat_id = message["chat"]["id"]
@@ -258,6 +307,11 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     user = await get_user_by_telegram_id(db, telegram_id)
     if not user:
         await send_message(chat_id, _NOT_REGISTERED)
+        return True
+
+    # Issue #897 — capture amount-edit reply for an existing transaction
+    # before any other text routing.
+    if await _maybe_handle_amount_edit(db, user, chat_id, text):
         return True
 
     # Fast-path for explicit +/- expense syntax before generic intent routing.

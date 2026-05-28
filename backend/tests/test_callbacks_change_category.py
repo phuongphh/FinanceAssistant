@@ -71,5 +71,5 @@ async def test_change_category_accepts_valid_category(monkeypatch):
     assert expense.category == "shopping"
     db.flush.assert_awaited_once()
     db.refresh.assert_awaited_once_with(expense)
-    rerender.assert_awaited_once_with(1, 10, expense)
+    rerender.assert_awaited_once_with(1, 10, expense, edited=True, db=db)
     analytics_track.assert_called_once()

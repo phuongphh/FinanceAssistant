@@ -77,7 +77,7 @@ class TestTransactionConfirmation:
             show_edit_hint=True,
         )
         assert "Chi từ: Thẻ tín dụng [Vietcombank]" in result
-        assert "Quản lý chi tiêu" in result
+        assert "chi tiêu đã được ghi lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
 
@@ -109,7 +109,7 @@ class TestTransactionBatchConfirmation:
             show_edit_hint=True,
         )
         assert "Chi từ: Tiền mặt" in result
-        assert "Quản lý chi tiêu" in result
+        assert "chi tiêu đã được ghi lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
 
