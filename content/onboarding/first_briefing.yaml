@@ -7,10 +7,6 @@ explainer: |
 
   Mỗi sáng 8h Bé Tiền sẽ tổng hợp 3 thứ quan trọng nhất về tài sản của bạn trong 30 giây đọc.
 
-  Hôm nay Bé Tiền nói về:
-
-  Hoặc hỏi cụ thể — vd: sao tài sản của tôi giảm?
-
 # Button shown below the briefing — explains each metric in detail.
 explain_button:
   label: "💡 Bé Tiền đang nói gì?"
