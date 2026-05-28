@@ -157,3 +157,37 @@ def test_inline_keyboard_one_button_per_row():
 
 def test_empty_follow_ups_returns_none_keyboard():
     assert build_inline_keyboard([]) is None
+
+
+def test_assets_follow_up_month_vs_previous_routes_net_worth_with_param():
+    fus = get_follow_ups(IntentType.QUERY_ASSETS)
+    month_button = next(f for f in fus if f.label == "📈 So với tháng trước")
+    assert month_button.intent == IntentType.QUERY_NET_WORTH
+    assert month_button.parameters == {"time_range": "month_vs_previous"}
+
+
+def test_hnw_ytd_follow_up_routes_net_worth_with_ytd_param():
+    fus = get_follow_ups(IntentType.QUERY_ASSETS, wealth_level=WealthLevel.HIGH_NET_WORTH)
+    ytd_button = next(f for f in fus if "YTD - Tài sản từ đầu năm đến nay" in f.label)
+    assert ytd_button.intent == IntentType.QUERY_NET_WORTH
+    assert ytd_button.parameters == {"time_range": "ytd"}
+
+    parsed = parse_callback_data(ytd_button.to_callback_data())
+    assert parsed is not None
+    assert parsed.intent == IntentType.QUERY_NET_WORTH
+    assert parsed.parameters == {"time_range": "ytd"}
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_assets_follow_up_has_ytd_button_for_all_wealth_levels(level):
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(IntentType.QUERY_ASSETS, **kwargs)
+    ytd_button = next(f for f in fus if "YTD - Tài sản từ đầu năm đến nay" in f.label)
+    assert ytd_button.intent == IntentType.QUERY_NET_WORTH
+    assert ytd_button.parameters == {"time_range": "ytd"}
