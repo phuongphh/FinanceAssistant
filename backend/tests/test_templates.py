@@ -1,6 +1,7 @@
 """Tests for message templates (Issue #27)."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from backend.bot.formatters.templates import (
     format_budget_alert,
@@ -9,6 +10,8 @@ from backend.bot.formatters.templates import (
     format_transaction_confirmation,
     format_welcome_message,
 )
+
+_VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 class TestTransactionConfirmation:
@@ -29,7 +32,7 @@ class TestTransactionConfirmation:
             amount=85_000,
             category_code="food",
             location="Hà Nội",
-            time=datetime(2026, 4, 15, 12, 15),
+            time=datetime(2026, 4, 15, 12, 15, tzinfo=_VN),
         )
         assert "📍 Hà Nội" in result
         assert "12:15" in result
@@ -94,7 +97,7 @@ class TestTransactionBatchConfirmation:
     def test_contains_each_item_and_total(self):
         result = format_transaction_batch_confirmation(
             items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
-            time=datetime(2026, 5, 7, 19, 18),
+            time=datetime(2026, 5, 7, 19, 18, tzinfo=_VN),
         )
         assert "✅ Đã ghi xong 2 khoản!" in result
         assert "🚗 tiền xăng" in result

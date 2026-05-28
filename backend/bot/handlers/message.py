@@ -519,6 +519,7 @@ async def _handle_confirm_callback(
             category="saving",
             expense_date=date.today(),
         )
+        expense_data = await apply_default_source(db, user.id, expense_data)
         expense = await expense_service.create_expense(db, user.id, expense_data)
         await send_transaction_confirmation(db, expense)
         analytics.track(

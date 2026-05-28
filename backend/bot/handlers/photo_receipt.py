@@ -53,6 +53,7 @@ from backend.config.categories import get_all_categories
 from backend.models.user import User
 from backend.schemas.expense import VALID_CATEGORIES, ExpenseCreate
 from backend.services import expense_service
+from backend.services.expense_source_resolver import apply_default_source
 from backend.services.ocr_service import parse_receipt_image
 from backend.services.telegram_service import (
     download_file,
@@ -400,26 +401,24 @@ async def confirm_pending_receipt(*, db: AsyncSession, user: User, token: str) -
         return False
     if time.monotonic() - float(payload.get("created_at", 0)) > _PENDING_RECEIPT_TTL_S:
         return False
-    await expense_service.create_expense(
-        db,
-        user.id,
-        ExpenseCreate(
-            amount=float(payload["amount"]),
-            currency=str(payload["currency"]),
-            merchant=payload.get("merchant"),
-            category=str(payload["category"]),
-            source="ocr",
-            expense_date=date.fromisoformat(str(payload["expense_date"])),
-            note=payload.get("note"),
-            raw_data={
-                "ocr": {
-                    "confidence": payload.get("confidence"),
-                    "category_suggestion": payload.get("category_suggestion"),
-                    "items": payload.get("items") or [],
-                }
-            },
-        ),
+    expense_data = ExpenseCreate(
+        amount=float(payload["amount"]),
+        currency=str(payload["currency"]),
+        merchant=payload.get("merchant"),
+        category=str(payload["category"]),
+        source="ocr",
+        expense_date=date.fromisoformat(str(payload["expense_date"])),
+        note=payload.get("note"),
+        raw_data={
+            "ocr": {
+                "confidence": payload.get("confidence"),
+                "category_suggestion": payload.get("category_suggestion"),
+                "items": payload.get("items") or [],
+            }
+        },
     )
+    expense_data = await apply_default_source(db, user.id, expense_data)
+    await expense_service.create_expense(db, user.id, expense_data)
     return True
 
 
