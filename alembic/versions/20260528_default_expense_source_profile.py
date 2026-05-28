@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "20260528_default_expense_source_profile"
-down_revision = "20260527_credit_card_limit_and_debt"
+down_revision = "20260527creditlimit"
 branch_labels = None
 depends_on = None
 
