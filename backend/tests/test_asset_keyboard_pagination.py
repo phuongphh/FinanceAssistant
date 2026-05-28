@@ -117,6 +117,18 @@ class TestDashboardKeyboardSize:
     def test_returns_none_for_empty(self):
         assert asset_dashboard_edit_keyboard([]) is None
 
+    def test_edit_label_not_truncated_when_length_is_48(self):
+        label = "A" * 48
+        kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
+        edit_btn = kb["inline_keyboard"][1][0]
+        assert edit_btn["text"] == f"✏️ {label}"
+
+    def test_edit_label_truncates_at_49_with_ellipsis(self):
+        label = "B" * 49
+        kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
+        edit_btn = kb["inline_keyboard"][1][0]
+        assert edit_btn["text"] == f"✏️ {'B' * 45}…"
+
 
 class TestManageListKeyboards:
     def test_edit_list_paginates_under_budget(self):

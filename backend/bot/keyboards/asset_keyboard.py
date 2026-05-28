@@ -923,8 +923,10 @@ def asset_dashboard_edit_keyboard(
     ]
     for asset_id, label in page_items:
         clean = " ".join(str(label).split())
-        if len(clean) > 34:
-            clean = clean[:31].rstrip() + "…"
+        # Keep delete CTA as a single icon so the edit button can claim
+        # most of the row width in Telegram (roughly 9:1 visual split).
+        if len(clean) > 48:
+            clean = clean[:45].rstrip() + "…"
         keyboard.append(
             [
                 {
