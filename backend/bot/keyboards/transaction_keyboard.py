@@ -187,7 +187,7 @@ def credit_card_source_keyboard(cards: list) -> InlineKeyboardMarkup:
     for card in cards:
         rows.append([
             {
-                "text": f"💳 {card.bank_name}",
+                "text": f"💳 Thẻ tín dụng - {card.bank_name}",
                 "callback_data": f"txsrc_card:{card.id}",
             }
         ])
@@ -215,7 +215,7 @@ def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
 def source_asset_keyboard(assets: list) -> InlineKeyboardMarkup:
     rows: list[list[dict]] = []
     for a in assets:
-        rows.append([{"text": f"🏦 {a.name}", "callback_data": f"txsrc_bank:{a.id}"}])
+        rows.append([{"text": f"🏦 Thẻ thanh toán - {a.name}", "callback_data": f"txsrc_bank:{a.id}"}])
     rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
     rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
     return {"inline_keyboard": rows}

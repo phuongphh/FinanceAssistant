@@ -752,7 +752,8 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
 
     function sourceValue(item) {
         if (!item || !item.source_type) return '';
-        if (item.source_credit_card_id) return 'credit_card';
+        if (item.source_credit_card_id) return `credit_card:${item.source_credit_card_id}`;
+        if (item.source_asset_id && item.source_type === 'bank_account') return `bank_account:${item.source_asset_id}`;
         if (item.source_type === 'e_wallet') return `e_wallet:${item.e_wallet_provider || 'momo'}`;
         return item.source_type;
     }
@@ -763,6 +764,7 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
             return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo', source_credit_card_id: null, source_asset_id: null };
         }
         if (value.startsWith('credit_card:')) return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: value.split(':')[1] || null, source_asset_id: null };
+        if (value.startsWith('bank_account:')) return { source_type: 'bank_account', e_wallet_provider: null, source_credit_card_id: null, source_asset_id: value.split(':')[1] || null };
         if (value === 'credit_card') return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: editingItem?.source_credit_card_id || null, source_asset_id: null };
         return { source_type: value, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
     }

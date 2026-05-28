@@ -838,7 +838,7 @@ async def _build_source_options(db: AsyncSession, user_id):
         )
         return None
 
-    has_bank = any((a.subtype or "").lower() in ("bank_checking", "bank_account") for a in assets)
+    bank_assets = [a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")]
     has_ewallet = any((a.subtype or "").lower() in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet") for a in assets)
     has_cash = any((a.subtype or "").lower() == "cash" for a in assets)
 
@@ -847,9 +847,9 @@ async def _build_source_options(db: AsyncSession, user_id):
     if has_cash:
         expense.append({"value": "cash", "label": "Tiền mặt"})
         money_in.append({"value": "cash", "label": "Tiền mặt"})
-    if has_bank:
-        expense.append({"value": "bank_account", "label": "Tài khoản thanh toán"})
-        money_in.append({"value": "bank_account", "label": "Tài khoản thanh toán"})
+    for a in bank_assets:
+        expense.append({"value": f"bank_account:{a.id}", "label": f"Thẻ thanh toán - {a.name}"})
+        money_in.append({"value": f"bank_account:{a.id}", "label": f"Thẻ thanh toán - {a.name}"})
     if has_ewallet:
         for provider, label in (
             ("momo", "Ví Momo"),
@@ -857,10 +857,10 @@ async def _build_source_options(db: AsyncSession, user_id):
             ("zalopay", "Ví ZaloPay"),
             ("viettelpay", "Ví ViettelPay"),
         ):
-            expense.append({"value": f"e_wallet:{provider}", "label": label})
-            money_in.append({"value": f"e_wallet:{provider}", "label": label})
-    if cards:
-        expense.append({"value": "credit_card", "label": "Thẻ tín dụng"})
+            expense.append({"value": f"e_wallet:{provider}", "label": f"Ví điện tử - {label.replace('Ví ', '')}"})
+            money_in.append({"value": f"e_wallet:{provider}", "label": f"Ví điện tử - {label.replace('Ví ', '')}"})
+    for c in cards:
+        expense.append({"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng - {c.bank_name}"})
     return {"expense": expense, "money_in": money_in}
 
 

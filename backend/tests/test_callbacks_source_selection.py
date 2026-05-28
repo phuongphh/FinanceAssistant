@@ -335,7 +335,7 @@ async def test_txsrc_credit_card_shows_all_cards_for_expense_only():
     assert handled is True
     kb = edit_markup.await_args.kwargs["reply_markup"]["inline_keyboard"]
     labels = [row[0]["text"] for row in kb[:2]]
-    assert labels == ["💳 VCB", "💳 ACB"]
+    assert labels == ["💳 Thẻ tín dụng - VCB", "💳 Thẻ tín dụng - ACB"]
 
 
 @pytest.mark.asyncio
