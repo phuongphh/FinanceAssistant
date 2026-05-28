@@ -642,3 +642,39 @@ async def test_render_default_expense_source_options_uses_short_callback_tokens(
         "profile:set_default_expense_source:opt1",
     ]
     assert all(len(value) <= 64 for value in callback_values)
+
+@pytest.mark.asyncio
+async def test_expense_source_options_sorted_by_type_then_name(monkeypatch):
+    user_id = uuid.uuid4()
+
+    card_b = SimpleNamespace(id=uuid.uuid4(), bank_name="ZBank")
+    card_a = SimpleNamespace(id=uuid.uuid4(), bank_name="ACB")
+    bank_b = SimpleNamespace(id=uuid.uuid4(), subtype="bank_account", name="Vietcombank", is_active=True)
+    bank_a = SimpleNamespace(id=uuid.uuid4(), subtype="bank_checking", name="ACB", is_active=True)
+    wallet_b = SimpleNamespace(id=uuid.uuid4(), subtype="e_wallet", name="ZaloPay", is_active=True)
+    wallet_a = SimpleNamespace(id=uuid.uuid4(), subtype="momo", name="MoMo", is_active=True)
+
+    class _FakeResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[_FakeResult([card_b, card_a]), _FakeResult([bank_b, bank_a, wallet_b, wallet_a])])
+
+    options = await profile_menu_module._expense_source_options(user_id, db)
+
+    assert options == [
+        ("cash", "Tiền mặt"),
+        (f"bank_account:{bank_a.id}", "Tài khoản thanh toán [ACB]"),
+        (f"bank_account:{bank_b.id}", "Tài khoản thanh toán [Vietcombank]"),
+        (f"credit_card:{card_a.id}", "Thẻ tín dụng [ACB]"),
+        (f"credit_card:{card_b.id}", "Thẻ tín dụng [ZBank]"),
+        (f"e_wallet:{wallet_a.id}", "Ví điện tử [MoMo]"),
+        (f"e_wallet:{wallet_b.id}", "Ví điện tử [ZaloPay]"),
+    ]
