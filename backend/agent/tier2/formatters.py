@@ -295,6 +295,7 @@ def format_market_response(
     style: LevelStyle,
 ) -> str:
     ticker = payload.get("ticker", "?")
+    ticker_label = _market_ticker_label(ticker)
     asset_name = payload.get("asset_name") or ticker
     price = float(payload.get("current_price") or 0)
     change_pct = payload.get("change_pct")
@@ -302,7 +303,7 @@ def format_market_response(
     note = payload.get("note")
 
     if price <= 0:
-        return f"⚠️ Chưa có dữ liệu thị trường cho {ticker}.\n_{note or ''}_".strip()
+        return f"⚠️ Chưa có dữ liệu thị trường cho {ticker_label}.\n_{note or ''}_".strip()
 
     arrow = "➡️"
     sign = ""
@@ -311,7 +312,7 @@ def format_market_response(
         arrow = "📈" if change_pct > 0 else ("📉" if change_pct < 0 else "➡️")
 
     lines = [
-        f"📊 *{asset_name}* ({ticker})",
+        f"📊 *{asset_name}* ({ticker_label})",
         f"Giá: {format_money_short(price)}",
     ]
     if change_pct is not None:
@@ -344,3 +345,7 @@ def _generic_apology(user: User) -> str:
     return (
         f"Mình chưa hiểu rõ ý {name}, có thể hỏi lại cụ thể hơn được không? 🤔"
     )
+
+
+def _market_ticker_label(ticker: str) -> str:
+    return "Vàng SJC" if str(ticker).upper() == "SJC_GOLD" else str(ticker)

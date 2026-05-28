@@ -210,6 +210,40 @@ class TestMarketFormatter:
         )
         assert "Chưa có dữ liệu" in out
 
+    def test_sjc_gold_uses_vietnamese_label_in_header(self):
+        out = format_market_response(
+            {
+                "ticker": "SJC_GOLD",
+                "asset_name": "Vàng SJC",
+                "current_price": "90000000",
+                "change_pct": 0.5,
+                "period": "1d",
+                "user_owns": False,
+                "note": None,
+            },
+            _user(),
+            _style(),
+        )
+        assert "(Vàng SJC)" in out
+        assert "SJC_GOLD" not in out
+
+    def test_sjc_gold_uses_vietnamese_label_in_no_data_message(self):
+        out = format_market_response(
+            {
+                "ticker": "SJC_GOLD",
+                "asset_name": None,
+                "current_price": "0",
+                "change_pct": None,
+                "period": "1d",
+                "user_owns": False,
+                "note": "Provider lỗi",
+            },
+            _user(),
+            _style(),
+        )
+        assert "Vàng SJC" in out
+        assert "SJC_GOLD" not in out
+
 
 class TestTransactionsFormatter:
     def test_renders_rows_and_total(self):
