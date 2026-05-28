@@ -76,7 +76,7 @@ async def send_transaction_confirmation(
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode=None,
+        parse_mode="HTML",
         reply_markup=reply_markup,
         **message_kwargs_for_animation(text, "transaction"),
     )
@@ -144,7 +144,7 @@ async def send_transaction_batch_confirmation(
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode=None,
+        parse_mode="HTML",
         reply_markup=reply_markup,
         **message_kwargs_for_animation(text, "transaction"),
     )

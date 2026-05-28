@@ -2,9 +2,7 @@ confirmation:
   title_done: "✅ Đã ghi xong!"
   batch_title: "✅ Đã ghi xong {count} khoản!"
   source_prefix: "💳 Chi từ: {source}"
-  edit_hint: >-
-    Nếu bạn cần sửa/xoá giao dịch này thì hãy vào mục Quản lý chi tiêu
-    trong menu Chi tiêu nhé.
+  edit_hint: "<i>💡 Cần sửa/xoá? Vào mục Quản lý chi tiêu trong menu Chi tiêu nhé.</i>"
 
 source_labels:
   cash: "Tiền mặt"
