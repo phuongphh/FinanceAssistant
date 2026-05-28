@@ -285,6 +285,55 @@ action_quick_transaction:
     - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9
 
+    # ---- Expense-lead verb + amount anywhere in the clause ----
+    # Catches the colloquial Vietnamese shapes where users name what
+    # they bought BEFORE saying how much:
+    #   "chi vé công viên nước 500k", "chi 1000k ăn thịt cá sấu",
+    #   "mất 200k đổ xăng", "tốn 500k mua quà", "trả 200k tiền điện",
+    #   "đóng 500k học phí", "nộp 1tr tiền nhà", "xài 200k cà phê",
+    #   "thanh toán 1tr ăn tối", "bỏ 300k mua sách".
+    # Negative lookahead skips "chi tiêu/chi phí ..." (the noun phrase
+    # used by the query intents) so report-style asks still route to
+    # query_expenses / query_expenses_by_category.
+    # Money suffix is mandatory (k/tr/triệu/nghìn/ngàn/đ/vnd) — bare
+    # numbers without a unit are too noisy to trust at this confidence.
+    - pattern: '^(?:chi|tieu|xai|tra|mua|mat|ton|bo|dong|nop|thanh\s*toan|rut)\s+(?!(?:tieu|phi)\b)[^?\n]{0,60}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.9
+
+    # Subject-led variant: "tôi mất 500k đi nhậu", "mình chi 1tr ăn tối",
+    # "em vừa trả 200k tiền điện", "tao tốn 500k đổ xăng".
+    # The optional adverb cluster (đã/mới/vừa) covers past-tense
+    # phrasing that Vietnamese speakers default to when logging
+    # transactions retroactively.
+    - pattern: '\b(?:toi|minh|em|tao|tui|t)\s+(?:da\s+|moi\s+|vua\s+|cung\s+)?(?:chi|tieu|tra|mua|mat|ton|bo|dong|nop|xai|thanh\s*toan)\s+(?!(?:tieu|phi)\b)[^?\n]{0,60}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.88
+
+    # "hết X" idiom — when X is an amount, the sentence is almost
+    # always logging an expense: "ăn trưa hết 50k",
+    # "ăn thịt cá sấu hết 1000k", "mua sách hết 200k",
+    # "đổ xăng hết 100k", "đi grab hết 80k".
+    # Requires a money suffix to avoid matching unrelated "hết" usages
+    # like "hết tiền" or "hết hàng".
+    - pattern: '\bhet\s+\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ)\b'
+      confidence: 0.88
+
+    # Leading bare amount + description — the canonical fast-log shape:
+    #   "50k cà phê", "200k đổ xăng", "1tr ăn nhậu", "30k trà sữa".
+    # Anchored to start with an optional sign so the income fast-path
+    # ("+200k …") still wins via the message-layer pre-check.
+    - pattern: '^\s*[+\-]?\s*\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan)\s+[^\d?].{1,40}$'
+      confidence: 0.86
+
+    # Trailing-amount description — "ăn thịt cá sấu 1000k",
+    # "cà phê highlands 50k", "vé công viên nước 500k",
+    # "grab về nhà 80k". Requires the line to START with a known
+    # spending-context lead word (ăn/uống/mua/đi/vé/đổ/cà phê/trà
+    # sữa/cơm/phở/bún/grab/taxi/xe/tiền) so questions and reports
+    # ("ăn uống tháng này bao nhiêu") don't accidentally match —
+    # those have time tokens, not money suffixes.
+    - pattern: '^(?:an|uong|mua|di|ve|do|cafe|ca\s*phe|com|pho|bun|tra\s*sua|grab|taxi|xe|tien|nuoc|bia|ruou|do\s*xang|xang)\b[^?\n]{1,60}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan)\s*$'
+      confidence: 0.86
+
 action_record_saving:
   description: "User wants to record a saving."
   patterns:
