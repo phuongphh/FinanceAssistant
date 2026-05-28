@@ -77,6 +77,9 @@ async def test_confirm_yes_creates_expense_and_clears_state():
     with patch.object(
         message, "get_user_by_telegram_id", AsyncMock(return_value=user)
     ), patch.object(
+        message, "apply_default_source",
+        AsyncMock(side_effect=lambda _db, _u, d: d),
+    ), patch.object(
         message.expense_service,
         "create_expense",
         AsyncMock(return_value=expense_obj),

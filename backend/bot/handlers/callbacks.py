@@ -18,10 +18,8 @@ and edit the triggering message in place.
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,8 +57,6 @@ from backend.services.telegram_service import (
     edit_message_text,
     send_message,
 )
-
-_VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 logger = logging.getLogger(__name__)
 
@@ -229,14 +225,6 @@ async def _handle_source_selection_callback(
     return True
 
 
-def _to_vn_time(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(_VN_TZ)
-
-
 async def _rerender_transaction_message(
     chat_id: int,
     message_id: int,
@@ -257,7 +245,7 @@ async def _rerender_transaction_message(
         merchant=expense.merchant or expense.note or "Giao dịch",
         amount=float(expense.amount),
         category_code=_normalize_category(expense.category),
-        time=_to_vn_time(expense.created_at),
+        time=expense.created_at,
         source_label=source_label,
         show_edit_hint=is_expense,
     )

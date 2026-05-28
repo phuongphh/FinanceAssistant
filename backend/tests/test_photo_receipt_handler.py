@@ -255,6 +255,8 @@ async def test_confirm_pending_receipt_success_creates_expense():
     }
     create = AsyncMock()
     with patch.object(photo_receipt, "time") as t, \
+         patch.object(photo_receipt, "apply_default_source",
+                       AsyncMock(side_effect=lambda _db, _u, d: d)), \
          patch.object(photo_receipt.expense_service, "create_expense", create):
         t.monotonic.return_value = 101.0
         ok = await photo_receipt.confirm_pending_receipt(
@@ -262,6 +264,41 @@ async def test_confirm_pending_receipt_success_creates_expense():
         )
     assert ok is True
     create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_confirm_pending_receipt_applies_default_source():
+    """OCR confirm path must honour the user's default_expense_source."""
+    user = _user()
+    token = "tok_default_src"
+    photo_receipt._pending_receipt_confirms[token] = {
+        "created_at": 100.0,
+        "user_id": str(user.id),
+        "amount": 50000.0,
+        "currency": "VND",
+        "merchant": "Phở",
+        "category": "food",
+        "expense_date": "2026-05-28",
+    }
+
+    async def _stamp(_db, _uid, data):
+        data.source = "cash"
+        return data
+
+    create = AsyncMock()
+    with patch.object(photo_receipt, "time") as t, \
+         patch.object(photo_receipt, "apply_default_source",
+                       AsyncMock(side_effect=_stamp)) as apply_src, \
+         patch.object(photo_receipt.expense_service, "create_expense", create):
+        t.monotonic.return_value = 101.0
+        ok = await photo_receipt.confirm_pending_receipt(
+            db=MagicMock(), user=user, token=token
+        )
+    assert ok is True
+    apply_src.assert_awaited_once()
+    create.assert_awaited_once()
+    passed = create.await_args.args[2]
+    assert passed.source == "cash"
 
 
 @pytest.mark.asyncio
@@ -620,6 +657,8 @@ async def test_confirm_pending_receipt_persists_picked_category():
     }
     create = AsyncMock()
     with patch.object(photo_receipt, "time") as t, \
+         patch.object(photo_receipt, "apply_default_source",
+                       AsyncMock(side_effect=lambda _db, _u, d: d)), \
          patch.object(photo_receipt.expense_service, "create_expense", create):
         t.monotonic.return_value = 101.0
         ok = await photo_receipt.confirm_pending_receipt(

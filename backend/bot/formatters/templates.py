@@ -3,17 +3,35 @@
 Nguyên tắc: Một function = một loại tin nhắn.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from functools import lru_cache
 from html import escape as _html_escape
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import yaml
 
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.bot.formatters.progress_bar import make_category_bar, make_progress_bar
 from backend.config.categories import get_category
+
+_VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _as_vn_time(dt: datetime | None) -> datetime | None:
+    """Normalize any timestamp to Asia/Ho_Chi_Minh for display.
+
+    Centralized here so every confirmation template renders VN time
+    regardless of whether the caller remembered to convert. PG TIMESTAMPTZ
+    columns come back as aware UTC; naive datetimes are assumed UTC (the
+    historical default of ``datetime.utcnow``).
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_VN_TZ)
 
 _TRANSACTION_COPY_PATH = (
     Path(__file__).resolve().parents[3] / "content" / "transaction_copy.yaml"
@@ -65,8 +83,9 @@ def format_transaction_confirmation(
     context_parts: list[str] = []
     if location:
         context_parts.append(f"📍 {_html_escape(location)}")
-    if time:
-        context_parts.append(time.strftime("%H:%M"))
+    time_vn = _as_vn_time(time)
+    if time_vn:
+        context_parts.append(time_vn.strftime("%H:%M"))
     if context_parts:
         lines.append("  •  ".join(context_parts))
 
@@ -183,8 +202,9 @@ def format_transaction_batch_confirmation(
 
     lines.append("")
     lines.append(f"Tổng: {format_money_full(total)}")
-    if time:
-        lines.append(time.strftime("%H:%M"))
+    time_vn = _as_vn_time(time)
+    if time_vn:
+        lines.append(time_vn.strftime("%H:%M"))
 
     if source_label:
         source_template = _confirmation_copy(
