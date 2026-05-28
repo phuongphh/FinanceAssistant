@@ -936,9 +936,10 @@ async def _render_default_expense_source_options(
     db: AsyncSession, chat_id: int, message_id: int | None, user: User
 ) -> None:
     options = await _expense_source_options(user.id, db)
+    tokenized_options = [(_source_token(i), key, label) for i, (key, label) in enumerate(options)]
     rows = [
-        [{"text": label, "callback_data": f"profile:set_default_expense_source:{key}"}]
-        for key, label in options
+        [{"text": label, "callback_data": f"profile:set_default_expense_source:{token}"}]
+        for token, _key, label in tokenized_options
     ]
     rows.append(
         [{"text": _copy("default_expense_source", "back_button"), "callback_data": "profile:default_expense_source"}]
@@ -960,6 +961,7 @@ async def _set_default_expense_source(
     source_key: str,
 ) -> None:
     options = await _expense_source_options(user.id, db)
+    source_key = _decode_source_token(source_key, options)
     labels = dict(options)
     if source_key not in labels:
         await send_message(chat_id=chat_id, text=_copy("default_expense_source", "invalid"))
@@ -971,6 +973,20 @@ async def _set_default_expense_source(
         text=_copy("default_expense_source", "changed_message").format(source=labels[source_key]),
     )
     await _render_default_expense_source(db, chat_id, message_id, user, profile)
+
+
+def _source_token(index: int) -> str:
+    return f"opt{index}"
+
+
+def _decode_source_token(token_or_key: str, options: list[tuple[str, str]]) -> str:
+    if token_or_key.startswith("opt"):
+        suffix = token_or_key.removeprefix("opt")
+        if suffix.isdigit():
+            idx = int(suffix)
+            if 0 <= idx < len(options):
+                return options[idx][0]
+    return token_or_key
 
 
 def _notification_state_label(enabled: bool) -> str:

@@ -570,3 +570,75 @@ async def test_set_default_expense_source_updates_profile_and_sends_confirm(monk
         "Đã đổi nguồn chi tiêu thường xuyên" in call.kwargs.get("text", "")
         for call in send.await_args_list
     )
+
+
+@pytest.mark.asyncio
+async def test_set_default_expense_source_accepts_short_token_and_saves_real_key(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    profile = UserProfile(user_id=user.id)
+    db = MagicMock()
+    db.flush = AsyncMock()
+
+    card_key = f"credit_card:{uuid.uuid4()}"
+    monkeypatch.setattr(
+        profile_menu_module,
+        "_expense_source_options",
+        AsyncMock(return_value=[("cash", "Tiền mặt"), (card_key, "Thẻ tín dụng [VCB]")]),
+    )
+    monkeypatch.setattr(profile_menu_module, "_render_default_expense_source", AsyncMock())
+    monkeypatch.setattr(profile_menu_module, "send_message", AsyncMock())
+
+    await profile_menu_module._set_default_expense_source(
+        db,
+        chat_id=42,
+        message_id=88,
+        user=user,
+        profile=profile,
+        source_key="opt1",
+    )
+
+    assert profile.default_expense_source == card_key
+    db.flush.assert_awaited_once()
+
+
+def test_decode_source_token_handles_valid_invalid_and_legacy_values():
+    options = [
+        ("cash", "Tiền mặt"),
+        ("credit_card:abc", "Thẻ tín dụng [VCB]"),
+    ]
+    assert profile_menu_module._decode_source_token("opt0", options) == "cash"
+    assert profile_menu_module._decode_source_token("opt1", options) == "credit_card:abc"
+    assert profile_menu_module._decode_source_token("opt99", options) == "opt99"
+    assert profile_menu_module._decode_source_token("optx", options) == "optx"
+    assert (
+        profile_menu_module._decode_source_token("credit_card:abc", options)
+        == "credit_card:abc"
+    )
+
+
+@pytest.mark.asyncio
+async def test_render_default_expense_source_options_uses_short_callback_tokens(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    long_key = f"credit_card:{uuid.uuid4()}"
+
+    monkeypatch.setattr(
+        profile_menu_module,
+        "_expense_source_options",
+        AsyncMock(return_value=[("cash", "Tiền mặt"), (long_key, "Thẻ tín dụng [VCB]")]),
+    )
+    edit = AsyncMock()
+    monkeypatch.setattr(profile_menu_module, "edit_message_text", edit)
+
+    await profile_menu_module._render_default_expense_source_options(
+        MagicMock(), chat_id=42, message_id=99, user=user
+    )
+
+    rows = edit.await_args.kwargs["reply_markup"]["inline_keyboard"]
+    callback_values = [row[0]["callback_data"] for row in rows[:-1]]
+    assert callback_values == [
+        "profile:set_default_expense_source:opt0",
+        "profile:set_default_expense_source:opt1",
+    ]
+    assert all(len(value) <= 64 for value in callback_values)
