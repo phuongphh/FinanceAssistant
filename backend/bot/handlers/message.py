@@ -38,6 +38,7 @@ from backend.intent.intents import IntentType
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service, report_service, wizard_service
 from backend.services.dashboard_service import get_user_by_telegram_id
+from backend.services.expense_source_resolver import apply_default_source
 from backend.services.llm_service import call_llm
 from backend.services.telegram_service import send_message
 from backend.wealth.amount_parser import parse_amount
@@ -281,6 +282,7 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
             source_type=source_type,
             source_credit_card_id=source_card_id,
         )
+        expense_data = await apply_default_source(db, user.id, expense_data)
         expense = await expense_service.create_expense(db, user.id, expense_data)
         await send_transaction_confirmation(db, expense)
         return True

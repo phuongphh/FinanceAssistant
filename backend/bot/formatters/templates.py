@@ -4,10 +4,29 @@ Nguyên tắc: Một function = một loại tin nhắn.
 """
 
 from datetime import date, datetime
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.bot.formatters.progress_bar import make_category_bar, make_progress_bar
 from backend.config.categories import get_category
+
+_TRANSACTION_COPY_PATH = (
+    Path(__file__).resolve().parents[3] / "content" / "transaction_copy.yaml"
+)
+
+
+@lru_cache(maxsize=1)
+def _transaction_copy() -> dict[str, Any]:
+    with open(_TRANSACTION_COPY_PATH, encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _confirmation_copy(key: str, default: str = "") -> str:
+    return _transaction_copy().get("confirmation", {}).get(key, default)
 
 
 def format_transaction_confirmation(
@@ -18,6 +37,8 @@ def format_transaction_confirmation(
     time: datetime | None = None,
     daily_spent: float | None = None,
     daily_budget: float | None = None,
+    source_label: str | None = None,
+    show_edit_hint: bool = False,
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi giao dịch thành công.
 
@@ -34,7 +55,8 @@ def format_transaction_confirmation(
     """
     cat = get_category(category_code)
 
-    lines: list[str] = ["✅ Ghi xong!", ""]
+    title = _confirmation_copy("title_done", "✅ Đã ghi xong!")
+    lines: list[str] = [title, ""]
     lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
 
     context_parts: list[str] = []
@@ -44,6 +66,12 @@ def format_transaction_confirmation(
         context_parts.append(time.strftime("%H:%M"))
     if context_parts:
         lines.append("  •  ".join(context_parts))
+
+    if source_label:
+        source_template = _confirmation_copy(
+            "source_prefix", "💳 Chi từ: {source}"
+        )
+        lines.append(source_template.format(source=source_label))
 
     if daily_spent is not None and daily_budget is not None and daily_budget > 0:
         lines.append("")
@@ -64,6 +92,12 @@ def format_transaction_confirmation(
             lines.append(
                 f"Vượt ngân sách {format_money_short(-remaining)} — cần chú ý 😅"
             )
+
+    if show_edit_hint:
+        hint = _confirmation_copy("edit_hint")
+        if hint:
+            lines.append("")
+            lines.append(hint.strip())
 
     return "\n".join(lines)
 
@@ -128,10 +162,15 @@ def format_receipt_confirmation(
 def format_transaction_batch_confirmation(
     items: list[tuple[str, float, str]],
     time: datetime | None = None,
+    source_label: str | None = None,
+    show_edit_hint: bool = False,
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi nhiều giao dịch cùng lúc."""
     total = sum(amount for _, amount, _ in items)
-    lines: list[str] = [f"✅ Ghi xong {len(items)} khoản!", ""]
+    title_template = _confirmation_copy(
+        "batch_title", "✅ Đã ghi xong {count} khoản!"
+    )
+    lines: list[str] = [title_template.format(count=len(items)), ""]
 
     for merchant, amount, category_code in items:
         cat = get_category(category_code)
@@ -141,6 +180,19 @@ def format_transaction_batch_confirmation(
     lines.append(f"Tổng: {format_money_full(total)}")
     if time:
         lines.append(time.strftime("%H:%M"))
+
+    if source_label:
+        source_template = _confirmation_copy(
+            "source_prefix", "💳 Chi từ: {source}"
+        )
+        lines.append(source_template.format(source=source_label))
+
+    if show_edit_hint:
+        hint = _confirmation_copy("edit_hint")
+        if hint:
+            lines.append("")
+            lines.append(hint.strip())
+
     return "\n".join(lines)
 
 
