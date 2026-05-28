@@ -339,6 +339,24 @@ async def test_txsrc_credit_card_shows_all_cards_for_expense_only():
 
 
 @pytest.mark.asyncio
+async def test_txsrc_card_select_confirmation_mentions_bank_name():
+    user = _user(state={
+        "flow": "transaction_source_select",
+        "step": "source_type",
+        "draft": {"amount": 200000.0, "transaction_type": "expense", "merchant": "test"},
+    })
+    db = MagicMock()
+    expense = _expense(transaction_type="expense", amount=200000.0)
+    card_id = uuid.uuid4()
+    card = SimpleNamespace(id=card_id, bank_name="MSB")
+    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks, "list_credit_cards", AsyncMock(return_value=[card])),          patch.object(callbacks.expense_service, "create_expense", AsyncMock(return_value=expense)),          patch.object(callbacks, "edit_message_text", AsyncMock(return_value={"ok": True})) as edit_text,          patch.object(callbacks, "answer_callback", AsyncMock()),          patch("backend.services.wizard_service.clear", AsyncMock()):
+        handled = await callbacks._handle_source_selection_callback(db, _callback(f"txsrc_card:{card_id}"))
+
+    assert handled is True
+    assert "Thẻ tín dụng MSB" in edit_text.await_args.kwargs["text"]
+
+
+@pytest.mark.asyncio
 async def test_txsrc_card_select_creates_expense_with_credit_card_source():
     user = _user(state={
         "flow": "transaction_source_select",
@@ -348,13 +366,32 @@ async def test_txsrc_card_select_creates_expense_with_credit_card_source():
     db = MagicMock()
     expense = _expense(transaction_type="expense", amount=200000.0)
     card_id = uuid.uuid4()
-    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks.expense_service, "create_expense", AsyncMock(return_value=expense)) as create,          patch.object(callbacks, "edit_message_text", AsyncMock(return_value={"ok": True})),          patch.object(callbacks, "answer_callback", AsyncMock()),          patch("backend.services.wizard_service.clear", AsyncMock()):
+    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks, "list_credit_cards", AsyncMock(return_value=[SimpleNamespace(id=card_id, bank_name="VCB")])),          patch.object(callbacks.expense_service, "create_expense", AsyncMock(return_value=expense)) as create,          patch.object(callbacks, "edit_message_text", AsyncMock(return_value={"ok": True})),          patch.object(callbacks, "answer_callback", AsyncMock()),          patch("backend.services.wizard_service.clear", AsyncMock()):
         handled = await callbacks._handle_source_selection_callback(db, _callback(f"txsrc_card:{card_id}"))
 
     assert handled is True
     payload = create.await_args.args[2]
     assert payload.source_type == "credit_card"
     assert str(payload.source_credit_card_id) == str(card_id)
+
+
+@pytest.mark.asyncio
+async def test_txsrc_card_select_rejects_unknown_card_id():
+    user = _user(state={
+        "flow": "transaction_source_select",
+        "step": "source_type",
+        "draft": {"amount": 200000.0, "transaction_type": "expense", "merchant": "test"},
+    })
+    db = MagicMock()
+    card_id = uuid.uuid4()
+    with patch.object(callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)),          patch.object(callbacks, "list_credit_cards", AsyncMock(return_value=[])),          patch.object(callbacks.expense_service, "create_expense", AsyncMock()) as create,          patch.object(callbacks, "answer_callback", AsyncMock()) as answer:
+        handled = await callbacks._handle_source_selection_callback(db, _callback(f"txsrc_card:{card_id}"))
+
+    assert handled is True
+    create.assert_not_awaited()
+    answer.assert_awaited_once()
+    assert "không hợp lệ" in (answer.await_args.kwargs.get("text") or "").lower()
+
 from backend.bot.keyboards.transaction_keyboard import transaction_source_keyboard
 
 def test_tx_source_keyboard_expense_includes_credit_card():

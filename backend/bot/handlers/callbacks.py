@@ -137,12 +137,27 @@ async def _handle_source_selection_callback(
         return True
     source_credit_card_id = None
     source_asset_id = None
+    selected_card_bank_name = None
     if data.startswith("txsrc_wallet:"):
         source_type = "e_wallet"
         wallet_provider = data.split(":", 1)[1]
     elif data.startswith("txsrc_card:"):
         source_type = "credit_card"
-        source_credit_card_id = data.split(":", 1)[1]
+        requested_card_id = data.split(":", 1)[1]
+        cards = await list_credit_cards(db, user.id)
+        selected_card = next(
+            (c for c in cards if str(c.id) == str(requested_card_id)),
+            None,
+        )
+        if selected_card is None:
+            await answer_callback(
+                callback_id,
+                text="Thẻ không hợp lệ hoặc đã bị xoá 🌱",
+                show_alert=True,
+            )
+            return True
+        source_credit_card_id = selected_card.id
+        selected_card_bank_name = selected_card.bank_name
     elif data.startswith("txsrc_asset:"):
         source_asset_id = data.split(":", 1)[1]
     elif data.startswith("txsrc:"):
@@ -173,7 +188,11 @@ async def _handle_source_selection_callback(
         "vnpay": "Ví VNPay",
         "zalopay": "Ví ZaloPay",
         "viettelpay": "Ví ViettelPay",
-        "credit_card": "Thẻ tín dụng",
+        "credit_card": (
+            f"Thẻ tín dụng {selected_card_bank_name}"
+            if selected_card_bank_name
+            else "Thẻ tín dụng"
+        ),
     }.get(wallet_provider or source_type, "không liên kết nguồn")
     confirmation_text = (
         f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}"

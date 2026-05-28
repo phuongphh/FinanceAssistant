@@ -169,3 +169,20 @@ class TestExpenseOverviewSourceOptions:
             assert resp.status_code == 401
         finally:
             app.dependency_overrides.pop(get_db, None)
+
+
+def test_clean_expense_payload_keeps_credit_card_source_fields():
+    card_id = str(uuid.uuid4())
+    payload = {
+        "amount": 120000,
+        "transaction_type": "expense",
+        "source_type": "credit_card",
+        "source_credit_card_id": card_id,
+        "source": "ignored-by-cleaner",
+    }
+
+    cleaned = miniapp_routes._clean_expense_payload(payload)
+
+    assert cleaned["source_type"] == "credit_card"
+    assert cleaned["source_credit_card_id"] == card_id
+    assert cleaned["source"] == "manual"

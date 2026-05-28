@@ -603,8 +603,9 @@ def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
         "source_type",
         "e_wallet_provider",
         "source_asset_id",
+        "source_credit_card_id",
     }
-    source_fields = {"source_type", "e_wallet_provider", "source_asset_id"}
+    source_fields = {"source_type", "e_wallet_provider", "source_asset_id", "source_credit_card_id"}
     clean = {}
     for k, v in payload.items():
         if k not in allowed or v == "":
