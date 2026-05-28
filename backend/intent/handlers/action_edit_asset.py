@@ -199,12 +199,14 @@ class ActionEditAssetHandler(IntentHandler):
             await send_message(
                 chat_id=chat_id,
                 text=(
-                    "Mình không tìm thấy tài sản loại này 🌱 — đây là toàn bộ "
-                    "danh mục, bạn chọn dòng cần sửa nhé."
+                    "Mình không tìm thấy tài sản loại này 🌱 — "
+                    "mình mở danh sách để bạn chọn dòng cần sửa nhé."
                 ),
             )
 
-        await asset_entry_handlers.show_asset_dashboard_report(db, chat_id, user)
+        await asset_entry_handlers.show_asset_edit_picker_for_all_assets(
+            db, chat_id, user
+        )
         return ""
 
     async def _apply_inline_edit(

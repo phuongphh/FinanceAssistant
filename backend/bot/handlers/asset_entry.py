@@ -422,6 +422,34 @@ async def show_asset_edit_picker(
     )
 
 
+async def show_asset_edit_picker_for_all_assets(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Show only the edit picker list (no report header/body)."""
+    assets = _sort_assets_for_dashboard(
+        await asset_service.get_user_assets(db, user.id),
+        _dashboard_sort_for_user(user),
+    )
+    rows = [
+        (asset.id, _asset_dashboard_row_label(asset))
+        for asset in assets
+        if asset.is_active
+    ]
+    if not rows:
+        await send_message(
+            chat_id=chat_id,
+            text="Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé.",
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text="✏️ Chọn dòng cụ thể để sửa nhé:",
+        parse_mode="HTML",
+        reply_markup=asset_dashboard_edit_keyboard(rows),
+    )
+
+
 async def start_asset_edit_wizard(
     db: AsyncSession,
     chat_id: int,
