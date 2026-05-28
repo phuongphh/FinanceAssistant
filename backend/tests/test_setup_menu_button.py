@@ -52,11 +52,24 @@ def fake_settings(monkeypatch):
 class TestBumpedMiniAppUrl:
     def test_appends_build_hash_query_param(self):
         url = _bumped_mini_app_url("https://example.com", "abc1234")
-        assert url == "https://example.com/miniapp/wealth?b=abc1234"
+        assert url == (
+            "https://example.com/miniapp/wealth?b=abc1234&source=chat_menu_button"
+        )
 
     def test_strips_trailing_slash_on_base(self):
         url = _bumped_mini_app_url("https://example.com/", "abc1234")
-        assert url == "https://example.com/miniapp/wealth?b=abc1234"
+        assert url == (
+            "https://example.com/miniapp/wealth?b=abc1234&source=chat_menu_button"
+        )
+
+    def test_carries_source_param_to_escape_poisoned_webview_cache(self):
+        # The menu URL must NOT be byte-identical to a bare ``?b=<hash>`` URL:
+        # a restart recomputes the SAME build hash (it only changes when
+        # asset bytes change), so ``?b`` alone can't bust a WebView entry that
+        # cached a blank render. The distinct ``source`` makes it a URL the
+        # WebView has never seen — the documented root-cause fix.
+        url = _bumped_mini_app_url("https://example.com", "abc1234")
+        assert "source=chat_menu_button" in url
 
     def test_replaces_stale_b_param_on_redeploy(self):
         # Defensive: even if MINIAPP_BASE_URL were ever set with a leftover
@@ -89,7 +102,7 @@ class TestSetupChatMenuButton:
         # Pin the cache-bust contract: the build hash MUST be on the URL,
         # not the document — that's the whole point of this module.
         assert button["web_app"]["url"] == (
-            "https://example.com/miniapp/wealth?b=abc1234"
+            "https://example.com/miniapp/wealth?b=abc1234&source=chat_menu_button"
         )
 
     @pytest.mark.asyncio
