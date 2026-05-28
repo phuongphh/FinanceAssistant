@@ -81,6 +81,6 @@ def test_first_briefing_insight_render_text_is_plain_text_for_entities_send():
         suggested_query="bắt đầu quản lý tài chính",
     )
 
-    assert "Hỏi thử: bắt đầu quản lý tài chính" in insight.render_text
+    assert "Hỏi thử:" not in insight.render_text
     assert "<code>" not in insight.render_text
     assert "</code>" not in insight.render_text
