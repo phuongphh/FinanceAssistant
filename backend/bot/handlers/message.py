@@ -183,6 +183,33 @@ async def _start_source_prompt(
     return True
 
 
+async def _record_signed_expense_with_default(
+    db: AsyncSession, user, parsed: dict
+) -> bool:
+    """Record an expense from the signed/amount-led fast-path using the
+    user's ``default_expense_source``.
+
+    Returns True when the expense was created and the confirmation card
+    was sent — caller then skips the wizard. Returns False when the user
+    has no default source configured (caller falls back to the picker).
+    """
+    merchant = (parsed.get("merchant") or parsed.get("note") or "Giao dịch").strip()
+    expense_data = ExpenseCreate(
+        amount=float(parsed["amount"]),
+        merchant=merchant or "Giao dịch",
+        note=parsed.get("note"),
+        source="manual",
+        category="other",
+        expense_date=date.today(),
+    )
+    resolved = await apply_default_source(db, user.id, expense_data)
+    if not resolved.source_type:
+        return False
+    expense = await expense_service.create_expense(db, user.id, resolved)
+    await send_transaction_confirmation(db, expense)
+    return True
+
+
 # Outcome kinds that mean "the user got their answer / a follow-up
 # prompt — do NOT fall through to the LLM transaction parser".
 _TERMINAL_OUTCOMES = frozenset(
@@ -236,6 +263,9 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
     # Fast-path for explicit +/- expense syntax before generic intent routing.
     signed = _parse_signed_transaction(text)
     if signed is not None:
+        if signed["transaction_type"] == "expense":
+            if await _record_signed_expense_with_default(db, user, signed):
+                return True
         return await _start_source_prompt(db, chat_id, user, signed)
 
     # Phase 3.5 — full intent flow with confirm/clarify state handling.

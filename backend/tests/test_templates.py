@@ -78,6 +78,8 @@ class TestTransactionConfirmation:
         )
         assert "Chi từ: Thẻ tín dụng [Vietcombank]" in result
         assert "Quản lý chi tiêu" in result
+        assert "<i>" in result and "</i>" in result
+        assert "💡" in result
 
     def test_unknown_category_falls_back_to_other(self):
         result = format_transaction_confirmation(
@@ -108,6 +110,8 @@ class TestTransactionBatchConfirmation:
         )
         assert "Chi từ: Tiền mặt" in result
         assert "Quản lý chi tiêu" in result
+        assert "<i>" in result and "</i>" in result
+        assert "💡" in result
 
 
 class TestDailySummary:

@@ -5,6 +5,7 @@ Nguyên tắc: Một function = một loại tin nhắn.
 
 from datetime import date, datetime
 from functools import lru_cache
+from html import escape as _html_escape
 from pathlib import Path
 from typing import Any
 
@@ -57,11 +58,13 @@ def format_transaction_confirmation(
 
     title = _confirmation_copy("title_done", "✅ Đã ghi xong!")
     lines: list[str] = [title, ""]
-    lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
+    lines.append(
+        f"{cat.emoji} {_html_escape(merchant)}  —  {format_money_full(amount)}"
+    )
 
     context_parts: list[str] = []
     if location:
-        context_parts.append(f"📍 {location}")
+        context_parts.append(f"📍 {_html_escape(location)}")
     if time:
         context_parts.append(time.strftime("%H:%M"))
     if context_parts:
@@ -71,7 +74,7 @@ def format_transaction_confirmation(
         source_template = _confirmation_copy(
             "source_prefix", "💳 Chi từ: {source}"
         )
-        lines.append(source_template.format(source=source_label))
+        lines.append(source_template.format(source=_html_escape(source_label)))
 
     if daily_spent is not None and daily_budget is not None and daily_budget > 0:
         lines.append("")
@@ -174,7 +177,9 @@ def format_transaction_batch_confirmation(
 
     for merchant, amount, category_code in items:
         cat = get_category(category_code)
-        lines.append(f"{cat.emoji} {merchant}  —  {format_money_full(amount)}")
+        lines.append(
+            f"{cat.emoji} {_html_escape(merchant)}  —  {format_money_full(amount)}"
+        )
 
     lines.append("")
     lines.append(f"Tổng: {format_money_full(total)}")
@@ -185,7 +190,7 @@ def format_transaction_batch_confirmation(
         source_template = _confirmation_copy(
             "source_prefix", "💳 Chi từ: {source}"
         )
-        lines.append(source_template.format(source=source_label))
+        lines.append(source_template.format(source=_html_escape(source_label)))
 
     if show_edit_hint:
         hint = _confirmation_copy("edit_hint")
