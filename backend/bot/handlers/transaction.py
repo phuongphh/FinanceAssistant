@@ -5,6 +5,8 @@ OCR confirm, or SMS parsing) to display a rich confirmation in Telegram.
 """
 
 import uuid
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +28,18 @@ from backend.services.expense_source_resolver import (
 from backend.services.telegram_service import send_message
 
 # Legacy category codes (from earlier phases) → new shared codes.
+_VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _to_vn_time(dt: datetime | None) -> datetime | None:
+    """Convert a (possibly naive-UTC) timestamp to Asia/Ho_Chi_Minh."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_VN_TZ)
+
+
 _LEGACY_CATEGORY_ALIASES = {
     "food_drink": "food",
     "utilities": "utility",
@@ -61,18 +75,13 @@ async def send_transaction_confirmation(
         merchant=expense.merchant or expense.note or "Giao dịch",
         amount=float(expense.amount),
         category_code=_normalize_category(expense.category),
-        time=expense.created_at,
+        time=_to_vn_time(expense.created_at),
         daily_spent=daily_spent,
         daily_budget=daily_budget,
         source_label=source_label,
         show_edit_hint=is_expense,
     )
-    # Expense confirmations are terminal (edit-hint instead of inline
-    # actions); money-in keeps the legacy action keyboard so the user can
-    # still tweak category / undo.
-    reply_markup = (
-        None if is_expense else transaction_actions_keyboard(str(expense.id))
-    )
+    reply_markup = transaction_actions_keyboard(str(expense.id))
     await send_message(
         chat_id=user.telegram_id,
         text=text,
@@ -134,7 +143,9 @@ async def send_transaction_batch_confirmation(
             )
             for expense in expenses
         ],
-        time=max((expense.created_at for expense in expenses), default=None),
+        time=_to_vn_time(
+            max((expense.created_at for expense in expenses), default=None)
+        ),
         source_label=source_label,
         show_edit_hint=all_expense,
     )

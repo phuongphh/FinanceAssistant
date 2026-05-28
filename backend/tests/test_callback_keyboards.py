@@ -13,7 +13,9 @@ from backend.bot.keyboards.common import (
 from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
     confirm_delete_keyboard,
+    source_picker_keyboard,
     transaction_actions_keyboard,
+    transaction_actions_with_done_keyboard,
     transaction_batch_actions_keyboard,
 )
 from backend.config.categories import get_all_categories
@@ -79,21 +81,69 @@ class TestTransactionActionsKeyboard:
         kb = transaction_actions_keyboard("abc")
         assert "inline_keyboard" in kb
         rows = kb["inline_keyboard"]
-        assert len(rows) == 2
-        assert len(rows[0]) == 3  # Đổi danh mục / Sửa / Xóa
-        assert len(rows[1]) == 1  # Hủy (5s)
+        assert len(rows) == 1
+        assert len(rows[0]) == 4  # 🏷 / 💳 / 💵 / 🗑
 
-    def test_button_labels(self):
+    def test_button_labels_icon_only(self):
         kb = transaction_actions_keyboard("abc")
         labels = [btn["text"] for row in kb["inline_keyboard"] for btn in row]
-        assert "🏷 Đổi danh mục" in labels
-        assert "✏️ Sửa" in labels
-        assert "🗑 Xóa" in labels
-        assert "↶ Hủy (5s)" in labels
+        assert labels == ["🏷", "💳", "💵", "🗑"]
+
+    def test_callback_prefixes(self):
+        tx = str(uuid.uuid4())
+        kb = transaction_actions_keyboard(tx)
+        prefixes = [
+            parse_callback(btn["callback_data"])[0]
+            for row in kb["inline_keyboard"]
+            for btn in row
+        ]
+        assert prefixes == [
+            CallbackPrefix.CHANGE_CATEGORY,
+            CallbackPrefix.CHANGE_SOURCE,
+            CallbackPrefix.EDIT_AMOUNT,
+            CallbackPrefix.DELETE_TRANSACTION,
+        ]
 
     def test_callback_data_within_limit(self):
         tx = str(uuid.uuid4())
         kb = transaction_actions_keyboard(tx)
+        for row in kb["inline_keyboard"]:
+            for btn in row:
+                assert (
+                    len(btn["callback_data"].encode("utf-8"))
+                    <= TELEGRAM_CALLBACK_DATA_MAX_BYTES
+                )
+
+
+class TestTransactionActionsWithDoneKeyboard:
+    def test_adds_done_row(self):
+        tx = str(uuid.uuid4())
+        kb = transaction_actions_with_done_keyboard(tx)
+        rows = kb["inline_keyboard"]
+        assert len(rows) == 2
+        assert len(rows[0]) == 4
+        assert len(rows[1]) == 1
+        done_btn = rows[1][0]
+        assert "Đồng ý" in done_btn["text"]
+        prefix, args = parse_callback(done_btn["callback_data"])
+        assert prefix == CallbackPrefix.CONFIRM_EDIT_DONE
+        assert args == [tx]
+
+
+class TestSourcePickerKeyboard:
+    def test_has_all_source_types_and_cancel(self):
+        tx = str(uuid.uuid4())
+        kb = source_picker_keyboard(tx)
+        labels = [btn["text"] for row in kb["inline_keyboard"] for btn in row]
+        assert any("Tiền mặt" in label for label in labels)
+        assert any("Tài khoản" in label for label in labels)
+        assert any("Ví điện tử" in label for label in labels)
+        assert any("Thẻ tín dụng" in label for label in labels)
+        assert kb["inline_keyboard"][-1][0]["text"] == "❌ Hủy"
+
+    def test_callbacks_within_limit(self):
+        tx = str(uuid.uuid4())
+        kb = source_picker_keyboard(tx)
         for row in kb["inline_keyboard"]:
             for btn in row:
                 assert (
