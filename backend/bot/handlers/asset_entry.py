@@ -621,6 +621,7 @@ async def show_asset_edit_list(
     chat_id: int,
     user: User,
     asset_type: str,
+    subtype: str | None = None,
     *,
     page: int = 0,
     message_id: int | None = None,
