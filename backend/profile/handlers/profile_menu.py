@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.progress_bar import make_progress_bar
 from backend.models.user import User
+from backend.models.credit_card import CreditCard
 from backend.profile.models.user_profile import AGE_RANGES, UserProfile
 from backend.profile.services.stats_aggregator import ProfileStatsAggregator
 from backend.profile.services.wealth_level_mapper import WealthLevelMapper
@@ -26,6 +27,7 @@ from backend.services.telegram_service import (
     edit_message_text,
     send_message,
 )
+from backend.wealth.models.asset import Asset
 
 FLOW_PROFILE = "profile_edit"
 STEP_DISPLAY_NAME = "awaiting_display_name"
@@ -104,6 +106,12 @@ def profile_keyboard(*, editable: bool = True) -> dict[str, list[list[dict[str, 
                     {
                         "text": _copy("keyboards", "profile", "glossary"),
                         "callback_data": "profile:glossary",
+                    }
+                ],
+                [
+                    {
+                        "text": _copy("keyboards", "profile", "default_expense_source"),
+                        "callback_data": "profile:default_expense_source",
                     }
                 ],
             ]
@@ -421,6 +429,18 @@ async def handle_profile_callback(
 
     if action == "glossary":
         await _render_glossary(chat_id, message_id)
+        return True
+    if action == "default_expense_source":
+        await _render_default_expense_source(db, chat_id, message_id, user, profile)
+        return True
+    if action == "change_default_expense_source":
+        await _render_default_expense_source_options(db, chat_id, message_id, user)
+        return True
+    if action == "set_default_expense_source" and len(parts) >= 3:
+        source_key = ":".join(parts[2:])
+        await _set_default_expense_source(
+            db, chat_id, message_id, user, profile, source_key
+        )
         return True
 
     if action == "toggle_twin_terms":
@@ -857,6 +877,100 @@ def _format_wealth_journey(progress: dict[str, Any]) -> str:
 
 def _fmt_time(value: time | None) -> str:
     return (value or time(7, 0)).strftime("%H:%M")
+
+
+async def _expense_source_options(user_id: Any, db: AsyncSession) -> list[tuple[str, str]]:
+    options: list[tuple[str, str]] = [("cash", "Tiền mặt")]
+    cards = (
+        await db.execute(
+            select(CreditCard).where(CreditCard.user_id == user_id).order_by(CreditCard.created_at.asc())
+        )
+    ).scalars().all()
+    for card in cards:
+        options.append((f"credit_card:{card.id}", f"Thẻ tín dụng [{card.bank_name}]"))
+
+    assets = (
+        await db.execute(
+            select(Asset)
+            .where(Asset.user_id == user_id, Asset.asset_type == "cash", Asset.is_active.is_(True))
+            .order_by(Asset.created_at.asc())
+        )
+    ).scalars().all()
+    for asset in assets:
+        subtype = (asset.subtype or "").lower()
+        if subtype in {"bank_checking", "bank_account"}:
+            options.append((f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset.name}]"))
+        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay", "e_wallet"}:
+            options.append((f"e_wallet:{asset.id}", f"Ví điện tử [{asset.name}]"))
+    return options
+
+
+def _resolve_source_label(options: list[tuple[str, str]], selected: str | None) -> str:
+    if not selected:
+        return "Chưa cài đặt"
+    for key, label in options:
+        if key == selected:
+            return label
+    return "Chưa cài đặt"
+
+
+async def _render_default_expense_source(
+    db: AsyncSession, chat_id: int, message_id: int | None, user: User, profile: UserProfile
+) -> None:
+    options = await _expense_source_options(user.id, db)
+    label = _resolve_source_label(options, profile.default_expense_source)
+    text = _copy("default_expense_source", "panel").format(source=label)
+    markup = {
+        "inline_keyboard": [
+            [{"text": _copy("default_expense_source", "change_button"), "callback_data": "profile:change_default_expense_source"}],
+            [{"text": _copy("default_expense_source", "back_button"), "callback_data": "profile:view"}],
+        ]
+    }
+    if message_id is None:
+        await send_message(chat_id=chat_id, text=text, reply_markup=markup)
+        return
+    await edit_message_text(chat_id=chat_id, message_id=message_id, text=text, reply_markup=markup)
+
+
+async def _render_default_expense_source_options(
+    db: AsyncSession, chat_id: int, message_id: int | None, user: User
+) -> None:
+    options = await _expense_source_options(user.id, db)
+    rows = [
+        [{"text": label, "callback_data": f"profile:set_default_expense_source:{key}"}]
+        for key, label in options
+    ]
+    rows.append(
+        [{"text": _copy("default_expense_source", "back_button"), "callback_data": "profile:default_expense_source"}]
+    )
+    markup = {"inline_keyboard": rows}
+    text = _copy("default_expense_source", "picker_title")
+    if message_id is None:
+        await send_message(chat_id=chat_id, text=text, reply_markup=markup)
+        return
+    await edit_message_text(chat_id=chat_id, message_id=message_id, text=text, reply_markup=markup)
+
+
+async def _set_default_expense_source(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    profile: UserProfile,
+    source_key: str,
+) -> None:
+    options = await _expense_source_options(user.id, db)
+    labels = dict(options)
+    if source_key not in labels:
+        await send_message(chat_id=chat_id, text=_copy("default_expense_source", "invalid"))
+        return
+    profile.default_expense_source = source_key
+    await db.flush()
+    await send_message(
+        chat_id=chat_id,
+        text=_copy("default_expense_source", "changed_message").format(source=labels[source_key]),
+    )
+    await _render_default_expense_source(db, chat_id, message_id, user, profile)
 
 
 def _notification_state_label(enabled: bool) -> str:

@@ -40,6 +40,7 @@ class UserProfile(Base):
     reminder_time: Mapped[time] = mapped_column(
         Time, default=time(9, 0), nullable=False
     )
+    default_expense_source: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
