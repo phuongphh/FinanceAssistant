@@ -83,6 +83,13 @@
         ['transfer', '🔄 Chuyển khoản'],
         ['other', '📌 Khác'],
     ];
+    const MONEY_IN_CATEGORIES = [
+        ['salary_bonus', '💼 Lương/Thưởng'],
+        ['freelance_part_time', '🛠️ Freelance/Công việc thêm'],
+        ['dividend', '📈 Cổ tức'],
+        ['saving_interest', '🏦 Lãi tiết kiệm'],
+        ['other_income', '📌 Khác'],
+    ];
 
     // Localised UI strings live next to CATEGORIES so init-phase callers
     // (applyLocalizedKeywords, renderExpenses) can read them without
@@ -150,7 +157,11 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
         els.modalCancel.addEventListener('click', closeModal);
         els.modalSave.addEventListener('click', onSave);
-        els.modalType.addEventListener('change', () => applySourceOptions(els.modalType.value, '', null));
+        els.modalType.addEventListener('change', () => {
+            applyCategoryOptions(els.modalType.value);
+            els.modalCategory.value = els.modalType.value === 'money_in' ? 'other_income' : 'other';
+            applySourceOptions(els.modalType.value, '', null);
+        });
         els.modalDelete.addEventListener('click', onDelete);
         els.modal.addEventListener('click', (e) => {
             if (e.target === els.modal) closeModal();
@@ -680,10 +691,15 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
     // -- Modal: add / edit / delete ---------------------------------------
 
     function initModalForm() {
-        els.modalCategory.innerHTML = CATEGORIES.map(
+        applyCategoryOptions('expense');
+        els.modalAmount.addEventListener('input', onAmountInput);
+    }
+
+    function applyCategoryOptions(txType) {
+        const options = (txType === 'money_in' ? MONEY_IN_CATEGORIES : CATEGORIES);
+        els.modalCategory.innerHTML = options.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
-        els.modalAmount.addEventListener('input', onAmountInput);
     }
 
     function parseMoneyInput(raw) {
@@ -731,9 +747,10 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         const txType = item?.transaction_type || forcedType || 'expense';
         els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
         els.modalType.value = txType;
+        applyCategoryOptions(txType);
         applySourceOptions(txType, sourceValue(item), item?.source_credit_card_id || null);
         els.modalAmount.value = item ? formatMoneyInput(Math.round(item.amount || 0)) : '';
-        els.modalCategory.value = item?.category || 'other';
+        els.modalCategory.value = item?.category || (txType === 'money_in' ? 'other_income' : 'other');
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
         els.modalNote.value = item?.merchant || item?.note || '';
         els.modalPayment.value = item?.payment_method || '';

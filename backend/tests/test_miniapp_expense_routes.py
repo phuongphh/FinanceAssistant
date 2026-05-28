@@ -185,3 +185,26 @@ def test_clean_expense_payload_keeps_credit_card_source_fields():
     assert cleaned["source_type"] == "credit_card"
     assert cleaned["source_credit_card_id"] == card_id
     assert cleaned["source"] == "manual"
+
+
+def test_clean_expense_payload_maps_money_in_category_code_to_income_label():
+    payload = {
+        "amount": 5000000,
+        "transaction_type": "money_in",
+        "category": "salary_bonus",
+    }
+
+    cleaned = miniapp_routes._clean_expense_payload(payload)
+
+    assert cleaned["category"] == "Lương/Thưởng"
+
+
+def test_clean_expense_payload_money_in_fallback_category_is_khac():
+    payload = {
+        "amount": 5000000,
+        "transaction_type": "money_in",
+    }
+
+    cleaned = miniapp_routes._clean_expense_payload(payload)
+
+    assert cleaned["category"] == "Khác"
