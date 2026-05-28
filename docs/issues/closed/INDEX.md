@@ -469,6 +469,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #882 | Pre-Phase | Migration fails: 20260528_default_expense_source_profile references wrong down_revision | [pre-phase/issue-882.md](by-phase/pre-phase/issue-882.md) |
 | #884 | Pre-Phase | Migration fails again: revision ID 20260528_default_expense_source_profile exceeds varchar(32) | [pre-phase/issue-884.md](by-phase/pre-phase/issue-884.md) |
 | #887 | Pre-Phase | rebuild-finance.sh: alembic upgrade head wrapped in single string | [pre-phase/issue-887.md](by-phase/pre-phase/issue-887.md) |
+| #891 | Pre-Phase | Expense confirmation: use default_expense_source + final-confirm UX | [pre-phase/issue-891.md](by-phase/pre-phase/issue-891.md) |
 
-**Total:** 465 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 448 Pre-Phase)
+**Total:** 466 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 449 Pre-Phase)
