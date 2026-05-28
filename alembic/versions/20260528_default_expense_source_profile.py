@@ -1,6 +1,6 @@
 """add default expense source to user profiles
 
-Revision ID: 20260528_default_expense_source_profile
+Revision ID: 20260528defaultexpsource
 Revises: 20260527_credit_card_limit_and_debt
 Create Date: 2026-05-28
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "20260528_default_expense_source_profile"
+revision = "20260528defaultexpsource"
 down_revision = "20260527creditlimit"
 branch_labels = None
 depends_on = None
