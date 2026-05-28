@@ -880,14 +880,19 @@ def _fmt_time(value: time | None) -> str:
 
 
 async def _expense_source_options(user_id: Any, db: AsyncSession) -> list[tuple[str, str]]:
-    options: list[tuple[str, str]] = [("cash", "Tiền mặt")]
+    cash_options: list[tuple[str, str]] = [("cash", "Tiền mặt")]
+    bank_options: list[tuple[str, str]] = []
+    card_options: list[tuple[str, str]] = []
+    wallet_options: list[tuple[str, str]] = []
+
     cards = (
         await db.execute(
             select(CreditCard).where(CreditCard.user_id == user_id).order_by(CreditCard.created_at.asc())
         )
     ).scalars().all()
     for card in cards:
-        options.append((f"credit_card:{card.id}", f"Thẻ tín dụng [{card.bank_name}]"))
+        bank_name = str(card.bank_name or "").strip()
+        card_options.append((f"credit_card:{card.id}", f"Thẻ tín dụng [{bank_name}]"))
 
     assets = (
         await db.execute(
@@ -898,11 +903,16 @@ async def _expense_source_options(user_id: Any, db: AsyncSession) -> list[tuple[
     ).scalars().all()
     for asset in assets:
         subtype = (asset.subtype or "").lower()
+        asset_name = str(asset.name or "").strip()
         if subtype in {"bank_checking", "bank_account"}:
-            options.append((f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset.name}]"))
+            bank_options.append((f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset_name}]"))
         elif subtype in {"momo", "vnpay", "zalopay", "viettelpay", "e_wallet"}:
-            options.append((f"e_wallet:{asset.id}", f"Ví điện tử [{asset.name}]"))
-    return options
+            wallet_options.append((f"e_wallet:{asset.id}", f"Ví điện tử [{asset_name}]"))
+
+    def _sort_alpha(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
+        return sorted(items, key=lambda pair: pair[1].casefold())
+
+    return cash_options + _sort_alpha(bank_options) + _sort_alpha(card_options) + _sort_alpha(wallet_options)
 
 
 def _resolve_source_label(options: list[tuple[str, str]], selected: str | None) -> str:
