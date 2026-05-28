@@ -468,6 +468,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #869 | Pre-Phase | Dashboard API vẫn trả về 401 sau khi fix signature field | [pre-phase/issue-869.md](by-phase/pre-phase/issue-869.md) |
 | #882 | Pre-Phase | Migration fails: 20260528_default_expense_source_profile references wrong down_revision | [pre-phase/issue-882.md](by-phase/pre-phase/issue-882.md) |
 | #884 | Pre-Phase | Migration fails again: revision ID 20260528_default_expense_source_profile exceeds varchar(32) | [pre-phase/issue-884.md](by-phase/pre-phase/issue-884.md) |
+| #887 | Pre-Phase | rebuild-finance.sh: alembic upgrade head wrapped in single string | [pre-phase/issue-887.md](by-phase/pre-phase/issue-887.md) |
 
-**Total:** 464 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 447 Pre-Phase)
+**Total:** 465 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 448 Pre-Phase)
