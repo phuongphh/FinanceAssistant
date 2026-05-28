@@ -11,7 +11,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.jobs.reminder_scheduler_job import _should_send_reminders_now
 from backend.models.user import User
+from backend.models.credit_card import CreditCard
 from backend.profile.handlers.profile_menu import (
+    _expense_source_options,
+    _resolve_source_label,
     handle_profile_callback,
     handle_profile_view,
     notification_keyboard,
@@ -22,6 +25,7 @@ from backend.profile.handlers.profile_menu import (
 )
 from backend.profile.handlers import profile_menu as profile_menu_module
 from backend.profile.models.user_profile import UserProfile
+from backend.wealth.models.asset import Asset
 from backend.profile.services.stats_aggregator import ProfileStatsAggregator
 from backend.profile.services.wealth_level_mapper import WealthLevelMapper
 
@@ -199,8 +203,9 @@ async def test_handle_profile_view_degrades_when_stats_fail(monkeypatch):
 
     assert "Profile của Bé Tiền Test" in sent["text"]
     assert "chế độ an toàn" in sent["text"]
-    # 4 rows: [edit_name, edit_age] + [notifications] + [glossary] + [back]
-    assert len(sent["reply_markup"]["inline_keyboard"]) == 4
+    # 5 rows: [edit_name, edit_age] + [notifications] + [glossary]
+    # + [default_expense_source] + [back]
+    assert len(sent["reply_markup"]["inline_keyboard"]) == 5
 
 
 def test_sanitize_display_name_validates_and_strips_at():
@@ -428,3 +433,140 @@ def test_reminder_profile_settings_gate_delivery_time():
         profile,
         now=datetime(2026, 5, 7, 8, 5, tzinfo=timezone.utc),
     ) is False
+
+
+@pytest.mark.asyncio
+async def test_expense_source_options_include_all_supported_types():
+    user_id = uuid.uuid4()
+    db = MagicMock()
+
+    card = CreditCard(user_id=user_id, bank_name="VCB", closing_date=1)
+    card.id = uuid.uuid4()
+    card.created_at = datetime.now(timezone.utc)
+
+    bank_asset = Asset(
+        user_id=user_id,
+        asset_type="cash",
+        subtype="bank_checking",
+        name="Techcombank",
+        initial_value=Decimal("0"),
+        current_value=Decimal("0"),
+        acquired_at=datetime.now(timezone.utc).date(),
+    )
+    bank_asset.id = uuid.uuid4()
+    bank_asset.is_active = True
+    bank_asset.created_at = datetime.now(timezone.utc)
+
+    wallet_asset = Asset(
+        user_id=user_id,
+        asset_type="cash",
+        subtype="momo",
+        name="MoMo Cá nhân",
+        initial_value=Decimal("0"),
+        current_value=Decimal("0"),
+        acquired_at=datetime.now(timezone.utc).date(),
+    )
+    wallet_asset.id = uuid.uuid4()
+    wallet_asset.is_active = True
+    wallet_asset.created_at = datetime.now(timezone.utc)
+
+    db.execute = AsyncMock(
+        side_effect=[_scalars([card]), _scalars([bank_asset, wallet_asset])]
+    )
+    options = await _expense_source_options(user_id, db)
+
+    assert ("cash", "Tiền mặt") in options
+    assert (f"credit_card:{card.id}", "Thẻ tín dụng [VCB]") in options
+    assert (f"bank_account:{bank_asset.id}", "Tài khoản thanh toán [Techcombank]") in options
+    assert (f"e_wallet:{wallet_asset.id}", "Ví điện tử [MoMo Cá nhân]") in options
+
+
+def test_resolve_source_label_returns_fallback_for_missing_or_unknown():
+    options = [("cash", "Tiền mặt"), ("credit_card:1", "Thẻ tín dụng [VCB]")]
+    assert _resolve_source_label(options, None) == "Chưa cài đặt"
+    assert _resolve_source_label(options, "unknown") == "Chưa cài đặt"
+    assert _resolve_source_label(options, "cash") == "Tiền mặt"
+
+
+@pytest.mark.asyncio
+async def test_default_expense_source_callback_routes_to_panel(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    profile = UserProfile(user_id=user.id)
+    db = MagicMock()
+
+    monkeypatch.setattr(
+        profile_menu_module,
+        "_get_user_by_telegram_id",
+        AsyncMock(return_value=user),
+    )
+    monkeypatch.setattr(
+        profile_menu_module,
+        "get_or_create_profile",
+        AsyncMock(return_value=profile),
+    )
+    render = AsyncMock()
+    monkeypatch.setattr(profile_menu_module, "_render_default_expense_source", render)
+    monkeypatch.setattr(profile_menu_module, "answer_callback", AsyncMock())
+
+    handled = await handle_profile_callback(
+        db,
+        {
+            "id": "cb-default",
+            "data": "profile:default_expense_source",
+            "from": {"id": 12345},
+            "message": {"chat": {"id": 42}, "message_id": 10},
+        },
+    )
+
+    assert handled is True
+    render.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_default_expense_source_updates_profile_and_sends_confirm(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    profile = UserProfile(user_id=user.id)
+    db = MagicMock()
+    db.flush = AsyncMock()
+
+    monkeypatch.setattr(
+        profile_menu_module,
+        "_get_user_by_telegram_id",
+        AsyncMock(return_value=user),
+    )
+    monkeypatch.setattr(
+        profile_menu_module,
+        "get_or_create_profile",
+        AsyncMock(return_value=profile),
+    )
+    monkeypatch.setattr(
+        profile_menu_module,
+        "_expense_source_options",
+        AsyncMock(return_value=[("cash", "Tiền mặt")]),
+    )
+    monkeypatch.setattr(profile_menu_module, "_render_default_expense_source", AsyncMock())
+    send = AsyncMock()
+    monkeypatch.setattr(profile_menu_module, "send_message", send)
+    monkeypatch.setattr(profile_menu_module, "answer_callback", AsyncMock())
+
+    handled = await handle_profile_callback(
+        db,
+        {
+            "id": "cb-set",
+            "data": "profile:set_default_expense_source:cash",
+            "from": {"id": 12345},
+            "message": {"chat": {"id": 42}, "message_id": 11},
+        },
+    )
+
+    assert handled is True
+    assert profile.default_expense_source == "cash"
+    db.flush.assert_awaited_once()
+    assert any(
+        "Đã đổi nguồn chi tiêu thường xuyên" in call.kwargs.get("text", "")
+        for call in send.await_args_list
+    )
