@@ -151,6 +151,17 @@ def test_source_options_distinguish_expense_vs_money_in_and_gate_credit_card():
     assert "if (selectedValue === 'credit_card' && existingCardId)" in js
 
 
+def test_money_in_modal_uses_income_category_options():
+    js = JS.read_text()
+
+    assert "const MONEY_IN_CATEGORIES" in js
+    assert "['salary_bonus', '💼 Lương/Thưởng']" in js
+    assert "['freelance_part_time', '🛠️ Freelance/Công việc thêm']" in js
+    assert "['dividend', '📈 Cổ tức']" in js
+    assert "['saving_interest', '🏦 Lãi tiết kiệm']" in js
+    assert "applyCategoryOptions(txType);" in js
+
+
 def test_expense_amount_input_uses_localized_grouping_and_safe_numeric_parse():
     html = HTML.read_text()
     js = JS.read_text()

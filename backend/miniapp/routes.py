@@ -591,6 +591,13 @@ async def miniapp_delete_expense(
 
 
 def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
+    money_in_category_labels = {
+        "salary_bonus": "Lương/Thưởng",
+        "freelance_part_time": "Freelance/Công việc thêm",
+        "dividend": "Cổ tức",
+        "saving_interest": "Lãi tiết kiệm",
+        "other_income": "Khác",
+    }
     allowed = {
         "amount",
         "currency",
@@ -614,7 +621,8 @@ def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
             continue
         clean[k] = v
     if clean.get("transaction_type") == "money_in":
-        clean.setdefault("category", "income")
+        selected = str(clean.get("category") or "").strip()
+        clean["category"] = money_in_category_labels.get(selected, selected or "Khác")
     payment_method = str(payload.get("payment_method") or "").strip()[:64]
     if payment_method:
         clean["raw_data"] = {"payment_method": payment_method}
