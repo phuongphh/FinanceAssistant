@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-📋 **Encryption End-to-End** (next) — [detail](#)
+🚀 **First-5-Minutes WOW** (current) — [detail](docs/current/phase-4.4/phase-4.4-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
@@ -31,7 +31,8 @@
 - ✅ Phase 4.2: Customer Experience Hardening
 - ✅ Phase 4.2.5: Admin Observability
 - ✅ Phase 4.3: Twin Enhancement + Habit Loop + Admin Dashboard
-- 📋 Phase 5.0: Encryption End-to-End ← **next**
+- 🚀 Phase 4.4: First-5-Minutes WOW ← **current**
+- 📋 Phase 5.0: Encryption End-to-End
 - 🔮 Phase 5.1: Zalo Spike & OA Verification
 - 🔮 Phase 5.2: Zalo Core Product Parity
 - 🔮 Phase 5.3: Zalo Mini App

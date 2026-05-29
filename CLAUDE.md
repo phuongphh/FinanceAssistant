@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-📋 **Encryption End-to-End** (next) — [detail](#)
+🚀 **First-5-Minutes WOW** (current) — [detail](docs/current/phase-4.4/phase-4.4-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).

@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "5.0"
+current_phase: "4.4"
 
 phases:
   - id: "1"
@@ -209,6 +209,16 @@ phases:
     description: "Twin từ feature khó hiểu → habit-forming experience: weather metaphor (Khiêm tốn/Bình thường/Lạc quan) thay P10/P50/P90, life-outcome translation, story-first narrative (4-5 màn swipe), mascot personification, habit loop (on-demand recompute <5s + causality + action + negative delta + delta threshold + return tease), Twin admin dashboard 4 sections (engagement funnel, loop health, comprehension, delta distribution). 4 Epics / 15 stories."
     completed_date: "2026-05-29"
     icon: "✅"
+
+  - id: "4.4"
+    name: "First-5-Minutes WOW"
+    status: current
+    duration: "~7-10 ngày"
+    detail_doc: "docs/current/phase-4.4/phase-4.4-detailed.md"
+    issues_doc: "docs/current/phase-4.4/phase-4.4-issues.md"
+    description: "WOW phút-0 cho người mới (hook kéo tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #1 The Reading ('em đoán thử' chân dung tài chính từ zero data, LLM qua Groq) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). Reading=hook phút-1, Twin=payoff phút-4. 4 Epics / 18 issues."
+    completed_date: ""
+    icon: "🪞"
 
   - id: "5.0"
     name: "Encryption End-to-End"
