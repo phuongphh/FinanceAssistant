@@ -604,6 +604,21 @@ async def handle_first_asset_screenshot(
         )
         return True
 
+    # The OCR prompt may report a non-VND currency (USD, etc.). We only
+    # store VND here and have no FX conversion in onboarding, so treating
+    # a foreign balance as VND would massively misstate the user's assets
+    # (e.g. "1,000,000 USD" saved as 1,000,000 VND). Nudge them to type
+    # the VND figure instead rather than silently mis-saving.
+    currency = (result.get("currency") or "VND").upper()
+    if currency != "VND":
+        await _finish(step["screenshot_not_balance"])
+        analytics.track(
+            "onboarding_v2_screenshot_non_vnd",
+            user_id=user.id,
+            properties={"currency": currency, "confidence": result.get("confidence")},
+        )
+        return True
+
     try:
         value = Decimal(str(raw_balance))
     except (ValueError, ArithmeticError):
@@ -715,13 +730,19 @@ async def _send_reading(
 
     if message_id is not None:
         try:
-            await edit_message_text(
+            # edit_message_text returns None (not raises) when Telegram
+            # rejects the edit — treat that as a failed edit so the fresh
+            # send below still delivers the Reading instead of leaving the
+            # user stuck on the "đang đoán…" placeholder.
+            edited = await edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=text,
                 parse_mode="HTML",
             )
-            return
+            if edited is not None:
+                return
+            logger.debug("reading edit returned None; sending fresh")
         except Exception:
             logger.debug("reading edit failed; sending fresh", exc_info=True)
     await send_message(chat_id, text, parse_mode="HTML")
