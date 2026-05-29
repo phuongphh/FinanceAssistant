@@ -12,6 +12,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
-| #907 | Onboarding: resume nudge collides with name/salutation sub-steps ("two flows at once") | [issue-907.md](issue-907.md) |
 
-**Total active:** 9
+**Total active:** 8
