@@ -471,6 +471,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #887 | Pre-Phase | rebuild-finance.sh: alembic upgrade head wrapped in single string | [pre-phase/issue-887.md](by-phase/pre-phase/issue-887.md) |
 | #891 | Pre-Phase | Expense confirmation: use default_expense_source + final-confirm UX | [pre-phase/issue-891.md](by-phase/pre-phase/issue-891.md) |
 | #897 | Pre-Phase | feat(expense-confirm): restore footer buttons + Vietnam TZ + source/amount edit wizards | [pre-phase/issue-897.md](by-phase/pre-phase/issue-897.md) |
+| #901 | Pre-Phase | Fix funding-source balance adjustment on edit/reverse + deterministic "latest" ordering | [pre-phase/issue-901.md](by-phase/pre-phase/issue-901.md) |
 
-**Total:** 467 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 450 Pre-Phase)
+**Total:** 468 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 451 Pre-Phase)
