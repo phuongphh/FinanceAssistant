@@ -216,7 +216,7 @@ phases:
     duration: "~7-10 ngày"
     detail_doc: "docs/current/phase-4.4/phase-4.4-detailed.md"
     issues_doc: "docs/current/phase-4.4/phase-4.4-issues.md"
-    description: "WOW phút-0 cho người mới (hook kéo tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #1 The Reading ('em đoán thử' chân dung tài chính từ zero data, LLM qua Groq) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). Reading=hook phút-1, Twin=payoff phút-4. 4 Epics / 18 issues."
+    description: "WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues."
     completed_date: ""
     icon: "🪞"
 

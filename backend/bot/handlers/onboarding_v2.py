@@ -42,7 +42,6 @@ from backend.models.onboarding_session import (
 from backend.models.user import User
 from backend.services import onboarding_service as legacy_onboarding_service
 from backend.services.founding import founding_member_service
-from backend.services import reading_service
 from backend.services.onboarding import (
     data_quality_service,
     next_action_service,
@@ -119,25 +118,6 @@ def is_v2_enabled() -> bool:
     )
 
 
-READING_FLAG_ENV = "READING_ENABLED"
-
-
-def is_reading_enabled() -> bool:
-    """The Reading (WOW #1) is on by default; operator can disable via env
-    if the minute-1 LLM beat regresses. Read here at the handler edge
-    (never in ``reading_service``) per the layer contract — same pattern
-    as ``is_v2_enabled``.
-    """
-    import os
-
-    return os.environ.get(READING_FLAG_ENV, "true").lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
-    )
-
-
 SCREENSHOT_ONBOARDING_FLAG_ENV = "SCREENSHOT_ONBOARDING_ENABLED"
 
 
@@ -150,7 +130,7 @@ def is_screenshot_onboarding_enabled() -> bool:
     balance-OCR path is validated in prod. The flag is consulted at the
     worker edge (photo routing) and here for the prompt hint; the env read
     never reaches a service (layer contract), same pattern as
-    ``is_reading_enabled``.
+    ``is_v2_enabled``.
     """
     import os
 
@@ -461,13 +441,6 @@ async def _on_goal_picked(
         properties={"goal": goal_code},
     )
 
-    # The Reading v0 (WOW #1): a warm, zero-data "đoán thử" right after
-    # the goal pick, before we ask for the first number. Flag-gated at the
-    # handler edge; the service guarantees a renderable string so this can
-    # never block the flow. We always fall through to the next step.
-    if is_reading_enabled():
-        await _send_reading(db, chat_id, user, goal_code=goal_code)
-
     if session.current_step == STEP_TRUST_PRIVACY:
         await _send_trust_card(db, chat_id, user)
     else:
@@ -694,67 +667,6 @@ async def handle_first_asset_screenshot(
     return True
 
 
-# ---------- The Reading (Phase 4.4 Epic 1, WOW #1) -------------------
-
-
-async def _send_reading(
-    db: AsyncSession,
-    chat_id: int,
-    user: User,
-    *,
-    goal_code: str | None,
-    amount_text: str | None = None,
-) -> None:
-    """Send The Reading. v0 = zero data (no amount); v1 = real number.
-
-    Sends an instant "đang đoán…" placeholder, then edits it in place
-    with the composed Reading once the (Groq, sub-second) LLM returns.
-    The ``READING_ENABLED`` flag is checked by the caller, not here. The
-    service guarantees a renderable string even on LLM failure, so this
-    never blocks the onboarding beat.
-    """
-    copy = onboarding_service.load_copy()["reading"]
-    salutation = onboarding_service.salutation_of(user)
-    fmt = {"salutation": salutation, "Salutation": salutation.capitalize()}
-
-    message_id = None
-    try:
-        resp = await send_message(
-            chat_id, copy["placeholder"].format(**fmt), parse_mode="HTML"
-        )
-        message_id = (resp.get("result") or {}).get("message_id") if resp else None
-    except Exception:
-        logger.debug("reading placeholder send failed", exc_info=True)
-
-    text = await reading_service.generate_reading(
-        db=db,
-        user_id=user.id,
-        salutation=salutation,
-        display_name=user.display_name or "",
-        goal_label=reading_service.goal_label_for(goal_code),
-        amount_text=amount_text,
-    )
-
-    if message_id is not None:
-        try:
-            # edit_message_text returns None (not raises) when Telegram
-            # rejects the edit — treat that as a failed edit so the fresh
-            # send below still delivers the Reading instead of leaving the
-            # user stuck on the "đang đoán…" placeholder.
-            edited = await edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=text,
-                parse_mode="HTML",
-            )
-            if edited is not None:
-                return
-            logger.debug("reading edit returned None; sending fresh")
-        except Exception:
-            logger.debug("reading edit failed; sending fresh", exc_info=True)
-    await send_message(chat_id, text, parse_mode="HTML")
-
-
 def _step3_header_text(*, demo: bool) -> str:
     copy = onboarding_service.load_copy()
     header = (
@@ -865,33 +777,19 @@ async def _save_onboarding_first_asset(
     )
 
     # Demo gets its own ack so the user doesn't read "Bé Tiền ghi nhận: 50tr"
-    # and think we banked their cash. Real input keeps the personal phrasing.
+    # and think we banked their cash. Real input keeps the personal phrasing
+    # and bridges straight into the Twin — the payoff the user came for.
     if demo:
         await send_message(
             chat_id, twin_narrative_service_v2.demo_ack_text(), parse_mode="HTML"
         )
     else:
+        copy = onboarding_service.load_copy()["step_2_asset"]
         name = user.display_name or "bạn"
         await send_message(
             chat_id,
-            f"✅ Bé Tiền ghi nhận: <b>{format_money_short(value)}</b>. Đang vẽ Twin cho bạn — chờ chút nhé {name}…",
+            copy["asset_ack"].format(amount=format_money_short(value), name=name),
             parse_mode="HTML",
-        )
-
-    # The Reading v1 (WOW #1, real-number pass): re-read with the actual
-    # asset so the guess feels earned, then bridge into the Twin. Demo
-    # never gets a Reading — the 50tr placeholder isn't the user's number,
-    # so a personalized guess off it would read as a lie. Flag-gated at the
-    # handler edge; failure-safe via the service fallback.
-    if not demo and is_reading_enabled():
-        session = await onboarding_service.get_session(db, user.id)
-        goal_code = session.goal_choice if session is not None else None
-        await _send_reading(
-            db,
-            chat_id,
-            user,
-            goal_code=goal_code,
-            amount_text=format_money_short(value),
         )
 
     await _trigger_first_twin(db, chat_id, user, demo=demo)
