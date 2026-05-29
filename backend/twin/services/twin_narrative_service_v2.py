@@ -31,11 +31,17 @@ def load_copy() -> dict[str, Any]:
         return yaml.safe_load(fh)
 
 
-def narrative_text(*, demo: bool = False) -> str:
+def narrative_text(*, demo: bool = False, salutation: str = "bạn") -> str:
+    """Compose the pre-chart mascot intro.
+
+    ``salutation`` is how Bé Tiền addresses the user (anh/chị/bạn); the
+    caller resolves it via ``onboarding_service.salutation_of(user)``.
+    ``{Salutation}`` (sentence-start, capitalized) is derived here so the
+    YAML stays free of casing logic.
+    """
     copy = load_copy()
-    if demo:
-        return copy["demo_narrative"]
-    return copy["narrative"]
+    template = copy["demo_narrative"] if demo else copy["narrative"]
+    return template.format(salutation=salutation, Salutation=salutation.capitalize())
 
 
 def chart_caption(*, name: str, horizon_years: int, demo: bool = False) -> str:

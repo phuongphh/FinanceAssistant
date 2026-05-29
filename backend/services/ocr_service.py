@@ -80,6 +80,44 @@ Quy tắc:
 === END ==="""
 
 
+# Phase 4.4 Epic 2 — balance-screenshot onboarding. A user pastes a
+# screenshot of their bank/e-wallet/brokerage home screen during the
+# first-asset step; we read the *total balance* (an ASSET, tiền đang có),
+# NOT an expense. Distinct schema from the receipt prompt above: no
+# items/merchant/category — just the headline balance figure.
+_BALANCE_PROMPT = """Bạn là trợ lý đọc số dư tài sản từ ảnh chụp màn hình tiếng Việt.
+Dưới đây là text trích xuất từ ảnh (có thể nhiễu OCR). Ảnh thường là màn hình
+ứng dụng ngân hàng / ví điện tử / app chứng khoán, hiển thị TỔNG SỐ DƯ hoặc
+số dư một tài khoản (tiền người dùng ĐANG CÓ — đây là TÀI SẢN, không phải chi tiêu).
+Hãy trả về DUY NHẤT một JSON theo schema sau, không kèm giải thích:
+
+{{
+  "total_balance": <số thực, chỉ số, đơn vị mặc định VND, null nếu không tìm thấy>,
+  "currency": "VND" | "USD" | ...,
+  "account_label": <string tên tài khoản/ngân hàng/ví nếu rõ, hoặc null>,
+  "confidence": "high"|"medium"|"low",
+  "error": null | "not_a_balance"
+}}
+
+Quy tắc:
+- Chỉ đọc số dư TÀI SẢN (tiền đang có). Đặt "error": "not_a_balance" khi text
+  KHÔNG chứa số dư tài khoản nào (ví dụ chỉ là hoá đơn, biên lai chi tiêu, ảnh
+  không liên quan tài chính).
+- Nếu có nhiều số, ưu tiên dòng "Tổng số dư", "Số dư khả dụng", "Tổng tài sản",
+  "Số dư hiện tại", "Available balance", "Total balance". Lấy con số LỚN NHẤT
+  mang nghĩa tổng nếu không chắc dòng nào là tổng.
+- Bỏ dấu phân cách hàng nghìn và ký hiệu tiền tệ khi parse số.
+  Ví dụ "12.500.000 ₫" → 12500000, "1,234.56 USD" → 1234.56.
+- ``account_label``: tên ngân hàng/ví/tài khoản nếu nhận ra (ví dụ "Vietcombank",
+  "Momo", "Techcombank — Thanh toán"), nếu không rõ → null.
+- ``confidence``: "high" nếu thấy rõ một con số tổng số dư; "medium" nếu phải
+  chọn giữa nhiều con số; "low" nếu số bị nhiễu/phải đoán nhiều.
+
+=== OCR TEXT ===
+{text}
+=== END ==="""
+
+
 def _extract_text(payload: Any) -> str:
     """Best-effort text extraction from the provider response.
 
@@ -255,13 +293,73 @@ async def parse_receipt_image(
     response_text = _strip_code_fence(response_text)
     result = _loads_receipt_json(response_text)
     if result is None:
-        logger.error("Failed to parse structuring LLM response: %s", response_text[:300])
+        logger.error(
+            "Failed to parse structuring LLM response: %s", response_text[:300]
+        )
         raise ValueError("Invalid JSON from receipt parser")
 
     logger.info(
         "OCR parsed: merchant=%s amount=%s confidence=%s error=%s",
         result.get("merchant_name"),
         result.get("total_amount"),
+        result.get("confidence"),
+        result.get("error"),
+    )
+    return result
+
+
+async def parse_balance_screenshot(
+    image_bytes: bytes,
+    mime_type: str,
+    *,
+    db: AsyncSession | None = None,
+    user_id: uuid.UUID | None = None,
+) -> dict:
+    """Extract a total *asset balance* from a bank/wallet screenshot.
+
+    Phase 4.4 Epic 2 (screenshot onboarding). Reuses the same two-stage
+    pipeline as :func:`parse_receipt_image` — external OCR then DeepSeek —
+    but with a balance-extraction prompt (asset, not expense). Returns a
+    dict with ``total_balance`` (number or ``None``), ``currency``,
+    ``account_label``, ``confidence`` and ``error``.
+
+    ``db``/``user_id`` are forwarded to ``call_llm`` for cost tracking and
+    per-user caching; callers in the request path SHOULD pass both.
+    """
+    ocr_text = await _call_external_ocr(image_bytes, mime_type)
+    if not ocr_text.strip():
+        return {
+            "total_balance": None,
+            "currency": "VND",
+            "account_label": None,
+            "confidence": "low",
+            "error": "not_a_balance",
+        }
+
+    prompt = _BALANCE_PROMPT.format(text=ocr_text)
+    try:
+        response_text = await call_llm(
+            prompt,
+            task_type="parse_balance",
+            db=db,
+            user_id=user_id,
+            # Per-user cache: re-uploading the same screenshot shouldn't pay twice.
+            use_cache=bool(db and user_id),
+        )
+    except LLMError as exc:
+        logger.warning("Balance structuring LLM failed: %s", exc)
+        raise ValueError(f"Balance parser unavailable: {exc}") from exc
+
+    response_text = _strip_code_fence(response_text)
+    result = _loads_receipt_json(response_text)
+    if result is None:
+        logger.error("Failed to parse balance LLM response: %s", response_text[:300])
+        raise ValueError("Invalid JSON from balance parser")
+
+    logger.info(
+        "Balance parsed: account=%s balance=%s confidence=%s error=%s",
+        result.get("account_label"),
+        result.get("total_balance"),
         result.get("confidence"),
         result.get("error"),
     )

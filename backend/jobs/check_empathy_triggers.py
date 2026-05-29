@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
@@ -51,6 +52,20 @@ ACTIVE_WINDOW_DAYS = 60
 QUIET_HOURS_START = time(22, 0)
 QUIET_HOURS_END = time(7, 0)
 LOCAL_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+# Phase 4.4 Epic 3 — the proactive-companion trigger
+# (``onboarding_no_twin_return``) is gated here, at the job edge, NOT in
+# the engine/service (layer contract: services never read env). Off →
+# the engine skips the new trigger but every pre-existing empathy trigger
+# still fires.
+def _proactive_companion_enabled() -> bool:
+    return os.environ.get("PROACTIVE_COMPANION_ENABLED", "true").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
 
 
 def _is_quiet_hour(now_local: datetime) -> bool:
@@ -102,7 +117,9 @@ async def _process_user(user: User, *, now: datetime) -> None:
             )
             return
 
-        trigger = await empathy_engine.check_all_triggers(db, user, now=now)
+        trigger = await empathy_engine.check_all_triggers(
+            db, user, now=now, include_proactive=_proactive_companion_enabled()
+        )
         if not trigger:
             return
 

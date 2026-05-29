@@ -31,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.onboarding_session import (
     ALL_GOALS,
+    ALL_SALUTATIONS,
+    DEFAULT_SALUTATION,
     OnboardingSession,
     STEP_COMPLETED,
     STEP_FIRST_ASSET,
@@ -38,6 +40,7 @@ from backend.models.onboarding_session import (
     STEP_GOAL_QUESTION,
     STEP_TWIN_SHOWN,
 )
+from backend.models.user import User
 from backend.services.onboarding.wealth_inference_service import infer_segment
 from backend.wealth.amount_parser import parse_amount as _parse_amount_canonical
 
@@ -132,6 +135,41 @@ async def start_or_resume(db: AsyncSession, user_id: uuid.UUID) -> OnboardingSes
     db.add(session)
     await db.flush()
     return session
+
+
+# ---------- Salutation (Phase 4.4 Epic 0) -----------------------------
+
+
+def salutation_of(user: User | None) -> str:
+    """How Bé Tiền should address ``user`` — falls back to "bạn".
+
+    Pure (no DB / no env) so callers in any layer — empathy engine,
+    twin narrative, onboarding copy — can resolve the salutation the
+    same way. NULL column → gender-neutral ``DEFAULT_SALUTATION``.
+    """
+    if user is None:
+        return DEFAULT_SALUTATION
+    value = (user.salutation or "").strip()
+    return value if value in ALL_SALUTATIONS else DEFAULT_SALUTATION
+
+
+async def set_salutation(
+    db: AsyncSession, user_id: uuid.UUID, salutation: str
+) -> User | None:
+    """Persist the user's chosen salutation (anh/chị/bạn).
+
+    Returns ``None`` for an unknown salutation or missing user so the
+    handler can re-prompt. Flush-only — the worker/router boundary
+    commits.
+    """
+    if salutation not in ALL_SALUTATIONS:
+        return None
+    user = await db.get(User, user_id)
+    if user is None:
+        return None
+    user.salutation = salutation
+    await db.flush()
+    return user
 
 
 async def set_goal(

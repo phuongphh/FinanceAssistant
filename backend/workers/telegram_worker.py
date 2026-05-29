@@ -465,6 +465,22 @@ async def _handle_message(
         message.get("photo")
         or ((message.get("document") or {}).get("mime_type", "").startswith("image/"))
     ):
+        # Phase 4.4 Epic 2 (default off) — a photo sent while the user is
+        # on the onboarding first-asset step is a balance screenshot, not
+        # a receipt. Route it to the screenshot reader BEFORE OCR so the
+        # number isn't misread as an expense. The flag is read here at the
+        # worker edge (layer contract: services never read env); the
+        # handler returns False when the user isn't on the first-asset
+        # step, so every other photo still flows to receipt OCR.
+        from backend.bot.handlers import onboarding_v2 as onboarding_v2_handlers
+
+        if onboarding_v2_handlers.is_screenshot_onboarding_enabled():
+            consumed = await onboarding_v2_handlers.handle_first_asset_screenshot(
+                db, message, resolved_user
+            )
+            if consumed:
+                return resolved_user.id
+
         from backend.bot.handlers.photo_receipt import handle_photo_message
 
         consumed = await handle_photo_message(db, message, resolved_user)
@@ -839,7 +855,11 @@ async def _handle_callback(
     # ``action_suggestion:dismiss:*`` namespaces fired from on-demand
     # recompute notifications. Distinct from the menu router which owns
     # ``menu:twin:*`` (category=twin under the menu prefix).
-    if callback_data == "twin:causality" or callback_data == "twin:action" or callback_data.startswith("twin:action_done:"):
+    if (
+        callback_data == "twin:causality"
+        or callback_data == "twin:action"
+        or callback_data.startswith("twin:action_done:")
+    ):
         from backend.bot.handlers.twin_callback_handler import handle_twin_callback
 
         if await handle_twin_callback(db, callback_query):

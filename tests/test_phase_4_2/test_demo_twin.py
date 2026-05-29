@@ -47,7 +47,9 @@ def test_real_narrative_still_personal():
     copy = _load_first_twin_intro()
     real = copy["narrative"].lower()
     assert "twin tài chính" in real
-    assert "của bạn" in real
+    # Phase 4.4 Epic 0 threads the chosen salutation (anh/chị/bạn) into the
+    # narrative instead of a hardcoded "bạn" — still personal, now per-user.
+    assert "{salutation}" in real
 
 
 def test_demo_caption_marks_demo_and_excludes_name():
