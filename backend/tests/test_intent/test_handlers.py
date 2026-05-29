@@ -82,9 +82,16 @@ async def test_query_assets_handler_lists_all_types():
             name="Nhà Q1", asset_type="real_estate", current_value=Decimal("3000000000")
         ),
     ]
-    with patch(
-        "backend.intent.handlers.query_assets.asset_service.get_user_assets",
-        AsyncMock(return_value=assets),
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=assets),
+        ),
+        # No live quote available → stock falls back to stored current_value.
+        patch(
+            "backend.intent.handlers.query_assets.value_stock_holdings",
+            AsyncMock(return_value={}),
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_ASSETS,
@@ -99,6 +106,61 @@ async def test_query_assets_handler_lists_all_types():
     assert "Nhà Q1" in response
     # Net worth total in the header.
     assert "3,084,500,000" in response or "3,084" in response
+
+
+@pytest.mark.asyncio
+async def test_query_assets_handler_stock_uses_live_market_prices():
+    """The headline total must use LIVE stock prices so it matches the
+    ``Hiện tại`` figure in the YTD / "So với tháng trước" comparison
+    (which goes through ``net_worth_calculator.calculate()``). Previously
+    stocks were read from the stored ``current_value`` here, drifting from
+    the live comparison number intraday."""
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+    from backend.wealth.valuation.stock import HoldingValuation
+
+    vnm = _fake_asset(
+        name="VNM",
+        asset_type="stock",
+        current_value=Decimal("4500000"),  # stored — must NOT be used
+        extra={"ticker": "VNM", "quantity": "100"},
+    )
+    cash = _fake_asset(
+        name="VCB", asset_type="cash", current_value=Decimal("80000000")
+    )
+
+    # Live quote: 100 cổ × 60k = 6,000,000 (vs 4.5tr stored).
+    live = {
+        vnm: HoldingValuation(
+            current_price=Decimal("60000"),
+            quantity=Decimal("100"),
+            cost_basis=Decimal("45000"),
+            current_value=Decimal("6000000"),
+            pnl_pct=Decimal("33.33"),
+            is_stale=False,
+        )
+    }
+
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=[vnm, cash]),
+        ),
+        patch(
+            "backend.intent.handlers.query_assets.value_stock_holdings",
+            AsyncMock(return_value=live),
+        ) as stock_mock,
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="tài sản của tôi",
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    stock_mock.assert_awaited_once()
+    # Total uses LIVE stock value: 80tr + 6tr = 86,000,000 (not 84.5tr).
+    assert "86,000,000" in response or "86tr" in response
+    assert "84,500,000" not in response
 
 
 @pytest.mark.asyncio
