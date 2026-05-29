@@ -282,6 +282,84 @@ async def test_adjust_asset_expense_reverse_restores_balance(source_type):
     assert asset.current_value == Decimal("1000000")
 
 
+# ---------------------------------------------------------------------------
+# Edit flow that switches the funding source AND changes the amount in one go.
+# The double-entry (reverse old source, then apply new source) must refund the
+# original amount to the OLD asset and debit the NEW amount from the NEW asset.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_expense_switch_ewallet_to_bank_with_amount_change(monkeypatch):
+    """Edit a 300k e-wallet expense into a 500k bank-account expense.
+
+    Expected: the e-wallet is refunded the *original* 300k (reverse of an
+    expense adds the amount back) and the bank account is debited the *new*
+    500k. Both run through the same asset branch of ``_adjust_source_asset``.
+    """
+    user_id = uuid.uuid4()
+    ewallet_asset = _make_asset(user_id, "1000000")
+    bank_asset = _make_asset(user_id, "5000000")
+
+    expense = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        amount=300000,
+        transaction_type="expense",
+        source="manual",
+        source_asset_id=ewallet_asset.id,
+        source_credit_card_id=None,
+        source_type="e_wallet",
+        e_wallet_provider="momo",
+        raw_data=None,
+        expense_date=datetime.utcnow().date(),
+        category="food_drink",
+        currency="VND",
+        merchant="cafe",
+        note="n",
+        needs_review=False,
+        month_key="2026-05",
+    )
+
+    async def _get_expense(_db, _uid, _eid):
+        return expense
+
+    async def _resolve(_db, _uid, _data):
+        # Mirror the resolver picking the requested bank asset for the new source.
+        return expense_service.SourceResolution(
+            bank_asset.id, None, None, "bank_account", None
+        )
+
+    async def _latest(_db, _eid):
+        return None
+
+    async def _create(_db, _uid, _expense, **kwargs):
+        return SimpleNamespace(id=uuid.uuid4())
+
+    monkeypatch.setattr(expense_service, "get_expense", _get_expense)
+    monkeypatch.setattr(expense_service, "resolve_source_asset_for_payload", _resolve)
+    monkeypatch.setattr(expense_service, "_latest_active_transaction", _latest)
+    monkeypatch.setattr(expense_service, "_create_transaction_record", _create)
+
+    # execute() queue order: (1) reverse on OLD e-wallet, (2) apply on NEW bank.
+    db = FakeDB([ewallet_asset, bank_asset])
+
+    payload = expense_service.ExpenseUpdate(
+        amount=500000, source_type="bank_account", source_asset_id=bank_asset.id
+    )
+    got = await expense_service.update_expense(db, user_id, expense.id, payload)
+
+    assert got is expense
+    # OLD e-wallet refunded the ORIGINAL amount: 1,000,000 + 300,000.
+    assert ewallet_asset.current_value == Decimal("1300000")
+    # NEW bank account debited the NEW amount: 5,000,000 − 500,000.
+    assert bank_asset.current_value == Decimal("4500000")
+    # Expense itself now points at the new source/amount.
+    assert expense.source_asset_id == bank_asset.id
+    assert expense.source_type == "bank_account"
+    assert expense.amount == 500000
+
+
 @pytest.mark.asyncio
 async def test_resolve_source_asset_for_payload_credit_card_invalid_owner(monkeypatch):
     user_id = uuid.uuid4()
