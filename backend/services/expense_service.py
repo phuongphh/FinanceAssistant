@@ -52,11 +52,26 @@ async def _adjust_source_asset(
     db: AsyncSession, expense: Expense, multiplier: int = 1
 ) -> None:
     if expense.source_type == "credit_card" and expense.source_credit_card_id:
-        card = await db.get(CreditCard, expense.source_credit_card_id)
-        if card is not None and card.user_id == expense.user_id:
-            card.debt_balance = Decimal(card.debt_balance or 0) + (
-                Decimal(str(expense.amount or 0)) * multiplier
+        # Lock the card row so concurrent edits/reverses can't race on the
+        # debt balance (same SELECT … FOR UPDATE guard the asset branch uses).
+        stmt = (
+            select(CreditCard)
+            .where(
+                CreditCard.id == expense.source_credit_card_id,
+                CreditCard.user_id == expense.user_id,
             )
+            .with_for_update()
+        )
+        card = (await db.execute(stmt)).scalar_one_or_none()
+        if card is not None:
+            # Debt moves opposite to a cash/bank balance: an expense charged
+            # to the card *raises* debt, a money_in (refund/repayment) *lowers*
+            # it. ``_source_asset_delta`` already encodes direction (expense =
+            # −amount, money_in = +amount), so negate it for the debt side.
+            card.debt_balance = Decimal(card.debt_balance or 0) + (
+                -_source_asset_delta(expense) * multiplier
+            )
+            card.updated_at = datetime.utcnow()
         return
     if not expense.source_asset_id:
         return
@@ -441,7 +456,19 @@ async def list_expenses(
         stmt = stmt.where(Expense.category == category)
     if transaction_type:
         stmt = stmt.where(Expense.transaction_type == transaction_type)
-    stmt = stmt.order_by(Expense.expense_date.desc()).limit(limit).offset(offset)
+    # ``expense_date`` is day-precision (user-provided date), so two rows on
+    # the same day would tie. Break the tie by ``created_at`` (second-precision
+    # insert time) then ``id`` so ordering — and "latest transaction" lookups —
+    # are deterministic.
+    stmt = (
+        stmt.order_by(
+            Expense.expense_date.desc(),
+            Expense.created_at.desc(),
+            Expense.id.desc(),
+        )
+        .limit(limit)
+        .offset(offset)
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +33,46 @@ class FakeDB:
 
     async def get(self, _model, _id):
         return None
+
+
+def _make_card(debt="100000"):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        debt_balance=Decimal(debt),
+        updated_at=None,
+    )
+
+
+def _make_asset(user_id, value="1000000"):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        current_value=Decimal(value),
+        last_valued_at=None,
+    )
+
+
+def _expense_on_card(card, *, amount, transaction_type):
+    return SimpleNamespace(
+        user_id=card.user_id,
+        source_type="credit_card",
+        source_credit_card_id=card.id,
+        source_asset_id=None,
+        amount=amount,
+        transaction_type=transaction_type,
+    )
+
+
+def _expense_on_asset(asset, *, source_type, amount, transaction_type):
+    return SimpleNamespace(
+        user_id=asset.user_id,
+        source_type=source_type,
+        source_credit_card_id=None,
+        source_asset_id=asset.id,
+        amount=amount,
+        transaction_type=transaction_type,
+    )
 
 
 @pytest.mark.asyncio
@@ -118,24 +159,127 @@ async def test_update_expense_marks_old_tx_edited_and_creates_new(monkeypatch):
     assert created.get("edited_at") is not None
 
 
+# ---------------------------------------------------------------------------
+# Credit-card debt adjustments — direction must be honoured.
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
-async def test_adjust_source_asset_credit_card_increases_debt():
-    card = SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4(), debt_balance=100000)
-    expense = SimpleNamespace(
-        user_id=card.user_id,
-        source_type="credit_card",
-        source_credit_card_id=card.id,
-        amount=250000,
-        source_asset_id=None,
-    )
-    db = FakeDB()
+async def test_adjust_credit_card_expense_increases_debt():
+    """An expense charged to a credit card raises the debt balance."""
+    card = _make_card("100000")
+    expense = _expense_on_card(card, amount=250000, transaction_type="expense")
+    db = FakeDB([card])
 
-    async def _get(_model, _id):
-        return card
-
-    db.get = _get
     await expense_service._adjust_source_asset(db, expense, multiplier=1)
-    assert float(card.debt_balance) == 350000
+
+    assert card.debt_balance == Decimal("350000")
+    assert card.updated_at is not None
+
+
+@pytest.mark.asyncio
+async def test_adjust_credit_card_money_in_decreases_debt():
+    """A money_in (refund/repayment) on a credit card lowers the debt.
+
+    This is the regression guard for the original bug, where money_in
+    wrongly *increased* the debt because direction was ignored.
+    """
+    card = _make_card("500000")
+    expense = _expense_on_card(card, amount=200000, transaction_type="money_in")
+    db = FakeDB([card])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=1)
+
+    assert card.debt_balance == Decimal("300000")
+
+
+@pytest.mark.asyncio
+async def test_adjust_credit_card_expense_reverse_restores_debt():
+    """Reversing an expense (multiplier=-1) undoes the debt increase."""
+    card = _make_card("350000")
+    expense = _expense_on_card(card, amount=250000, transaction_type="expense")
+    db = FakeDB([card])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=-1)
+
+    assert card.debt_balance == Decimal("100000")
+
+
+@pytest.mark.asyncio
+async def test_adjust_credit_card_money_in_reverse_restores_debt():
+    card = _make_card("300000")
+    expense = _expense_on_card(card, amount=200000, transaction_type="money_in")
+    db = FakeDB([card])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=-1)
+
+    assert card.debt_balance == Decimal("500000")
+
+
+@pytest.mark.asyncio
+async def test_adjust_credit_card_skips_other_user():
+    """A card owned by a different user must not be mutated."""
+    card = _make_card("100000")
+    expense = _expense_on_card(card, amount=250000, transaction_type="expense")
+    expense.user_id = uuid.uuid4()  # different owner
+    # The owner-scoped SELECT returns nothing → no card row.
+    db = FakeDB([None])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=1)
+
+    assert card.debt_balance == Decimal("100000")
+
+
+# ---------------------------------------------------------------------------
+# Asset-backed sources (cash / bank_account / e_wallet) — balance moves with
+# direction: expense lowers the balance, money_in raises it.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("source_type", ["cash", "bank_account", "e_wallet"])
+@pytest.mark.asyncio
+async def test_adjust_asset_expense_decreases_balance(source_type):
+    user_id = uuid.uuid4()
+    asset = _make_asset(user_id, "1000000")
+    expense = _expense_on_asset(
+        asset, source_type=source_type, amount=300000, transaction_type="expense"
+    )
+    db = FakeDB([asset])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=1)
+
+    assert asset.current_value == Decimal("700000")
+    assert asset.last_valued_at is not None
+
+
+@pytest.mark.parametrize("source_type", ["cash", "bank_account", "e_wallet"])
+@pytest.mark.asyncio
+async def test_adjust_asset_money_in_increases_balance(source_type):
+    user_id = uuid.uuid4()
+    asset = _make_asset(user_id, "1000000")
+    expense = _expense_on_asset(
+        asset, source_type=source_type, amount=300000, transaction_type="money_in"
+    )
+    db = FakeDB([asset])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=1)
+
+    assert asset.current_value == Decimal("1300000")
+
+
+@pytest.mark.parametrize("source_type", ["cash", "bank_account", "e_wallet"])
+@pytest.mark.asyncio
+async def test_adjust_asset_expense_reverse_restores_balance(source_type):
+    user_id = uuid.uuid4()
+    asset = _make_asset(user_id, "700000")
+    expense = _expense_on_asset(
+        asset, source_type=source_type, amount=300000, transaction_type="expense"
+    )
+    db = FakeDB([asset])
+
+    await expense_service._adjust_source_asset(db, expense, multiplier=-1)
+
+    assert asset.current_value == Decimal("1000000")
 
 
 @pytest.mark.asyncio

@@ -79,7 +79,17 @@ async def list_incomes(
         stmt = stmt.where(IncomeRecord.period >= period_from)
     if period_to:
         stmt = stmt.where(IncomeRecord.period <= period_to)
-    stmt = stmt.order_by(IncomeRecord.period.desc()).limit(limit).offset(offset)
+    # ``period`` is day-precision; tie-break by ``created_at`` (second-precision
+    # insert time) then ``id`` so "latest income" lookups are deterministic.
+    stmt = (
+        stmt.order_by(
+            IncomeRecord.period.desc(),
+            IncomeRecord.created_at.desc(),
+            IncomeRecord.id.desc(),
+        )
+        .limit(limit)
+        .offset(offset)
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

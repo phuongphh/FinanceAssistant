@@ -167,7 +167,10 @@ async def get_user_assets(
         stmt = stmt.where(Asset.is_placeholder_asset.is_(False), Asset.is_confirmed.is_(True))
     if asset_type is not None:
         stmt = stmt.where(Asset.asset_type == asset_type)
-    stmt = stmt.order_by(Asset.created_at.desc())
+    # ``created_at`` is second-precision; add ``id`` as a final tiebreaker so
+    # two assets created in the same second still order deterministically
+    # ("latest asset" lookups must be unambiguous).
+    stmt = stmt.order_by(Asset.created_at.desc(), Asset.id.desc())
     return list((await db.execute(stmt)).scalars().all())
 
 
