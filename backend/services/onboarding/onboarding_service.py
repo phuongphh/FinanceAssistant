@@ -184,6 +184,30 @@ def goal_substep(user: User | None) -> str:
     return SUBSTEP_GOAL
 
 
+async def touch_session(
+    db: AsyncSession, user_id: uuid.UUID
+) -> OnboardingSession | None:
+    """Bump ``updated_at`` to mark fresh onboarding activity.
+
+    The name → salutation sub-steps mutate only the ``User`` row, never the
+    ``OnboardingSession`` row, so SQLAlchemy's ``onupdate`` never fires and
+    ``session.updated_at`` stays frozen at ``/start`` time. Handlers call this
+    when the user advances through those sub-steps so the resume-nudge delay is
+    measured from the *latest* interaction — otherwise a user who lingers in
+    the intro would be nudged the instant they reach goal pick (the cron would
+    still see the stale ``/start`` timestamp). Flush-only; the worker commits.
+
+    Setting ``updated_at`` explicitly (rather than relying on ``onupdate``)
+    guarantees an UPDATE is emitted even though no other session column changed.
+    """
+    session = await get_session(db, user_id)
+    if session is None:
+        return None
+    session.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return session
+
+
 async def set_salutation(
     db: AsyncSession, user_id: uuid.UUID, salutation: str
 ) -> User | None:

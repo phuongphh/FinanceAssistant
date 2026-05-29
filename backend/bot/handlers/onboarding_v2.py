@@ -356,6 +356,10 @@ async def handle_name_text_input(
 
     await legacy_onboarding_service.set_display_name(db, user.id, name)
     user.display_name = name
+    # Name lives on the User row, so the session's onupdate never fires —
+    # bump it explicitly so the resume-nudge delay measures from now, not
+    # /start (see onboarding_service.touch_session).
+    await onboarding_service.touch_session(db, user.id)
     await db.flush()
 
     await send_message(
@@ -396,6 +400,9 @@ async def _on_salutation_picked(
     if updated is None:
         await answer_callback(callback_id, text="Lựa chọn không hợp lệ")
         return
+    # Salutation lives on the User row too — bump the session so reaching goal
+    # pick doesn't trip an immediate nudge off the stale /start timestamp.
+    await onboarding_service.touch_session(db, user.id)
     await answer_callback(callback_id)
 
     copy = onboarding_service.load_copy()

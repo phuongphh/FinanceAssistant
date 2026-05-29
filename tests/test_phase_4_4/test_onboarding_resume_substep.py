@@ -172,3 +172,54 @@ def test_intro_substep_false_for_later_steps(step):
     user = SimpleNamespace(display_name=None, salutation=None)
     session = SimpleNamespace(current_step=step)
     assert _is_intro_substep(session, user) is False
+
+
+# ----- touch_session (resume-nudge delay measured from latest activity) ---
+
+
+class _FakeDB:
+    """Minimal async DB stub: resolves ``get`` from a preloaded map."""
+
+    def __init__(self, session):
+        self._session = session
+        self.flushed = False
+
+    async def get(self, model, pk):
+        return self._session
+
+    async def flush(self):
+        self.flushed = True
+
+
+@pytest.mark.asyncio
+async def test_touch_session_bumps_updated_at():
+    import datetime as _dt
+
+    from backend.services.onboarding import onboarding_service
+
+    stale = _dt.datetime(2020, 1, 1, tzinfo=_dt.timezone.utc)
+    session = SimpleNamespace(current_step=STEP_GOAL_QUESTION, updated_at=stale)
+    db = _FakeDB(session)
+
+    before = _dt.datetime.now(_dt.timezone.utc)
+    result = await onboarding_service.touch_session(db, uuid.uuid4())
+    after = _dt.datetime.now(_dt.timezone.utc)
+
+    assert result is session
+    # updated_at moved off the stale /start timestamp to "now".
+    assert session.updated_at > stale
+    assert before <= session.updated_at <= after
+    # Flush-only: the mutator must persist via flush, never commit.
+    assert db.flushed is True
+
+
+@pytest.mark.asyncio
+async def test_touch_session_missing_returns_none():
+    from backend.services.onboarding import onboarding_service
+
+    db = _FakeDB(None)
+    result = await onboarding_service.touch_session(db, uuid.uuid4())
+
+    assert result is None
+    # No row to bump → no flush.
+    assert db.flushed is False
