@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +19,7 @@ from backend.market_data.providers.gold_pnj_json import PNJ_GOLD_MENU_PRODUCTS
 from backend.market_data.normalizer import PriceQuote
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
+from backend.utils.time_vn import now_vn, to_vn
 from backend.wealth.models.asset import Asset
 
 logger = logging.getLogger(__name__)
@@ -130,7 +129,7 @@ class QueryMarketHandler(IntentHandler):
         generic stock-style "which ticker?" clarification.
         """
         symbols = ("BTC", "ETH", "BNB", "SOL", "XRP")
-        today_label = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%d/%m/%Y")
+        today_label = now_vn().strftime("%d/%m/%Y")
         lines = [f"₿ *Giá tiền số phổ biến — {today_label}:*"]
         had_quote = False
 
@@ -165,7 +164,7 @@ class QueryMarketHandler(IntentHandler):
             lines.append(f"• {symbol}: {quote.price:,.0f}đ{change_text}{stale}")
 
         if stale_times:
-            latest = max(stale_times).astimezone().strftime("%H:%M")
+            latest = to_vn(max(stale_times)).strftime("%H:%M")
             lines.insert(1, f"⚠️ Dữ liệu cập nhật lần cuối: {latest}")
 
         if not had_quote:
@@ -230,8 +229,7 @@ class QueryMarketHandler(IntentHandler):
                 lines.append(f"• {label}: {quote.price:,.0f}đ/lượng{stale}")
 
         if fetched_times:
-            tz = ZoneInfo("Asia/Ho_Chi_Minh")
-            latest = max(fetched_times).astimezone(tz)
+            latest = to_vn(max(fetched_times))
             stamp = latest.strftime("%H:%M ngày %d/%m/%Y")
             lines[0] = f"🥇 *Giá vàng hôm nay* (cập nhật {stamp}):"
 

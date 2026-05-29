@@ -80,6 +80,7 @@ from backend.services.telegram_service import (
     send_chat_action,
     send_message,
 )
+from backend.utils.time_vn import to_vn
 
 if TYPE_CHECKING:
     from backend.wealth.services.net_worth_calculator import NetWorthBreakdown
@@ -1506,7 +1507,7 @@ async def _action_market_vnindex(
                 "price": iq.price,
                 "change": dec(iq.metadata.get("change")),
                 "pct": dec(iq.metadata.get("change_pct")),
-                "updated": iq.fetched_at.astimezone().strftime("%H:%M %d/%m"),
+                "updated": to_vn(iq.fetched_at).strftime("%H:%M %d/%m"),
                 "stale_note": " · dữ liệu cũ/ngoài giờ" if iq.is_stale else "",
             }
         except Exception:

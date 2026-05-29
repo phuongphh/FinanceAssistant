@@ -3,35 +3,18 @@
 Nguyên tắc: Một function = một loại tin nhắn.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from functools import lru_cache
 from html import escape as _html_escape
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import yaml
 
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.bot.formatters.progress_bar import make_category_bar, make_progress_bar
 from backend.config.categories import get_category
-
-_VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
-
-
-def _as_vn_time(dt: datetime | None) -> datetime | None:
-    """Normalize any timestamp to Asia/Ho_Chi_Minh for display.
-
-    Centralized here so every confirmation template renders VN time
-    regardless of whether the caller remembered to convert. PG TIMESTAMPTZ
-    columns come back as aware UTC; naive datetimes are assumed UTC (the
-    historical default of ``datetime.utcnow``).
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(_VN_TZ)
+from backend.utils.time_vn import to_vn as _as_vn_time
 
 _TRANSACTION_COPY_PATH = (
     Path(__file__).resolve().parents[3] / "content" / "transaction_copy.yaml"

@@ -11,7 +11,6 @@ generate_portfolio_chart(assets_data, *, change_pct, timestamp) -> bytes
 """
 import io
 import logging
-from datetime import datetime
 
 import matplotlib
 matplotlib.use("Agg")  # non-interactive, must come before pyplot import
@@ -20,6 +19,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
+from backend.utils.time_vn import now_vn
 from backend.wealth.asset_types import get_label
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ def generate_portfolio_chart(
     # Header
     fig.text(0.04, 0.945, "Báo cáo danh mục tài sản",
              ha="left", va="top", fontsize=13, fontweight="bold", color=_WHITE)
-    today_str = datetime.now().strftime("%d/%m/%Y")
+    today_str = now_vn().strftime("%d/%m/%Y")
     fig.text(0.96, 0.945, today_str,
              ha="right", va="top", fontsize=10, color=_MUTED)
 
