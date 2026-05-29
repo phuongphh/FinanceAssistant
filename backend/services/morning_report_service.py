@@ -5,12 +5,13 @@ and sends everything to the user via Telegram.
 """
 import logging
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
+from backend.utils.time_vn import now_vn
 from backend.services.chart_generator import generate_portfolio_chart
 from backend.wealth.asset_types import get_icon, get_label
 from backend.wealth.services import asset_service, net_worth_calculator
@@ -97,9 +98,9 @@ async def build_morning_report(
     if prev_total and prev_total > 0:
         change_pct = round(((total_value - prev_total) / prev_total) * 100, 1)
 
-    # Timestamp
-    now = datetime.now()
-    timestamp = now.strftime("%H:%M %d/%m/%Y")
+    # Timestamp — VN local time (the prod server runs UTC, so a naive
+    # datetime.now() would render an hour-skewed, non-VN clock).
+    timestamp = now_vn().strftime("%H:%M %d/%m/%Y")
 
     # Render chart (fallback to None on failure)
     assets_data = [
