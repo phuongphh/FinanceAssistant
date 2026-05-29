@@ -82,9 +82,16 @@ async def test_query_assets_handler_lists_all_types():
             name="Nhà Q1", asset_type="real_estate", current_value=Decimal("3000000000")
         ),
     ]
-    with patch(
-        "backend.intent.handlers.query_assets.asset_service.get_user_assets",
-        AsyncMock(return_value=assets),
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=assets),
+        ),
+        # No live quote available → stock falls back to stored current_value.
+        patch(
+            "backend.intent.handlers.query_assets.value_stock_holdings",
+            AsyncMock(return_value={}),
+        ),
     ):
         intent = IntentResult(
             intent=IntentType.QUERY_ASSETS,
@@ -99,6 +106,114 @@ async def test_query_assets_handler_lists_all_types():
     assert "Nhà Q1" in response
     # Net worth total in the header.
     assert "3,084,500,000" in response or "3,084" in response
+
+
+@pytest.mark.asyncio
+async def test_query_assets_handler_stock_uses_live_market_prices():
+    """The headline total must use LIVE stock prices so it matches the
+    ``Hiện tại`` figure in the YTD / "So với tháng trước" comparison
+    (which goes through ``net_worth_calculator.calculate()``). Previously
+    stocks were read from the stored ``current_value`` here, drifting from
+    the live comparison number intraday."""
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+    from backend.wealth.valuation.stock import HoldingValuation
+
+    vnm = _fake_asset(
+        name="VNM",
+        asset_type="stock",
+        current_value=Decimal("4500000"),  # stored — must NOT be used
+        extra={"ticker": "VNM", "quantity": "100"},
+    )
+    cash = _fake_asset(
+        name="VCB", asset_type="cash", current_value=Decimal("80000000")
+    )
+
+    # Live quote: 100 cổ × 60k = 6,000,000 (vs 4.5tr stored).
+    live = {
+        vnm: HoldingValuation(
+            current_price=Decimal("60000"),
+            quantity=Decimal("100"),
+            cost_basis=Decimal("45000"),
+            current_value=Decimal("6000000"),
+            pnl_pct=Decimal("33.33"),
+            is_stale=False,
+        )
+    }
+
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=[vnm, cash]),
+        ),
+        patch(
+            "backend.intent.handlers.query_assets.value_stock_holdings",
+            AsyncMock(return_value=live),
+        ) as stock_mock,
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="tài sản của tôi",
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    stock_mock.assert_awaited_once()
+    # Total uses LIVE stock value: 80tr + 6tr = 86,000,000 (not 84.5tr).
+    assert "86,000,000" in response or "86tr" in response
+    assert "84,500,000" not in response
+
+
+@pytest.mark.asyncio
+async def test_query_assets_handler_gold_uses_live_market_prices():
+    """Gold must be live-quoted intraday too, matching ``calculate()``.
+    Previously gold was only refreshed once a day by the EOD job, so the
+    asset-list headline lagged the live comparison figure between EOD runs."""
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+    from backend.wealth.valuation.gold import HoldingValuation
+
+    gold = _fake_asset(
+        name="SJC 2 lượng",
+        asset_type="gold",
+        current_value=Decimal("160000000"),  # stored — must NOT be used
+        extra={"type": "SJC", "quantity": "2"},
+    )
+    cash = _fake_asset(
+        name="VCB", asset_type="cash", current_value=Decimal("80000000")
+    )
+
+    # Live quote: 2 lượng × 90tr = 180,000,000 (vs 160tr stored).
+    live = {
+        gold: HoldingValuation(
+            current_price=Decimal("90000000"),
+            quantity=Decimal("2"),
+            cost_basis=Decimal("80000000"),
+            current_value=Decimal("180000000"),
+            pnl_pct=Decimal("12.5"),
+            is_stale=False,
+        )
+    }
+
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=[gold, cash]),
+        ),
+        patch(
+            "backend.intent.handlers.query_assets.value_gold_holdings",
+            AsyncMock(return_value=live),
+        ) as gold_mock,
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="tài sản của tôi",
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    gold_mock.assert_awaited_once()
+    # Total uses LIVE gold value: 80tr + 180tr = 260,000,000 (not 240tr).
+    assert "260,000,000" in response or "260tr" in response
+    assert "240,000,000" not in response
 
 
 @pytest.mark.asyncio
@@ -396,6 +511,162 @@ async def test_query_net_worth_handler_zero_assets():
             intent=IntentType.QUERY_NET_WORTH,
             confidence=0.95,
             raw_text="tổng tài sản",
+        )
+        response = await QueryNetWorthHandler().handle(intent, _user(), _fake_db())
+
+    assert "chưa có tài sản" in response
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_month_vs_previous_renders_comparison():
+    """The "📈 So với tháng trước" tap renders the ⚖️ So sánh block."""
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal("500000000")
+    breakdown.asset_count = 3
+
+    calculate_mock = AsyncMock(return_value=breakdown)
+    historical_mock = AsyncMock(return_value=Decimal("450000000"))
+
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            calculate_mock,
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_historical",
+            historical_mock,
+        ),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="so với tháng trước",
+            parameters={"time_range": "month_vs_previous"},
+        )
+        response = await QueryNetWorthHandler().handle(intent, _user("An"), _fake_db())
+
+    assert "⚖️ So sánh Tổng tài sản" in response
+    assert "Tháng này" in response and "Tháng trước" in response
+    # net_worth English key must never leak to the user.
+    assert "net_worth" not in response
+    assert "📈" in response  # 500tr > 450tr is a gain
+    # current uses the live total; baseline uses the snapshot.
+    calculate_mock.assert_awaited_once()
+    historical_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_ytd_renders_comparison():
+    """The "📈 YTD" tap renders the ⚖️ So sánh block with year baseline."""
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+    from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal("5000000000")
+    breakdown.asset_count = 5
+
+    ytd = NetWorthYtdReturn(
+        current=Decimal("5000000000"),
+        base=Decimal("4000000000"),
+        change_absolute=Decimal("1000000000"),
+        change_percentage=25.0,
+        period_label="YTD",
+    )
+    ytd_mock = AsyncMock(return_value=ytd)
+
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            AsyncMock(return_value=breakdown),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_ytd_return_from_current",
+            ytd_mock,
+        ),
+    ):
+        user = _user("An")
+        user.created_at = datetime(2024, 1, 1)
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="ytd",
+            parameters={"time_range": "ytd"},
+        )
+        response = await QueryNetWorthHandler().handle(intent, user, _fake_db())
+
+    assert "⚖️ So sánh Tổng tài sản" in response
+    assert "Hiện tại" in response
+    assert f"Đầu năm {date.today().year}" in response
+    assert "+25.0%" in response
+    assert "net_worth" not in response
+    ytd_mock.assert_awaited_once_with(
+        ANY, user.id, Decimal("5000000000"), account_created_at=user.created_at
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_ytd_join_date_fallback_label():
+    """When the account is younger than the year, baseline reads 'Từ ngày tham gia'."""
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+    from backend.wealth.services.net_worth_calculator import NetWorthYtdReturn
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal("500000000")
+    breakdown.asset_count = 2
+
+    # No baseline snapshot → change_percentage None → renders 0.0%.
+    ytd = NetWorthYtdReturn(
+        current=Decimal("500000000"),
+        base=Decimal("0"),
+        change_absolute=Decimal("500000000"),
+        change_percentage=None,
+        period_label="Từ ngày tham gia",
+        is_join_date_fallback=True,
+    )
+
+    with (
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+            AsyncMock(return_value=breakdown),
+        ),
+        patch(
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_ytd_return_from_current",
+            AsyncMock(return_value=ytd),
+        ),
+    ):
+        user = _user("An")
+        user.created_at = datetime(2026, 2, 1)
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="ytd",
+            parameters={"time_range": "ytd"},
+        )
+        response = await QueryNetWorthHandler().handle(intent, user, _fake_db())
+
+    assert "Từ ngày tham gia" in response
+    assert "0.0%" in response
+
+
+@pytest.mark.asyncio
+async def test_query_net_worth_handler_comparison_zero_assets():
+    """Comparison taps degrade to the friendly empty state."""
+    from backend.intent.handlers.query_net_worth import QueryNetWorthHandler
+
+    breakdown = MagicMock()
+    breakdown.total = Decimal(0)
+
+    with patch(
+        "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate",
+        AsyncMock(return_value=breakdown),
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_NET_WORTH,
+            confidence=0.95,
+            raw_text="so với tháng trước",
+            parameters={"time_range": "month_vs_previous"},
         )
         response = await QueryNetWorthHandler().handle(intent, _user(), _fake_db())
 

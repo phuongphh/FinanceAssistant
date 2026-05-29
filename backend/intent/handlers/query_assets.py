@@ -1,6 +1,7 @@
 """Handler for ``query_assets`` — list user's assets, grouped by type."""
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ from backend.wealth.valuation.crypto import (
     HoldingValuation,
     value_crypto_holdings,
 )
+from backend.wealth.valuation.gold import value_gold_holdings
+from backend.wealth.valuation.stock import value_stock_holdings
 
 # Top-N items per asset type to render before the "...và X mục nữa" tail.
 _TOP_N_PER_TYPE = 3
@@ -67,13 +70,15 @@ class QueryAssetsHandler(IntentHandler):
         filtered_type: str | None,
         style: LevelStyle,
     ) -> str:
-        crypto_valuations = await self._value_crypto_assets(assets)
+        crypto_valuations, market_valuations = await self._value_market_assets(
+            assets
+        )
 
         by_type: dict[str, list] = {}
         display_values: dict[object, Decimal] = {}
         total = Decimal(0)
         for asset in assets:
-            valuation = crypto_valuations.get(asset)
+            valuation = market_valuations.get(asset)
             value = (
                 valuation.current_value
                 if valuation is not None
@@ -144,12 +149,35 @@ class QueryAssetsHandler(IntentHandler):
             lines.append("Hỏi mình nếu cần thêm chi tiết nhé 😊")
         return "\n".join(lines).rstrip()
 
-    async def _value_crypto_assets(self, assets) -> dict[object, HoldingValuation]:
-        # Single batched provider call regardless of how many crypto
-        # holdings the user owns. The previous per-asset await loop was
-        # the dominant contributor to the 10s+ tail latency on the
-        # interactive ``query_assets`` reply (issue #797).
-        return await value_crypto_holdings(assets)
+    async def _value_market_assets(
+        self, assets
+    ) -> tuple[dict[object, HoldingValuation], dict[object, HoldingValuation]]:
+        # Live-quote stock, crypto AND gold holdings so the headline "Tổng"
+        # matches ``net_worth_calculator.calculate()`` — the same basis the
+        # YTD / "So với tháng trước" comparison uses. Stocks and gold were
+        # previously read from the stored ``current_value`` here, which
+        # drifted from the live comparison figure intraday (gold only got
+        # refreshed once a day by the EOD job). Three batched provider calls
+        # run in parallel (different providers), mirroring ``calculate()`` —
+        # single batch per class, not per-asset (issue #797).
+        #
+        # Returns ``(crypto_valuations, market_valuations)``: crypto is kept
+        # separate because crypto holdings render a detailed per-line
+        # ``symbol: qty × price`` row; ``market_valuations`` merges all three
+        # classes for the headline total and per-asset display value.
+        crypto_valuations, stock_valuations, gold_valuations = (
+            await asyncio.gather(
+                value_crypto_holdings(assets),
+                value_stock_holdings(assets),
+                value_gold_holdings(assets),
+            )
+        )
+        market_valuations: dict[object, HoldingValuation] = {
+            **stock_valuations,
+            **gold_valuations,
+            **crypto_valuations,
+        }
+        return crypto_valuations, market_valuations
 
 
 def _crypto_symbol(asset) -> str:

@@ -25,6 +25,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.tier2.db_agent import DBAgentResult
+from backend.bot.formatters.comparison import (
+    format_comparison_block,
+    metric_label_vi,
+)
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
@@ -272,15 +276,16 @@ def format_comparison_response(
     diff = float(payload.get("diff_absolute") or 0)
     diff_pct = float(payload.get("diff_percent") or 0)
 
-    sign = "+" if diff >= 0 else ""
-    arrow = "📈" if diff > 0 else ("📉" if diff < 0 else "➡️")
-
-    return (
-        f"⚖️ So sánh {metric}:\n\n"
-        f"• {label_a.capitalize()}: {format_money_short(a)}\n"
-        f"• {label_b.capitalize()}: {format_money_short(b)}\n\n"
-        f"{arrow} Chênh lệch: {sign}{format_money_short(diff)} "
-        f"({sign}{diff_pct:.1f}%)"
+    # Translate the metric key (e.g. "net_worth") to its Vietnamese label —
+    # raw English keys must never reach the user.
+    return format_comparison_block(
+        metric_label=metric_label_vi(metric),
+        label_a=label_a.capitalize(),
+        value_a=a,
+        label_b=label_b.capitalize(),
+        value_b=b,
+        diff=diff,
+        diff_pct=diff_pct,
     )
 
 

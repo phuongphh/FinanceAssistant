@@ -1,9 +1,19 @@
-"""Handler for ``query_net_worth`` — total + change vs last month."""
+"""Handler for ``query_net_worth`` — total + change vs last month.
+
+When the intent carries ``time_range`` (``month_vs_previous`` or ``ytd``)
+— set by the asset-list follow-up buttons "📈 So với tháng trước" and
+"📈 YTD - Tài sản từ đầu năm đến nay" — we render the shared ``⚖️ So sánh``
+comparison block instead of the plain headline, so a tap produces the same
+message as typing "So sánh tài sản của tôi so với tháng trước".
+"""
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.bot.formatters.comparison import format_comparison_block
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.handlers.base import IntentHandler
 from backend.intent.intents import IntentResult
@@ -12,9 +22,18 @@ from backend.models.user import User
 from backend.wealth.ladder import detect_level
 from backend.wealth.services import net_worth_calculator
 
+# Vietnamese label for the compared metric. Mirrors ``net_worth`` →
+# "Tổng tài sản" used across the briefing / asset surfaces (never surface
+# the raw English metric key to the user).
+_NET_WORTH_LABEL_VI = "Tổng tài sản"
+
 
 class QueryNetWorthHandler(IntentHandler):
     async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
+        time_range = (intent.parameters or {}).get("time_range")
+        if time_range in ("month_vs_previous", "ytd"):
+            return await self._handle_comparison(time_range, user, db)
+
         breakdown = await net_worth_calculator.calculate(db, user.id)
         if breakdown.total <= 0:
             name = user.display_name or "bạn"
@@ -69,3 +88,64 @@ class QueryNetWorthHandler(IntentHandler):
                 )
 
         return decorate("\n".join(lines), style)
+
+    async def _handle_comparison(
+        self, time_range: str, user: User, db: AsyncSession
+    ) -> str:
+        """Render the ``⚖️ So sánh Tổng tài sản`` block for the follow-up taps.
+
+        Both branches use the *live* current total (matches the headline the
+        user just saw on the asset list) and a snapshot-based baseline:
+        - ``month_vs_previous``: baseline = net worth at the end of last month.
+        - ``ytd``: baseline = net worth at the start of the year (or the join
+          date when the account is younger than the current year).
+
+        Empty/zero state is friendly rather than a divide-by-zero.
+        """
+        breakdown = await net_worth_calculator.calculate(db, user.id)
+        current = breakdown.total
+        if current <= 0:
+            name = user.display_name or "bạn"
+            return (
+                f"💎 {name} chưa có tài sản nào trong hệ thống.\n\n"
+                "Tap /themtaisan để mình tính tổng tài sản giúp nhé 🚀"
+            )
+
+        if time_range == "ytd":
+            ytd = await net_worth_calculator.calculate_ytd_return_from_current(
+                db,
+                user.id,
+                current,
+                account_created_at=user.created_at,
+            )
+            previous = ytd.base
+            diff = ytd.change_absolute
+            # ``change_percentage`` is None when there's no baseline snapshot.
+            diff_pct = (
+                ytd.change_percentage if ytd.change_percentage is not None else 0.0
+            )
+            label_b = (
+                "Từ ngày tham gia"
+                if ytd.is_join_date_fallback
+                else f"Đầu năm {date.today().year}"
+            )
+            label_a = "Hiện tại"
+        else:  # month_vs_previous
+            last_month_end = date.today().replace(day=1) - timedelta(days=1)
+            previous = await net_worth_calculator.calculate_historical(
+                db, user.id, last_month_end
+            )
+            diff = current - previous
+            diff_pct = float(diff / previous * 100) if previous > 0 else 0.0
+            label_a = "Tháng này"
+            label_b = "Tháng trước"
+
+        return format_comparison_block(
+            metric_label=_NET_WORTH_LABEL_VI,
+            label_a=label_a,
+            value_a=current,
+            label_b=label_b,
+            value_b=previous,
+            diff=diff,
+            diff_pct=diff_pct,
+        )
