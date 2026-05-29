@@ -18,6 +18,8 @@
 #   {days_silent}       — days since last event
 #   {weekend_pct}       — e.g. "62%"
 #   {suggested_amount}  — pre-formatted currency string
+#   {salutation}        — how Bé Tiền addresses the user (anh/chị/bạn)
+#   {days_since_onboarding} — days since onboarding finished
 #
 # TONE RULES (docs/tone_guide.md):
 # - Never use "đừng", "không nên", "phải", "sai", "tệ", "lãng phí".
@@ -116,3 +118,20 @@ consecutive_over_budget:
       {name} ơi, mình để ý danh mục {category} đã vượt ngân sách 3 tháng liên tục rồi.
 
       Có thể ngân sách đặt hơi thấp so với nhu cầu thực tế chăng? Chúng ta điều chỉnh cho hợp lý hơn nhé — không có gì xấu hổ cả, thực tế đang nói với chúng ta một điều gì đó 🌱
+
+# Phase 4.4 Epic 3 — proactive activation nudge. Fires when an onboarded
+# user saw their Twin once (at the end of onboarding) but hasn't returned
+# to it within the activation window. Voice: "em để ý thấy…", warm, never
+# pressuring, addresses the user by their chosen salutation (anh/chị/bạn).
+onboarding_no_twin_return:
+  conditions: "Onboarded but viewed Twin on < 2 distinct days, 3–30 days after onboarding"
+  cooldown_days: 30
+  messages:
+    - |-
+      Em để ý thấy {salutation} vẽ Twin tài chính hôm trước rồi mà chưa ghé lại 🌱
+
+      Không có gì gấp đâu ạ — chỉ là Twin sẽ rõ nét hơn mỗi lần {salutation} thêm một con số mới. Khi nào rảnh, {salutation} ghé xem em cập nhật tới đâu nhé 💚
+    - |-
+      Mấy hôm nay em vẫn để dành Twin của {salutation} ở đây nè.
+
+      Em hiểu {salutation} bận — em không làm phiền nhiều đâu ạ. Chỉ là khi nào {salutation} muốn xem bức tranh tài chính của mình thay đổi ra sao, em luôn sẵn sàng ạ 🌿

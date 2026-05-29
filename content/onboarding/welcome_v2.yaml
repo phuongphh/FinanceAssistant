@@ -28,6 +28,27 @@ source_variants:
   direct_msg:
     prefix: "Cảm ơn bạn đã trả lời tin nhắn của Bé Tiền — bắt đầu khám phá nhé!"
 
+# Salutation pick (Phase 4.4 Epic 0) — asked right after the user gives
+# their name, before the goal question. Lets Bé Tiền address the user
+# warmly (anh/chị) instead of the neutral "bạn". Picking "bạn" is a
+# first-class friendly option, never framed to the user as a fallback.
+step_salutation:
+  header: "Bé Tiền xưng hô sao cho thân nhỉ?"
+  body: |
+    Để trò chuyện cho gần gũi, Bé Tiền nên gọi mình là gì ạ?
+  buttons:
+    anh: "Gọi mình là anh"
+    chị: "Gọi mình là chị"
+    bạn: "Cứ gọi mình là bạn"
+  callback_prefix: "onboarding_v2:salutation:"
+  acks:
+    anh: |
+      Dạ vâng, em nhớ rồi ạ! 💚
+    chị: |
+      Dạ vâng, em nhớ rồi ạ! 💚
+    bạn: |
+      Okie, mình xưng bạn cho thoải mái nhé! 💚
+
 # Goal question. Three button labels keyed by goal code.
 # NOTE: not numbered (1/3) — the user-visible 3-step counter starts at the
 # trust card (1/3). Goal pick is a preamble personalization tap.
@@ -48,6 +69,38 @@ step_1_goal:
     track_spending: |
       Bé Tiền sẽ giúp bạn thấy tiền đi đâu, không còn mơ hồ.
 
+# The Reading (Phase 4.4 Epic 1, WOW #1) — Bé Tiền "đoán thử" a warm
+# sketch of the user's financial self. v0 runs on zero data (goal + name)
+# right after goal-pick; v1 re-reads once a real number is known.
+# {salutation} = anh/chị/bạn, {Salutation} = sentence-start capitalized;
+# both filled by reading_service. The LLM writes only the middle "guess";
+# the open line + disclaimer/CTA here are fixed (structure-in-code,
+# copy-in-YAML). Fallbacks fire when the LLM is slow/unavailable so the
+# minute-1 moment never breaks.
+reading:
+  # Shown immediately while waiting for the LLM (edited in place after).
+  placeholder: |
+    🔮 Khoan đã… để em đoán thử một chút về {salutation} nhé…
+  open: |
+    🔮 Để em đoán thử nha — {salutation} đừng cười nếu em trật chút xíu nha 😄
+  # v0: after the guess, gently invite the real number.
+  disclaimer_v0: |
+    …em đoán mò qua mục tiêu thôi đó. {Salutation} cho em xem con số thật, em vẽ được bức tranh chuẩn hơn nhiều 💚
+  # v1: after reading the real number, bridge to the Twin teaser.
+  disclaimer_v1: |
+    Giờ em đoán có cơ sở hơn rồi đó. Để em vẽ Twin tài chính cho {salutation} xem nhé…
+  # Fallbacks when the LLM is unavailable — keep the beat, no guess.
+  fallback_v0: |
+    🔮 Em đang hình dung về hành trình tài chính của {salutation}… nhưng để chắc, {salutation} cho em xem con số thật nhé 💚
+  fallback_v1: |
+    Cảm ơn {salutation} đã tin tưởng chia sẻ. Để em vẽ Twin tài chính cho {salutation} xem nhé…
+  # Goal phrases fed into the LLM prompt (anchor for the guess).
+  goal_labels:
+    understand_wealth: "muốn hiểu rõ tổng tài sản của mình"
+    plan_goal: "muốn lên kế hoạch cho một mục tiêu lớn trong đời"
+    track_spending: "muốn theo dõi chi tiêu thông minh hơn"
+  goal_label_default: "muốn quản lý tài chính tốt hơn"
+
 # Step 2 — first asset prompt.
 step_2_asset:
   header: "(2/3) Tài sản hiện tại"
@@ -63,6 +116,25 @@ step_2_asset:
     Số tiền hơi nhỏ — bạn có thể nhập tài sản (tiết kiệm, đầu tư, vàng…) tối thiểu từ 1 triệu trở lên, hoặc bấm nút demo bên dưới.
   too_large: |
     Số tiền có vẻ chưa hợp lý. Bạn kiểm tra lại giúp Bé Tiền nhé.
+  # Screenshot onboarding (Epic 2, default off). Hint appended to body
+  # only when SCREENSHOT_ONBOARDING_ENABLED is on; the others are sent
+  # while reading a balance screenshot the user snapped.
+  screenshot_hint: |
+    💡 Ngại gõ số? Bạn chụp luôn màn hình số dư app ngân hàng / ví đầu tư gửi Bé Tiền cũng được nhé.
+  screenshot_reading: |
+    Bé Tiền đang đọc ảnh giúp bạn… chờ chút xíu nha 👀
+  screenshot_failed: |
+    Bé Tiền chưa mở được ảnh đó. Bạn chụp lại rõ hơn, hoặc gõ thẳng con số (ví dụ <code>200tr</code>, <code>1.5 tỷ</code>) cũng được nhé.
+  screenshot_not_balance: |
+    Bé Tiền nhìn chưa ra con số tổng tài sản trong ảnh này. Bạn thử chụp màn hình có dòng "Tổng số dư" / "Số dư khả dụng", hoặc gõ thẳng con số giúp Bé Tiền nhé.
+  # Data-quality double-check after reading a balance off a screenshot.
+  # {warning} = the data-quality message, {amount} = the read figure.
+  screenshot_quality_warning: |
+    ⚠️ <b>Kiểm tra lại số tiền</b>
+
+    {warning}
+
+    Bé Tiền đọc được <b>{amount}</b> từ ảnh. Bạn chọn số đúng nhé:
 
 # Demo mode banner — explicit framing so user does not mistake the
 # 50tr placeholder for their own Twin (loss-of-trust risk).

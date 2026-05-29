@@ -2,14 +2,17 @@
 # Mascot intro shown BEFORE the cone chart image so user has a frame
 # for the chart they're about to see. Composer-only — no LLM call.
 
+# {salutation} = how Bé Tiền addresses the user (anh/chị/bạn); {Salutation}
+# is the sentence-start capitalized form. Both are filled by
+# twin_narrative_service_v2.narrative_text() — default "bạn"/"Bạn".
 narrative: |
-  ✨ Đây là <b>Twin tài chính</b> của bạn — Bé Tiền vẽ ra 3 con đường tương lai dựa trên tình hình hiện tại.
+  ✨ Đây là <b>Twin tài chính</b> của {salutation} — Bé Tiền vẽ ra 3 con đường tương lai dựa trên tình hình hiện tại.
 
   • Đường <b>giữa</b> là điều kiện thường (kịch bản P50).
-  • Đường <b>trên</b> là nếu bạn tiết kiệm chăm hơn (P90).
+  • Đường <b>trên</b> là nếu {salutation} tiết kiệm chăm hơn (P90).
   • Đường <b>dưới</b> là nếu có biến cố (P10).
 
-  Bạn không cần đoán tương lai — Bé Tiền đoán giúp, bạn chỉ cần quyết định.
+  {Salutation} không cần đoán tương lai — Bé Tiền đoán giúp, {salutation} chỉ cần quyết định.
 
 # Demo variant — shown when user picks "Để Bé Tiền dùng demo trước".
 # Must NOT call it "Twin của bạn" — that broke trust in user testing.
@@ -25,7 +28,7 @@ demo_narrative: |
   • Đường <b>trên</b> là kịch bản thị trường thuận lợi (P90).
   • Đường <b>dưới</b> là khi có biến cố (P10).
 
-  Đây không phải số liệu của bạn — nhập tài sản thật để Bé Tiền vẽ Twin riêng cho bạn.
+  Đây không phải số liệu của {salutation} — nhập tài sản thật để Bé Tiền vẽ Twin riêng cho {salutation}.
 
 caption: |
   📈 Twin của {name} — kịch bản {horizon} năm tới.

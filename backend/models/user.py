@@ -22,6 +22,9 @@ class User(Base):
     )
     telegram_handle: Mapped[str | None] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(255))
+    # Phase 4.4 Epic 0 — how Bé Tiền addresses the user (anh/chị/bạn).
+    # NULL until the onboarding salutation step; helpers fall back to "bạn".
+    salutation: Mapped[str | None] = mapped_column(String(10))
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Ho_Chi_Minh")
     currency: Mapped[str] = mapped_column(String(10), default="VND")
     monthly_income: Mapped[float | None] = mapped_column(Numeric(15, 2))

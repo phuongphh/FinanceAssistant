@@ -20,8 +20,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, time, timezone
+import os
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.analytics import EventType
@@ -53,6 +57,47 @@ QUIET_HOURS_END = time(7, 0)
 LOCAL_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
+# Phase 4.4 Epic 3 — the proactive-companion trigger
+# (``onboarding_no_twin_return``) is gated here, at the job edge, NOT in
+# the engine/service (layer contract: services never read env). Off →
+# the engine skips the new trigger but every pre-existing empathy trigger
+# still fires.
+def _proactive_companion_enabled() -> bool:
+    return os.environ.get("PROACTIVE_COMPANION_ENABLED", "true").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+async def _get_onboarded_candidates(
+    db: AsyncSession, *, now: datetime
+) -> list[User]:
+    """Recently-onboarded users who may need the proactive nudge.
+
+    ``get_active_users`` keys off having a non-deleted expense, so a user
+    who finished onboarding (saw their Twin once) but has not logged a
+    single expense never enters that set — yet that drifted-after-WOW
+    cohort is *exactly* who the ``onboarding_no_twin_return`` trigger
+    targets. We pull them in separately here, gated by the proactive flag
+    at the caller, and the engine's own window/cooldown checks still
+    decide whether the trigger actually fires.
+
+    Bounded to the trigger's activation window
+    (``ONBOARDING_SILENCE_MAX_DAYS``) so we never scan the whole table.
+    """
+    since = now - timedelta(days=empathy_engine.ONBOARDING_SILENCE_MAX_DAYS)
+    stmt = select(User).where(
+        User.onboarding_completed_at.isnot(None),
+        User.onboarding_completed_at >= since,
+        User.deleted_at.is_(None),
+        User.is_active.is_(True),
+        User.telegram_id.isnot(None),
+    )
+    return list((await db.execute(stmt)).scalars())
+
+
 def _is_quiet_hour(now_local: datetime) -> bool:
     t = now_local.time()
     # Window wraps midnight: 22:00 <= t OR t < 07:00
@@ -70,11 +115,21 @@ async def run_hourly_empathy_check(now: datetime | None = None) -> None:
         )
         return
 
+    proactive_on = _proactive_companion_enabled()
+
     session_factory = get_session_factory()
     async with session_factory() as db:
         users = await get_active_users(db, days=ACTIVE_WINDOW_DAYS)
+        # When the proactive companion is on, fold in recently-onboarded
+        # users who have no expense yet — they're invisible to
+        # get_active_users but are the target of onboarding_no_twin_return.
+        if proactive_on:
+            by_id = {u.id: u for u in users}
+            for u in await _get_onboarded_candidates(db, now=now_utc):
+                by_id.setdefault(u.id, u)
+            users = list(by_id.values())
 
-    logger.info("empathy-check: scanning %d active users", len(users))
+    logger.info("empathy-check: scanning %d candidate users", len(users))
 
     for user in users:
         try:
@@ -102,7 +157,9 @@ async def _process_user(user: User, *, now: datetime) -> None:
             )
             return
 
-        trigger = await empathy_engine.check_all_triggers(db, user, now=now)
+        trigger = await empathy_engine.check_all_triggers(
+            db, user, now=now, include_proactive=_proactive_companion_enabled()
+        )
         if not trigger:
             return
 
