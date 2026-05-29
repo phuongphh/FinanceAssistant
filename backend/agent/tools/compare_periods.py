@@ -85,8 +85,18 @@ async def _income(
 async def _net_worth(
     db: AsyncSession, user_id: uuid.UUID, end: date
 ) -> Decimal:
-    """Net worth at end-of-period uses ``calculate_historical`` —
-    answers 'how much did I have on Apr 30' rather than today."""
+    """Net worth at end-of-period.
+
+    For a period that ends today (``this_month`` / ``this_year``) the
+    "current" net worth is the live value — same number the user sees on
+    the asset list — so we call :func:`calculate`. Daily snapshots can lag
+    intraday stock/crypto moves, which would otherwise make the current
+    column drift from the headline total. Past periods (``last_month`` /
+    ``last_year``) have no live value to quote, so they read the snapshot
+    via :func:`calculate_historical` ('how much did I have on Apr 30')."""
+    if end >= date.today():
+        breakdown = await net_worth_calculator.calculate(db, user_id)
+        return breakdown.total
     return await net_worth_calculator.calculate_historical(db, user_id, end)
 
 
