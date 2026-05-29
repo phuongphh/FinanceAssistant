@@ -164,6 +164,59 @@ async def test_query_assets_handler_stock_uses_live_market_prices():
 
 
 @pytest.mark.asyncio
+async def test_query_assets_handler_gold_uses_live_market_prices():
+    """Gold must be live-quoted intraday too, matching ``calculate()``.
+    Previously gold was only refreshed once a day by the EOD job, so the
+    asset-list headline lagged the live comparison figure between EOD runs."""
+    from backend.intent.handlers.query_assets import QueryAssetsHandler
+    from backend.wealth.valuation.gold import HoldingValuation
+
+    gold = _fake_asset(
+        name="SJC 2 lượng",
+        asset_type="gold",
+        current_value=Decimal("160000000"),  # stored — must NOT be used
+        extra={"type": "SJC", "quantity": "2"},
+    )
+    cash = _fake_asset(
+        name="VCB", asset_type="cash", current_value=Decimal("80000000")
+    )
+
+    # Live quote: 2 lượng × 90tr = 180,000,000 (vs 160tr stored).
+    live = {
+        gold: HoldingValuation(
+            current_price=Decimal("90000000"),
+            quantity=Decimal("2"),
+            cost_basis=Decimal("80000000"),
+            current_value=Decimal("180000000"),
+            pnl_pct=Decimal("12.5"),
+            is_stale=False,
+        )
+    }
+
+    with (
+        patch(
+            "backend.intent.handlers.query_assets.asset_service.get_user_assets",
+            AsyncMock(return_value=[gold, cash]),
+        ),
+        patch(
+            "backend.intent.handlers.query_assets.value_gold_holdings",
+            AsyncMock(return_value=live),
+        ) as gold_mock,
+    ):
+        intent = IntentResult(
+            intent=IntentType.QUERY_ASSETS,
+            confidence=0.95,
+            raw_text="tài sản của tôi",
+        )
+        response = await QueryAssetsHandler().handle(intent, _user(), _fake_db())
+
+    gold_mock.assert_awaited_once()
+    # Total uses LIVE gold value: 80tr + 180tr = 260,000,000 (not 240tr).
+    assert "260,000,000" in response or "260tr" in response
+    assert "240,000,000" not in response
+
+
+@pytest.mark.asyncio
 async def test_query_assets_handler_crypto_uses_market_prices():
     from backend.intent.handlers.query_assets import QueryAssetsHandler
     from backend.wealth.valuation.crypto import HoldingValuation
