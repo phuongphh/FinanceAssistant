@@ -67,7 +67,9 @@ def _user(*, days_ago_onboarded, completed=True, naive=False):
 @pytest.mark.asyncio
 async def test_fires_in_window_with_no_return_view():
     user = _user(days_ago_onboarded=ONBOARDING_SILENCE_MIN_DAYS + 1)
-    db = _FakeDB(twin_view_days=1)  # saw it once at onboarding only
+    # Onboarding writes no TwinViewEvent, so a user who never came back
+    # has 0 distinct view days.
+    db = _FakeDB(twin_view_days=0)
 
     trigger = await empathy_engine._check_onboarding_no_twin_return(db, user, NOW)
 
@@ -89,7 +91,7 @@ async def test_no_fire_when_not_onboarded():
 async def test_no_fire_before_window_opens():
     # Onboarded today — too soon to nudge.
     user = _user(days_ago_onboarded=ONBOARDING_SILENCE_MIN_DAYS - 1)
-    db = _FakeDB(twin_view_days=1)
+    db = _FakeDB(twin_view_days=0)
 
     assert await empathy_engine._check_onboarding_no_twin_return(db, user, NOW) is None
 
@@ -98,16 +100,17 @@ async def test_no_fire_before_window_opens():
 async def test_no_fire_after_window_closes():
     # Past the activation window — generic silent-N-days triggers own this.
     user = _user(days_ago_onboarded=ONBOARDING_SILENCE_MAX_DAYS + 1)
-    db = _FakeDB(twin_view_days=1)
+    db = _FakeDB(twin_view_days=0)
 
     assert await empathy_engine._check_onboarding_no_twin_return(db, user, NOW) is None
 
 
 @pytest.mark.asyncio
 async def test_no_fire_when_user_returned_to_twin():
-    # Viewed the Twin on 2+ distinct days — they came back, no nudge.
+    # Came back to the Twin at least once after onboarding (>= 1 distinct
+    # view day) — no nudge. Onboarding itself writes no view event.
     user = _user(days_ago_onboarded=ONBOARDING_SILENCE_MIN_DAYS + 2)
-    db = _FakeDB(twin_view_days=2)
+    db = _FakeDB(twin_view_days=1)
 
     assert await empathy_engine._check_onboarding_no_twin_return(db, user, NOW) is None
 
@@ -315,6 +318,99 @@ async def test_job_passes_include_proactive_into_check_all_triggers(monkeypatch)
     await check_empathy_triggers._process_user(user, now=NOW)
 
     assert captured["include_proactive"] is True
+
+
+def _stub_session_factory(monkeypatch, check_empathy_triggers):
+    """Make get_session_factory hand back a no-op async session."""
+
+    class _Session:
+        async def __aenter__(self):
+            return _FakeDB()
+
+        async def __aexit__(self, *_a):
+            return False
+
+    monkeypatch.setattr(
+        check_empathy_triggers, "get_session_factory", lambda: (lambda: _Session())
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_folds_in_onboarded_candidates_when_proactive_on(monkeypatch):
+    """A recently-onboarded user with no expense is invisible to
+    get_active_users but must still be scanned when the proactive flag is
+    on — otherwise onboarding_no_twin_return never fires for its cohort."""
+    from backend.jobs import check_empathy_triggers
+
+    active = SimpleNamespace(id=uuid.uuid4(), telegram_id=1)
+    onboarded = SimpleNamespace(id=uuid.uuid4(), telegram_id=2)
+
+    async def fake_active(_db, **_k):
+        return [active]
+
+    async def fake_onboarded(_db, *, now):
+        return [onboarded]
+
+    scanned = []
+
+    async def fake_process(user, *, now):
+        scanned.append(user.id)
+
+    monkeypatch.setattr(check_empathy_triggers, "get_active_users", fake_active)
+    monkeypatch.setattr(
+        check_empathy_triggers, "_get_onboarded_candidates", fake_onboarded
+    )
+    monkeypatch.setattr(check_empathy_triggers, "_process_user", fake_process)
+    async def _noop_sleep(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(check_empathy_triggers.asyncio, "sleep", _noop_sleep)
+    monkeypatch.setenv("PROACTIVE_COMPANION_ENABLED", "true")
+    _stub_session_factory(monkeypatch, check_empathy_triggers)
+
+    await check_empathy_triggers.run_hourly_empathy_check(now=NOW)
+
+    assert active.id in scanned
+    assert onboarded.id in scanned
+
+
+@pytest.mark.asyncio
+async def test_run_skips_onboarded_candidates_when_proactive_off(monkeypatch):
+    """Flag off → don't even query the onboarded-only cohort."""
+    from backend.jobs import check_empathy_triggers
+
+    active = SimpleNamespace(id=uuid.uuid4(), telegram_id=1)
+
+    async def fake_active(_db, **_k):
+        return [active]
+
+    called = {"onboarded": False}
+
+    async def fake_onboarded(_db, *, now):
+        called["onboarded"] = True
+        return []
+
+    scanned = []
+
+    async def fake_process(user, *, now):
+        scanned.append(user.id)
+
+    monkeypatch.setattr(check_empathy_triggers, "get_active_users", fake_active)
+    monkeypatch.setattr(
+        check_empathy_triggers, "_get_onboarded_candidates", fake_onboarded
+    )
+    monkeypatch.setattr(check_empathy_triggers, "_process_user", fake_process)
+    async def _noop_sleep(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(check_empathy_triggers.asyncio, "sleep", _noop_sleep)
+    monkeypatch.setenv("PROACTIVE_COMPANION_ENABLED", "false")
+    _stub_session_factory(monkeypatch, check_empathy_triggers)
+
+    await check_empathy_triggers.run_hourly_empathy_check(now=NOW)
+
+    assert called["onboarded"] is False
+    assert scanned == [active.id]
 
 
 @pytest.mark.asyncio

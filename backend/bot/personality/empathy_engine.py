@@ -30,7 +30,7 @@ import logging
 import random
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -92,9 +92,12 @@ ONBOARDING_SILENCE_MIN_DAYS = 3
 ONBOARDING_SILENCE_MAX_DAYS = 30
 
 # Distinct days a user must have viewed the Twin on before we consider
-# them "returned". The first view happens at the end of onboarding, so
-# < 2 distinct days means they never came back to it.
-TWIN_RETURN_MIN_DISTINCT_DAYS = 2
+# them "returned". Onboarding does NOT write a TwinViewEvent (the first
+# Twin shown at the end of onboarding is tracked separately via
+# ``mark_twin_shown``), so the baseline count is 0. Any genuine return
+# visit therefore lands on >= 1 distinct day — that's enough to count as
+# "came back", so we only nudge when the count is still 0.
+TWIN_RETURN_MIN_DISTINCT_DAYS = 1
 
 
 @dataclass(frozen=True)
@@ -231,7 +234,7 @@ async def _check_onboarding_no_twin_return(
     (``ONBOARDING_SILENCE_MIN_DAYS`` … ``ONBOARDING_SILENCE_MAX_DAYS``
     days after ``onboarding_completed_at``) when the user has viewed the
     Twin on fewer than ``TWIN_RETURN_MIN_DISTINCT_DAYS`` distinct days —
-    i.e. only the first view at the end of onboarding. Past the window
+    i.e. has not come back to look at it after onboarding. Past the window
     the generic silent-N-days triggers take over, so this stays a focused
     re-engagement nudge.
     """
@@ -246,7 +249,8 @@ async def _check_onboarding_no_twin_return(
         return None
 
     # Count distinct calendar days the user opened the Twin. Onboarding
-    # contributes one day; a genuine return visit adds a second.
+    # writes no TwinViewEvent, so this starts at 0; a genuine return visit
+    # is the first row, lifting the count to >= 1.
     distinct_days_stmt = select(
         func.count(func.distinct(func.date(TwinViewEvent.created_at)))
     ).where(TwinViewEvent.user_id == user.id)
