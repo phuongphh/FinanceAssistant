@@ -24,6 +24,16 @@ Không compete với Money Lover, MISA, Spendee. Không compete với Finhay, Ti
 
 > **Đây là wow-factor sản phẩm, được agreed trong strategic review tháng 5/2026.**
 
+> **Cập nhật (rev 2026-05-29 — strategic review "5 phút đầu"):** Twin vẫn là
+> **differentiator + payoff** dài hạn. Nhưng review phát hiện Twin là feature
+> *lean-forward* tuần-2 — nó chỉ xuất hiện SAU bước nhập tài sản (ma sát cao nhất),
+> nên người mới rời đi trước khi chạm tới. Giải pháp: **The Reading** (Phase 4.4) —
+> một WOW phút-0/phút-1 chạy trên *zero data* ("Để em đoán thử về anh/chị…"), đóng
+> vai trò **hook kéo người dùng tới được Twin**. Reading **không thay thế** Twin:
+> Reading = hook (phút 1), Twin = payoff (phút 4, "đây là anh hôm nay — xem anh năm
+> 2030?"). Cùng triết lý *probability over precision* ("em đoán" ↔ weather metaphor).
+> Chi tiết: [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
+
 **Bé Tiền của bạn năm 2030 sẽ thế nào?**
 
 Visual avatar/dashboard show financial future based on current trajectory. Updates daily based on actions. Compare:
@@ -271,6 +281,20 @@ Twin từ feature khó hiểu → habit-forming experience (4 Epics / 15 stories
 - **Epic 3 — Habit loop:** on-demand recompute (<5s) + causality + action prompt + negative delta handling + delta threshold + return tease
 - **Epic 4 — Twin admin dashboard:** engagement funnel, loop health, comprehension, delta distribution (4 sections)
 - **Roadmap impact:** Phase 5.0 (Encryption) lùi ~3 tuần; timeline soft launch tháng 6/2026 vẫn an toàn.
+
+#### Phase 4.4: First-5-Minutes WOW — 📋 PLANNED (current)
+**Mục tiêu:** WOW phút-0 cho người mới — hook kéo tới Twin, **không thay** Twin.
+
+Chẩn đoán review "5 phút đầu": sản phẩm không thiếu feature, thiếu *5 phút đầu*.
+Twin (differentiator) bị backloaded sau bước nhập tài sản → người mới rời trước khi
+chạm. Phase 4.4 đưa WOW lên trước bước nhập liệu (4 Epics / 18 issues, ~7-10 ngày):
+- **WOW #0 — Salutation:** thêm cột `users.salutation`, hỏi anh/chị/bạn trong onboarding (gộp với bước tên). Tiền đề bắt buộc — Reading sẽ gọi nhầm xưng hô nếu thiếu.
+- **WOW #1 — The Reading ⭐:** "Để em đoán thử về anh/chị…" — chân dung tài chính từ zero data (goal + tên), giọng khiêm tốn nhưng cụ thể, KHÔNG phán xét. LLM qua Groq cho latency. Hook chính.
+- **WOW #2 — Screenshot onboarding:** chụp app ngân hàng → OCR số dư → net worth ~30s (tái dùng pipeline OCR, không gọi Claude vision). Rủi ro cao nhất, cắt được nếu trượt T6.
+- **WOW #3 — Proactive companion:** thêm trigger vào `empathy_engine` đã chạy hourly — Bé Tiền nhắn trước một cách ấm.
+- **Twin positioning:** Reading = hook (phút 1), Twin = payoff (phút 4). Bổ trợ.
+- **Roadmap impact:** Phase 5.0 (Encryption) lùi thêm ~1-1.5 tuần; soft launch tháng 6/2026 vẫn an toàn.
+Detail: [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
 
 **🎉 Tháng 6 SOFT LAUNCH** với foundation complete:
 - 50 founding member (50% lifetime discount khi Pro ra mắt — commitment honored)
