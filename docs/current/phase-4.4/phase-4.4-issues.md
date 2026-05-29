@@ -80,9 +80,10 @@ khiêm tốn nhưng cụ thể, không phán xét. v1 đọc lại trên số th
 - Nhận `{salutation, display_name, goal_label, optional số}` → `call_llm(task_type="reading", user_id=…, shared_cache=False, provider="groq")`. Flush-only.
 - **DoD:** service test (mock LLM); xác minh truyền user_id + shared_cache=False.
 
-#### Issue #1.3 — Hook Reading v0 vào _on_goal_picked
+#### Issue #1.3 — Hook Reading v0 vào _on_goal_picked + flag `READING_ENABLED`
 - Sau goal_ack → Reading v0 → `_send_first_asset_prompt`. Placeholder "đang đoán…" khi chờ LLM.
-- **DoD:** integration test flow.
+- Feature flag `READING_ENABLED` (mặc định `true`) đọc ở **router/worker** (KHÔNG trong service): tắt → bỏ qua Reading v0/v1, đi thẳng asset prompt.
+- **DoD:** integration test flow; test flag on/off (off → không gọi reading_service, onboarding như cũ).
 
 #### Issue #1.4 — Reading v1 trên số thật
 - Sau `_save_onboarding_first_asset`, trước `_trigger_first_twin`: đọc lại với số.
@@ -118,9 +119,11 @@ hiện có (external OCR + DeepSeek), KHÔNG gọi Claude vision.
 - Prompt nhận diện layout 2-3 bank; fallback message thân thiện.
 - **DoD:** parse đúng số dư mẫu mỗi bank.
 
-#### Issue #2.3 — Hook nhánh photo trong onboarding
+#### Issue #2.3 — Hook nhánh photo trong onboarding + flag `SCREENSHOT_ONBOARDING_ENABLED`
+- ⚠️ **Worker ordering (bắt buộc xử lý):** `backend/workers/telegram_worker.py` hiện route **mọi** photo/image-document tới `photo_receipt.handle_photo_message` (OCR hoá đơn) TRƯỚC khi tới wizard onboarding. Ở bước first-asset, screenshot ngân hàng sẽ bị OCR-hoá-đơn "nuốt" nếu không sửa thứ tự. Giải pháp: kiểm tra onboarding session **trước** nhánh photo_receipt trong worker (hoặc cho `handle_photo_message` delegate sang onboarding khi user đang ở first-asset step). Quyết định cách nào ghi rõ trong PR.
 - Update ảnh ở bước first-asset → parse → confirm → `_save_onboarding_first_asset`.
-- **DoD:** integration test photo → net worth → Reading v1.
+- Feature flag `SCREENSHOT_ONBOARDING_ENABLED` (mặc định `false`, cắt khỏi T6): tắt → nhánh ảnh không parse, chỉ gõ tay; photo_receipt cũ không đổi.
+- **DoD:** integration test photo → net worth → Reading v1; test screenshot ở onboarding KHÔNG bị photo_receipt nuốt; test flag off → ảnh không parse số dư.
 
 #### Issue #2.4 — Copy gợi ý screenshot
 - `step_2_asset` thêm "hoặc chụp màn hình app ngân hàng gửi em".
@@ -139,9 +142,10 @@ Bé Tiền nhắn trước một cách ấm. Thêm 1 trigger vào empathy_engine
 
 ### Child issues
 
-#### Issue #3.1 — Trigger im-lặng-sau-onboarding
+#### Issue #3.1 — Trigger im-lặng-sau-onboarding + flag `PROACTIVE_COMPANION_ENABLED`
 - `_check_*` mới + đăng ký trong `check_all_triggers`. Điều kiện vd: onboarded nhưng chưa xem Twin lần 2 sau N ngày.
-- **DoD:** unit test fire/không-fire + cooldown.
+- Feature flag `PROACTIVE_COMPANION_ENABLED` (mặc định `true`) đọc ở **job/worker** (KHÔNG trong service): tắt → `check_all_triggers` bỏ qua trigger mới, trigger empathy cũ vẫn chạy.
+- **DoD:** unit test fire/không-fire + cooldown; test flag off → trigger mới không fire, trigger cũ vẫn fire.
 
 #### Issue #3.2 — Copy empathy mới
 - `content/empathy_messages.yaml` giọng "em để ý thấy…".

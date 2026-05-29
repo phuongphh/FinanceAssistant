@@ -161,8 +161,17 @@ xúc dẫn người dùng *tự nguyện* cung cấp dữ liệu.
 | LLM latency phá nhịp phút-1 | Trung | `provider="groq"` sub-second; có "đang đoán…" placeholder. |
 | Phase 5.0 trượt thêm | Thấp | Encryption là infra tháng 7, không chặn soft launch. |
 
-**Rollback:** Mỗi WOW độc lập sau feature-flag. Reading/Screenshot/Proactive tắt được
-riêng. Salutation cột nullable → tắt step vẫn chạy (fallback "bạn").
+**Rollback — feature flags (env, đọc ở router/worker, KHÔNG đọc trong service):**
+
+| Flag | Mặc định T6 | Tắt → hành vi |
+|---|---|---|
+| `READING_ENABLED` | `true` | Bỏ qua Reading v0/v1; onboarding đi thẳng goal → asset → Twin teaser như cũ. |
+| `SCREENSHOT_ONBOARDING_ENABLED` | `false` (cắt khỏi T6 mặc định) | Nhánh ảnh ở first-asset không parse; chỉ nhận gõ tay. |
+| `PROACTIVE_COMPANION_ENABLED` | `true` | `check_all_triggers` bỏ qua trigger mới; các trigger empathy cũ vẫn chạy. |
+
+Salutation KHÔNG có flag: cột nullable, không bao giờ tắt — nếu skip step thì
+fallback "bạn" (an toàn cho user cũ NULL). Mỗi flag có một issue định nghĩa tên +
+nơi đọc + test on/off (xem Issue #1.3, #2.3, #3.1 trong issues doc).
 
 ---
 
@@ -177,6 +186,7 @@ riêng. Salutation cột nullable → tắt step vẫn chạy (fallback "bạn")
 - [ ] `vi-localization-checker` pass; 0 chuỗi VN hardcode; mọi copy ở YAML.
 - [ ] `layer-contract-checker` pass; 0 `db.commit()` trong service.
 - [ ] Twin teaser phút-4 vẫn nguyên (không regression onboarding v2).
+- [ ] 3 feature flag (`READING_ENABLED`, `SCREENSHOT_ONBOARDING_ENABLED`, `PROACTIVE_COMPANION_ENABLED`) đọc ở router/worker; mỗi flag có test on/off; tắt được riêng không lỗi.
 
 ---
 

@@ -33,6 +33,7 @@ Exit codes:
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -201,6 +202,39 @@ def render_roadmap_table(data: dict) -> str:
     return "\n".join(lines)
 
 
+_MD_LINK_RE = re.compile(r"\]\(([^)]+)\)")
+
+
+def rewrite_links_relative(text: str, target_dir: Path) -> str:
+    """Rewrite repo-root-relative markdown links to be relative to ``target_dir``.
+
+    The phase-status YAML stores doc paths relative to the repo root
+    (e.g. ``docs/current/phase-4.4/...``). That resolves correctly for
+    target files at the repo root (CLAUDE.md, README.md) but 404s from a
+    file inside a subdirectory (docs/README.md would resolve them to
+    ``docs/docs/current/...``). Re-anchor each in-repo link to the target
+    file's directory so links work from wherever the marker lives.
+
+    External links (http, mailto, anchors, absolute paths) are left as-is.
+    """
+    rel_dir = target_dir.relative_to(REPO_ROOT)
+    if rel_dir == Path("."):
+        return text  # already correct for repo-root targets
+
+    def _rewrite(match: re.Match) -> str:
+        link = match.group(1)
+        if link.startswith(("http://", "https://", "mailto:", "#", "/")):
+            return match.group(0)
+        # Split off any #anchor so it survives the relpath computation.
+        path_part, _, anchor = link.partition("#")
+        new_path = os.path.relpath(path_part, rel_dir)
+        if anchor:
+            new_path = f"{new_path}#{anchor}"
+        return f"]({new_path})"
+
+    return _MD_LINK_RE.sub(_rewrite, text)
+
+
 def update_marker(content: str, marker_id: str, new_content: str) -> tuple[str, bool]:
     """
     Replace content between <!-- BEGIN: <marker_id> --> and <!-- END: <marker_id> -->.
@@ -238,6 +272,7 @@ def sync_file(path: Path, rendered: dict[str, str], dry_run: bool = False) -> bo
 
     found_markers = []
     for marker_id, new_content in rendered.items():
+        new_content = rewrite_links_relative(new_content, path.parent)
         content, found = update_marker(content, marker_id, new_content)
         if found:
             # short label = part after the colon
