@@ -153,6 +153,37 @@ def salutation_of(user: User | None) -> str:
     return value if value in ALL_SALUTATIONS else DEFAULT_SALUTATION
 
 
+# Sub-steps within STEP_GOAL_QUESTION. Name entry and salutation pick are
+# collapsed into the single ``goal_question`` DB step, so the live position
+# inside that step is *derived* from the User row rather than stored — no
+# migration required. Order: name → salutation → goal pick.
+SUBSTEP_NAME = "name"
+SUBSTEP_SALUTATION = "salutation"
+SUBSTEP_GOAL = "goal"
+
+
+def goal_substep(user: User | None) -> str:
+    """Resolve which sub-step of ``goal_question`` the user is on.
+
+    Pure (no DB / no env). Only meaningful while
+    ``current_step == STEP_GOAL_QUESTION``:
+
+      - no ``display_name`` yet            → still entering name
+      - name set but no ``salutation`` yet → picking salutation
+      - both set                           → picking goal
+
+    Because the goal step never mutates the ``OnboardingSession`` row while
+    the user moves name → salutation, ``session.updated_at`` stays frozen at
+    ``/start`` time. Callers (resume nudge, resume button) MUST use this to
+    avoid mistaking a name/salutation user for someone stuck at goal pick.
+    """
+    if user is None or not (user.display_name or "").strip():
+        return SUBSTEP_NAME
+    if not (user.salutation or "").strip():
+        return SUBSTEP_SALUTATION
+    return SUBSTEP_GOAL
+
+
 async def set_salutation(
     db: AsyncSession, user_id: uuid.UUID, salutation: str
 ) -> User | None:

@@ -1423,7 +1423,17 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
 async def _resume_at(db: AsyncSession, chat_id: int, user: User, session) -> None:
     if session.current_step == STEP_GOAL_QUESTION:
-        await _send_goal_question(db, chat_id, user)
+        # Name + salutation are sub-steps of goal_question (no dedicated DB
+        # state). Resume at the exact sub-step the user left off — never jump
+        # straight to the goal question, which would silently skip name and
+        # salutation and fork the flow (the original "two flows" bug).
+        substep = onboarding_service.goal_substep(user)
+        if substep == onboarding_service.SUBSTEP_NAME:
+            await _send_name_prompt(chat_id)
+        elif substep == onboarding_service.SUBSTEP_SALUTATION:
+            await _send_salutation_question(db, chat_id, user)
+        else:
+            await _send_goal_question(db, chat_id, user)
     elif session.current_step == STEP_TRUST_PRIVACY:
         await _send_trust_card(db, chat_id, user)
     elif session.current_step == STEP_FIRST_ASSET:
