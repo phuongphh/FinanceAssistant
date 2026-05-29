@@ -1,5 +1,13 @@
 # Phase 4.4 — First-5-Minutes WOW — Manual Test Cases (Telegram)
 
+<!-- testing-signoff: need to be signed -->
+<!--
+  Sign-off marker — driven by scripts/archive_phase.py.
+  When testing is complete, change "need to be signed" → "signed" on the
+  line above. The next archive-phase workflow run will move every
+  phase-X-* doc (except the detailed_doc) into docs/archive/.
+-->
+
 > **Cách dùng tài liệu này**
 > Đây là bộ test **chạy tay trên Telegram** (manual QA), không phải pytest.
 > Mỗi case có: **ID · Mục tiêu · Tiền điều kiện (precondition) · Các bước · Kết quả mong đợi**.
