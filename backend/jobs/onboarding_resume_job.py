@@ -72,6 +72,28 @@ def _build_message(session: OnboardingSession) -> tuple[str, dict]:
     return text, keyboard
 
 
+def _is_intro_substep(session: OnboardingSession, user: User) -> bool:
+    """True while the user is in the name/salutation sub-steps of goal_question.
+
+    Those sub-steps mutate the ``User`` row (set_display_name /
+    set_salutation), never the ``OnboardingSession`` row, so
+    ``session.updated_at`` freezes at ``/start`` time and a name-entry user
+    trips the "stuck >10 min" filter within minutes of starting. The nudge is
+    Twin-centric ("Twin sẵn sàng"), which is premature and off-message during
+    the minute-1 intro, and its resume used to fork the flow past
+    name+salutation. The job skips these — leaving ``nudge_sent_at`` NULL so
+    the user stays eligible once they reach goal pick / asset / twin.
+    """
+    return (
+        session.current_step == STEP_GOAL_QUESTION
+        and onboarding_service.goal_substep(user)
+        in (
+            onboarding_service.SUBSTEP_NAME,
+            onboarding_service.SUBSTEP_SALUTATION,
+        )
+    )
+
+
 async def _send_nudge(session: OnboardingSession, user: User) -> bool:
     """Dispatch the nudge to every channel the user has opted into.
 
@@ -140,6 +162,10 @@ async def run_onboarding_resume_job() -> int:
             for session in stuck:
                 user = await db.get(User, session.user_id)
                 if not user:
+                    continue
+                # WOW-first: don't fire the Twin-centric nudge during the
+                # name/salutation intro sub-steps (see _is_intro_substep).
+                if _is_intro_substep(session, user):
                     continue
                 ok = await _send_nudge(session, user)
                 if ok:

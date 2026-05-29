@@ -356,6 +356,10 @@ async def handle_name_text_input(
 
     await legacy_onboarding_service.set_display_name(db, user.id, name)
     user.display_name = name
+    # Name lives on the User row, so the session's onupdate never fires —
+    # bump it explicitly so the resume-nudge delay measures from now, not
+    # /start (see onboarding_service.touch_session).
+    await onboarding_service.touch_session(db, user.id)
     await db.flush()
 
     await send_message(
@@ -396,6 +400,9 @@ async def _on_salutation_picked(
     if updated is None:
         await answer_callback(callback_id, text="Lựa chọn không hợp lệ")
         return
+    # Salutation lives on the User row too — bump the session so reaching goal
+    # pick doesn't trip an immediate nudge off the stale /start timestamp.
+    await onboarding_service.touch_session(db, user.id)
     await answer_callback(callback_id)
 
     copy = onboarding_service.load_copy()
@@ -1423,7 +1430,17 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
 async def _resume_at(db: AsyncSession, chat_id: int, user: User, session) -> None:
     if session.current_step == STEP_GOAL_QUESTION:
-        await _send_goal_question(db, chat_id, user)
+        # Name + salutation are sub-steps of goal_question (no dedicated DB
+        # state). Resume at the exact sub-step the user left off — never jump
+        # straight to the goal question, which would silently skip name and
+        # salutation and fork the flow (the original "two flows" bug).
+        substep = onboarding_service.goal_substep(user)
+        if substep == onboarding_service.SUBSTEP_NAME:
+            await _send_name_prompt(chat_id)
+        elif substep == onboarding_service.SUBSTEP_SALUTATION:
+            await _send_salutation_question(db, chat_id, user)
+        else:
+            await _send_goal_question(db, chat_id, user)
     elif session.current_step == STEP_TRUST_PRIVACY:
         await _send_trust_card(db, chat_id, user)
     elif session.current_step == STEP_FIRST_ASSET:
