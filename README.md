@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Admin Observability** (current) — [detail](docs/current/phase-4.2.5/phase-4.2.5-detailed.md)
+📋 **Encryption End-to-End** (next) — [detail](#)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
@@ -23,11 +23,23 @@
 - ✅ Phase 3.8: Wealth Completion
 - ✅ Phase 3.8.5: Pre-Launch Readiness
 - ✅ Phase 3.9: Market Data Real
-- 📋 Phase 4A: Financial Twin Conservative MVP ← **next**
+- ✅ Phase 3.9.5: Pre-Launch UX Polish
 - 🔮 Phase 3B: Market Intelligence
-- 🔮 Phase 4: Investment Intelligence
-- 🔮 Phase 5: Behavioral Engine
-- 🔮 Phase 6: Scale & Commercialize
+- ✅ Phase 4A: Financial Twin Conservative MVP
+- ✅ Phase 4B: Twin Polish + Life Events + Cashflow v2 + Zalo
+- ✅ Phase 4.1: Pre-Launch Hardening
+- ✅ Phase 4.2: Customer Experience Hardening
+- ✅ Phase 4.2.5: Admin Observability
+- ✅ Phase 4.3: Twin Enhancement + Habit Loop + Admin Dashboard
+- 📋 Phase 5.0: Encryption End-to-End ← **next**
+- 🔮 Phase 5.1: Zalo Spike & OA Verification
+- 🔮 Phase 5.2: Zalo Core Product Parity
+- 🔮 Phase 5.3: Zalo Mini App
+- 🔮 Phase 5.4: Achievement & Badges
+- 🔮 Phase 5.5: Behavioral Engine
+- 🔮 Phase 5.6: Household Mode
+- 🔮 Phase 5.7: Monetization Infrastructure
+- 🔮 Phase 6.0: Tết Launch (Public)
 <!-- END: phase-status:status-list -->
 
 
@@ -214,7 +226,7 @@ Base URL: `http://localhost:8000/api/v1`
 
 - 🎯 **[Product Strategy](docs/current/strategy.md)** — Vision, positioning, roadmap
 - 🔧 **[Technical Spec (CLAUDE.md)](CLAUDE.md)** — Full system design, đọc trước khi code
-- 📋 **[Current Phase (3A)](docs/current/phase-3a-detailed.md)** — Implementation guide
+- 📋 **[Latest Phase (4.3)](docs/current/phase-4.3/phase-4.3-detailed.md)** — Twin Enhancement + Habit Loop + Admin Dashboard
 - 📚 **[All docs](docs/README.md)** — Navigation hub
 - 📝 **[Migration Notes V1→V2](docs/archive/MIGRATION_NOTES.md)** — Context về pivot
 
