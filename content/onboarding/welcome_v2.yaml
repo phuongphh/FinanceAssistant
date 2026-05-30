@@ -28,6 +28,16 @@ source_variants:
   direct_msg:
     prefix: "Cảm ơn bạn đã trả lời tin nhắn của Bé Tiền — bắt đầu khám phá nhé!"
 
+# Name prompt — the very first beat of V2 onboarding, asked before the
+# salutation pick. {prompt} is sent as one bubble; keep it warm and short.
+step_name:
+  prompt: |
+    Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨
+
+    (Bạn chỉ cần nhắn tên bạn vào đây)
+  invalid: |
+    Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.
+
 # Salutation pick (Phase 4.4 Epic 0) — asked right after the user gives
 # their name, before the goal question. Lets Bé Tiền address the user
 # warmly (anh/chị) instead of the neutral "bạn". Picking "bạn" is a
@@ -108,6 +118,14 @@ step_2_asset:
     {warning}
 
     Bé Tiền đọc được <b>{amount}</b> từ ảnh. Bạn chọn số đúng nhé:
+  # Same double-check, but for a number the user typed (not from a photo).
+  # {warning} = the data-quality message, {amount} = the parsed figure.
+  text_quality_warning: |
+    ⚠️ <b>Kiểm tra lại số tiền</b>
+
+    {warning}
+
+    Bé Tiền hiểu là <b>{amount}</b>. Bạn chọn số đúng nhé:
 
 # Demo mode banner — explicit framing so user does not mistake the
 # 50tr placeholder for their own Twin (loss-of-trust risk).
@@ -122,6 +140,14 @@ demo_banner:
 # Step 3 — Twin shown ack.
 step_3_twin:
   header: "(3/3) Twin của bạn"
+
+# Next-best-action prompts — shown after onboarding when the user taps a
+# follow-up action button (or when their session has expired).
+next_action:
+  session_expired: "Gõ /start để bắt đầu nhé"
+  log_expense_prompt: |
+    🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>
+  default_prompt: "Gõ /menu để chọn bước tiếp theo nhé."
 
 # Resume helpers.
 resume:
