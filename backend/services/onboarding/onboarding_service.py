@@ -18,7 +18,6 @@ router boundary commits.
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -79,16 +78,6 @@ MIN_ASSET_VND = Decimal("1_000_000")
 MAX_ASSET_VND = Decimal("100_000_000_000_000")
 
 DEMO_ASSET_VND = Decimal("50_000_000")  # Demo Twin uses 50tr placeholder.
-TRUST_CARD_FLAG_ENV = "TRUST_CARD_ENABLED"
-
-
-def is_trust_card_enabled() -> bool:
-    return os.environ.get(TRUST_CARD_FLAG_ENV, "true").lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
 
 
 def parse_asset_amount(raw: str) -> Decimal | None:
@@ -228,15 +217,26 @@ async def set_salutation(
 
 
 async def set_goal(
-    db: AsyncSession, user_id: uuid.UUID, goal_code: str
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    goal_code: str,
+    *,
+    trust_card_enabled: bool,
 ) -> OnboardingSession | None:
+    """Record the goal pick and route to the next step.
+
+    ``trust_card_enabled`` is resolved at the handler edge (feature flag
+    read) and passed in — the service never reads env. When the trust card
+    is enabled and not yet accepted, route through the privacy step; else
+    skip straight to the first-asset step.
+    """
     if goal_code not in ALL_GOALS:
         return None
     session = await get_session(db, user_id)
     if session is None:
         return None
     session.goal_choice = goal_code
-    if is_trust_card_enabled() and session.trust_accepted_at is None:
+    if trust_card_enabled and session.trust_accepted_at is None:
         session.current_step = STEP_TRUST_PRIVACY
     else:
         session.current_step = STEP_FIRST_ASSET

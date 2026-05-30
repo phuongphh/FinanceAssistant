@@ -215,7 +215,7 @@ async def test_goal_pick_routes_to_asset_prompt_no_reading(monkeypatch):
     from backend.bot.handlers import onboarding_v2
     from backend.services.onboarding import onboarding_service
 
-    async def _set_goal(_db, _uid, _goal):
+    async def _set_goal(_db, _uid, _goal, *, trust_card_enabled=True):
         # Not on the trust step → flow goes to the asset prompt.
         return SimpleNamespace(current_step=STEP_FIRST_ASSET_SENTINEL)
 

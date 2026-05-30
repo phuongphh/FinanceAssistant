@@ -142,6 +142,26 @@ def is_screenshot_onboarding_enabled() -> bool:
     )
 
 
+TRUST_CARD_FLAG_ENV = "TRUST_CARD_ENABLED"
+
+
+def is_trust_card_enabled() -> bool:
+    """Trust/privacy card is shown by default; operator can disable via env.
+
+    Read at the handler edge and passed into ``onboarding_service.set_goal``
+    so the service stays env-free (layer contract), same pattern as
+    ``is_v2_enabled`` / ``is_screenshot_onboarding_enabled``.
+    """
+    import os
+
+    return os.environ.get(TRUST_CARD_FLAG_ENV, "true").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
 # ---------- Entry: /start with optional invite token -----------------
 
 
@@ -305,10 +325,10 @@ async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> Non
 
 
 async def _send_name_prompt(chat_id: int) -> None:
+    copy = onboarding_service.load_copy()
     await send_message(
         chat_id,
-        "Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨\n\n"
-        "(Bạn chỉ cần nhắn tên bạn vào đây)",
+        copy["step_name"]["prompt"],
         parse_mode="HTML",
     )
 
@@ -327,9 +347,10 @@ async def handle_name_text_input(
 
     is_valid, name = legacy_onboarding_service.validate_display_name(raw_text)
     if not is_valid:
+        copy = onboarding_service.load_copy()
         await send_message(
             chat_id,
-            "Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.",
+            copy["step_name"]["invalid"],
             parse_mode="HTML",
         )
         return True
@@ -415,7 +436,9 @@ async def _on_goal_picked(
     user: User,
     goal_code: str,
 ) -> None:
-    session = await onboarding_service.set_goal(db, user.id, goal_code)
+    session = await onboarding_service.set_goal(
+        db, user.id, goal_code, trust_card_enabled=is_trust_card_enabled()
+    )
     if session is None:
         await answer_callback(callback_id, text="Lựa chọn không hợp lệ")
         return
@@ -720,9 +743,12 @@ async def handle_asset_text_input(
             },
         }
         await db.flush()
+        copy = onboarding_service.load_copy()
         await send_message(
             chat_id,
-            f"⚠️ <b>Kiểm tra lại số tiền</b>\n\n{warning.message}\n\nBé Tiền hiểu là <b>{format_money_short(value)}</b>. Bạn chọn số đúng nhé:",
+            copy["step_2_asset"]["text_quality_warning"].format(
+                warning=warning.message, amount=format_money_short(value)
+            ),
             parse_mode="HTML",
             reply_markup=_quality_keyboard(value),
         )
@@ -1095,11 +1121,7 @@ async def _on_feedback_signal(
 
     # Persist as a Feedback row too so /feedback_inbox sees it alongside
     # explicit feedback — the operator triages all signals in one place.
-    from backend.feedback.models.feedback import (
-        FEEDBACK_STATUS_NEW,
-        Feedback,
-    )
-
+    # (Feedback / FEEDBACK_STATUS_NEW are imported at module level.)
     fb = Feedback(
         user_id=user.id,
         content=f"[onboarding_signal:{signal}]",
@@ -1279,9 +1301,10 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
     from backend.services.dashboard_service import get_user_by_telegram_id
 
+    copy = onboarding_service.load_copy()
     user = await get_user_by_telegram_id(db, telegram_id)
     if user is None:
-        await answer_callback(callback_id, text="Gõ /start để bắt đầu nhé")
+        await answer_callback(callback_id, text=copy["next_action"]["session_expired"])
         return True
 
     action = data.split(":", 1)[1]
@@ -1315,11 +1338,11 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
     elif action == "log_expense":
         await send_message(
             chat_id,
-            "🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>",
+            copy["next_action"]["log_expense_prompt"],
             parse_mode="HTML",
         )
     else:
-        await send_message(chat_id, "Gõ /menu để chọn bước tiếp theo nhé.")
+        await send_message(chat_id, copy["next_action"]["default_prompt"])
     return True
 
 
