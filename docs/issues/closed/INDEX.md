@@ -473,6 +473,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #897 | Pre-Phase | feat(expense-confirm): restore footer buttons + Vietnam TZ + source/amount edit wizards | [pre-phase/issue-897.md](by-phase/pre-phase/issue-897.md) |
 | #901 | Pre-Phase | Fix funding-source balance adjustment on edit/reverse + deterministic "latest" ordering | [pre-phase/issue-901.md](by-phase/pre-phase/issue-901.md) |
 | #907 | Pre-Phase | Onboarding: resume nudge collides with name/salutation sub-steps ("two flows at once") | [pre-phase/issue-907.md](by-phase/pre-phase/issue-907.md) |
+| #910 | Phase 4 | [Phase 4.4] Gỡ bỏ "The Reading" — chữa 3 pain của first-5-minutes WOW | [phase-4/issue-910.md](by-phase/phase-4/issue-910.md) |
 
-**Total:** 469 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 452 Pre-Phase)
+**Total:** 470 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 452 Pre-Phase)

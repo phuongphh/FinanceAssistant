@@ -12,6 +12,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
-| #910 | [Phase 4.4] Gỡ bỏ "The Reading" — chữa 3 pain của first-5-minutes WOW | [issue-910.md](issue-910.md) |
 
-**Total active:** 9
+**Total active:** 8
