@@ -69,38 +69,6 @@ step_1_goal:
     track_spending: |
       Bé Tiền sẽ giúp bạn thấy tiền đi đâu, không còn mơ hồ.
 
-# The Reading (Phase 4.4 Epic 1, WOW #1) — Bé Tiền "đoán thử" a warm
-# sketch of the user's financial self. v0 runs on zero data (goal + name)
-# right after goal-pick; v1 re-reads once a real number is known.
-# {salutation} = anh/chị/bạn, {Salutation} = sentence-start capitalized;
-# both filled by reading_service. The LLM writes only the middle "guess";
-# the open line + disclaimer/CTA here are fixed (structure-in-code,
-# copy-in-YAML). Fallbacks fire when the LLM is slow/unavailable so the
-# minute-1 moment never breaks.
-reading:
-  # Shown immediately while waiting for the LLM (edited in place after).
-  placeholder: |
-    🔮 Khoan đã… để em đoán thử một chút về {salutation} nhé…
-  open: |
-    🔮 Để em đoán thử nha — {salutation} đừng cười nếu em trật chút xíu nha 😄
-  # v0: after the guess, gently invite the real number.
-  disclaimer_v0: |
-    …em đoán mò qua mục tiêu thôi đó. {Salutation} cho em xem con số thật, em vẽ được bức tranh chuẩn hơn nhiều 💚
-  # v1: after reading the real number, bridge to the Twin teaser.
-  disclaimer_v1: |
-    Giờ em đoán có cơ sở hơn rồi đó. Để em vẽ Twin tài chính cho {salutation} xem nhé…
-  # Fallbacks when the LLM is unavailable — keep the beat, no guess.
-  fallback_v0: |
-    🔮 Em đang hình dung về hành trình tài chính của {salutation}… nhưng để chắc, {salutation} cho em xem con số thật nhé 💚
-  fallback_v1: |
-    Cảm ơn {salutation} đã tin tưởng chia sẻ. Để em vẽ Twin tài chính cho {salutation} xem nhé…
-  # Goal phrases fed into the LLM prompt (anchor for the guess).
-  goal_labels:
-    understand_wealth: "muốn hiểu rõ tổng tài sản của mình"
-    plan_goal: "muốn lên kế hoạch cho một mục tiêu lớn trong đời"
-    track_spending: "muốn theo dõi chi tiêu thông minh hơn"
-  goal_label_default: "muốn quản lý tài chính tốt hơn"
-
 # Step 2 — first asset prompt.
 step_2_asset:
   header: "(2/3) Tài sản hiện tại"
@@ -108,6 +76,11 @@ step_2_asset:
     Để vẽ Twin tài chính chính xác, Bé Tiền cần 1 con số khởi đầu — tổng tiền tiết kiệm/đầu tư hiện tại của bạn.
 
     Bạn có thể gõ số tiền (ví dụ: <code>200tr</code>, <code>1.5 tỷ</code>, <code>500000000</code>), hoặc dùng số liệu demo để xem trước.
+  # Ack after a real number — bridges straight into the Twin reveal so the
+  # transition reads as one continuous beat (no detour before the payoff).
+  # {amount} = formatted figure, {name} = display name (or "bạn").
+  asset_ack: |
+    ✅ Bé Tiền ghi nhận: <b>{amount}</b>. Để Bé Tiền vẽ Twin tài chính cho {name} nhé — chờ chút xíu thôi…
   demo_button: "🎭 Để Bé Tiền dùng demo trước"
   demo_callback: "onboarding_v2:demo"
   invalid: |

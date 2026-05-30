@@ -7,11 +7,17 @@
 | Epic | Tên | Issues | Ưu tiên | Ước lượng |
 |---|---|---|---|---|
 | E0 | Salutation Foundation | 5 | P0 (chặn tất cả) | ~1 ngày |
-| E1 | The Reading | 6 | P0 (WOW chính) | ~2-3 ngày |
+| ~~E1~~ | ~~The Reading~~ | ❌ **GỠ BỎ** | — | — |
 | E2 | Screenshot Onboarding | 4 | P2 (rủi ro cao) | ~3-5 ngày |
 | E3 | Proactive Companion | 3 | P1 | ~2-3 ngày |
 
-**Tổng:** 4 Epics / 18 issues / ~7-10 ngày. Thứ tự build: E0 → E1 → E3 → E2.
+**Tổng:** 3 Epics còn hiệu lực / ~12 issues. Thứ tự build: E0 → E3 → E2.
+
+> **🛑 E1 "The Reading" đã GỠ BỎ (29/05/2026).** Reading v0+v1 phản tác dụng
+> (vướng nút demo, chuyển cảnh gập ghềnh, v0 generic-trên-zero-data hại uy tín).
+> Đã xoá `reading_service.py` + `reading_prompt.py` + test + flag `READING_ENABLED`;
+> onboarding đi thẳng goal → asset → Twin (`asset_ack` bắc cầu). Chi tiết: banner
+> DECISION trong `phase-4.4-detailed.md`.
 
 ## 🏷️ Label Conventions
 - `phase-4.4`, `epic-0`/`epic-1`/`epic-2`/`epic-3`
@@ -59,7 +65,13 @@ trong onboarding (gộp với bước tên), thread vào mọi surface có giọ
 
 ---
 
-## 🅰️ Epic #E1 — The Reading ⭐
+## ~~🅰️ Epic #E1 — The Reading ⭐~~ ❌ GỠ BỎ (29/05/2026)
+
+> **Toàn bộ Epic E1 đã bị cắt.** Reading v0+v1 phản tác dụng — xem banner DECISION
+> trong `phase-4.4-detailed.md`. Đã xoá code + test + flag. Issues #1.1–#1.6 dưới
+> đây giữ để lưu vết, **không còn thực thi**. Thay thế: `step_2_asset.asset_ack`
+> trong `welcome_v2.yaml` bắc cầu thẳng từ asset sang Twin; test bảo vệ ở
+> `tests/test_phase_4_4/test_onboarding_no_reading.py`.
 
 ### Description
 WOW phút-1: Bé Tiền "đoán" chân dung tài chính từ goal + tên (zero data), giọng
@@ -123,7 +135,7 @@ hiện có (external OCR + DeepSeek), KHÔNG gọi Claude vision.
 - ⚠️ **Worker ordering (bắt buộc xử lý):** `backend/workers/telegram_worker.py` hiện route **mọi** photo/image-document tới `photo_receipt.handle_photo_message` (OCR hoá đơn) TRƯỚC khi tới wizard onboarding. Ở bước first-asset, screenshot ngân hàng sẽ bị OCR-hoá-đơn "nuốt" nếu không sửa thứ tự. Giải pháp: kiểm tra onboarding session **trước** nhánh photo_receipt trong worker (hoặc cho `handle_photo_message` delegate sang onboarding khi user đang ở first-asset step). Quyết định cách nào ghi rõ trong PR.
 - Update ảnh ở bước first-asset → parse → confirm → `_save_onboarding_first_asset`.
 - Feature flag `SCREENSHOT_ONBOARDING_ENABLED` (mặc định `false`, cắt khỏi T6): tắt → nhánh ảnh không parse, chỉ gõ tay; photo_receipt cũ không đổi.
-- **DoD:** integration test photo → net worth → Reading v1; test screenshot ở onboarding KHÔNG bị photo_receipt nuốt; test flag off → ảnh không parse số dư.
+- **DoD:** integration test photo → net worth → `asset_ack` → Twin teaser; test screenshot ở onboarding KHÔNG bị photo_receipt nuốt; test flag off → ảnh không parse số dư.
 
 #### Issue #2.4 — Copy gợi ý screenshot
 - `step_2_asset` thêm "hoặc chụp màn hình app ngân hàng gửi em".
@@ -160,10 +172,9 @@ Bé Tiền nhắn trước một cách ấm. Thêm 1 trigger vào empathy_engine
 ## 🔗 Dependency Graph
 
 ```
-E0 (salutation) ──┬──> E1 (Reading, cần xưng hô)
-                  ├──> E3 (Empathy render, cần xưng hô)
-                  └──> E2 (Reading v1 sau screenshot)
-E1 ──> E2 (Reading v1 đọc số từ screenshot)
+E0 (salutation) ──┬──> E3 (Empathy render, cần xưng hô)
+                  └──> E2 (Screenshot → first asset)
+(E1 The Reading ── ❌ GỠ BỎ; không còn cạnh phụ thuộc nào trỏ vào/ra E1)
 ```
 
-E0 là blocker cứng. E2 có thể cắt khỏi T6 mà không ảnh hưởng E0/E1/E3.
+E0 là blocker cứng. E2 có thể cắt khỏi T6 mà không ảnh hưởng E0/E3.

@@ -10,6 +10,37 @@
 
 ---
 
+## 🛑 DECISION (29/05/2026) — "The Reading" (WOW #1) đã được GỠ BỎ
+
+Sau khi triển khai và trải nghiệm thực tế, **toàn bộ The Reading (v0 teaser phút-1
++ v1 đọc-lại phút-3) bị cắt khỏi flow first-5-minutes.** Giữ lại **WOW #0
+(salutation)** và **WOW #3 (proactive companion)**; onboarding đi thẳng
+**goal → asset → Twin** như một mạch liền.
+
+**Vì sao gỡ (3 pain xác nhận):**
+
+1. **Vướng flow (pain #1).** Reading v1 chỉ chạy trên *số thật*
+   (`if not demo and is_reading_enabled()`), nên bấm nút **demo** ở bước asset
+   âm thầm bỏ qua một nhịp mà disclaimer v0 đã hứa ("cho em xem con số thật") →
+   nút demo *làm gãy* WOW.
+2. **Chuyển cảnh gập ghềnh (pain #2).** ack → placeholder v1 → đoán → disclaimer
+   v1 → "(3/3) Twin" là một chuỗi tự-mâu-thuẫn, hứa-rồi-hứa-lại ngay trước payoff.
+3. **Reading v0 quá generic (pain #3).** v0 chạy trên *zero data* (chỉ tên + xưng
+   hô + goal) nên về mặt cấu trúc chỉ đẻ ra lời tán kiểu Barnum/cold-read → độc
+   với uy tín của một sản phẩm tài chính. Không sửa được bằng prompt tốt hơn.
+
+**Hệ quả kỹ thuật:** xoá `backend/services/reading_service.py`,
+`backend/bot/personality/reading_prompt.py`, `tests/test_phase_4_4/test_epic1_reading.py`;
+gỡ hook + flag `READING_ENABLED` (`is_reading_enabled`) khỏi `onboarding_v2.py`;
+xoá block `reading:` trong `welcome_v2.yaml`, thêm `step_2_asset.asset_ack` bắc cầu
+thẳng vào Twin. Test mới: `tests/test_phase_4_4/test_onboarding_no_reading.py`.
+
+> Các phần "The Reading" bên dưới (choreography phút 1/3, Files Touched, Epic 1,
+> flag `READING_ENABLED`, DoD) được giữ lại để lưu vết quyết định, nhưng đã
+> **không còn hiệu lực** — xem banner này là nguồn sự thật.
+
+---
+
 ## 📋 Changelog so với Strategy V3 Roadmap
 
 | Thay đổi | Lý do |
@@ -61,9 +92,9 @@ xúc dẫn người dùng *tự nguyện* cung cấp dữ liệu.
 |---|---|---|---|
 | 0 | `_send_welcome_and_goal` | Mở cảm xúc, CHƯA xin số | có sẵn, chỉnh copy |
 | 0.5 | `handle_name_text_input` → salutation | 🫱 **WOW #0** — hỏi tên + xưng hô (anh/chị/bạn) | **MỚI** |
-| 1 | `_on_goal_picked` → Reading | 🪞 **WOW #1** — "để em đoán thử về anh…" | **MỚI** |
+| ~~1~~ | ~~`_on_goal_picked` → Reading~~ | ~~🪞 **WOW #1** — "để em đoán thử về anh…"~~ | ❌ **GỠ** (xem banner) |
 | 2 | `_send_first_asset_prompt` | 📸 **WOW #2** — chụp screenshot / gõ số | **MỚI** (nhánh photo) |
-| 3 | `reading_service` (v1) | 🪞 Reading đọc lại trên số thật | **MỚI** |
+| ~~3~~ | ~~`reading_service` (v1)~~ | ~~🪞 Reading đọc lại trên số thật~~ | ❌ **GỠ** — thay bằng `step_2_asset.asset_ack` bắc cầu thẳng vào Twin |
 | 4 | `_trigger_first_twin` | 💎 "đây là anh hôm nay. Xem anh 2030?" | có sẵn |
 | 5 | `mark_twin_shown` + founding | Gieo quan hệ + badge | có sẵn |
 | sau | `empathy_engine` | 💬 **WOW #3** — Bé Tiền nhắn trước | **MỚI** (trigger + copy) |
@@ -79,10 +110,10 @@ xúc dẫn người dùng *tự nguyện* cung cấp dữ liệu.
 | `alembic/versions/*_add_salutation.py` | #0 | **MỚI** — cột `salutation VARCHAR(10) NULL` |
 | `backend/models/user.py` | #0 | thêm `salutation: Mapped[str \| None]` cạnh `display_name` |
 | `backend/services/onboarding_service.py` | #0 | thêm `set_salutation()` (flush-only) |
-| `backend/bot/handlers/onboarding_v2.py` | #0,#1,#2 | salutation step + Reading hook + nhánh photo |
-| `content/onboarding/welcome_v2.yaml` | #0,#1,#2 | block `salutation`, `reading`, gợi ý screenshot |
-| `backend/bot/personality/reading_prompt.py` | #1 | **MỚI** — `READING_PROMPT` + parse (khuôn storytelling) |
-| `backend/services/reading_service.py` | #1 | **MỚI** — logic, gọi `call_llm`, flush-only |
+| `backend/bot/handlers/onboarding_v2.py` | #0,#2 | salutation step + nhánh photo (~~Reading hook~~ ❌ đã gỡ) |
+| `content/onboarding/welcome_v2.yaml` | #0,#2 | block `salutation`, `step_2_asset.asset_ack`, gợi ý screenshot (~~block `reading`~~ ❌ đã gỡ) |
+| ~~`backend/bot/personality/reading_prompt.py`~~ | ~~#1~~ | ❌ **ĐÃ XOÁ** (xem banner DECISION) |
+| ~~`backend/services/reading_service.py`~~ | ~~#1~~ | ❌ **ĐÃ XOÁ** (xem banner DECISION) |
 | `backend/services/ocr_service.py` | #2 | thêm `parse_balance_screenshot()` |
 | `backend/bot/personality/empathy_engine.py` | #3 | thêm `_check_*` trigger + đăng ký |
 | `content/empathy_messages.yaml` | #3 | copy trigger mới (giọng "em để ý thấy…") |
@@ -108,15 +139,18 @@ xúc dẫn người dùng *tự nguyện* cung cấp dữ liệu.
 - **0.4** Thread salutation vào `empathy_engine.render_message` + `twin_narrative_service_v2` để giọng nhất quán toàn sản phẩm.
 - **0.5** /profile: ô đổi xưng hô (xử lý đoán-sai). *Optional cho T6, làm nếu kịp.*
 
-### Epic 1 — The Reading (WOW #1) ⭐ ưu tiên cao nhất
-**Mục tiêu:** WOW phút-1 chạy trên zero data, "ơ sao đúng vậy", không phán xét.
+### ~~Epic 1 — The Reading (WOW #1)~~ ❌ GỠ BỎ (29/05/2026)
+**Quyết định:** cắt toàn bộ Epic 1. Xem banner **DECISION** đầu doc cho lý do
+(3 pain: vướng flow demo, chuyển cảnh gập ghềnh, v0 generic-trên-zero-data hại
+uy tín). Onboarding nay đi thẳng goal → asset → Twin; `step_2_asset.asset_ack`
+thay cho cả v0 lẫn v1. Stories 1.1–1.6 dưới đây giữ để lưu vết, **không còn thực thi.**
 
-- **1.1** `reading_prompt.py`: `READING_PROMPT` + parse, khuôn theo `storytelling_prompt.py`. Text cố định (mở/đóng/CTA) ở YAML, chỉ *cấu trúc* prompt ở code.
-- **1.2** `reading_service.py`: nhận `{salutation, display_name, goal_label, (optional) số}` → `call_llm(task_type="reading", user_id=…, shared_cache=False)`, `provider="groq"` cho latency. Flush-only.
-- **1.3** Hook v0 vào `_on_goal_picked`: sau goal_ack → Reading v0 → rồi mới `_send_first_asset_prompt`.
-- **1.4** Reading v1: sau `_save_onboarding_first_asset`, đọc lại trên số thật trước Twin teaser.
-- **1.5** `content/onboarding/welcome_v2.yaml` block `reading`: câu mở, disclaimer "em đoán", CTA "cho em xem thật".
-- **1.6** Persona QA: chạy `prompt-tester` cho cả 3 biến thể xưng hô + ≥3 goal. Tiêu chí: 0 câu phán xét, 0 lần "Personal CFO/CFO", xưng hô đúng 100%.
+- ~~**1.1** `reading_prompt.py`: `READING_PROMPT` + parse.~~ → file đã xoá.
+- ~~**1.2** `reading_service.py`: `call_llm(task_type="reading", …)`.~~ → file đã xoá.
+- ~~**1.3** Hook v0 vào `_on_goal_picked`.~~ → hook + flag đã gỡ.
+- ~~**1.4** Reading v1 sau `_save_onboarding_first_asset`.~~ → thay bằng `asset_ack`.
+- ~~**1.5** block `reading` trong `welcome_v2.yaml`.~~ → block đã xoá.
+- ~~**1.6** Persona QA `prompt-tester`.~~ → không còn prompt để QA.
 
 ### Epic 2 — Zero-effort Screenshot Onboarding (WOW #2)
 **Mục tiêu:** "chụp màn hình app ngân hàng → 30 giây thấy tài sản".
@@ -165,7 +199,7 @@ xúc dẫn người dùng *tự nguyện* cung cấp dữ liệu.
 
 | Flag | Mặc định T6 | Tắt → hành vi |
 |---|---|---|
-| `READING_ENABLED` | `true` | Bỏ qua Reading v0/v1; onboarding đi thẳng goal → asset → Twin teaser như cũ. |
+| ~~`READING_ENABLED`~~ | — | ❌ **GỠ BỎ** — Reading đã xoá hẳn, không còn flag. Onboarding luôn đi thẳng goal → asset → Twin. |
 | `SCREENSHOT_ONBOARDING_ENABLED` | `false` (cắt khỏi T6 mặc định) | Nhánh ảnh ở first-asset không parse; chỉ nhận gõ tay. |
 | `PROACTIVE_COMPANION_ENABLED` | `true` | `check_all_triggers` bỏ qua trigger mới; các trigger empathy cũ vẫn chạy. |
 
@@ -179,14 +213,13 @@ nơi đọc + test on/off (xem Issue #1.3, #2.3, #3.1 trong issues doc).
 
 - [ ] Migration salutation applied; user cũ fallback "bạn" không lỗi.
 - [ ] Onboarding hỏi tên + xưng hô (3 nút) trước goal.
-- [ ] Reading v0 (phút 1) + v1 (phút 3) chạy, đúng xưng hô 100% trong test.
-- [ ] `prompt-tester` pass: 0 phán xét, 0 "CFO" user-facing, persona nhất quán.
+- [x] ~~Reading v0/v1~~ → **GỠ BỎ**; onboarding đi thẳng goal → asset → Twin; `asset_ack` bắc cầu, demo path sạch (test `test_onboarding_no_reading.py`).
 - [ ] Screenshot parse số dư ≥ 2 bank với fallback gõ tay (hoặc cắt scope có ghi chú).
 - [ ] Empathy trigger mới gửi qua job hourly, copy ấm, đúng xưng hô.
 - [ ] `vi-localization-checker` pass; 0 chuỗi VN hardcode; mọi copy ở YAML.
 - [ ] `layer-contract-checker` pass; 0 `db.commit()` trong service.
 - [ ] Twin teaser phút-4 vẫn nguyên (không regression onboarding v2).
-- [ ] 3 feature flag (`READING_ENABLED`, `SCREENSHOT_ONBOARDING_ENABLED`, `PROACTIVE_COMPANION_ENABLED`) đọc ở router/worker; mỗi flag có test on/off; tắt được riêng không lỗi.
+- [ ] 2 feature flag còn lại (`SCREENSHOT_ONBOARDING_ENABLED`, `PROACTIVE_COMPANION_ENABLED`) đọc ở router/worker; mỗi flag có test on/off; tắt được riêng không lỗi. (`READING_ENABLED` đã gỡ.)
 
 ---
 
@@ -202,9 +235,11 @@ nơi đọc + test on/off (xem Issue #1.3, #2.3, #3.1 trong issues doc).
 ## 🧭 Recommendations / Thứ tự thực thi
 
 1. **Epic 0 trước nhất** (~1 ngày) — chặn mọi thứ phía sau.
-2. **Epic 1 The Reading** (~2-3 ngày) — bang-for-buck cao nhất, đứng độc lập.
+2. ~~**Epic 1 The Reading**~~ — ❌ **GỠ BỎ** (xem banner DECISION).
 3. **Epic 3 Proactive** (~2-3 ngày) — rẻ, hạ tầng có sẵn.
 4. **Epic 2 Screenshot** (~3-5 ngày) — rủi ro cao nhất, làm cuối; cắt được nếu trượt T6.
 
-**Nếu chỉ kịp 1 thứ cho tháng 6:** ship Epic 0 + Epic 1 (The Reading). Đó là cú WOW
-ở giây thứ 30 — đúng chỗ Twin đang bị đẩy lùi tới tuần 2.
+**Nếu chỉ kịp 1 thứ cho tháng 6:** ship Epic 0 (salutation) + làm flow goal → asset →
+Twin thật mượt. WOW thật của sản phẩm là **Twin** ở phút-4; salutation + chuyển cảnh
+liền mạch (asset_ack) đưa người dùng tới đó mà không vấp. (The Reading từng được kỳ
+vọng là hook phút-30 nhưng thực tế phản tác dụng — xem banner.)
