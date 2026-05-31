@@ -13,7 +13,10 @@ from backend.wealth.valuation.crypto import (
     value_crypto_holding,
     value_crypto_holdings,
 )
-from backend.wealth.valuation.gold import value_gold_holding
+from backend.wealth.valuation.gold import (
+    value_gold_holding,
+    value_gold_holdings,
+)
 from backend.wealth.valuation.stock import (
     value_stock_holding,
     value_stock_holdings,
@@ -224,6 +227,57 @@ async def test_value_stock_holdings_empty_input_skips_provider():
     fetch = AsyncMock(return_value={})
     with patch("backend.wealth.valuation.stock.get_stock_quotes", fetch):
         valuations = await value_stock_holdings([])
+
+    assert valuations == {}
+    assert fetch.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_value_gold_holdings_batches_single_provider_call():
+    sjc = _asset("gold", {"type": "SJC", "quantity": "2", "avg_price": "80000000"})
+    ring = _asset(
+        "gold", {"type": "RING_24K", "quantity": "1", "avg_price": "7000000"}
+    )
+    quotes = {
+        "SJC_GOLD": _quote("SJC_GOLD", "90000000", "gold"),
+        "RING_24K": _quote("RING_24K", "7500000", "gold"),
+    }
+    fetch = AsyncMock(return_value=quotes)
+    with patch("backend.wealth.valuation.gold.get_gold_quotes", fetch):
+        valuations = await value_gold_holdings([sjc, ring])
+
+    assert fetch.await_count == 1
+    assert set(fetch.await_args.args[0]) == {"SJC_GOLD", "RING_24K"}
+    assert valuations[sjc].current_value == Decimal("180000000")
+    assert valuations[ring].current_value == Decimal("7500000")
+    assert all(not v.is_stale for v in valuations.values())
+
+
+@pytest.mark.asyncio
+async def test_value_gold_holdings_ignores_non_gold_and_handles_provider_failure():
+    cash = _asset("cash", {}, current_value=Decimal("50000000"))
+    sjc = _asset(
+        "gold",
+        {"type": "SJC", "quantity": "2", "avg_price": "80000000"},
+        current_value=Decimal("160000000"),
+    )
+    with patch(
+        "backend.wealth.valuation.gold.get_gold_quotes",
+        AsyncMock(side_effect=ProviderUnavailable("down")),
+    ):
+        valuations = await value_gold_holdings([cash, sjc])
+
+    assert cash not in valuations
+    # Falls back to stored avg_price × quantity, flagged stale.
+    assert valuations[sjc].current_price == Decimal("80000000")
+    assert valuations[sjc].is_stale is True
+
+
+@pytest.mark.asyncio
+async def test_value_gold_holdings_empty_input_skips_provider():
+    fetch = AsyncMock(return_value={})
+    with patch("backend.wealth.valuation.gold.get_gold_quotes", fetch):
+        valuations = await value_gold_holdings([])
 
     assert valuations == {}
     assert fetch.await_count == 0

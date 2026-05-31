@@ -31,10 +31,45 @@ groq_client = AsyncOpenAI(
 
 # Tasks that use Claude (only OCR and complex analysis)
 USE_CLAUDE = {"ocr", "complex_analysis"}
+
+# max_tokens is a CEILING, not a target. Billing and latency track the
+# ACTUAL completion tokens the model emits, so a high cap costs nothing for
+# a short reply — it only stops the model being cut off mid-sentence.
+#
+# Two compounding traps make a tight ceiling dangerous here:
+#
+# 1. Vietnamese density: diacritic-dense text tokenizes 2-4x heavier than
+#    English, so a "max 200 từ" advisory reply routinely runs 700-1000
+#    tokens of VISIBLE answer — and models overshoot a soft word cap.
+# 2. Hidden reasoning tokens: DeepSeek V4-Flash is a hybrid-reasoning model.
+#    Its chain-of-thought is billed INSIDE max_tokens but lands in a separate
+#    `reasoning_content` field we never read — we only surface
+#    `message.content`. So the budget is silently SPLIT between invisible
+#    reasoning and the actual answer. When reasoning runs long, the visible
+#    answer truncates mid-sentence even though the reply LOOKS short. This is
+#    why the cut point is intermittent (it tracks reasoning length, not a
+#    fixed offset) and why bumping the cap to 1200 "fixed it" only sometimes.
+#
+# A 500-token default silently truncated EVERY generative Vietnamese task
+# (advisory, investment_advice, roadmap_advisory, report_text, the twin /
+# life-event narratives, news summaries…) mid-sentence. We rediscovered this
+# repeatedly via whack-a-mole — report_text, parse_receipt, then advisory —
+# before sizing the default for reasoning + a FULL Vietnamese answer (~1000
+# reasoning + ~1000 answer). 2000 matches Tier-3's per-turn ceiling, so the
+# stack is consistent, and a new generative task_type is safe without
+# touching this file.
+#
+# Only register a task below when it needs MORE than the default (JSON
+# structuring), never less — capping below the default re-introduces the bug.
+DEFAULT_MAX_TOKENS = 2000
 TASK_MAX_TOKENS = {
-    # Monthly reports contain multiple sections + bullets and were
-    # getting cut mid-sentence at 500 tokens in production.
-    "report_text": 900,
+    # Receipt structuring returns a JSON object (amount, merchant, date,
+    # note, items[]). At 500 tokens V4-Flash spent the budget reasoning
+    # before the answer and truncated the JSON mid-object (cut right after
+    # "date"), so json.loads failed and the bot rejected valid receipts. An
+    # itemized receipt (20-30 line items) plus the hidden reasoning trace
+    # needs headroom ABOVE the generous default, so it stays registered.
+    "parse_receipt": 2500,
 }
 
 
@@ -184,7 +219,7 @@ async def call_llm(
     # via content/cost/budget_messages.yaml.
     from backend.adapters.llm.cost_tracking_adapter import tracked_call
 
-    max_tokens = TASK_MAX_TOKENS.get(task_type, 500)
+    max_tokens = TASK_MAX_TOKENS.get(task_type, DEFAULT_MAX_TOKENS)
 
     async with tracked_call(
         db, user_id, provider=provider, operation=task_type
@@ -198,6 +233,14 @@ async def call_llm(
                 timeout=effective_timeout,
             )
             result = response.choices[0].message.content.strip()
+            if getattr(response.choices[0], "finish_reason", None) == "length":
+                logger.warning(
+                    "%s response truncated at max_tokens=%d (task=%s) — "
+                    "raise TASK_MAX_TOKENS if downstream parsing fails",
+                    provider,
+                    max_tokens,
+                    task_type,
+                )
             tokens_used = response.usage.total_tokens if response.usage else None
             if response.usage:
                 recorder.tokens_in = response.usage.prompt_tokens or 0

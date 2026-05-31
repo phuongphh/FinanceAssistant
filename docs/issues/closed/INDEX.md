@@ -460,6 +460,21 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #799 | Pre-Phase | [bug] Callback txsrc_wallet:* không gửi response — user stuck ở màn hình chọn nguồn | [pre-phase/issue-799.md](by-phase/pre-phase/issue-799.md) |
 | #801 | Pre-Phase | [bug] Money-in transaction fails with integer overflow when amount > 2.1 tỷ | [pre-phase/issue-801.md](by-phase/pre-phase/issue-801.md) |
 | #818 | Pre-Phase | [db] Migration 20260523_life_insurance_date_fields_backfill fails — wrong down_revision + revision ID too long | [pre-phase/issue-818.md](by-phase/pre-phase/issue-818.md) |
+| #845 | Pre-Phase | [bug] Expense mini-app 'Không tải được dữ liệu' — không gọi được API sau khi load | [pre-phase/issue-845.md](by-phase/pre-phase/issue-845.md) |
+| #854 | Pre-Phase | OCR receipt flow drops transfer note and skips category selection | [pre-phase/issue-854.md](by-phase/pre-phase/issue-854.md) |
+| #861 | Pre-Phase | [Bug] Twin dashboard status pill shows "Story 3.2" placeholder instead of causality explanation | [pre-phase/issue-861.md](by-phase/pre-phase/issue-861.md) |
+| #865 | Pre-Phase | Mini App wealth dashboard không mở được (404 JS + 422 API) | [pre-phase/issue-865.md](by-phase/pre-phase/issue-865.md) |
+| #867 | Pre-Phase | Mini App wealth dashboard API trả về 401 Unauthorized | [pre-phase/issue-867.md](by-phase/pre-phase/issue-867.md) |
+| #869 | Pre-Phase | Dashboard API vẫn trả về 401 sau khi fix signature field | [pre-phase/issue-869.md](by-phase/pre-phase/issue-869.md) |
+| #882 | Pre-Phase | Migration fails: 20260528_default_expense_source_profile references wrong down_revision | [pre-phase/issue-882.md](by-phase/pre-phase/issue-882.md) |
+| #884 | Pre-Phase | Migration fails again: revision ID 20260528_default_expense_source_profile exceeds varchar(32) | [pre-phase/issue-884.md](by-phase/pre-phase/issue-884.md) |
+| #887 | Pre-Phase | rebuild-finance.sh: alembic upgrade head wrapped in single string | [pre-phase/issue-887.md](by-phase/pre-phase/issue-887.md) |
+| #891 | Pre-Phase | Expense confirmation: use default_expense_source + final-confirm UX | [pre-phase/issue-891.md](by-phase/pre-phase/issue-891.md) |
+| #897 | Pre-Phase | feat(expense-confirm): restore footer buttons + Vietnam TZ + source/amount edit wizards | [pre-phase/issue-897.md](by-phase/pre-phase/issue-897.md) |
+| #901 | Pre-Phase | Fix funding-source balance adjustment on edit/reverse + deterministic "latest" ordering | [pre-phase/issue-901.md](by-phase/pre-phase/issue-901.md) |
+| #907 | Pre-Phase | Onboarding: resume nudge collides with name/salutation sub-steps ("two flows at once") | [pre-phase/issue-907.md](by-phase/pre-phase/issue-907.md) |
+| #910 | Phase 4 | [Phase 4.4] Gỡ bỏ "The Reading" — chữa 3 pain của first-5-minutes WOW | [phase-4/issue-910.md](by-phase/phase-4/issue-910.md) |
+| #912 | Pre-Phase | Tech debt: i18n hóa 6 chuỗi onboarding + gỡ env-read khỏi service layer | [pre-phase/issue-912.md](by-phase/pre-phase/issue-912.md) |
 
-**Total:** 456 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 439 Pre-Phase)
+**Total:** 471 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 453 Pre-Phase)

@@ -108,6 +108,8 @@ def test_dashboard_common_exposes_expected_helpers() -> None:
         "formatMoneyFull",
         "escapeHtml",
         "fetchAPI",
+        "resolveInitData",
+        "authHeaders",
         "formatDate",
         "resolveDateFormat",
     ])
@@ -148,9 +150,9 @@ def test_format_money_full_uses_vi_locale_grouping() -> None:
             'rounded': DC.formatMoneyFull(1500.7),
         };
     """)
-    assert cases["1000"] == "1.000đ"
-    assert cases["1234567"] == "1.234.567đ"
-    assert cases["rounded"] == "1.501đ"
+    assert cases["1000"] == "1,000đ"
+    assert cases["1234567"] == "1,234,567đ"
+    assert cases["rounded"] == "1,501đ"
 
 
 def test_escape_html_blocks_xss_vectors() -> None:
@@ -214,6 +216,80 @@ def test_fetch_api_includes_telegram_init_data_header() -> None:
     assert captured["data"] == {"ok": 1}
 
 
+def test_fetch_api_waits_for_late_init_data_before_fallback() -> None:
+    """Telegram WebApp can hydrate initData a tick late on cold loads.
+    fetchAPI should wait briefly so first request is authenticated.
+    """
+    captured = _evaluate("""
+        let calls = 0;
+        ctx.Telegram.WebApp.initData = '';
+        ctx.fetch = (url, opts) => {
+            calls += 1;
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({ data: { ok: calls, hdr: opts && opts.headers && opts.headers['X-Telegram-Init-Data'] } }),
+            });
+        };
+        setTimeout(() => { ctx.Telegram.WebApp.initData = 'late-stub'; }, 20);
+        const data = await DC.fetchAPI('/expense-dashboard/overview');
+        return data;
+    """)
+    assert captured["ok"] == 1
+    assert captured["hdr"] == "late-stub"
+
+
+def test_fetch_api_uses_query_initdata_without_double_decode_breakage() -> None:
+    """URLSearchParams already decodes values; decode again can crash on `%`."""
+    captured = _evaluate("""
+        let seenHeader = '';
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { search: '?tgWebAppData=query%25signed%3Dabc' };
+        ctx.fetch = (url, opts) => {
+            seenHeader = opts && opts.headers && opts.headers['X-Telegram-Init-Data'];
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({ data: { ok: 1 } }),
+            });
+        };
+        const data = await DC.fetchAPI('/expense-dashboard/overview');
+        return { data, seenHeader };
+    """)
+    assert captured["data"] == {"ok": 1}
+    assert captured["seenHeader"] == "query%signed=abc"
+
+
+def test_resolve_init_data_reads_hash_fragment() -> None:
+    """Root-cause regression guard (issue #865): Telegram puts launch
+    params in the URL *hash* (#tgWebAppData=…), not the query string. When
+    tg.initData hasn't hydrated, resolveInitData must recover auth from the
+    hash so the page-load GET still authenticates instead of 401-ing.
+    """
+    captured = _evaluate("""
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '#tgWebAppData=hash%25signed%3Dxyz&tgWebAppVersion=7.0', search: '' };
+        const resolved = await DC.resolveInitData(0);
+        return { resolved };
+    """)
+    assert captured["resolved"] == "hash%signed=xyz"
+
+
+def test_auth_headers_attach_resolved_init_data() -> None:
+    """Mutation guard: POST/PATCH headers must carry the same resolved
+    initData the page-load GET sent. Without this, a page that recovered
+    auth from the hash would load but silently 401 on every mutation.
+    """
+    captured = _evaluate("""
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '#tgWebAppData=from-hash', search: '' };
+        const headers = await DC.authHeaders();
+        return headers;
+    """)
+    assert captured["X-Telegram-Init-Data"] == "from-hash"
+    assert captured["Content-Type"] == "application/json"
+
+
 def test_fetch_api_surfaces_payload_error() -> None:
     """When the API responds 200 with a structured error envelope the
     helper must throw so callers' catch blocks fire.
@@ -232,6 +308,29 @@ def test_fetch_api_surfaces_payload_error() -> None:
         }
     """)
     assert threw == {"threw": True, "message": "no funds"}
+
+
+def test_fetch_api_throws_no_init_data_when_session_absent() -> None:
+    """Root-cause guard (menu-button 401): when no initData can be resolved
+    anywhere (tg.initData empty, no URL hash, no query), fetchAPI must throw a
+    distinct NO_INIT_DATA error WITHOUT firing the doomed request — so the UI
+    can tell "opened outside Telegram / launch delivered nothing" apart from a
+    server-*rejected* session (wrong bot token), instead of conflating both as
+    an opaque 'API 401'.
+    """
+    result = _evaluate("""
+        let calls = 0;
+        ctx.Telegram.WebApp.initData = '';
+        ctx.location = { hash: '', search: '' };
+        ctx.fetch = () => { calls += 1; return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: {} }) }); };
+        try {
+            await DC.fetchAPI('/wealth/overview');
+            return { threw: false, calls };
+        } catch (err) {
+            return { threw: true, message: String(err.message), calls };
+        }
+    """)
+    assert result == {"threw": True, "message": "NO_INIT_DATA", "calls": 0}
 
 
 def test_fetch_api_throws_on_http_failure() -> None:

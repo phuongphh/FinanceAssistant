@@ -230,6 +230,26 @@ def cash_subtype_keyboard() -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
+def cash_existing_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Prompt when user already has a ``Tiền mặt`` asset."""
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "Thêm",
+                    "callback_data": build_callback(CB_ASSET_ADD, "cash_existing", "add"),
+                },
+                {
+                    "text": "Hủy",
+                    "callback_data": build_callback(
+                        CB_ASSET_ADD, "cash_existing", "cancel"
+                    ),
+                },
+            ]
+        ]
+    }
+
+
 def stock_subtype_keyboard() -> InlineKeyboardMarkup:
     subs = get_subtypes(AssetType.STOCK.value)
     rows = [
@@ -903,8 +923,10 @@ def asset_dashboard_edit_keyboard(
     ]
     for asset_id, label in page_items:
         clean = " ".join(str(label).split())
-        if len(clean) > 34:
-            clean = clean[:31].rstrip() + "…"
+        # Keep delete CTA as a single icon so the edit button can claim
+        # most of the row width in Telegram (roughly 9:1 visual split).
+        if len(clean) > 48:
+            clean = clean[:45].rstrip() + "…"
         keyboard.append(
             [
                 {
@@ -912,7 +934,7 @@ def asset_dashboard_edit_keyboard(
                     "callback_data": build_callback(CB_ASSET_ROW, "edit", asset_id),
                 },
                 {
-                    "text": "🗑️",
+                    "text": "🗑",
                     "callback_data": build_callback(CB_ASSET_ROW, "delete", asset_id),
                 },
             ]

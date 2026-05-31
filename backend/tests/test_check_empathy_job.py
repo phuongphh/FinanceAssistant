@@ -10,7 +10,7 @@ Covers:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -76,6 +76,9 @@ class TestQuietHours:
             return_value=lambda: _FakeSession(),
         ), patch(
             "backend.jobs.check_empathy_triggers.get_active_users",
+            new_callable=AsyncMock, return_value=[],
+        ), patch(
+            "backend.jobs.check_empathy_triggers._get_onboarded_candidates",
             new_callable=AsyncMock, return_value=[],
         ):
             await check_empathy_triggers.run_hourly_empathy_check(now=now)

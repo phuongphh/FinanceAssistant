@@ -87,6 +87,7 @@ keyboards:
     edit_age: "🎂 Đổi nhóm tuổi"
     notifications: "🔔 Cài thông báo"
     glossary: "❓ Giải thích các mục"
+    default_expense_source: "💸 Nguồn chi tiêu thường xuyên"
     back: "◀️ Quay lại"
   age:
     none: "🚫 Không muốn nói"
@@ -145,3 +146,11 @@ messages:
   time_invalid_format: "Giờ không hợp lệ. Format: HH:MM (00:00 - 23:59)"
   time_updated: "✅ Đã cập nhật giờ thành {time}."
   default_name: "Bạn"
+
+default_expense_source:
+  panel: "💸 Nguồn chi tiêu thường xuyên bạn đang dùng là *{source}*.\n\nBấm *Đổi nguồn* nếu bạn muốn thay đổi."
+  picker_title: "Chọn nguồn chi tiêu thường xuyên:"
+  change_button: "Đổi nguồn"
+  back_button: "◀️ Quay lại Profile"
+  changed_message: "✅ Đã đổi nguồn chi tiêu thường xuyên sang: {source}."
+  invalid: "Nguồn chi tiêu không hợp lệ."

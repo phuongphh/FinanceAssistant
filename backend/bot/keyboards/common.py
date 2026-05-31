@@ -21,11 +21,15 @@ TELEGRAM_CALLBACK_DATA_MAX_BYTES: Final[int] = 64
 class CallbackPrefix:
     EDIT_TRANSACTION = "edit_tx"
     CHANGE_CATEGORY = "change_cat"
+    CHANGE_SOURCE = "change_src"
+    EDIT_AMOUNT = "edit_amt"
+    CONFIRM_EDIT_DONE = "tx_done"
     DELETE_TRANSACTION = "del_tx"
     UNDO_TRANSACTION = "undo_tx"
     UNDO_TRANSACTION_BATCH = "undo_batch"
     VIEW_REPORT = "view_report"
     SELECT_CATEGORY = "sel_cat"
+    RECEIPT_CATEGORY = "rcat"
     CONFIRM_ACTION = "confirm"
     CANCEL_ACTION = "cancel"
 

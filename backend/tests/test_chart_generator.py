@@ -4,7 +4,7 @@ import zlib
 
 import pytest
 
-from backend.services.chart_generator import _empty_chart, generate_portfolio_chart
+from backend.services.chart_generator import _cfg_for, _empty_chart, generate_portfolio_chart
 
 
 def _is_png(data: bytes) -> bool:
@@ -25,6 +25,10 @@ def _png_dimensions(data: bytes) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 
 class TestGeneratePortfolioChart:
+    def test_cfg_for_life_insurance_uses_vietnamese_label(self):
+        cfg = _cfg_for("life_insurance", 0)
+        assert cfg["label"] == "Bảo hiểm nhân thọ"
+
     def test_returns_png_bytes(self):
         assets = [{"asset_type": "stocks", "value": 10_000_000}]
         result = generate_portfolio_chart(assets)

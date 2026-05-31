@@ -71,14 +71,26 @@ def _is_ngrok_free_interstitial_host(base_url: str) -> bool:
 
 
 def _bumped_mini_app_url(base: str, build_hash: str) -> str:
-    """Return ``{base}/miniapp/wealth?b={build_hash}`` preserving any existing
-    query string or trailing slash on ``base``.
+    """Return ``{base}/miniapp/wealth?b={build_hash}&source=chat_menu_button``
+    preserving any existing query string or trailing slash on ``base``.
 
     Telegram caches WebView HTML by URL, so the build hash MUST live on the
     URL itself (not just inside the document) for the next tap to defeat the
     cache. Using a stable parameter name (``b``) means the cached entry from
     deploy N is invalidated by the new value at deploy N+1 — Telegram treats
     them as different URLs.
+
+    The ``source`` param does double duty. Primarily it aligns this entry
+    point with the ``urls.py`` convention every other launch URL already
+    follows (inline "Mở dashboard" buttons carry ``&source=...``), giving us
+    analytics attribution for menu-button taps. Critically, it also means the
+    menu URL is NOT byte-identical to a bare ``?b=<hash>`` URL: if the WebView
+    ever cached a blank/failed render of the old menu URL, ``?b`` alone cannot
+    bust it on a restart that recomputes the *same* build hash (the hash only
+    changes when CSS/JS/template bytes change, not on every boot). Carrying a
+    distinct ``source`` yields a URL the WebView has never seen, escaping any
+    poisoned cache entry — the same reason inline buttons render fine while a
+    bare menu URL stays blank.
     """
     base = base.rstrip("/")
     parts = urlsplit(f"{base}/miniapp/wealth")
@@ -88,6 +100,7 @@ def _bumped_mini_app_url(base: str, build_hash: str) -> str:
         if kv
     )
     existing["b"] = build_hash
+    existing["source"] = "chat_menu_button"
     new_query = urlencode(existing)
     return urlunsplit(
         (parts.scheme, parts.netloc, parts.path, new_query, parts.fragment)

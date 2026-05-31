@@ -42,7 +42,11 @@ from backend.models.onboarding_session import (
 from backend.models.user import User
 from backend.services import onboarding_service as legacy_onboarding_service
 from backend.services.founding import founding_member_service
-from backend.services.onboarding import data_quality_service, next_action_service, onboarding_service
+from backend.services.onboarding import (
+    data_quality_service,
+    next_action_service,
+    onboarding_service,
+)
 from backend.services.telegram_service import (
     answer_callback,
     edit_message_text,
@@ -73,13 +77,7 @@ def _trust_keyboard(copy: dict[str, Any]) -> dict:
                     "text": copy["buttons"]["ok_label"],
                     "callback_data": copy["callbacks"]["ok"],
                 }
-            ],
-            [
-                {
-                    "text": copy["buttons"]["question_label"],
-                    "callback_data": copy["callbacks"]["question"],
-                }
-            ],
+            ]
         ]
     }
 
@@ -87,8 +85,17 @@ def _trust_keyboard(copy: dict[str, Any]) -> dict:
 def _quality_keyboard(value: Decimal) -> dict:
     rows = []
     for idx, (_, candidate) in enumerate(data_quality_service.estimate_options(value)):
-        rows.append([{"text": f"✅ {format_money_short(candidate)}", "callback_data": f"onboarding_v2:asset_confirm:{idx}"}])
-    rows.append([{"text": "✍️ Nhập lại", "callback_data": "onboarding_v2:asset_reenter"}])
+        rows.append(
+            [
+                {
+                    "text": f"✅ {format_money_short(candidate)}",
+                    "callback_data": f"onboarding_v2:asset_confirm:{idx}",
+                }
+            ]
+        )
+    rows.append(
+        [{"text": "✍️ Nhập lại", "callback_data": "onboarding_v2:asset_reenter"}]
+    )
     return {"inline_keyboard": rows}
 
 
@@ -104,6 +111,50 @@ def is_v2_enabled() -> bool:
     import os
 
     return os.environ.get(FEATURE_FLAG_ENV, "true").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+SCREENSHOT_ONBOARDING_FLAG_ENV = "SCREENSHOT_ONBOARDING_ENABLED"
+
+
+def is_screenshot_onboarding_enabled() -> bool:
+    """Screenshot onboarding (Phase 4.4 Epic 2, P2) is OFF by default.
+
+    When a user is on the first-asset step they can paste a screenshot of
+    their bank/wallet balance instead of typing the number. This is a
+    cuttable nicety, so it ships dark — operator flips it on once the
+    balance-OCR path is validated in prod. The flag is consulted at the
+    worker edge (photo routing) and here for the prompt hint; the env read
+    never reaches a service (layer contract), same pattern as
+    ``is_v2_enabled``.
+    """
+    import os
+
+    return os.environ.get(SCREENSHOT_ONBOARDING_FLAG_ENV, "false").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+TRUST_CARD_FLAG_ENV = "TRUST_CARD_ENABLED"
+
+
+def is_trust_card_enabled() -> bool:
+    """Trust/privacy card is shown by default; operator can disable via env.
+
+    Read at the handler edge and passed into ``onboarding_service.set_goal``
+    so the service stays env-free (layer contract), same pattern as
+    ``is_v2_enabled`` / ``is_screenshot_onboarding_enabled``.
+    """
+    import os
+
+    return os.environ.get(TRUST_CARD_FLAG_ENV, "true").lower() not in (
         "0",
         "false",
         "no",
@@ -274,10 +325,10 @@ async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> Non
 
 
 async def _send_name_prompt(chat_id: int) -> None:
+    copy = onboarding_service.load_copy()
     await send_message(
         chat_id,
-        "Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨\n\n"
-        "(Bạn chỉ cần nhắn tên bạn vào đây)",
+        copy["step_name"]["prompt"],
         parse_mode="HTML",
     )
 
@@ -296,15 +347,20 @@ async def handle_name_text_input(
 
     is_valid, name = legacy_onboarding_service.validate_display_name(raw_text)
     if not is_valid:
+        copy = onboarding_service.load_copy()
         await send_message(
             chat_id,
-            "Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.",
+            copy["step_name"]["invalid"],
             parse_mode="HTML",
         )
         return True
 
     await legacy_onboarding_service.set_display_name(db, user.id, name)
     user.display_name = name
+    # Name lives on the User row, so the session's onupdate never fires —
+    # bump it explicitly so the resume-nudge delay measures from now, not
+    # /start (see onboarding_service.touch_session).
+    await onboarding_service.touch_session(db, user.id)
     await db.flush()
 
     await send_message(
@@ -312,9 +368,64 @@ async def handle_name_text_input(
         f"Chào {name} 👋 Mình hỏi nhanh 1 câu để cá nhân hoá nhé:",
         parse_mode="HTML",
     )
-    await _send_goal_question(db, chat_id, user)
+    await _send_salutation_question(db, chat_id, user)
     analytics.track("onboarding_v2_name_captured", user_id=user.id)
     return True
+
+
+async def _send_salutation_question(db: AsyncSession, chat_id: int, user: User) -> None:
+    copy = onboarding_service.load_copy()
+    step = copy["step_salutation"]
+    prefix = step["callback_prefix"]
+    text = f"<b>{step['header']}</b>\n\n{step['body']}"
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": step["buttons"]["anh"], "callback_data": f"{prefix}anh"}],
+            [{"text": step["buttons"]["chị"], "callback_data": f"{prefix}chị"}],
+            [{"text": step["buttons"]["bạn"], "callback_data": f"{prefix}bạn"}],
+        ]
+    }
+    await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
+    analytics.track("onboarding_v2_salutation_asked", user_id=user.id)
+
+
+async def _on_salutation_picked(
+    db: AsyncSession,
+    chat_id: int,
+    callback_id: str,
+    message_id: int | None,
+    user: User,
+    salutation: str,
+) -> None:
+    updated = await onboarding_service.set_salutation(db, user.id, salutation)
+    if updated is None:
+        await answer_callback(callback_id, text="Lựa chọn không hợp lệ")
+        return
+    # Salutation lives on the User row too — bump the session so reaching goal
+    # pick doesn't trip an immediate nudge off the stale /start timestamp.
+    await onboarding_service.touch_session(db, user.id)
+    await answer_callback(callback_id)
+
+    copy = onboarding_service.load_copy()
+    ack = copy["step_salutation"]["acks"].get(salutation, "")
+    if message_id is not None and ack:
+        try:
+            await edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=ack,
+                parse_mode="HTML",
+                reply_markup={"inline_keyboard": []},
+            )
+        except Exception:
+            logger.debug("edit on salutation pick failed", exc_info=True)
+
+    analytics.track(
+        "onboarding_v2_salutation_picked",
+        user_id=user.id,
+        properties={"salutation": salutation},
+    )
+    await _send_goal_question(db, chat_id, user)
 
 
 async def _on_goal_picked(
@@ -325,7 +436,9 @@ async def _on_goal_picked(
     user: User,
     goal_code: str,
 ) -> None:
-    session = await onboarding_service.set_goal(db, user.id, goal_code)
+    session = await onboarding_service.set_goal(
+        db, user.id, goal_code, trust_card_enabled=is_trust_card_enabled()
+    )
     if session is None:
         await answer_callback(callback_id, text="Lựa chọn không hợp lệ")
         return
@@ -350,6 +463,7 @@ async def _on_goal_picked(
         user_id=user.id,
         properties={"goal": goal_code},
     )
+
     if session.current_step == STEP_TRUST_PRIVACY:
         await _send_trust_card(db, chat_id, user)
     else:
@@ -364,34 +478,19 @@ async def _send_trust_card(db: AsyncSession, chat_id: int, user: User) -> None:
     bullets = "\n".join(f"• {line}" for line in copy.get("bullets", []))
     text = f"<b>{copy['header']}</b>\n\n{copy['body']}\n\n{bullets}"
     await onboarding_service.mark_trust_shown(db, user.id)
-    await send_message(chat_id, text, parse_mode="HTML", reply_markup=_trust_keyboard(copy))
+    await send_message(
+        chat_id, text, parse_mode="HTML", reply_markup=_trust_keyboard(copy)
+    )
     analytics.track("onboarding_trust_card_shown", user_id=user.id)
 
 
-async def _on_trust_ok(db: AsyncSession, chat_id: int, callback_id: str, user: User) -> None:
+async def _on_trust_ok(
+    db: AsyncSession, chat_id: int, callback_id: str, user: User
+) -> None:
     await onboarding_service.accept_trust(db, user.id)
     await answer_callback(callback_id, text="Cảm ơn bạn 💚")
     analytics.track("onboarding_trust_accepted", user_id=user.id)
     await _send_first_asset_prompt(db, chat_id, user)
-
-
-async def _on_trust_question(db: AsyncSession, chat_id: int, callback_id: str, user: User) -> None:
-    before = await onboarding_service.get_session(db, user.id)
-    should_create_feedback = before is not None and before.trust_question_raised_at is None
-    await onboarding_service.mark_trust_question_raised(db, user.id)
-    if should_create_feedback:
-        db.add(Feedback(
-            user_id=user.id,
-            content="[trust_question] User asked a question before entering assets",
-            trigger="onboarding_trust_card",
-            status=FEEDBACK_STATUS_NEW,
-            priority="high",
-        ))
-    await db.flush()
-    copy = _load_trust_copy()
-    await answer_callback(callback_id, text="Đã ghi nhận")
-    await send_message(chat_id, copy["question_ack"], parse_mode="HTML")
-    analytics.track("onboarding_trust_question_raised", user_id=user.id)
 
 
 # ---------- Step 2 ----------------------------------------------------
@@ -400,7 +499,12 @@ async def _on_trust_question(db: AsyncSession, chat_id: int, callback_id: str, u
 async def _send_first_asset_prompt(db: AsyncSession, chat_id: int, user: User) -> None:
     copy = onboarding_service.load_copy()
     step = copy["step_2_asset"]
-    text = f"<b>{step['header']}</b>\n\n{step['body']}"
+    body = step["body"]
+    # Only advertise the screenshot path when the feature is live, so the
+    # hint never promises something the worker won't act on.
+    if is_screenshot_onboarding_enabled() and step.get("screenshot_hint"):
+        body = f"{body}\n\n{step['screenshot_hint']}"
+    text = f"<b>{step['header']}</b>\n\n{body}"
     keyboard = {
         "inline_keyboard": [
             [
@@ -411,14 +515,190 @@ async def _send_first_asset_prompt(db: AsyncSession, chat_id: int, user: User) -
     await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
 
 
+async def handle_first_asset_screenshot(
+    db: AsyncSession, message: dict, user: User
+) -> bool:
+    """Read a balance screenshot as the user's first asset (Epic 2).
+
+    Returns ``True`` when the message is consumed — which, once the user
+    is on the first-asset step, is *any* photo: a screenshot there is
+    meant as a balance, so on OCR failure we nudge them to type the
+    number rather than letting the receipt-expense path mis-handle it.
+    Returns ``False`` only when the user is NOT on the first-asset step,
+    so the caller falls through to the receipt OCR handler.
+
+    The ``SCREENSHOT_ONBOARDING_ENABLED`` flag is checked by the caller
+    (worker edge), not here.
+    """
+    session = await onboarding_service.get_session(db, user.id)
+    if session is None or session.current_step != STEP_FIRST_ASSET:
+        return False
+
+    chat_id = (message.get("chat") or {}).get("id")
+    if chat_id is None:
+        return False
+
+    from backend.bot.handlers.photo_receipt import (
+        _MAX_IMAGE_BYTES,
+        _extract_message_id,
+        _select_photo,
+    )
+    from backend.services.ocr_service import parse_balance_screenshot
+    from backend.services.telegram_service import download_file
+
+    copy = onboarding_service.load_copy()
+    step = copy["step_2_asset"]
+
+    photos = message.get("photo") or []
+    document = message.get("document") or {}
+    doc_is_image = isinstance(document.get("mime_type"), str) and document[
+        "mime_type"
+    ].startswith("image/")
+    if not photos and not doc_is_image:
+        return False
+
+    if photos:
+        chosen = _select_photo(photos)
+        if not chosen:
+            return False
+        file_id = chosen.get("file_id")
+        mime_type = "image/jpeg"
+    else:
+        file_id = document.get("file_id")
+        mime_type = document.get("mime_type") or "image/jpeg"
+    if not file_id:
+        return False
+
+    ack = await send_message(chat_id, step["screenshot_reading"], parse_mode="HTML")
+    ack_id = _extract_message_id(ack)
+
+    async def _finish(text: str, *, keyboard: dict | None = None) -> None:
+        if ack_id is not None and keyboard is None:
+            try:
+                await edit_message_text(
+                    chat_id=chat_id, message_id=ack_id, text=text, parse_mode="HTML"
+                )
+                return
+            except Exception:
+                logger.debug("balance ack edit failed; sending fresh", exc_info=True)
+        await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
+
+    image_bytes = await download_file(file_id)
+    if not image_bytes or len(image_bytes) > _MAX_IMAGE_BYTES:
+        await _finish(step["screenshot_failed"])
+        return True
+
+    try:
+        result = await parse_balance_screenshot(
+            image_bytes, mime_type, db=db, user_id=user.id
+        )
+    except ValueError as exc:
+        logger.warning("balance screenshot OCR failed: %s", exc)
+        await _finish(step["screenshot_failed"])
+        return True
+
+    raw_balance = result.get("total_balance")
+    if result.get("error") == "not_a_balance" or raw_balance is None:
+        await _finish(step["screenshot_not_balance"])
+        analytics.track(
+            "onboarding_v2_screenshot_no_balance",
+            user_id=user.id,
+            properties={"confidence": result.get("confidence")},
+        )
+        return True
+
+    # The OCR prompt may report a non-VND currency (USD, etc.). We only
+    # store VND here and have no FX conversion in onboarding, so treating
+    # a foreign balance as VND would massively misstate the user's assets
+    # (e.g. "1,000,000 USD" saved as 1,000,000 VND). Nudge them to type
+    # the VND figure instead rather than silently mis-saving.
+    currency = (result.get("currency") or "VND").upper()
+    if currency != "VND":
+        await _finish(step["screenshot_not_balance"])
+        analytics.track(
+            "onboarding_v2_screenshot_non_vnd",
+            user_id=user.id,
+            properties={"currency": currency, "confidence": result.get("confidence")},
+        )
+        return True
+
+    try:
+        value = Decimal(str(raw_balance))
+    except (ValueError, ArithmeticError):
+        await _finish(step["screenshot_failed"])
+        return True
+
+    if value < onboarding_service.MIN_ASSET_VND:
+        await _finish(step["too_small"])
+        return True
+    if value > onboarding_service.MAX_ASSET_VND:
+        await _finish(step["too_large"])
+        return True
+
+    analytics.track(
+        "onboarding_v2_screenshot_balance_read",
+        user_id=user.id,
+        properties={
+            "value_vnd_bucket": _bucket_label(value),
+            "confidence": result.get("confidence"),
+        },
+    )
+
+    warning = await data_quality_service.first_warning(
+        db,
+        user.id,
+        asset_type="cash",
+        amount_vnd=value,
+        segment=session.inferred_wealth_segment,
+    )
+    if warning is not None:
+        user.wizard_state = {
+            "flow": "onboarding_asset_quality",
+            "step": "confirm",
+            "draft": {
+                "value_vnd": str(value),
+                "raw_text": f"[screenshot] {result.get('account_label') or ''}"[:500],
+                "warning_type": warning.warning_type,
+            },
+        }
+        await db.flush()
+        await _finish(
+            step["screenshot_quality_warning"].format(
+                warning=warning.message, amount=format_money_short(value)
+            ),
+            keyboard=_quality_keyboard(value),
+        )
+        analytics.track(
+            "data_quality_warning_shown",
+            user_id=user.id,
+            properties={
+                "warning_type": warning.warning_type,
+                "surface": "onboarding_screenshot",
+            },
+        )
+        return True
+
+    await _save_onboarding_first_asset(
+        db,
+        chat_id,
+        user,
+        value,
+        raw_text=f"[screenshot] {result.get('account_label') or ''}",
+        warning_type=None,
+        demo=False,
+    )
+    return True
 
 
 def _step3_header_text(*, demo: bool) -> str:
     copy = onboarding_service.load_copy()
-    header = ((copy.get("step_3_twin") or {}).get("header") or "(3/3) Twin đầu tiên").strip()
+    header = (
+        (copy.get("step_3_twin") or {}).get("header") or "(3/3) Twin đầu tiên"
+    ).strip()
     if demo:
         return f"<b>{header}</b>\n\n🎭 Dưới đây là bản demo để bạn hình dung trước."
     return f"<b>{header}</b>"
+
 
 async def handle_asset_text_input(
     db: AsyncSession, chat_id: int, user: User, raw_text: str
@@ -463,9 +743,12 @@ async def handle_asset_text_input(
             },
         }
         await db.flush()
+        copy = onboarding_service.load_copy()
         await send_message(
             chat_id,
-            f"⚠️ <b>Kiểm tra lại số tiền</b>\n\n{warning.message}\n\nBé Tiền hiểu là <b>{format_money_short(value)}</b>. Bạn chọn số đúng nhé:",
+            copy["step_2_asset"]["text_quality_warning"].format(
+                warning=warning.message, amount=format_money_short(value)
+            ),
             parse_mode="HTML",
             reply_markup=_quality_keyboard(value),
         )
@@ -480,7 +763,6 @@ async def handle_asset_text_input(
         db, chat_id, user, value, raw_text=raw_text, warning_type=None, demo=False
     )
     return True
-
 
 
 async def _save_onboarding_first_asset(
@@ -521,18 +803,21 @@ async def _save_onboarding_first_asset(
     )
 
     # Demo gets its own ack so the user doesn't read "Bé Tiền ghi nhận: 50tr"
-    # and think we banked their cash. Real input keeps the personal phrasing.
+    # and think we banked their cash. Real input keeps the personal phrasing
+    # and bridges straight into the Twin — the payoff the user came for.
     if demo:
         await send_message(
             chat_id, twin_narrative_service_v2.demo_ack_text(), parse_mode="HTML"
         )
     else:
+        copy = onboarding_service.load_copy()["step_2_asset"]
         name = user.display_name or "bạn"
         await send_message(
             chat_id,
-            f"✅ Bé Tiền ghi nhận: <b>{format_money_short(value)}</b>. Đang vẽ Twin cho bạn — chờ chút nhé {name}…",
+            copy["asset_ack"].format(amount=format_money_short(value), name=name),
             parse_mode="HTML",
         )
+
     await _trigger_first_twin(db, chat_id, user, demo=demo)
 
 
@@ -621,7 +906,6 @@ async def _on_retry_twin(
     await _trigger_first_twin(db, chat_id, user, demo=demo)
 
 
-
 async def _on_asset_quality_confirm(
     db: AsyncSession,
     chat_id: int,
@@ -640,7 +924,9 @@ async def _on_asset_quality_confirm(
         idx = int(option_index)
         value = data_quality_service.estimate_options(original)[idx][1]
     except Exception:
-        await answer_callback(callback_id, text="Lựa chọn không hợp lệ", show_alert=True)
+        await answer_callback(
+            callback_id, text="Lựa chọn không hợp lệ", show_alert=True
+        )
         return
     if message_id is not None:
         try:
@@ -707,9 +993,10 @@ async def _trigger_first_twin(
 
     # Narrative after successful compute resolution so users never read
     # Twin-copy when compute actually failed (prevents UX contradiction).
+    salutation = onboarding_service.salutation_of(user)
     await send_message(
         chat_id,
-        twin_narrative_service_v2.narrative_text(demo=demo),
+        twin_narrative_service_v2.narrative_text(demo=demo, salutation=salutation),
         parse_mode="HTML",
     )
 
@@ -768,7 +1055,10 @@ async def _resolve_twin_cone(
     if demo:
         from backend.twin.services import demo_twin_service
 
-        return demo_twin_service.compute_demo_cone(), demo_twin_service.demo_horizon_years()
+        return (
+            demo_twin_service.compute_demo_cone(),
+            demo_twin_service.demo_horizon_years(),
+        )
 
     from backend.twin.services import twin_projection_service
 
@@ -831,11 +1121,7 @@ async def _on_feedback_signal(
 
     # Persist as a Feedback row too so /feedback_inbox sees it alongside
     # explicit feedback — the operator triages all signals in one place.
-    from backend.feedback.models.feedback import (
-        FEEDBACK_STATUS_NEW,
-        Feedback,
-    )
-
+    # (Feedback / FEEDBACK_STATUS_NEW are imported at module level.)
     fb = Feedback(
         user_id=user.id,
         content=f"[onboarding_signal:{signal}]",
@@ -1015,9 +1301,10 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
     from backend.services.dashboard_service import get_user_by_telegram_id
 
+    copy = onboarding_service.load_copy()
     user = await get_user_by_telegram_id(db, telegram_id)
     if user is None:
-        await answer_callback(callback_id, text="Gõ /start để bắt đầu nhé")
+        await answer_callback(callback_id, text=copy["next_action"]["session_expired"])
         return True
 
     action = data.split(":", 1)[1]
@@ -1038,21 +1325,24 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
     if action == "add_asset":
         from backend.bot.handlers.asset_entry import start_asset_wizard
+
         await start_asset_wizard(db, chat_id, user)
     elif action == "add_income":
         from backend.bot.handlers.income_entry import start_income_wizard
+
         await start_income_wizard(db, chat_id, user)
     elif action == "set_goal":
         from backend.bot.handlers.goal_entry import start_goals_wizard
+
         await start_goals_wizard(db, chat_id, user)
     elif action == "log_expense":
         await send_message(
             chat_id,
-            "🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>",
+            copy["next_action"]["log_expense_prompt"],
             parse_mode="HTML",
         )
     else:
-        await send_message(chat_id, "Gõ /menu để chọn bước tiếp theo nhé.")
+        await send_message(chat_id, copy["next_action"]["default_prompt"])
     return True
 
 
@@ -1061,7 +1351,17 @@ async def handle_next_action_callback(db: AsyncSession, callback_query: dict) ->
 
 async def _resume_at(db: AsyncSession, chat_id: int, user: User, session) -> None:
     if session.current_step == STEP_GOAL_QUESTION:
-        await _send_goal_question(db, chat_id, user)
+        # Name + salutation are sub-steps of goal_question (no dedicated DB
+        # state). Resume at the exact sub-step the user left off — never jump
+        # straight to the goal question, which would silently skip name and
+        # salutation and fork the flow (the original "two flows" bug).
+        substep = onboarding_service.goal_substep(user)
+        if substep == onboarding_service.SUBSTEP_NAME:
+            await _send_name_prompt(chat_id)
+        elif substep == onboarding_service.SUBSTEP_SALUTATION:
+            await _send_salutation_question(db, chat_id, user)
+        else:
+            await _send_goal_question(db, chat_id, user)
     elif session.current_step == STEP_TRUST_PRIVACY:
         await _send_trust_card(db, chat_id, user)
     elif session.current_step == STEP_FIRST_ASSET:
@@ -1124,6 +1424,12 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
         await _send_name_prompt(chat_id)
         return True
 
+    if action == "salutation" and len(parts) >= 3:
+        await _on_salutation_picked(
+            db, chat_id, callback_id, message_id, user, parts[2]
+        )
+        return True
+
     if action == "goal" and len(parts) >= 3:
         await _on_goal_picked(db, chat_id, callback_id, message_id, user, parts[2])
         return True
@@ -1132,12 +1438,10 @@ async def handle_callback(db: AsyncSession, callback_query: dict) -> bool:
         await _on_trust_ok(db, chat_id, callback_id, user)
         return True
 
-    if action == "trust_question":
-        await _on_trust_question(db, chat_id, callback_id, user)
-        return True
-
     if action == "asset_confirm" and len(parts) >= 3:
-        await _on_asset_quality_confirm(db, chat_id, callback_id, message_id, user, parts[2])
+        await _on_asset_quality_confirm(
+            db, chat_id, callback_id, message_id, user, parts[2]
+        )
         return True
 
     if action == "asset_reenter":

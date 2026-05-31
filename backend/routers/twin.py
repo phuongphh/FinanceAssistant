@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +12,12 @@ from backend.database import get_db
 from backend.life_events.impact import parse_event_ids
 from backend.miniapp.auth import require_miniapp_auth
 from backend.miniapp.routes import _resolve_user
-from backend.twin.services import twin_api_service, twin_projection_service
+from backend.twin.services import causality_service, twin_api_service, twin_projection_service
 from backend.models.twin_view_event import TwinViewEvent
 from backend.services.feature_events import record_feature_event
 from backend.utils.analytics_sanitizer import sanitize_properties
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/twin", tags=["twin"])
 
@@ -76,6 +80,34 @@ async def get_twin(
         response.status_code = 304
         return None
     return {"data": payload, "error": None}
+
+
+@router.get("/causality")
+async def get_twin_causality(
+    auth: dict = Depends(require_miniapp_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Explain the latest Twin net-worth change for the Mini App status pill.
+
+    Lazy companion to ``GET /api/twin``: the main projection payload stays
+    lean, and the causality breakdown is only computed when a user actually
+    taps the status pill. ``attribute_delta`` is read-only and server-cached
+    by projection id, so repeat taps within a session are cheap.
+    """
+    user = await _resolve_user(auth, db)
+    try:
+        breakdown = await causality_service.attribute_delta(db, user.id)
+    except Exception as exc:
+        logger.exception("twin causality failed user=%s", user.id)
+        raise HTTPException(status_code=503, detail="causality_unavailable") from exc
+    return {
+        "data": {
+            "text": breakdown.text,
+            "direction": breakdown.direction,
+            "show_breakdown": breakdown.show_breakdown,
+        },
+        "error": None,
+    }
 
 
 @router.post("/events")

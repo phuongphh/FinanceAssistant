@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Admin Observability** (current) — [detail](docs/current/phase-4.2.5/phase-4.2.5-detailed.md)
+🚀 **First-5-Minutes WOW** (current) — [detail](docs/current/phase-4.4/phase-4.4-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -151,8 +151,8 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-3.9/phase-3.9-detailed.md`](docs/current/phase-3.9/phase-3.9-detailed.md) — real market-data integration and quality gate
-- **Next phase:** Phase 4A — Financial Twin Conservative MVP
+- **Recently completed phase:** [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md) — Twin enhancement (weather metaphor + story-first), habit loop, Twin admin dashboard
+- **Next phase:** Phase 5.0 — Encryption End-to-End (after June 2026 soft launch)
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -178,27 +178,26 @@ Quick reference:
 
 ---
 
-## Phase 3.9 — Status: DONE ✅
+## Phase 4.3 — Status: DONE ✅
 
-**Status:** ✅ Implementation complete. Phase 3.9 replaced market-data stubs with real provider integrations and completed the Epic 5 quality gate.
+**Status:** ✅ Implementation complete. Phase 4.3 turned the Financial Twin from a hard-to-grasp feature into a habit-forming experience, and added a Twin admin dashboard. 4 Epics / 15 stories.
 
-### Shipped in Phase 3.9
+### Shipped in Phase 4.3
 
-- Real provider layer for VN stocks (SSI primary, VNDIRECT backup), crypto (CoinGecko), gold (SJC primary, PNJ backup), bank rates, and RSS news.
-- Redis cache and last-known fallback so briefings can show stale-data banners instead of failing hard.
-- Provider dispatcher with circuit breaker to protect failing upstreams.
-- Wealth valuation, morning briefing, portfolio analytics, price alerts, and agent market tools now consume normalized real quotes.
-- Epic 5 added end-to-end tests, an offline benchmark script, benchmark report, and provider ADR.
+- **Weather metaphor** thay P10/P50/P90 — 🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan — để người dùng hiểu probability cone mà không cần đọc số percentile.
+- **Life-outcome translation** + **story-first narrative** (4-5 màn swipe) + **mascot personification** giúp Twin kể chuyện thay vì bày số liệu.
+- **Habit loop**: on-demand recompute (<5s) + causality ("vì sao thay đổi") + action prompt + negative delta handling + delta threshold + return tease để kéo người dùng quay lại.
+- **Twin admin dashboard** 4 sections: engagement funnel, loop health, comprehension, delta distribution.
 
 ### Next phase
 
-Phase 4A — Financial Twin Conservative MVP.
+Phase 5.0 — Encryption End-to-End (sau soft launch June 2026).
 
-Detail: [`docs/current/phase-3.9/phase-3.9-detailed.md`](docs/current/phase-3.9/phase-3.9-detailed.md)
+Detail: [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md)
 
 ## Active Breaking Changes
 
-(None currently — Phase 3.8.5 is additive over 3.8)
+(None currently — Phase 4.3 is additive over 4.2.5)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 

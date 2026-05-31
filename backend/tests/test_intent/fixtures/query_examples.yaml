@@ -367,6 +367,75 @@ edge_cases:
     expected_min_confidence: 0.8
     notes: "Salary income credited to a cash account (#656)."
 
+  # Expense-lead verb + description + amount — the colloquial Vietnamese
+  # shape where users name what they bought between the verb and the
+  # number ("chi vé công viên nước 500k"). Previously fell to the LLM
+  # tier and was mis-tagged as action_record_saving.
+  - text: "chi vé công viên nước 500k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Expense lead verb with description before amount."
+
+  - text: "chi 1000k ăn thịt cá sấu"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Expense lead verb with amount before description."
+
+  - text: "mất 200k đổ xăng"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: '"mất X" idiom for unplanned expense.'
+
+  - text: "tốn 500k mua quà"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: '"tốn X" idiom — common spoken Vietnamese.'
+
+  - text: "đóng 500k học phí"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: 'Payment-style verb ("đóng") used for tuition.'
+
+  - text: "trả 200k tiền điện"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: 'Bill payment ("trả") routes to quick-transaction.'
+
+  # "hết X" idiom — sentence describes activity then total spent.
+  - text: "ăn thịt cá sấu hết 1000k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: '"hết X" idiom — activity then total cost.'
+
+  - text: "ăn trưa hết 50k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Lunch logged via hết idiom."
+
+  # Trailing-amount description — fast-log shape with no verb.
+  - text: "ăn thịt cá sấu 1000k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Description then amount, no leading verb."
+
+  - text: "cà phê highlands 50k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Trailing amount with cafe context."
+
+  # Leading-amount fast-log.
+  - text: "50k cà phê"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Amount-then-description quick log."
+
+  # Negative regressions — these MUST still route to their existing
+  # intents, NOT to action_quick_transaction.
+  - text: "tiết kiệm 1tr"
+    expected_intent: action_record_saving
+    expected_min_confidence: 0.85
+    notes: "Saving log must still beat the new expense patterns."
+
   # Inline-edit shapes — these used to fall through the picker even
   # though the user had already named both the asset and the new
   # value. The handler now reads asset_name + new_value and applies

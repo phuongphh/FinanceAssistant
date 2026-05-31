@@ -30,6 +30,8 @@ from backend.services import (
     intent_metrics,
     wealth_dashboard_service,
 )
+from backend.services.credit_card_service import list_credit_cards
+from backend.services.portfolio_service import list_assets
 
 logger = logging.getLogger(__name__)
 
@@ -589,6 +591,13 @@ async def miniapp_delete_expense(
 
 
 def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
+    money_in_category_labels = {
+        "salary_bonus": "Lương/Thưởng",
+        "freelance_part_time": "Freelance/Công việc thêm",
+        "dividend": "Cổ tức",
+        "saving_interest": "Lãi tiết kiệm",
+        "other_income": "Khác",
+    }
     allowed = {
         "amount",
         "currency",
@@ -601,8 +610,9 @@ def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
         "source_type",
         "e_wallet_provider",
         "source_asset_id",
+        "source_credit_card_id",
     }
-    source_fields = {"source_type", "e_wallet_provider", "source_asset_id"}
+    source_fields = {"source_type", "e_wallet_provider", "source_asset_id", "source_credit_card_id"}
     clean = {}
     for k, v in payload.items():
         if k not in allowed or v == "":
@@ -611,7 +621,8 @@ def _clean_expense_payload(payload: dict, *, partial: bool = False) -> dict:
             continue
         clean[k] = v
     if clean.get("transaction_type") == "money_in":
-        clean.setdefault("category", "income")
+        selected = str(clean.get("category") or "").strip()
+        clean["category"] = money_in_category_labels.get(selected, selected or "Khác")
     payment_method = str(payload.get("payment_method") or "").strip()[:64]
     if payment_method:
         clean["raw_data"] = {"payment_method": payment_method}
@@ -779,6 +790,7 @@ async def get_expense_dashboard_overview(
                 "expenses": [_serialize_expense_item(e) for e in expenses],
                 "money_in": [_serialize_expense_item(e) for e in money_in],
                 "money_in_total": sum(float(e.amount or 0) for e in money_in),
+                "source_options": await _build_source_options(db, user.id),
             }
         except Exception as exc:  # noqa: BLE001
             # Log the underlying DB / ORM error before flattening to a
@@ -808,6 +820,56 @@ async def get_expense_dashboard_overview(
         },
     )
     return {"data": payload, "error": None}
+
+
+async def _build_source_options(db: AsyncSession, user_id):
+    """Source-picker options for the add/edit transaction modal.
+
+    Auxiliary enrichment only — the modal's source dropdown. A failure here
+    (e.g. schema drift in ``assets``/``credit_cards``) must never blank the
+    whole Expense Dashboard, so we degrade to ``None``. The frontend treats a
+    *present* ``source_options`` as authoritative, so returning a degenerate
+    "no source"-only list would actually suppress its static
+    ``FALLBACK_SOURCE_OPTIONS`` (cash/bank/e-wallet/card) — leaving the user
+    unable to pick a normal source. Returning ``None`` lets the frontend fall
+    through to those static choices. The primary spending payload is always
+    returned.
+    """
+    base = [{"value": "", "label": "Không liên kết nguồn"}]
+    try:
+        assets = await list_assets(db, user_id, asset_type="cash", limit=500, offset=0)
+        cards = await list_credit_cards(db, user_id)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "expense_dashboard.source_options failed",
+            extra={"user_id": str(user_id)},
+        )
+        return None
+
+    bank_assets = [a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")]
+    has_ewallet = any((a.subtype or "").lower() in ("momo", "vnpay", "zalopay", "viettelpay", "e_wallet") for a in assets)
+    has_cash = any((a.subtype or "").lower() == "cash" for a in assets)
+
+    expense = list(base)
+    money_in = list(base)
+    if has_cash:
+        expense.append({"value": "cash", "label": "Tiền mặt"})
+        money_in.append({"value": "cash", "label": "Tiền mặt"})
+    for a in bank_assets:
+        expense.append({"value": f"bank_account:{a.id}", "label": f"Thẻ thanh toán - {a.name}"})
+        money_in.append({"value": f"bank_account:{a.id}", "label": f"Thẻ thanh toán - {a.name}"})
+    if has_ewallet:
+        for provider, label in (
+            ("momo", "Ví Momo"),
+            ("vnpay", "Ví VNPay"),
+            ("zalopay", "Ví ZaloPay"),
+            ("viettelpay", "Ví ViettelPay"),
+        ):
+            expense.append({"value": f"e_wallet:{provider}", "label": f"Ví điện tử - {label.replace('Ví ', '')}"})
+            money_in.append({"value": f"e_wallet:{provider}", "label": f"Ví điện tử - {label.replace('Ví ', '')}"})
+    for c in cards:
+        expense.append({"value": f"credit_card:{c.id}", "label": f"Thẻ tín dụng - {c.bank_name}"})
+    return {"expense": expense, "money_in": money_in}
 
 
 def _previous_month_key(month_key: str) -> str:

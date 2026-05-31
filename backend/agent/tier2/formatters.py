@@ -25,6 +25,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.tier2.db_agent import DBAgentResult
+from backend.bot.formatters.comparison import (
+    format_comparison_block,
+    metric_label_vi,
+)
 from backend.bot.formatters.money import format_money_full, format_money_short
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
@@ -272,15 +276,16 @@ def format_comparison_response(
     diff = float(payload.get("diff_absolute") or 0)
     diff_pct = float(payload.get("diff_percent") or 0)
 
-    sign = "+" if diff >= 0 else ""
-    arrow = "📈" if diff > 0 else ("📉" if diff < 0 else "➡️")
-
-    return (
-        f"⚖️ So sánh {metric}:\n\n"
-        f"• {label_a.capitalize()}: {format_money_short(a)}\n"
-        f"• {label_b.capitalize()}: {format_money_short(b)}\n\n"
-        f"{arrow} Chênh lệch: {sign}{format_money_short(diff)} "
-        f"({sign}{diff_pct:.1f}%)"
+    # Translate the metric key (e.g. "net_worth") to its Vietnamese label —
+    # raw English keys must never reach the user.
+    return format_comparison_block(
+        metric_label=metric_label_vi(metric),
+        label_a=label_a.capitalize(),
+        value_a=a,
+        label_b=label_b.capitalize(),
+        value_b=b,
+        diff=diff,
+        diff_pct=diff_pct,
     )
 
 
@@ -295,6 +300,7 @@ def format_market_response(
     style: LevelStyle,
 ) -> str:
     ticker = payload.get("ticker", "?")
+    ticker_label = _market_ticker_label(ticker)
     asset_name = payload.get("asset_name") or ticker
     price = float(payload.get("current_price") or 0)
     change_pct = payload.get("change_pct")
@@ -302,7 +308,7 @@ def format_market_response(
     note = payload.get("note")
 
     if price <= 0:
-        return f"⚠️ Chưa có dữ liệu thị trường cho {ticker}.\n_{note or ''}_".strip()
+        return f"⚠️ Chưa có dữ liệu thị trường cho {ticker_label}.\n_{note or ''}_".strip()
 
     arrow = "➡️"
     sign = ""
@@ -311,7 +317,7 @@ def format_market_response(
         arrow = "📈" if change_pct > 0 else ("📉" if change_pct < 0 else "➡️")
 
     lines = [
-        f"📊 *{asset_name}* ({ticker})",
+        f"📊 *{asset_name}* ({ticker_label})",
         f"Giá: {format_money_short(price)}",
     ]
     if change_pct is not None:
@@ -344,3 +350,7 @@ def _generic_apology(user: User) -> str:
     return (
         f"Mình chưa hiểu rõ ý {name}, có thể hỏi lại cụ thể hơn được không? 🤔"
     )
+
+
+def _market_ticker_label(ticker: str) -> str:
+    return "Vàng SJC" if str(ticker).upper() == "SJC_GOLD" else str(ticker)

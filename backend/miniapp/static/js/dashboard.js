@@ -5,7 +5,7 @@
     // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
     // first via the template. Destructure at IIFE top so bindings exit
     // TDZ before any caller (per the smoke-harness contract).
-    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate, authHeaders } = window.DashboardCommon;
 
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
@@ -112,12 +112,11 @@
         }
     }
 
-    function reportLoaded() {
+    async function reportLoaded() {
         if (loadBeaconSent) return;
         loadBeaconSent = true;
         const loadTimeMs = Math.round(performance.now() - pageStartedAt);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const headers = await authHeaders();
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
             headers,
@@ -140,6 +139,7 @@
 
     function buildErrorMessage(err) {
         if (err && err.name === 'AbortError') return 'Kết nối quá chậm — thử lại nhé.';
+        if (err && err.message === 'NO_INIT_DATA') return 'Hãy mở lại trang này từ trong Telegram nhé.';
         if (err && err.message === 'API 401') return 'Phiên đăng nhập Telegram không hợp lệ.';
         if (err && err.message === 'API 404') return 'Chưa có dữ liệu — hãy ghi giao dịch đầu tiên.';
         return 'Không tải được dữ liệu, thử lại nhé.';

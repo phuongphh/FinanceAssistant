@@ -15,9 +15,41 @@
 // at the top of their IIFE so call sites stay unchanged.
 (function () {
     'use strict';
+    let resolvedInitData = null;
 
     function getTelegram() {
         return (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) || null;
+    }
+
+    // Telegram injects launch params into the URL HASH fragment
+    // (#tgWebAppData=…&tgWebAppVersion=…), NOT the query string. When
+    // telegram-web-app.js hasn't populated `tg.initData` yet (slow CDN,
+    // cache miss), the hash is the authoritative fallback. We also check
+    // `search` for the rare desktop/manual-link case where a host appends
+    // `?tgWebAppData=` or `?initData=` directly.
+    function resolveInitDataFromUrl() {
+        if (typeof window === 'undefined') return '';
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        const hashParams = new URLSearchParams(hash);
+        const fromHash = hashParams.get('tgWebAppData') || hashParams.get('initData');
+        if (fromHash) return fromHash;
+        const qs = new URLSearchParams(window.location.search || '');
+        return qs.get('tgWebAppData') || qs.get('initData') || '';
+    }
+
+    async function resolveInitData(maxWaitMs = 250) {
+        if (resolvedInitData) return resolvedInitData;
+        const startedAt = Date.now();
+        while ((Date.now() - startedAt) <= maxWaitMs) {
+            const tg = getTelegram();
+            if (tg && tg.initData) {
+                resolvedInitData = tg.initData;
+                return resolvedInitData;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        resolvedInitData = resolveInitDataFromUrl();
+        return resolvedInitData;
     }
 
     function applyTheme(theme) {
@@ -52,7 +84,7 @@
     }
 
     function formatMoneyFull(amount) {
-        return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + 'đ';
+        return new Intl.NumberFormat('en-US').format(Math.round(amount)) + 'đ';
     }
 
     function escapeHtml(value) {
@@ -67,12 +99,20 @@
     // enough for cold market-data fetches on a poor 3G uplink, short
     // enough that the retry button fires before the user closes the app.
     async function fetchAPI(endpoint, options = {}) {
-        const tg = getTelegram();
         const controller = new AbortController();
         const tid = setTimeout(() => controller.abort(), 12000);
         const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
         try {
+            const initData = await resolveInitData();
+            // No initData (tg.initData empty AND no URL-hash/query fallback)
+            // means the page carries no Telegram session — opened in a plain
+            // browser, or a launch that delivered nothing. The server would
+            // 401, but that 401 is indistinguishable from a *rejected* session
+            // (wrong bot token). Throw a distinct error so the UI can say
+            // "open from inside Telegram" instead of conflating both as one
+            // opaque "phiên không hợp lệ".
+            if (!initData) throw new Error('NO_INIT_DATA');
+            headers['X-Telegram-Init-Data'] = initData;
             const response = await fetch('/miniapp/api' + endpoint, {
                 ...options,
                 headers: { ...headers, ...(options.headers || {}) },
@@ -85,6 +125,17 @@
         } finally {
             clearTimeout(tid);
         }
+    }
+
+    // Build headers for a POST mutation with the resolved initData
+    // attached. Mirrors fetchAPI's auth handling so a mutation can't omit
+    // the header that the page-load GET sent — critical when the page
+    // recovered initData from the URL hash (empty tg.initData).
+    async function authHeaders(extra = {}) {
+        const headers = { 'Content-Type': 'application/json', ...extra };
+        const initData = await resolveInitData();
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
+        return headers;
     }
 
     const DATE_FORMAT_BY_LANGUAGE = {
@@ -114,6 +165,8 @@
         formatMoneyFull,
         escapeHtml,
         fetchAPI,
+        resolveInitData,
+        authHeaders,
         formatDate,
         resolveDateFormat,
     };

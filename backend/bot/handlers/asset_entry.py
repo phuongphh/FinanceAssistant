@@ -70,6 +70,7 @@ from backend.bot.keyboards.asset_keyboard import (
     asset_market_manage_keyboard,
     asset_type_picker_keyboard,
     cash_subtype_keyboard,
+    cash_existing_confirm_keyboard,
     crypto_current_price_keyboard,
     crypto_subtype_keyboard,
     gold_current_price_keyboard,
@@ -421,6 +422,34 @@ async def show_asset_edit_picker(
     )
 
 
+async def show_asset_edit_picker_for_all_assets(
+    db: AsyncSession, chat_id: int, user: User
+) -> None:
+    """Show only the edit picker list (no report header/body)."""
+    assets = _sort_assets_for_dashboard(
+        await asset_service.get_user_assets(db, user.id),
+        _dashboard_sort_for_user(user),
+    )
+    rows = [
+        (asset.id, _asset_dashboard_row_label(asset))
+        for asset in assets
+        if asset.is_active
+    ]
+    if not rows:
+        await send_message(
+            chat_id=chat_id,
+            text="Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé.",
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text="✏️ Chọn dòng cụ thể để sửa nhé:",
+        parse_mode="HTML",
+        reply_markup=asset_dashboard_edit_keyboard(rows),
+    )
+
+
 async def start_asset_edit_wizard(
     db: AsyncSession,
     chat_id: int,
@@ -592,6 +621,7 @@ async def show_asset_edit_list(
     chat_id: int,
     user: User,
     asset_type: str,
+    subtype: str | None = None,
     *,
     page: int = 0,
     message_id: int | None = None,
@@ -972,6 +1002,46 @@ async def _handle_cash_subtype_pick(
         await send_message(chat_id=chat_id, text="Loại không hợp lệ.")
         return
 
+    if subtype == "cash":
+        existing_cash_assets = await asset_service.get_user_assets(
+            db,
+            user.id,
+            asset_type=AssetType.CASH.value,
+        )
+        has_cash_asset = any(
+            (a.subtype == "cash")
+            or (str((a.name or "")).strip().casefold() == "tiền mặt")
+            for a in existing_cash_assets
+        )
+        if has_cash_asset:
+            existing_cash = next(
+                (
+                    a
+                    for a in existing_cash_assets
+                    if (a.subtype == "cash")
+                    or (str((a.name or "")).strip().casefold() == "tiền mặt")
+                ),
+                None,
+            )
+            await wizard_service.update_step(
+                db,
+                user.id,
+                step="cash_existing_confirm",
+                draft_patch={
+                    "subtype": subtype,
+                    "merge_asset_id": str(existing_cash.id) if existing_cash else None,
+                },
+            )
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    "💵 Bạn đã có <b>Tiền mặt</b> rồi.\n"
+                    "Bạn có muốn cộng thêm vào không?"
+                ),
+                parse_mode="HTML",
+                reply_markup=cash_existing_confirm_keyboard(),
+            )
+            return
     await wizard_service.update_step(
         db,
         user.id,
@@ -979,6 +1049,58 @@ async def _handle_cash_subtype_pick(
         draft_patch={"subtype": subtype},
     )
     label_prompt, example = _CASH_SUBTYPE_PROMPTS[subtype]
+    await send_message(
+        chat_id=chat_id,
+        text=f"💬 {label_prompt}\n\n{example}",
+        parse_mode="HTML",
+    )
+
+
+async def _handle_cash_existing_confirm(
+    db: AsyncSession, chat_id: int, user: User, choice: str
+) -> None:
+    if choice == "cancel":
+        await start_asset_wizard(db, chat_id, user)
+        return
+
+    if choice != "add":
+        await send_message(chat_id=chat_id, text="Lựa chọn không hợp lệ.")
+        return
+
+    draft = wizard_service.get_draft(user.wizard_state)
+    subtype = str(draft.get("subtype") or "cash")
+    if subtype in {"bank_checking", "e_wallet"}:
+        merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
+        pending_amount_raw = draft.get("pending_amount")
+        if merge_asset_id_raw and pending_amount_raw is not None:
+            try:
+                merge_asset_id = uuid.UUID(merge_asset_id_raw)
+                pending_amount = Decimal(str(pending_amount_raw))
+            except (ValueError, ArithmeticError):
+                merge_asset_id = None
+                pending_amount = Decimal("0")
+            if merge_asset_id is not None and pending_amount > 0:
+                existing_asset = await asset_service.get_asset_by_id(
+                    db, user.id, merge_asset_id
+                )
+                if existing_asset is not None and existing_asset.is_active:
+                    new_total = Decimal(str(existing_asset.current_value or 0)) + pending_amount
+                    asset = await asset_service.update_current_value(
+                        db,
+                        user.id,
+                        existing_asset.id,
+                        new_total,
+                    )
+                    await _post_save(db, chat_id, user, asset)
+                    return
+    await wizard_service.update_step(
+        db,
+        user.id,
+        step="amount",
+    )
+    label_prompt, example = _CASH_SUBTYPE_PROMPTS.get(
+        subtype, _CASH_SUBTYPE_PROMPTS["cash"]
+    )
     await send_message(
         chat_id=chat_id,
         text=f"💬 {label_prompt}\n\n{example}",
@@ -1016,12 +1138,109 @@ async def _handle_cash_amount_input(
         await send_message(chat_id=chat_id, text="Số tiền phải lớn hơn 0 nhé 🙂")
         return
 
+    if draft.get("subtype") == "bank_checking" and label:
+        normalized_label = label.strip().casefold()
+        existing_assets = await asset_service.get_user_assets(
+            db,
+            user.id,
+            asset_type=AssetType.CASH.value,
+        )
+        existing_bank = next(
+            (
+                a
+                for a in existing_assets
+                if str(getattr(a, "subtype", "")) == "bank_checking"
+                and str((a.name or "")).strip().casefold() == normalized_label
+            ),
+            None,
+        )
+        if existing_bank is not None:
+            bank_name = html.escape(str(existing_bank.name).strip())
+            await wizard_service.update_step(
+                db,
+                user.id,
+                step="cash_existing_confirm",
+                draft_patch={
+                    "merge_asset_id": str(existing_bank.id),
+                    "merge_bank_name": str(existing_bank.name).strip(),
+                    "pending_amount": str(amount),
+                },
+            )
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    f"💳 Bạn đã có tài khoản thanh toán ở <b>{bank_name}</b>.\n"
+                    "Bạn có muốn cộng thêm vào không?"
+                ),
+                parse_mode="HTML",
+                reply_markup=cash_existing_confirm_keyboard(),
+            )
+            return
+
+    if draft.get("subtype") == "e_wallet" and label:
+        normalized_label = label.strip().casefold()
+        existing_assets = await asset_service.get_user_assets(
+            db,
+            user.id,
+            asset_type=AssetType.CASH.value,
+        )
+        existing_wallet = next(
+            (
+                a
+                for a in existing_assets
+                if str(getattr(a, "subtype", "")) == "e_wallet"
+                and str((a.name or "")).strip().casefold() == normalized_label
+            ),
+            None,
+        )
+        if existing_wallet is not None:
+            wallet_name = html.escape(str(existing_wallet.name).strip())
+            await wizard_service.update_step(
+                db,
+                user.id,
+                step="cash_existing_confirm",
+                draft_patch={
+                    "merge_asset_id": str(existing_wallet.id),
+                    "merge_wallet_name": str(existing_wallet.name).strip(),
+                    "pending_amount": str(amount),
+                },
+            )
+            await send_message(
+                chat_id=chat_id,
+                text=(
+                    f"💳 Bạn đã có ví điện tử <b>{wallet_name}</b>.\n"
+                    "Bạn có muốn cộng thêm vào không?"
+                ),
+                parse_mode="HTML",
+                reply_markup=cash_existing_confirm_keyboard(),
+            )
+            return
+
     name = label or {
         "bank_savings": "Tài khoản tiết kiệm",
         "bank_checking": "Tài khoản thanh toán",
         "cash": "Tiền mặt",
         "e_wallet": "Ví điện tử",
     }.get(draft.get("subtype", ""), "Tài khoản")
+
+    merge_asset_id_raw = str(draft.get("merge_asset_id") or "").strip()
+    if draft.get("subtype") in {"bank_checking", "e_wallet", "cash"} and merge_asset_id_raw:
+        try:
+            merge_asset_id = uuid.UUID(merge_asset_id_raw)
+        except ValueError:
+            merge_asset_id = None
+        if merge_asset_id is not None:
+            existing_asset = await asset_service.get_asset_by_id(db, user.id, merge_asset_id)
+            if existing_asset is not None and existing_asset.is_active:
+                new_total = Decimal(str(existing_asset.current_value or 0)) + amount
+                asset = await asset_service.update_current_value(
+                    db,
+                    user.id,
+                    existing_asset.id,
+                    new_total,
+                )
+                await _post_save(db, chat_id, user, asset)
+                return
 
     asset = await asset_service.create_asset(
         db,
@@ -2993,6 +3212,9 @@ async def _dispatch_asset_action(
         return
     if action == "cash_subtype" and arg:
         await _handle_cash_subtype_pick(db, chat_id, user, arg)
+        return
+    if action == "cash_existing" and arg:
+        await _handle_cash_existing_confirm(db, chat_id, user, arg)
         return
 
     if action == "stock_subtype" and arg:

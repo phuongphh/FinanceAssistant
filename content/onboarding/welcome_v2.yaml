@@ -28,6 +28,37 @@ source_variants:
   direct_msg:
     prefix: "Cảm ơn bạn đã trả lời tin nhắn của Bé Tiền — bắt đầu khám phá nhé!"
 
+# Name prompt — the very first beat of V2 onboarding, asked before the
+# salutation pick. {prompt} is sent as one bubble; keep it warm and short.
+step_name:
+  prompt: |
+    Trước tiên, Bé Tiền muốn gọi bạn là gì? ✨
+
+    (Bạn chỉ cần nhắn tên bạn vào đây)
+  invalid: |
+    Tên chưa hợp lệ nè 💚 Bạn nhập tên ngắn gọn (tối đa 24 ký tự) nhé.
+
+# Salutation pick (Phase 4.4 Epic 0) — asked right after the user gives
+# their name, before the goal question. Lets Bé Tiền address the user
+# warmly (anh/chị) instead of the neutral "bạn". Picking "bạn" is a
+# first-class friendly option, never framed to the user as a fallback.
+step_salutation:
+  header: "Bé Tiền xưng hô sao cho thân nhỉ?"
+  body: |
+    Để trò chuyện cho gần gũi, Bé Tiền nên gọi mình là gì ạ?
+  buttons:
+    anh: "Gọi mình là anh"
+    chị: "Gọi mình là chị"
+    bạn: "Cứ gọi mình là bạn"
+  callback_prefix: "onboarding_v2:salutation:"
+  acks:
+    anh: |
+      Dạ vâng, em nhớ rồi ạ! 💚
+    chị: |
+      Dạ vâng, em nhớ rồi ạ! 💚
+    bạn: |
+      Okie, mình xưng bạn cho thoải mái nhé! 💚
+
 # Goal question. Three button labels keyed by goal code.
 # NOTE: not numbered (1/3) — the user-visible 3-step counter starts at the
 # trust card (1/3). Goal pick is a preamble personalization tap.
@@ -55,6 +86,11 @@ step_2_asset:
     Để vẽ Twin tài chính chính xác, Bé Tiền cần 1 con số khởi đầu — tổng tiền tiết kiệm/đầu tư hiện tại của bạn.
 
     Bạn có thể gõ số tiền (ví dụ: <code>200tr</code>, <code>1.5 tỷ</code>, <code>500000000</code>), hoặc dùng số liệu demo để xem trước.
+  # Ack after a real number — bridges straight into the Twin reveal so the
+  # transition reads as one continuous beat (no detour before the payoff).
+  # {amount} = formatted figure, {name} = display name (or "bạn").
+  asset_ack: |
+    ✅ Bé Tiền ghi nhận: <b>{amount}</b>. Để Bé Tiền vẽ Twin tài chính cho {name} nhé — chờ chút xíu thôi…
   demo_button: "🎭 Để Bé Tiền dùng demo trước"
   demo_callback: "onboarding_v2:demo"
   invalid: |
@@ -63,6 +99,33 @@ step_2_asset:
     Số tiền hơi nhỏ — bạn có thể nhập tài sản (tiết kiệm, đầu tư, vàng…) tối thiểu từ 1 triệu trở lên, hoặc bấm nút demo bên dưới.
   too_large: |
     Số tiền có vẻ chưa hợp lý. Bạn kiểm tra lại giúp Bé Tiền nhé.
+  # Screenshot onboarding (Epic 2, default off). Hint appended to body
+  # only when SCREENSHOT_ONBOARDING_ENABLED is on; the others are sent
+  # while reading a balance screenshot the user snapped.
+  screenshot_hint: |
+    💡 Ngại gõ số? Bạn chụp luôn màn hình số dư app ngân hàng / ví đầu tư gửi Bé Tiền cũng được nhé.
+  screenshot_reading: |
+    Bé Tiền đang đọc ảnh giúp bạn… chờ chút xíu nha 👀
+  screenshot_failed: |
+    Bé Tiền chưa mở được ảnh đó. Bạn chụp lại rõ hơn, hoặc gõ thẳng con số (ví dụ <code>200tr</code>, <code>1.5 tỷ</code>) cũng được nhé.
+  screenshot_not_balance: |
+    Bé Tiền nhìn chưa ra con số tổng tài sản trong ảnh này. Bạn thử chụp màn hình có dòng "Tổng số dư" / "Số dư khả dụng", hoặc gõ thẳng con số giúp Bé Tiền nhé.
+  # Data-quality double-check after reading a balance off a screenshot.
+  # {warning} = the data-quality message, {amount} = the read figure.
+  screenshot_quality_warning: |
+    ⚠️ <b>Kiểm tra lại số tiền</b>
+
+    {warning}
+
+    Bé Tiền đọc được <b>{amount}</b> từ ảnh. Bạn chọn số đúng nhé:
+  # Same double-check, but for a number the user typed (not from a photo).
+  # {warning} = the data-quality message, {amount} = the parsed figure.
+  text_quality_warning: |
+    ⚠️ <b>Kiểm tra lại số tiền</b>
+
+    {warning}
+
+    Bé Tiền hiểu là <b>{amount}</b>. Bạn chọn số đúng nhé:
 
 # Demo mode banner — explicit framing so user does not mistake the
 # 50tr placeholder for their own Twin (loss-of-trust risk).
@@ -77,6 +140,14 @@ demo_banner:
 # Step 3 — Twin shown ack.
 step_3_twin:
   header: "(3/3) Twin của bạn"
+
+# Next-best-action prompts — shown after onboarding when the user taps a
+# follow-up action button (or when their session has expired).
+next_action:
+  session_expired: "Gõ /start để bắt đầu nhé"
+  log_expense_prompt: |
+    🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>
+  default_prompt: "Gõ /menu để chọn bước tiếp theo nhé."
 
 # Resume helpers.
 resume:

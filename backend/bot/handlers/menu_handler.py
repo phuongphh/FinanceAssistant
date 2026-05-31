@@ -80,6 +80,7 @@ from backend.services.telegram_service import (
     send_chat_action,
     send_message,
 )
+from backend.utils.time_vn import to_vn
 
 if TYPE_CHECKING:
     from backend.wealth.services.net_worth_calculator import NetWorthBreakdown
@@ -1105,27 +1106,10 @@ async def _action_expenses_ocr_prompt(
 async def _action_expenses_credit_cards(
     *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
 ) -> None:
-    """Guide user to use the new credit-card source flow safely and quickly."""
-    title = get_action_copy("action_expenses_credit_cards", "title")
-    body = get_action_copy("action_expenses_credit_cards", "body")
-    text = f"{title}\n\n{body}"
-    await send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode="Markdown",
-        reply_markup={
-            "inline_keyboard": [
-                [
-                    {
-                        "text": get_action_copy(
-                            "action_expenses_credit_cards", "back_button"
-                        ),
-                        "callback_data": "menu:expenses",
-                    }
-                ]
-            ]
-        },
-    )
+    """Render all credit cards + actions to add or go back."""
+    from backend.bot.handlers.credit_card_entry import show_credit_cards_list
+
+    await show_credit_cards_list(db, chat_id, user)
     analytics.track(
         "menu_action",
         user_id=user.id,
@@ -1523,7 +1507,7 @@ async def _action_market_vnindex(
                 "price": iq.price,
                 "change": dec(iq.metadata.get("change")),
                 "pct": dec(iq.metadata.get("change_pct")),
-                "updated": iq.fetched_at.astimezone().strftime("%H:%M %d/%m"),
+                "updated": to_vn(iq.fetched_at).strftime("%H:%M %d/%m"),
                 "stale_note": " · dữ liệu cũ/ngoài giờ" if iq.is_stale else "",
             }
         except Exception:

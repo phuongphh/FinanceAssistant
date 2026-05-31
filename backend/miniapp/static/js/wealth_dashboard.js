@@ -11,7 +11,7 @@
     // Shared helpers from /miniapp/static/js/dashboard_common.js — loaded
     // first via the template. Destructure at IIFE top so bindings exit
     // TDZ before any caller (per the smoke-harness contract).
-    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI } = window.DashboardCommon;
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, authHeaders } = window.DashboardCommon;
 
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
@@ -525,8 +525,7 @@
         if (!assetId && !assetIds.length) return;
         editBtn.disabled = true;
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const headers = await authHeaders();
             const response = await fetch('/miniapp/api/wealth/start-asset-edit', {
                 method: 'POST',
                 headers,
@@ -562,8 +561,7 @@
         if (deleteBtn) deleteBtn.disabled = true;
 
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const headers = await authHeaders();
             const idsToDelete = assetIds.length ? assetIds : [assetId];
             const response = await fetch('/miniapp/api/wealth/delete-asset', {
                 method: 'POST',
@@ -587,8 +585,7 @@
         if (els.addFirstAssetBtn) els.addFirstAssetBtn.disabled = true;
 
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const headers = await authHeaders();
             // Wait for the bot to post the type-picker before closing
             // the WebApp — otherwise the user lands on an empty chat
             // and assumes the button did nothing.
@@ -608,8 +605,7 @@
     async function backToMainMenu() {
         if (els.backMenuBtn) els.backMenuBtn.disabled = true;
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+            const headers = await authHeaders();
             // Bound the request so a stalled mobile connection can't trap
             // the user on the dashboard — we close regardless below.
             const controller = new AbortController();
@@ -637,17 +633,17 @@
 
     function buildErrorMessage(err) {
         if (err && err.name === 'AbortError') return 'Kết nối quá chậm — thử lại nhé.';
+        if (err && err.message === 'NO_INIT_DATA') return 'Hãy mở lại trang Tài sản từ trong Telegram nhé.';
         if (err && err.message === 'API 401') return 'Phiên đăng nhập Telegram không hợp lệ.';
         if (err && err.message === 'API 422') return 'Tham số không hợp lệ.';
         return 'Không tải được dữ liệu, thử lại nhé.';
     }
 
-    function reportLoaded() {
+    async function reportLoaded() {
         if (loadBeaconSent) return;
         loadBeaconSent = true;
         const loadTimeMs = Math.round(performance.now() - pageStartedAt);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const headers = await authHeaders();
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
             headers,

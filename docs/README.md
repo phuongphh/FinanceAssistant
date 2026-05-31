@@ -7,12 +7,11 @@
 ## 🎯 Current Focus
 
 <!-- BEGIN: phase-status:current-block -->
-🚀 **Phase 3.7 — Agent Architecture** (3 tuần)
+🚀 **Phase 4.4 — First-5-Minutes WOW** (~7-10 ngày)
 
-- 📖 Detailed doc: [docs/current/phase-3.7-detailed.md](docs/current/phase-3.7-detailed.md)
-- 📋 Issues: [docs/current/phase-3.7-issues.md](docs/current/phase-3.7-issues.md)
-- 📝 Scope: Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing
-
+- 📖 Detailed doc: [docs/current/phase-4.4/phase-4.4-detailed.md](current/phase-4.4/phase-4.4-detailed.md)
+- 📋 Issues: [docs/current/phase-4.4/phase-4.4-issues.md](current/phase-4.4/phase-4.4-issues.md)
+- 📝 Scope: WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues.
 <!-- END: phase-status:current-block -->
 
 **Auto-sync:** This block is regenerated from
@@ -36,23 +35,25 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 <!-- BEGIN: phase-status:roadmap-table -->
 | Phase | Status | Duration | Detailed Doc | Description |
 |---|---|---|---|---|
-| UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](docs/archive/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
-| Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](docs/archive/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
-| Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](docs/archive/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
-| Intent Understanding Layer | ✅ done | 3 tuần | [phase-3.5-detailed.md](docs/current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
-| Menu UX Revamp | ✅ done | 1.5 tuần | [phase-3.6-detailed.md](docs/archive/phase-3.6-detailed.md) | Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu |
-| Agent Architecture | ✅ done | 3 tuần | [phase-3.7-detailed.md](docs/current/phase-3.7-detailed.md) | Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing |
-| Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](docs/current/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
-| Pre-Launch Readiness | ✅ done | 3-4 ngày | [phase-3.8.5-detailed.md](docs/current/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
-| Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](docs/current/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
-| Pre-Launch UX Polish | ✅ done | 5-7 ngày | [phase-3.9.5-detailed.md](docs/current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
-| Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](docs/current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
-| Financial Twin Conservative MVP | ✅ done | ~3 tuần | [phase-4A-detailed.md](docs/current/phase-4A/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
-| Twin Polish + Life Events + Cashflow v2 + Zalo | ✅ done | ~4 tuần | [phase-4B-detailed.md](docs/current/phase-4B/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
-| Pre-Launch Hardening | ✅ done | ~3 tuần | [phase-4.1-detailed.md](docs/current/phase-4.1/phase-4.1-detailed.md) | Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026) |
-| Customer Experience Hardening | ✅ done | ~2 tuần | [phase-4.2-detailed.md](docs/current/phase-4.2/phase-4.2-detailed.md) | CX-ready bridge: Trust card + financial data integrity, Next Best Action 9-CTA matrix + briefing content quality + query-first prompts, Day 7 positioning micro-survey + kill criterion update. 7 stories + 3 migrations + 3 deploy tasks. |
-| Admin Observability | 🚀 current | ~3 tuần | [phase-4.2.5-detailed.md](docs/current/phase-4.2.5/phase-4.2.5-detailed.md) | Admin dashboard (React + Vite + FastAPI) cho operator monitor soft launch: KPI hero, 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention), user directory với search/filter/PII mask, audit log, JWT auth + force_password_change, license placeholder cho Phase 5.7. 23 stories / 7 Epics / ~66 SP. Ship trước soft launch tháng 6/2026. |
-| Encryption End-to-End | 🔮 planned | TBD | — | Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. |
+| UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](archive/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
+| Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](archive/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
+| Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](archive/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
+| Intent Understanding Layer | ✅ done | 3 tuần | [phase-3.5-detailed.md](current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
+| Menu UX Revamp | ✅ done | 1.5 tuần | [phase-3.6-detailed.md](archive/phase-3.6-detailed.md) | Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu |
+| Agent Architecture | ✅ done | 3 tuần | [phase-3.7-detailed.md](current/phase-3.7-detailed.md) | Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing |
+| Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](current/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
+| Pre-Launch Readiness | ✅ done | 3-4 ngày | [phase-3.8.5-detailed.md](current/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
+| Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](current/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
+| Pre-Launch UX Polish | ✅ done | 5-7 ngày | [phase-3.9.5-detailed.md](current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
+| Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
+| Financial Twin Conservative MVP | ✅ done | ~3 tuần | [phase-4A-detailed.md](current/phase-4A/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
+| Twin Polish + Life Events + Cashflow v2 + Zalo | ✅ done | ~4 tuần | [phase-4B-detailed.md](current/phase-4B/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
+| Pre-Launch Hardening | ✅ done | ~3 tuần | [phase-4.1-detailed.md](current/phase-4.1/phase-4.1-detailed.md) | Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026) |
+| Customer Experience Hardening | ✅ done | ~2 tuần | [phase-4.2-detailed.md](current/phase-4.2/phase-4.2-detailed.md) | CX-ready bridge: Trust card + financial data integrity, Next Best Action 9-CTA matrix + briefing content quality + query-first prompts, Day 7 positioning micro-survey + kill criterion update. 7 stories + 3 migrations + 3 deploy tasks. |
+| Admin Observability | ✅ done | ~3 tuần | [phase-4.2.5-detailed.md](current/phase-4.2.5/phase-4.2.5-detailed.md) | Admin dashboard (React + Vite + FastAPI) cho operator monitor soft launch: KPI hero, 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention), user directory với search/filter/PII mask, audit log, JWT auth + force_password_change, license placeholder cho Phase 5.7. 23 stories / 7 Epics / ~66 SP. Ship trước soft launch tháng 6/2026. |
+| Twin Enhancement + Habit Loop + Admin Dashboard | ✅ done | ~3 tuần | [phase-4.3-detailed.md](current/phase-4.3/phase-4.3-detailed.md) | Twin từ feature khó hiểu → habit-forming experience: weather metaphor (Khiêm tốn/Bình thường/Lạc quan) thay P10/P50/P90, life-outcome translation, story-first narrative (4-5 màn swipe), mascot personification, habit loop (on-demand recompute <5s + causality + action + negative delta + delta threshold + return tease), Twin admin dashboard 4 sections (engagement funnel, loop health, comprehension, delta distribution). 4 Epics / 15 stories. |
+| First-5-Minutes WOW | 🚀 current | ~7-10 ngày | [phase-4.4-detailed.md](current/phase-4.4/phase-4.4-detailed.md) | WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues. |
+| Encryption End-to-End | 📋 next | ~2-3 tuần | — | Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. |
 | Zalo Spike & OA Verification | 🔮 planned | TBD | — | Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows |
 | Zalo Core Product Parity | 🔮 planned | TBD | — | Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints |
 | Zalo Mini App | 🔮 planned | TBD | — | Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK |

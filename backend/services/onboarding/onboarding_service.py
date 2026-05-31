@@ -18,7 +18,6 @@ router boundary commits.
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -31,6 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.onboarding_session import (
     ALL_GOALS,
+    ALL_SALUTATIONS,
+    DEFAULT_SALUTATION,
     OnboardingSession,
     STEP_COMPLETED,
     STEP_FIRST_ASSET,
@@ -38,6 +39,7 @@ from backend.models.onboarding_session import (
     STEP_GOAL_QUESTION,
     STEP_TWIN_SHOWN,
 )
+from backend.models.user import User
 from backend.services.onboarding.wealth_inference_service import infer_segment
 from backend.wealth.amount_parser import parse_amount as _parse_amount_canonical
 
@@ -76,16 +78,6 @@ MIN_ASSET_VND = Decimal("1_000_000")
 MAX_ASSET_VND = Decimal("100_000_000_000_000")
 
 DEMO_ASSET_VND = Decimal("50_000_000")  # Demo Twin uses 50tr placeholder.
-TRUST_CARD_FLAG_ENV = "TRUST_CARD_ENABLED"
-
-
-def is_trust_card_enabled() -> bool:
-    return os.environ.get(TRUST_CARD_FLAG_ENV, "true").lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
 
 
 def parse_asset_amount(raw: str) -> Decimal | None:
@@ -134,16 +126,117 @@ async def start_or_resume(db: AsyncSession, user_id: uuid.UUID) -> OnboardingSes
     return session
 
 
-async def set_goal(
-    db: AsyncSession, user_id: uuid.UUID, goal_code: str
+# ---------- Salutation (Phase 4.4 Epic 0) -----------------------------
+
+
+def salutation_of(user: User | None) -> str:
+    """How Bé Tiền should address ``user`` — falls back to "bạn".
+
+    Pure (no DB / no env) so callers in any layer — empathy engine,
+    twin narrative, onboarding copy — can resolve the salutation the
+    same way. NULL column → gender-neutral ``DEFAULT_SALUTATION``.
+    """
+    if user is None:
+        return DEFAULT_SALUTATION
+    value = (user.salutation or "").strip()
+    return value if value in ALL_SALUTATIONS else DEFAULT_SALUTATION
+
+
+# Sub-steps within STEP_GOAL_QUESTION. Name entry and salutation pick are
+# collapsed into the single ``goal_question`` DB step, so the live position
+# inside that step is *derived* from the User row rather than stored — no
+# migration required. Order: name → salutation → goal pick.
+SUBSTEP_NAME = "name"
+SUBSTEP_SALUTATION = "salutation"
+SUBSTEP_GOAL = "goal"
+
+
+def goal_substep(user: User | None) -> str:
+    """Resolve which sub-step of ``goal_question`` the user is on.
+
+    Pure (no DB / no env). Only meaningful while
+    ``current_step == STEP_GOAL_QUESTION``:
+
+      - no ``display_name`` yet            → still entering name
+      - name set but no ``salutation`` yet → picking salutation
+      - both set                           → picking goal
+
+    Because the goal step never mutates the ``OnboardingSession`` row while
+    the user moves name → salutation, ``session.updated_at`` stays frozen at
+    ``/start`` time. Callers (resume nudge, resume button) MUST use this to
+    avoid mistaking a name/salutation user for someone stuck at goal pick.
+    """
+    if user is None or not (user.display_name or "").strip():
+        return SUBSTEP_NAME
+    if not (user.salutation or "").strip():
+        return SUBSTEP_SALUTATION
+    return SUBSTEP_GOAL
+
+
+async def touch_session(
+    db: AsyncSession, user_id: uuid.UUID
 ) -> OnboardingSession | None:
+    """Bump ``updated_at`` to mark fresh onboarding activity.
+
+    The name → salutation sub-steps mutate only the ``User`` row, never the
+    ``OnboardingSession`` row, so SQLAlchemy's ``onupdate`` never fires and
+    ``session.updated_at`` stays frozen at ``/start`` time. Handlers call this
+    when the user advances through those sub-steps so the resume-nudge delay is
+    measured from the *latest* interaction — otherwise a user who lingers in
+    the intro would be nudged the instant they reach goal pick (the cron would
+    still see the stale ``/start`` timestamp). Flush-only; the worker commits.
+
+    Setting ``updated_at`` explicitly (rather than relying on ``onupdate``)
+    guarantees an UPDATE is emitted even though no other session column changed.
+    """
+    session = await get_session(db, user_id)
+    if session is None:
+        return None
+    session.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return session
+
+
+async def set_salutation(
+    db: AsyncSession, user_id: uuid.UUID, salutation: str
+) -> User | None:
+    """Persist the user's chosen salutation (anh/chị/bạn).
+
+    Returns ``None`` for an unknown salutation or missing user so the
+    handler can re-prompt. Flush-only — the worker/router boundary
+    commits.
+    """
+    if salutation not in ALL_SALUTATIONS:
+        return None
+    user = await db.get(User, user_id)
+    if user is None:
+        return None
+    user.salutation = salutation
+    await db.flush()
+    return user
+
+
+async def set_goal(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    goal_code: str,
+    *,
+    trust_card_enabled: bool,
+) -> OnboardingSession | None:
+    """Record the goal pick and route to the next step.
+
+    ``trust_card_enabled`` is resolved at the handler edge (feature flag
+    read) and passed in — the service never reads env. When the trust card
+    is enabled and not yet accepted, route through the privacy step; else
+    skip straight to the first-asset step.
+    """
     if goal_code not in ALL_GOALS:
         return None
     session = await get_session(db, user_id)
     if session is None:
         return None
     session.goal_choice = goal_code
-    if is_trust_card_enabled() and session.trust_accepted_at is None:
+    if trust_card_enabled and session.trust_accepted_at is None:
         session.current_step = STEP_TRUST_PRIVACY
     else:
         session.current_step = STEP_FIRST_ASSET

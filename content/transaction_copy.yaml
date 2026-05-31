@@ -1,0 +1,12 @@
+confirmation:
+  title_done: "✅ Đã ghi xong!"
+  batch_title: "✅ Đã ghi xong {count} khoản!"
+  source_prefix: "💳 Chi từ: {source}"
+  edit_hint: "<i>💡 chi tiêu đã được ghi lại, nếu đúng bạn không cần làm gì thêm!</i>"
+
+source_labels:
+  cash: "Tiền mặt"
+  bank_account: "Tài khoản thanh toán"
+  e_wallet: "Ví điện tử"
+  credit_card: "Thẻ tín dụng"
+  unknown: "Nguồn khác"

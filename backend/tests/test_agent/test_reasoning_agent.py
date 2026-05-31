@@ -307,3 +307,29 @@ class TestCallbackResilience:
         )
         # Agent still completes successfully even if streamer dies.
         assert trace.success is True
+
+
+class TestReasoningPromptDate:
+    """The Tier-3 prompt must inject today's real date so date-relative
+    reasoning ("tháng này", "năm nay") resolves against the calendar
+    instead of the model's training-cutoff guess — the second half of
+    the production bug, where Tier 3 answered with "tháng 7/2025"."""
+
+    def test_prompt_injects_today_for_relative_dates(self):
+        from datetime import date
+
+        from backend.agent.tier3.prompts import build_reasoning_prompt
+        from backend.wealth.ladder import WealthLevel
+
+        today = date(2026, 5, 26)
+        prompt = build_reasoning_prompt(
+            user_name="Hà",
+            wealth_level=WealthLevel.YOUNG_PROFESSIONAL,
+            net_worth=Decimal("100_000_000"),
+            tool_descriptions="(no tools)",
+            today=today,
+        )
+
+        assert "2026-05-26" in prompt
+        assert "tháng 5/2026" in prompt
+        assert "năm nay" in prompt and "2026" in prompt

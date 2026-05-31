@@ -30,7 +30,7 @@ import logging
 import random
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -42,7 +42,9 @@ from backend.analytics import EventType
 from backend.bot.formatters.money import format_money_full
 from backend.models.event import Event
 from backend.models.expense import Expense
+from backend.models.twin_view_event import TwinViewEvent
 from backend.models.user import User
+from backend.services.onboarding.onboarding_service import salutation_of
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,23 @@ LARGE_TX_MIN_SAMPLES = 5
 # Categories considered internal transfers — excluded from large-tx.
 _INTERNAL_CATEGORIES = frozenset({"transfer", "saving", "savings", "investment"})
 
+# Phase 4.4 Epic 3 — proactive activation nudge window. A user who
+# finished onboarding (and thus saw their Twin once) but never came back
+# to look again is the classic "saw the WOW, then drifted" case. We nudge
+# gently inside this window; past the upper bound the generic
+# silent-N-days triggers take over, so this stays a focused
+# re-engagement nudge rather than a perpetual one.
+ONBOARDING_SILENCE_MIN_DAYS = 3
+ONBOARDING_SILENCE_MAX_DAYS = 30
+
+# Distinct days a user must have viewed the Twin on before we consider
+# them "returned". Onboarding does NOT write a TwinViewEvent (the first
+# Twin shown at the end of onboarding is tracked separately via
+# ``mark_twin_shown``), so the baseline count is 0. Any genuine return
+# visit therefore lands on >= 1 distinct day — that's enough to count as
+# "came back", so we only nudge when the count is still 0.
+TWIN_RETURN_MIN_DISTINCT_DAYS = 1
+
 
 @dataclass(frozen=True)
 class EmpathyTrigger:
@@ -91,25 +110,42 @@ class EmpathyTrigger:
 
 
 async def check_all_triggers(
-    db: AsyncSession, user: User, *, now: datetime | None = None
+    db: AsyncSession,
+    user: User,
+    *,
+    now: datetime | None = None,
+    include_proactive: bool = True,
 ) -> Optional[EmpathyTrigger]:
     """Walk checks in priority order. Return first trigger not on cooldown.
 
     ``now`` override is for tests; production callers pass ``None``.
+
+    ``include_proactive`` gates the Phase 4.4 proactive-companion trigger
+    (``onboarding_no_twin_return``). The engine never reads env itself —
+    the hourly job reads ``PROACTIVE_COMPANION_ENABLED`` and passes the
+    decision in, per the layer contract. When ``False`` the new trigger
+    is skipped while every pre-existing empathy trigger still fires.
     """
     now = now or datetime.now(timezone.utc)
 
     # Priority matters: acute signals (big spend) beat ambient ones
-    # (silent N days) when both match on the same pass.
-    checks = (
+    # (silent N days) when both match on the same pass. The order of this
+    # tuple IS the effective priority (we return the first match).
+    checks = [
         _check_large_transaction,
         _check_payday_splurge,
         _check_over_budget_monthly,
-        _check_user_silent_7_days,
-        _check_user_silent_30_days,
-        _check_weekend_high_spending,
-        _check_first_saving_month,
-        _check_consecutive_over_budget,
+    ]
+    if include_proactive:
+        checks.append(_check_onboarding_no_twin_return)
+    checks.extend(
+        (
+            _check_user_silent_7_days,
+            _check_user_silent_30_days,
+            _check_weekend_high_spending,
+            _check_first_saving_month,
+            _check_consecutive_over_budget,
+        )
     )
 
     for check_fn in checks:
@@ -187,6 +223,47 @@ async def _check_over_budget_monthly(
 ) -> EmpathyTrigger | None:
     """STUB — needs per-user budget config (not yet modeled)."""
     return None
+
+
+async def _check_onboarding_no_twin_return(
+    db: AsyncSession, user: User, now: datetime
+) -> EmpathyTrigger | None:
+    """Onboarded user who saw the Twin once but never came back to it.
+
+    Fires inside the activation window
+    (``ONBOARDING_SILENCE_MIN_DAYS`` … ``ONBOARDING_SILENCE_MAX_DAYS``
+    days after ``onboarding_completed_at``) when the user has viewed the
+    Twin on fewer than ``TWIN_RETURN_MIN_DISTINCT_DAYS`` distinct days —
+    i.e. has not come back to look at it after onboarding. Past the window
+    the generic silent-N-days triggers take over, so this stays a focused
+    re-engagement nudge.
+    """
+    completed_at = user.onboarding_completed_at
+    if completed_at is None:
+        return None
+    if completed_at.tzinfo is None:
+        completed_at = completed_at.replace(tzinfo=timezone.utc)
+
+    days_since = (now - completed_at).days
+    if not (ONBOARDING_SILENCE_MIN_DAYS <= days_since < ONBOARDING_SILENCE_MAX_DAYS):
+        return None
+
+    # Count distinct calendar days the user opened the Twin. Onboarding
+    # writes no TwinViewEvent, so this starts at 0; a genuine return visit
+    # is the first row, lifting the count to >= 1.
+    distinct_days_stmt = select(
+        func.count(func.distinct(func.date(TwinViewEvent.created_at)))
+    ).where(TwinViewEvent.user_id == user.id)
+    twin_view_days = int((await db.execute(distinct_days_stmt)).scalar_one() or 0)
+    if twin_view_days >= TWIN_RETURN_MIN_DISTINCT_DAYS:
+        return None
+
+    return EmpathyTrigger(
+        name="onboarding_no_twin_return",
+        priority=3,
+        cooldown_days=30,
+        context={"days_since_onboarding": days_since},
+    )
 
 
 async def _check_user_silent_7_days(
@@ -385,6 +462,7 @@ def render_message(trigger: EmpathyTrigger, user: User) -> str:
     template = random.choice(templates)
     context = {
         "name": user.get_greeting_name(),
+        "salutation": salutation_of(user),
         **trigger.context,
     }
     try:

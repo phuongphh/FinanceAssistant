@@ -13,7 +13,7 @@
     // the IIFE so the bindings are out of TDZ before any init-phase
     // caller (cf. the UI_KEYWORDS regression that motivated the smoke
     // harness).
-    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate } = window.DashboardCommon;
+    const { applyTheme, formatMoneyShort, formatMoneyFull, escapeHtml, fetchAPI, formatDate, authHeaders } = window.DashboardCommon;
 
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
@@ -83,6 +83,13 @@
         ['transfer', '🔄 Chuyển khoản'],
         ['other', '📌 Khác'],
     ];
+    const MONEY_IN_CATEGORIES = [
+        ['salary_bonus', '💼 Lương/Thưởng'],
+        ['freelance_part_time', '🛠️ Freelance/Công việc thêm'],
+        ['dividend', '📈 Cổ tức'],
+        ['saving_interest', '🏦 Lãi tiết kiệm'],
+        ['other_income', '📌 Khác'],
+    ];
 
     // Localised UI strings live next to CATEGORIES so init-phase callers
     // (applyLocalizedKeywords, renderExpenses) can read them without
@@ -106,7 +113,29 @@
     let currentCategoryFilter = '';
     const pageStartedAt = performance.now();
     let loadBeaconSent = false;
-    const SOURCE = new URLSearchParams(window.location.search).get('source');
+    
+    const FALLBACK_SOURCE_OPTIONS = {
+        expense: [
+            { value: '', label: 'Không liên kết nguồn' },
+            { value: 'cash', label: 'Tiền mặt' },
+            { value: 'bank_account', label: 'Tài khoản thanh toán' },
+            { value: 'e_wallet:momo', label: 'Ví Momo' },
+            { value: 'e_wallet:vnpay', label: 'Ví VNPay' },
+            { value: 'e_wallet:zalopay', label: 'Ví ZaloPay' },
+            { value: 'e_wallet:viettelpay', label: 'Ví ViettelPay' },
+            { value: 'credit_card', label: 'Thẻ tín dụng' },
+        ],
+        money_in: [
+            { value: '', label: 'Không liên kết nguồn' },
+            { value: 'cash', label: 'Tiền mặt' },
+            { value: 'bank_account', label: 'Tài khoản thanh toán' },
+            { value: 'e_wallet:momo', label: 'Ví Momo' },
+            { value: 'e_wallet:vnpay', label: 'Ví VNPay' },
+            { value: 'e_wallet:zalopay', label: 'Ví ZaloPay' },
+            { value: 'e_wallet:viettelpay', label: 'Ví ViettelPay' },
+        ],
+    };
+const SOURCE = new URLSearchParams(window.location.search).get('source');
     let refreshInFlight = false;
     let lastRefreshAt = 0;
     let activeRequestId = 0;
@@ -128,6 +157,11 @@
         if (els.moneyInList) els.moneyInList.addEventListener('click', onExpenseRowClick);
         els.modalCancel.addEventListener('click', closeModal);
         els.modalSave.addEventListener('click', onSave);
+        els.modalType.addEventListener('change', () => {
+            applyCategoryOptions(els.modalType.value);
+            els.modalCategory.value = els.modalType.value === 'money_in' ? 'other_income' : 'other';
+            applySourceOptions(els.modalType.value, '', null);
+        });
         els.modalDelete.addEventListener('click', onDelete);
         els.modal.addEventListener('click', (e) => {
             if (e.target === els.modal) closeModal();
@@ -657,9 +691,30 @@
     // -- Modal: add / edit / delete ---------------------------------------
 
     function initModalForm() {
-        els.modalCategory.innerHTML = CATEGORIES.map(
+        applyCategoryOptions('expense');
+        els.modalAmount.addEventListener('input', onAmountInput);
+    }
+
+    function applyCategoryOptions(txType) {
+        const options = (txType === 'money_in' ? MONEY_IN_CATEGORIES : CATEGORIES);
+        els.modalCategory.innerHTML = options.map(
             ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`
         ).join('');
+    }
+
+    function parseMoneyInput(raw) {
+        const digits = String(raw || '').replace(/[^\d]/g, '');
+        return digits ? Number(digits) : 0;
+    }
+
+    function formatMoneyInput(raw) {
+        const amount = parseMoneyInput(raw);
+        return amount ? amount.toLocaleString('en-US') : '';
+    }
+
+    function onAmountInput() {
+        const formatted = formatMoneyInput(els.modalAmount.value);
+        if (els.modalAmount.value !== formatted) els.modalAmount.value = formatted;
     }
 
     function applyLocalizedKeywords() {
@@ -672,17 +727,33 @@
         els.categoryFilter.innerHTML = '<option value="">Tất cả</option>';
     }
 
+
+    function applySourceOptions(txType, selectedValue = '', existingCardId = null) {
+        const key = txType === 'money_in' ? 'money_in' : 'expense';
+        const sourceOptions = (lastOverview && lastOverview.source_options && lastOverview.source_options[key]) || FALLBACK_SOURCE_OPTIONS[key];
+        const opts = [...sourceOptions];
+        if (selectedValue === 'credit_card' && existingCardId) {
+            opts.push({ value: `credit_card:${existingCardId}`, label: 'Thẻ tín dụng (đã chọn)' });
+        }
+        els.modalSource.innerHTML = opts
+            .map((it) => `<option value="${escapeHtml(it.value)}">${escapeHtml(it.label)}</option>`)
+            .join('');
+        els.modalSource.value = selectedValue || '';
+        if (els.modalSource.value !== (selectedValue || '')) els.modalSource.value = '';
+    }
+
     function openModal(item, forcedType) {
         editingExpenseId = item?.id || null;
         const txType = item?.transaction_type || forcedType || 'expense';
         els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
         els.modalType.value = txType;
-        els.modalAmount.value = item ? Math.round(item.amount || 0) : '';
-        els.modalCategory.value = item?.category || 'other';
+        applyCategoryOptions(txType);
+        applySourceOptions(txType, sourceValue(item), item?.source_credit_card_id || null);
+        els.modalAmount.value = item ? formatMoneyInput(Math.round(item.amount || 0)) : '';
+        els.modalCategory.value = item?.category || (txType === 'money_in' ? 'other_income' : 'other');
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
         els.modalNote.value = item?.merchant || item?.note || '';
         els.modalPayment.value = item?.payment_method || '';
-        els.modalSource.value = sourceValue(item);
         els.modalDelete.hidden = !editingExpenseId;
         els.modalSave.disabled = false;
         els.modalDelete.disabled = false;
@@ -698,20 +769,31 @@
 
     function sourceValue(item) {
         if (!item || !item.source_type) return '';
+        if (item.source_credit_card_id) return `credit_card:${item.source_credit_card_id}`;
+        if (item.source_asset_id && item.source_type === 'bank_account') return `bank_account:${item.source_asset_id}`;
         if (item.source_type === 'e_wallet') return `e_wallet:${item.e_wallet_provider || 'momo'}`;
         return item.source_type;
     }
 
-    function parseSourceValue(value) {
-        if (!value) return { source_type: null, e_wallet_provider: null };
+    function parseSourceValue(value, editingItem = null) {
+        if (!value) return { source_type: null, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
         if (value.startsWith('e_wallet:')) {
-            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo' };
+            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo', source_credit_card_id: null, source_asset_id: null };
         }
-        return { source_type: value, e_wallet_provider: null };
+        if (value.startsWith('credit_card:')) return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: value.split(':')[1] || null, source_asset_id: null };
+        if (value.startsWith('bank_account:')) return { source_type: 'bank_account', e_wallet_provider: null, source_credit_card_id: null, source_asset_id: value.split(':')[1] || null };
+        if (value === 'credit_card') return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: editingItem?.source_credit_card_id || null, source_asset_id: null };
+        return { source_type: value, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
+    }
+
+
+    function findById(id) {
+        const all = [...(lastOverview.expenses || []), ...(lastOverview.money_in || [])];
+        return all.find((it) => it.id === id) || null;
     }
 
     async function onSave() {
-        const amount = parseFloat(els.modalAmount.value);
+        const amount = parseMoneyInput(els.modalAmount.value);
         if (!amount || amount < 1000) {
             if (tg && tg.showAlert) tg.showAlert('Số tiền phải từ 1.000đ.');
             else window.alert('Số tiền phải từ 1.000đ.');
@@ -726,7 +808,7 @@
             note: note || null,
             merchant: note || null,
             payment_method: els.modalPayment.value.trim() || null,
-            ...parseSourceValue(els.modalSource.value),
+            ...parseSourceValue(els.modalSource.value, editingExpenseId ? findById(editingExpenseId) : null),
         };
         els.modalSave.disabled = true;
         let saved;
@@ -786,17 +868,17 @@
 
     function buildErrorMessage(err) {
         if (err && err.name === 'AbortError') return 'Kết nối quá chậm — thử lại nhé.';
+        if (err && err.message === 'NO_INIT_DATA') return 'Hãy mở lại trang này từ trong Telegram nhé.';
         if (err && err.message === 'API 401') return 'Phiên đăng nhập Telegram không hợp lệ.';
         if (err && err.message === 'API 422') return 'Tham số không hợp lệ.';
         return 'Không tải được dữ liệu, thử lại nhé.';
     }
 
-    function reportLoaded() {
+    async function reportLoaded() {
         if (loadBeaconSent) return;
         loadBeaconSent = true;
         const loadTimeMs = Math.round(performance.now() - pageStartedAt);
-        const headers = { 'Content-Type': 'application/json' };
-        if (tg && tg.initData) headers['X-Telegram-Init-Data'] = tg.initData;
+        const headers = await authHeaders();
         fetch('/miniapp/api/events/loaded', {
             method: 'POST',
             headers,

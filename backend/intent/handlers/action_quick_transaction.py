@@ -36,6 +36,7 @@ from backend.intent.intents import IntentResult
 from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
+from backend.services.expense_source_resolver import apply_default_source
 from backend.services.llm_service import call_llm
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
 class ParsedExpenseItem:
     amount: float
     merchant: str
-    category_hint: str = "needs_review"
+    category_hint: str = "other"
 
 
 _FALLBACK_REPLY = (
@@ -277,6 +278,7 @@ class ActionQuickTransactionHandler(IntentHandler):
                 source="manual",
                 expense_date=date.today(),
             )
+            expense_data = await apply_default_source(db, user.id, expense_data)
             expense = await expense_service.create_expense(db, user.id, expense_data)
             await send_transaction_confirmation(db, expense)
         else:
@@ -296,6 +298,9 @@ class ActionQuickTransactionHandler(IntentHandler):
                         "batch_index": index,
                         "raw_text": text,
                     },
+                )
+                expense_data = await apply_default_source(
+                    db, user.id, expense_data
                 )
                 expenses.append(
                     await expense_service.create_expense(db, user.id, expense_data)
@@ -490,7 +495,9 @@ def _guess_category(text: str | None) -> str:
     for category, keywords in _CATEGORY_KEYWORDS:
         if any(keyword in normalized for keyword in keywords):
             return category
-    return "needs_review"
+    # Confirmation flow is terminal — show "Khác" rather than blocking on
+    # a clarifier the user can no longer reach.
+    return "other"
 
 
 def _coerce_parsed_items(
@@ -518,7 +525,7 @@ def _coerce_parsed_items(
             ParsedExpenseItem(
                 amount=amount,
                 merchant=merchant,
-                category_hint=category_hint or "needs_review",
+                category_hint=category_hint or "other",
             )
         )
     return parsed_items

@@ -48,9 +48,12 @@ from backend import analytics
 from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.templates import format_receipt_confirmation
 from backend.bot.handlers.transaction import _normalize_category
+from backend.bot.keyboards.transaction_keyboard import receipt_confirm_keyboard
+from backend.config.categories import get_all_categories
 from backend.models.user import User
 from backend.schemas.expense import VALID_CATEGORIES, ExpenseCreate
 from backend.services import expense_service
+from backend.services.expense_source_resolver import apply_default_source
 from backend.services.ocr_service import parse_receipt_image
 from backend.services.telegram_service import (
     download_file,
@@ -79,6 +82,45 @@ EVENT_RECEIPT_PHOTO_FAILED = "receipt_photo_failed"
 EVENT_RECEIPT_EXPENSE_AUTOSAVED = "receipt_expense_autosaved"
 _PENDING_RECEIPT_TTL_S = 180
 _pending_receipt_confirms: dict[str, dict[str, Any]] = {}
+
+# Receipt notes are echoed back to the user and persisted verbatim; bound
+# the length so a noisy OCR dump can't blow up the message or the column.
+_MAX_NOTE_LEN = 200
+
+# Display-code namespace the inline category picker offers. A user pick must
+# be one of these before we mutate the pending payload.
+_VALID_DISPLAY_CATEGORY_CODES = frozenset(cat.code for cat in get_all_categories())
+
+
+def _clean_note(value: Any) -> str | None:
+    """Normalize an OCR-extracted note: collapse whitespace, bound length.
+
+    Returns ``None`` for empty/non-string input so callers can fall back to
+    an item-name preview.
+    """
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split())
+    if not cleaned:
+        return None
+    if len(cleaned) > _MAX_NOTE_LEN:
+        cleaned = cleaned[:_MAX_NOTE_LEN].rstrip() + "…"
+    return cleaned
+
+
+def _item_name_preview(items: list[Any]) -> str | None:
+    """Short ", "-joined preview of item names, used when no OCR note exists."""
+    names = [
+        str(it.get("name") or "").strip()
+        for it in items
+        if isinstance(it, dict) and (it.get("name") or "").strip()
+    ]
+    if not names:
+        return None
+    preview = ", ".join(names[:3])
+    if len(names) > 3:
+        preview += f" +{len(names) - 3}"
+    return preview
 
 
 def _parse_iso_date(value: Any) -> date | None:
@@ -216,6 +258,55 @@ def _format_receipt(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_receipt_confirmation(
+    payload: dict[str, Any], token: str
+) -> tuple[str, dict]:
+    """Build the confirmation text + inline keyboard from a pending payload.
+
+    Single source of truth for both the first render (after OCR) and the
+    re-render after a category pick, so the message body and the keyboard's
+    ticked category never drift apart.
+
+    A stored ``needs_review`` category means we couldn't confidently
+    auto-categorize: the body invites the user to pick and the keyboard
+    leaves every category un-ticked instead of pre-selecting "Khác".
+    """
+    stored = str(payload.get("category") or "needs_review")
+    uncertain = stored == "needs_review"
+    display_code = _normalize_category(stored)
+
+    note = payload.get("note")
+    items = [
+        (str(it.get("name") or ""), it.get("price"))
+        for it in (payload.get("items") or [])
+        if isinstance(it, dict)
+    ]
+    merchant = payload.get("merchant") or note or "Hoá đơn"
+    receipt_date = _parse_iso_date(payload.get("expense_date"))
+
+    body = format_receipt_confirmation(
+        merchant=str(merchant),
+        amount=float(payload["amount"]),
+        category_code=display_code,
+        receipt_date=receipt_date,
+        items=items,
+        confidence=str(payload.get("confidence") or "medium"),
+        note=note,
+        category_uncertain=uncertain,
+    )
+
+    if uncertain:
+        cta = "Chọn danh mục bên dưới rồi tap ✅ Đồng ý để lưu nhé 👇"
+    else:
+        cta = "Đúng rồi thì tap ✅ Đồng ý. Muốn đổi danh mục thì chọn bên dưới."
+
+    text = f"{body}\n\n{cta}"
+    keyboard = receipt_confirm_keyboard(
+        token, selected_code=None if uncertain else display_code
+    )
+    return text, keyboard
+
+
 async def _autosave_and_confirm(
     *,
     db: AsyncSession,
@@ -241,7 +332,7 @@ async def _autosave_and_confirm(
     parsed_date = _parse_iso_date(result.get("date")) or date.today()
     confidence = (result.get("confidence") or "medium").lower()
     items = result.get("items") or []
-    category = _resolve_ocr_category(result.get("category_suggestion"))
+    schema_category = _resolve_ocr_category(result.get("category_suggestion"))
 
     if amount <= 0:
         # Can't auto-save without a total. Keep the legacy read-only view
@@ -253,19 +344,16 @@ async def _autosave_and_confirm(
         )
         return
 
-    note_bits: list[str] = []
-    if items:
-        names = [
-            str(it.get("name") or "").strip()
-            for it in items
-            if isinstance(it, dict) and (it.get("name") or "").strip()
-        ]
-        if names:
-            preview = ", ".join(names[:3])
-            if len(names) > 3:
-                preview += f" +{len(names) - 3}"
-            note_bits.append(preview)
-    note = " · ".join(note_bits) or None
+    # Prefer the receipt's own memo ("Lời nhắn"/"Nội dung chuyển khoản")
+    # so transfer details aren't dropped; fall back to an item preview.
+    note = _clean_note(result.get("note")) or _item_name_preview(items)
+
+    # Keep ``needs_review`` so ``create_expense`` runs its LLM categorizer on
+    # the no-pick path; otherwise store the display code we actually show.
+    if schema_category == "needs_review":
+        category = "needs_review"
+    else:
+        category = _normalize_category(schema_category)
 
     token = secrets.token_urlsafe(8)
     _pending_receipt_confirms[token] = {
@@ -281,26 +369,9 @@ async def _autosave_and_confirm(
         "items": items[:20],
         "category_suggestion": result.get("category_suggestion"),
     }
-    text = format_receipt_confirmation(
-        merchant=merchant or note or "Hoá đơn",
-        amount=amount,
-        category_code=_normalize_category(category),
-        receipt_date=parsed_date,
-        items=[
-            (str(it.get("name") or ""), it.get("price"))
-            for it in items
-            if isinstance(it, dict)
-        ],
-        confidence=confidence,
-        auto_categorized=True,
+    text, keyboard = _render_receipt_confirmation(
+        _pending_receipt_confirms[token], token
     )
-    text += "\n\n✅ Đồng ý để mình lưu khoản chi này?"
-    keyboard = {
-        "inline_keyboard": [[
-            {"text": "✅ Đồng ý", "callback_data": f"confirm:receipt:{token}"},
-            {"text": "❌ Huỷ", "callback_data": f"cancel:receipt:{token}"},
-        ]]
-    }
 
     edited = False
     if ack_id:
@@ -323,27 +394,54 @@ async def _autosave_and_confirm(
             reply_markup=keyboard,
         )
 
+
 async def confirm_pending_receipt(*, db: AsyncSession, user: User, token: str) -> bool:
     payload = _pending_receipt_confirms.pop(token, None)
     if not payload or payload.get("user_id") != str(user.id):
         return False
     if time.monotonic() - float(payload.get("created_at", 0)) > _PENDING_RECEIPT_TTL_S:
         return False
-    await expense_service.create_expense(
-        db,
-        user.id,
-        ExpenseCreate(
-            amount=float(payload["amount"]),
-            currency=str(payload["currency"]),
-            merchant=payload.get("merchant"),
-            category=str(payload["category"]),
-            source="ocr",
-            expense_date=date.fromisoformat(str(payload["expense_date"])),
-            note=payload.get("note"),
-            raw_data={"ocr": {"confidence": payload.get("confidence"), "category_suggestion": payload.get("category_suggestion"), "items": payload.get("items") or []}},
-        ),
+    expense_data = ExpenseCreate(
+        amount=float(payload["amount"]),
+        currency=str(payload["currency"]),
+        merchant=payload.get("merchant"),
+        category=str(payload["category"]),
+        source="ocr",
+        expense_date=date.fromisoformat(str(payload["expense_date"])),
+        note=payload.get("note"),
+        raw_data={
+            "ocr": {
+                "confidence": payload.get("confidence"),
+                "category_suggestion": payload.get("category_suggestion"),
+                "items": payload.get("items") or [],
+            }
+        },
     )
+    expense_data = await apply_default_source(db, user.id, expense_data)
+    await expense_service.create_expense(db, user.id, expense_data)
     return True
+
+
+def set_pending_receipt_category(
+    *, token: str, user: User, category: str
+) -> tuple[str, dict] | None:
+    """Record the user's category pick on a pending receipt; re-render it.
+
+    Returns the refreshed ``(text, keyboard)`` so the caller can edit the
+    confirmation message in place, or ``None`` when the pick is rejected —
+    unknown token, not the owner, expired, or an invalid display code (a
+    spoofed callback). Picking refreshes the TTL so the user isn't rushed.
+    """
+    payload = _pending_receipt_confirms.get(token)
+    if not payload or payload.get("user_id") != str(user.id):
+        return None
+    if time.monotonic() - float(payload.get("created_at", 0)) > _PENDING_RECEIPT_TTL_S:
+        return None
+    if category not in _VALID_DISPLAY_CATEGORY_CODES:
+        return None
+    payload["category"] = category
+    payload["created_at"] = time.monotonic()
+    return _render_receipt_confirmation(payload, token)
 
 
 async def handle_photo_message(
@@ -520,5 +618,7 @@ __all__ = [
     "EVENT_RECEIPT_PHOTO_FAILED",
     "EVENT_RECEIPT_PHOTO_PARSED",
     "EVENT_RECEIPT_PHOTO_RECEIVED",
+    "confirm_pending_receipt",
     "handle_photo_message",
+    "set_pending_receipt_category",
 ]

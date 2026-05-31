@@ -49,7 +49,7 @@ async def test_next_action_matrix_has_9_unique_ctas(
     assert cta.button_key == button_key
     assert cta.text
     assert cta.message_text.startswith("💡 Bước tiếp theo dành cho bạn:")
-    assert "hỏi Bé Tiền" in cta.message_text
+    assert "hỏi Bé Tiền" not in cta.message_text
 
 
 def test_next_action_yaml_contains_unique_copy_for_each_cell():
@@ -81,6 +81,6 @@ def test_first_briefing_insight_render_text_is_plain_text_for_entities_send():
         suggested_query="bắt đầu quản lý tài chính",
     )
 
-    assert "Hỏi thử: bắt đầu quản lý tài chính" in insight.render_text
+    assert "Hỏi thử:" not in insight.render_text
     assert "<code>" not in insight.render_text
     assert "</code>" not in insight.render_text

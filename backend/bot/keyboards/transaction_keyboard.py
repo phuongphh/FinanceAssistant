@@ -11,44 +11,96 @@ InlineKeyboardMarkup = dict
 """Alias for clarity — we build raw dicts matching Telegram's schema."""
 
 
-def transaction_actions_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
-    """Keyboard xuất hiện SAU khi ghi giao dịch thành công.
+def _action_row(transaction_id: str) -> list[dict]:
+    tx = str(transaction_id)
+    return [
+        {
+            "text": "🏷",
+            "callback_data": build_callback(CallbackPrefix.CHANGE_CATEGORY, tx),
+        },
+        {
+            "text": "💳",
+            "callback_data": build_callback(CallbackPrefix.CHANGE_SOURCE, tx),
+        },
+        {
+            "text": "💵",
+            "callback_data": build_callback(CallbackPrefix.EDIT_AMOUNT, tx),
+        },
+        {
+            "text": "🗑",
+            "callback_data": build_callback(CallbackPrefix.DELETE_TRANSACTION, tx),
+        },
+    ]
 
-    Layout:
-        [🏷 Đổi danh mục] [✏️ Sửa] [🗑 Xóa]
-        [↶ Hủy (5s)]
+
+def transaction_actions_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
+    """Icon-only action row hiển thị sau khi ghi giao dịch thành công.
+
+    Layout: [🏷] [💳] [💵] [🗑]
     """
+    return {"inline_keyboard": [_action_row(transaction_id)]}
+
+
+def transaction_actions_with_done_keyboard(
+    transaction_id: str,
+) -> InlineKeyboardMarkup:
+    """Action row + nút ✅ Đồng ý (chỉ xuất hiện sau khi user đã sửa)."""
     tx = str(transaction_id)
     return {
         "inline_keyboard": [
+            _action_row(tx),
             [
                 {
-                    "text": "🏷 Đổi danh mục",
-                    "callback_data": build_callback(CallbackPrefix.CHANGE_CATEGORY, tx),
-                },
-                {
-                    "text": "✏️ Sửa",
+                    "text": "✅ Đồng ý",
                     "callback_data": build_callback(
-                        CallbackPrefix.EDIT_TRANSACTION, tx
+                        CallbackPrefix.CONFIRM_EDIT_DONE, tx
                     ),
-                },
-                {
-                    "text": "🗑 Xóa",
-                    "callback_data": build_callback(
-                        CallbackPrefix.DELETE_TRANSACTION, tx
-                    ),
-                },
+                }
             ],
-            [
-                {
-                    "text": "↶ Hủy (5s)",
-                    "callback_data": build_callback(
-                        CallbackPrefix.UNDO_TRANSACTION, tx
-                    ),
-                },
-            ],
-        ],
+        ]
     }
+
+
+def source_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
+    """Picker chọn nguồn tiền khi user sửa expense (mirror category_picker)."""
+    tx = str(transaction_id)
+    rows: list[list[dict]] = [
+        [
+            {
+                "text": "💵 Tiền mặt",
+                "callback_data": build_callback(
+                    CallbackPrefix.CHANGE_SOURCE, tx, "cash"
+                ),
+            },
+            {
+                "text": "🏦 Tài khoản",
+                "callback_data": build_callback(
+                    CallbackPrefix.CHANGE_SOURCE, tx, "bank"
+                ),
+            },
+        ],
+        [
+            {
+                "text": "👛 Ví điện tử",
+                "callback_data": build_callback(
+                    CallbackPrefix.CHANGE_SOURCE, tx, "wallet"
+                ),
+            },
+            {
+                "text": "💳 Thẻ tín dụng",
+                "callback_data": build_callback(
+                    CallbackPrefix.CHANGE_SOURCE, tx, "card"
+                ),
+            },
+        ],
+        [
+            {
+                "text": "❌ Hủy",
+                "callback_data": build_callback(CallbackPrefix.CANCEL_ACTION, tx),
+            }
+        ],
+    ]
+    return {"inline_keyboard": rows}
 
 
 def transaction_batch_actions_keyboard(batch_id: str) -> InlineKeyboardMarkup:
@@ -101,6 +153,47 @@ def category_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
+def receipt_confirm_keyboard(
+    token: str, selected_code: str | None = None
+) -> InlineKeyboardMarkup:
+    """Keyboard xác nhận hoá đơn OCR: lưới danh mục + 2 nút Đồng ý/Huỷ.
+
+    Layout:
+        [🍜 Ăn uống] [🚗 Di chuyển]
+        ... (2 cột danh mục) ...
+        [✅ Đồng ý]  [❌ Huỷ]
+
+    ``selected_code`` (display code) được đánh dấu "✓ " để user thấy lựa
+    chọn hiện tại. Khi chưa chọn (None) không cột nào được tick.
+    """
+    categories = get_all_categories()
+    rows: list[list[dict]] = []
+
+    for i in range(0, len(categories), 2):
+        row = []
+        for cat in categories[i : i + 2]:
+            label = f"{cat.emoji} {cat.name_vi}"
+            if selected_code and cat.code == selected_code:
+                label = f"✓ {label}"
+            row.append(
+                {
+                    "text": label,
+                    "callback_data": build_callback(
+                        CallbackPrefix.RECEIPT_CATEGORY, token, cat.code
+                    ),
+                }
+            )
+        rows.append(row)
+
+    rows.append(
+        [
+            {"text": "✅ Đồng ý", "callback_data": f"confirm:receipt:{token}"},
+            {"text": "❌ Huỷ", "callback_data": f"cancel:receipt:{token}"},
+        ]
+    )
+    return {"inline_keyboard": rows}
+
+
 def confirm_delete_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
     """Xác nhận trước khi xóa giao dịch."""
     tx = str(transaction_id)
@@ -128,16 +221,31 @@ def transaction_source_keyboard(transaction_type: str) -> InlineKeyboardMarkup:
     skip_label = (
         "Bỏ qua nguồn" if transaction_type == "expense" else "Ghi nhận không liên kết"
     )
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
-                {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_account"},
-            ],
-            [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:e_wallet"}],
-            [{"text": f"↪️ {skip_label}", "callback_data": f"{prefix}:skip"}],
-        ]
-    }
+    rows = [
+        [
+            {"text": "💵 Tiền mặt", "callback_data": f"{prefix}:cash"},
+            {"text": "🏦 Tài khoản", "callback_data": f"{prefix}:bank_pick"},
+        ],
+        [{"text": "👛 Ví điện tử", "callback_data": f"{prefix}:e_wallet"}],
+    ]
+    if transaction_type == "expense":
+        rows.append([{"text": "💳 Thẻ tín dụng", "callback_data": f"{prefix}:credit_card"}])
+    rows.append([{"text": f"↪️ {skip_label}", "callback_data": f"{prefix}:skip"}])
+    return {"inline_keyboard": rows}
+
+
+def credit_card_source_keyboard(cards: list) -> InlineKeyboardMarkup:
+    rows: list[list[dict]] = []
+    for card in cards:
+        rows.append([
+            {
+                "text": f"💳 Thẻ tín dụng - {card.bank_name}",
+                "callback_data": f"txsrc_card:{card.id}",
+            }
+        ])
+    rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
+    rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
+    return {"inline_keyboard": rows}
 
 
 def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
@@ -154,3 +262,12 @@ def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
             [{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}],
         ]
     }
+
+
+def source_asset_keyboard(assets: list) -> InlineKeyboardMarkup:
+    rows: list[list[dict]] = []
+    for a in assets:
+        rows.append([{"text": f"🏦 Thẻ thanh toán - {a.name}", "callback_data": f"txsrc_bank:{a.id}"}])
+    rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
+    rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
+    return {"inline_keyboard": rows}

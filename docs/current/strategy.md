@@ -24,6 +24,22 @@ Không compete với Money Lover, MISA, Spendee. Không compete với Finhay, Ti
 
 > **Đây là wow-factor sản phẩm, được agreed trong strategic review tháng 5/2026.**
 
+> **Cập nhật (rev 2026-05-29 — strategic review "5 phút đầu"):** Twin vẫn là
+> **differentiator + payoff** dài hạn. Nhưng review phát hiện Twin là feature
+> *lean-forward* tuần-2 — nó chỉ xuất hiện SAU bước nhập tài sản (ma sát cao nhất),
+> nên người mới rời đi trước khi chạm tới. Giải pháp ban đầu là **The Reading** —
+> một WOW phút-1 chạy trên *zero data* ("Để em đoán thử về anh/chị…").
+>
+> **🛑 Đính chính (29/05/2026, sau khi triển khai & trải nghiệm thật): The Reading
+> đã được GỠ BỎ.** Reading v0+v1 phản tác dụng: (1) vướng nút demo ở bước tài sản,
+> (2) chuyển cảnh sang Twin gập ghềnh, (3) v0 đoán-trên-zero-data nghe generic/bói
+> toán → hại uy tín một sản phẩm tài chính. Thay vào đó onboarding đi **thẳng**
+> goal → asset → Twin, với `step_2_asset.asset_ack` bắc cầu mượt một nhịp vào Twin
+> reveal. Cách kéo người mới tới Twin nay dựa vào việc **giảm ma sát + chuyển cảnh
+> liền mạch**, không phải thêm một màn đoán. WOW #0 (xưng hô) và WOW #3 (nhắn chủ
+> động) vẫn giữ. Chi tiết: banner DECISION trong
+> [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
+
 **Bé Tiền của bạn năm 2030 sẽ thế nào?**
 
 Visual avatar/dashboard show financial future based on current trajectory. Updates daily based on actions. Compare:
@@ -125,7 +141,8 @@ Twin appeals MOST to Level 1-2 — họ đang **building** tài sản → Twin s
 - Trajectory comparison (current vs optimal) (Phase 4A) ✅
 - Daily twin updates (Phase 4A) ✅
 - Life event simulation (Phase 4B) ✅
-- **Operator monitoring** layer (Phase 4.2.5 — in planning) để track Twin engagement với cohort
+- **Operator monitoring** layer (Phase 4.2.5) ✅ để track Twin engagement với cohort
+- **Twin habit loop + weather metaphor** (Phase 4.3) ✅ — Twin từ feature khó hiểu → habit-forming experience (Khiêm tốn/Bình thường/Lạc quan thay P10/P50/P90, story-first narrative, on-demand recompute, Twin admin dashboard)
 
 ### Trụ Cột 5 (Operational): Customer Experience & Trust ✅ DONE
 - Onboarding 3-step + first-Twin shortcut (Phase 4.1) ✅
@@ -249,8 +266,8 @@ CX-ready bridge giữa engineering readiness và cohort expansion:
 - Epic 3: Day 7 positioning micro-survey + kill criterion update
 - 7 stories + 3 migrations + 3 deploy tasks
 
-#### Phase 4.2.5: Admin Observability — 🔵 PLANNING (current)
-**Duration:** ~3 tuần | **Target ship:** Trước soft launch tháng 6/2026
+#### Phase 4.2.5: Admin Observability — ✅ DONE
+**Shipped:** 2026-05-26 | **Duration:** ~3 tuần
 
 Admin dashboard (React + Vite + FastAPI) cho operator/founder monitor soft launch:
 - KPI hero (DAU/MAU/stickiness/cost per user)
@@ -260,6 +277,31 @@ Admin dashboard (React + Vite + FastAPI) cho operator/founder monitor soft launc
 - License data model placeholder (activate ở Phase 5.7 cùng Pro launch)
 - 23 stories / 7 Epics / ~66 SP
 - Inserted để không phải query DB tay khi cohort scale 50 → 500
+
+#### Phase 4.3: Twin Enhancement + Habit Loop + Admin Dashboard — ✅ DONE
+**Shipped:** 2026-05-29 | **Duration:** ~3 tuần
+
+Twin từ feature khó hiểu → habit-forming experience (4 Epics / 15 stories):
+- **Epic 1 — Comprehension:** weather metaphor (🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan) thay P10/P50/P90, life-outcome translation
+- **Epic 2 — Story-first narrative:** 4-5 màn swipe story + mascot personification thay vì bày số liệu
+- **Epic 3 — Habit loop:** on-demand recompute (<5s) + causality + action prompt + negative delta handling + delta threshold + return tease
+- **Epic 4 — Twin admin dashboard:** engagement funnel, loop health, comprehension, delta distribution (4 sections)
+- **Roadmap impact:** Phase 5.0 (Encryption) lùi ~3 tuần; timeline soft launch tháng 6/2026 vẫn an toàn.
+
+#### Phase 4.4: First-5-Minutes WOW — 📋 PLANNED (current)
+**Mục tiêu:** WOW phút-0 cho người mới — hook kéo tới Twin, **không thay** Twin.
+
+Chẩn đoán review "5 phút đầu": sản phẩm không thiếu feature, thiếu *5 phút đầu*.
+Twin (differentiator) bị backloaded sau bước nhập tài sản → người mới rời trước khi
+chạm. Phase 4.4 giảm ma sát & làm mượt đường tới Twin (3 Epics còn hiệu lực,
+Epic 1 The Reading đã gỡ — xem dưới):
+- **WOW #0 — Salutation:** thêm cột `users.salutation`, hỏi anh/chị/bạn trong onboarding (gộp với bước tên). Cho Bé Tiền xưng hô ấm (anh/chị) ở mọi surface có giọng nói.
+- ~~**WOW #1 — The Reading ⭐**~~ — 🛑 **GỠ BỎ (29/05/2026).** Màn "đoán thử trên zero data" phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic → hại uy tín). Thay bằng chuyển cảnh liền mạch goal → asset → Twin (`step_2_asset.asset_ack`). Chi tiết: banner DECISION trong `phase-4.4/phase-4.4-detailed.md`.
+- **WOW #2 — Screenshot onboarding:** chụp app ngân hàng → OCR số dư → net worth ~30s (tái dùng pipeline OCR, không gọi Claude vision). Rủi ro cao nhất, cắt được nếu trượt T6.
+- **WOW #3 — Proactive companion:** thêm trigger vào `empathy_engine` đã chạy hourly — Bé Tiền nhắn trước một cách ấm.
+- **Twin positioning:** Twin vẫn là payoff (phút 4); đường tới Twin nay dựa vào giảm ma sát + chuyển cảnh mượt, không phải màn đoán phút-1.
+- **Roadmap impact:** Phase 5.0 (Encryption) lùi thêm ~1-1.5 tuần; soft launch tháng 6/2026 vẫn an toàn.
+Detail: [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
 
 **🎉 Tháng 6 SOFT LAUNCH** với foundation complete:
 - 50 founding member (50% lifetime discount khi Pro ra mắt — commitment honored)
@@ -494,6 +536,24 @@ Following decisions made during strategic review (May 2026):
 - Phase 5.0 (Encryption) push back ~3 tuần.
 - License placeholder ship sớm tránh migration đau đầu khi Phase 5.7 activate Pro tier.
 
+### Phase 4.3 Insertion (May 2026, post-Phase-4.2.5)
+
+**Decision:** Insert Phase 4.3 (Twin Enhancement + Habit Loop + Admin Dashboard) giữa Phase 4.2.5 và Phase 5.0.
+
+**Reason:** Financial Twin là *the differentiator* nhưng probability cone (P10/P50/P90) quá khó hiểu với mass-affluent user — risk là wow-factor không convert thành habit. Trước soft launch tháng 6 cần biến Twin từ feature "đọc một lần rồi thôi" → trải nghiệm kéo người dùng quay lại hàng tuần.
+
+**Scope:**
+- 4 Epics, 15 stories, ~3 tuần
+- Epic 1 — Comprehension: weather metaphor (🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan) thay P10/P50/P90 + life-outcome translation
+- Epic 2 — Story-first narrative: 4-5 màn swipe story + mascot personification
+- Epic 3 — Habit loop: on-demand recompute (<5s) + causality + action prompt + negative delta + delta threshold + return tease
+- Epic 4 — Twin admin dashboard: engagement funnel, loop health, comprehension, delta distribution (4 sections)
+
+**Roadmap impact:**
+- Phase 4.2.5 ✅ Done (2026-05-26), Phase 4.3 ✅ Done (2026-05-29).
+- Phase 5.0 (Encryption) lùi thêm ~3 tuần.
+- Soft launch tháng 6/2026 vẫn an toàn — habit loop chính là leverage cho cohort retention từ ngày đầu.
+
 ---
 
 ## 📝 Changelog
@@ -505,6 +565,7 @@ Following decisions made during strategic review (May 2026):
 - Phase 3B/4/5/6 substantially redefined
 - Cashflow forecasting roadmap added (v1 → v2 → v3 progression)
 - Pivot rationale documented in [MIGRATION_NOTES_V2_V3.md](../archive/MIGRATION_NOTES_V2_V3.md)
+- **2026-05-29:** Phase 4.2.5 (Admin Observability) ✅ + Phase 4.3 (Twin Enhancement + Habit Loop) ✅ shipped. Next focus: Phase 5.0 (Encryption End-to-End) sau soft launch tháng 6.
 
 **V2:** [archived](../archive/strategy-v2.md) — Pivot to Personal CFO positioning (wealth-first instead of expense-first)
 

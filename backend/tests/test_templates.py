@@ -1,6 +1,7 @@
 """Tests for message templates (Issue #27)."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from backend.bot.formatters.templates import (
     format_budget_alert,
@@ -10,6 +11,8 @@ from backend.bot.formatters.templates import (
     format_welcome_message,
 )
 
+_VN = ZoneInfo("Asia/Ho_Chi_Minh")
+
 
 class TestTransactionConfirmation:
     def test_basic_contains_emoji_and_amount(self):
@@ -18,7 +21,7 @@ class TestTransactionConfirmation:
             amount=45_000,
             category_code="food",
         )
-        assert "✅ Ghi xong!" in result
+        assert "✅ Đã ghi xong!" in result
         assert "Phở Bát Đàn" in result
         assert "45,000đ" in result
         assert "🍜" in result
@@ -29,7 +32,7 @@ class TestTransactionConfirmation:
             amount=85_000,
             category_code="food",
             location="Hà Nội",
-            time=datetime(2026, 4, 15, 12, 15),
+            time=datetime(2026, 4, 15, 12, 15, tzinfo=_VN),
         )
         assert "📍 Hà Nội" in result
         assert "12:15" in result
@@ -68,6 +71,19 @@ class TestTransactionConfirmation:
         assert "Vượt ngân sách" in result
         assert "😅" in result
 
+    def test_source_label_and_edit_hint(self):
+        result = format_transaction_confirmation(
+            merchant="Sashimi cá hồi",
+            amount=4_000_000,
+            category_code="food",
+            source_label="Thẻ tín dụng [Vietcombank]",
+            show_edit_hint=True,
+        )
+        assert "Chi từ: Thẻ tín dụng [Vietcombank]" in result
+        assert "chi tiêu đã được ghi lại" in result
+        assert "<i>" in result and "</i>" in result
+        assert "💡" in result
+
     def test_unknown_category_falls_back_to_other(self):
         result = format_transaction_confirmation(
             merchant="?",
@@ -81,13 +97,24 @@ class TestTransactionBatchConfirmation:
     def test_contains_each_item_and_total(self):
         result = format_transaction_batch_confirmation(
             items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
-            time=datetime(2026, 5, 7, 19, 18),
+            time=datetime(2026, 5, 7, 19, 18, tzinfo=_VN),
         )
-        assert "✅ Ghi xong 2 khoản!" in result
+        assert "✅ Đã ghi xong 2 khoản!" in result
         assert "🚗 tiền xăng" in result
         assert "🍜 ăn trưa" in result
         assert "Tổng: 100,000đ" in result
         assert "19:18" in result
+
+    def test_batch_source_label_and_edit_hint(self):
+        result = format_transaction_batch_confirmation(
+            items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
+            source_label="Tiền mặt",
+            show_edit_hint=True,
+        )
+        assert "Chi từ: Tiền mặt" in result
+        assert "chi tiêu đã được ghi lại" in result
+        assert "<i>" in result and "</i>" in result
+        assert "💡" in result
 
 
 class TestDailySummary:

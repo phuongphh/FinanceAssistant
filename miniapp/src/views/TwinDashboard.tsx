@@ -80,7 +80,7 @@ function Kpi({ label, value }: { label: string; value?: string }) {
 }
 
 function money(raw: string) {
-  return `${Number(raw).toLocaleString('vi-VN')}đ`;
+  return `${Number(raw).toLocaleString('en-US')}đ`;
 }
 
 function labelAsset(name: string) {
@@ -89,6 +89,7 @@ function labelAsset(name: string) {
     cash_savings: 'Tiền mặt',
     crypto: 'Tiền mã hóa',
     gold: 'Vàng',
+    life_insurance: 'Bảo hiểm nhân thọ',
     real_estate: 'Bất động sản',
     real_estate_vn: 'Bất động sản',
     stock: 'Cổ phiếu VN',

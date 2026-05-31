@@ -33,6 +33,15 @@ STEP_FIRST_ASSET = "first_asset"
 STEP_TWIN_SHOWN = "twin_shown"
 STEP_COMPLETED = "completed"
 
+# Phase 4.4 Epic 0 — salutation pick (how Bé Tiền addresses the user).
+# Stored on users.salutation; "bạn" is the gender-neutral fallback used
+# whenever the column is NULL.
+SALUTATION_ANH = "anh"
+SALUTATION_CHI = "chị"
+SALUTATION_BAN = "bạn"
+ALL_SALUTATIONS = (SALUTATION_ANH, SALUTATION_CHI, SALUTATION_BAN)
+DEFAULT_SALUTATION = SALUTATION_BAN
+
 # Goal codes — used by content/onboarding/welcome_v2.yaml + analytics.
 GOAL_UNDERSTAND_WEALTH = "understand_wealth"
 GOAL_PLAN_GOAL = "plan_goal"

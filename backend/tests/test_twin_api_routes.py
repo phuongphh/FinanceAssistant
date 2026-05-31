@@ -94,3 +94,56 @@ class TestTwinApiRoute:
             )
             assert resp2.status_code == 304
             assert not resp2.content
+
+
+class TestTwinCausalityRoute:
+    def teardown_method(self):
+        _clear_overrides()
+
+    def test_invalid_init_data_returns_401(self):
+        app.dependency_overrides[get_db] = _stub_db
+        resp = client.get("/api/twin/causality", headers={"X-Telegram-Init-Data": "invalid"})
+        assert resp.status_code == 401
+
+    def test_returns_causality_breakdown(self):
+        _override_auth()
+        user = SimpleNamespace(id=uuid.uuid4(), telegram_id=12345)
+        breakdown = SimpleNamespace(
+            text="Twin của anh ổn định tuần này — chưa có thay đổi đủ lớn để phân tích.",
+            direction="stable",
+            show_breakdown=False,
+        )
+
+        async def _fake_resolve(auth, db):
+            return user
+
+        async def _fake_attribute(db, user_id):
+            assert user_id == user.id
+            return breakdown
+
+        with patch.object(twin_router, "_resolve_user", _fake_resolve), patch.object(
+            twin_router.causality_service, "attribute_delta", _fake_attribute
+        ):
+            resp = client.get("/api/twin/causality", headers={"X-Telegram-Init-Data": "stub"})
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["error"] is None
+            assert body["data"]["text"] == breakdown.text
+            assert body["data"]["direction"] == "stable"
+            assert body["data"]["show_breakdown"] is False
+
+    def test_service_failure_returns_503(self):
+        _override_auth()
+        user = SimpleNamespace(id=uuid.uuid4(), telegram_id=12345)
+
+        async def _fake_resolve(auth, db):
+            return user
+
+        async def _boom(db, user_id):
+            raise RuntimeError("db down")
+
+        with patch.object(twin_router, "_resolve_user", _fake_resolve), patch.object(
+            twin_router.causality_service, "attribute_delta", _boom
+        ):
+            resp = client.get("/api/twin/causality", headers={"X-Telegram-Init-Data": "stub"})
+            assert resp.status_code == 503

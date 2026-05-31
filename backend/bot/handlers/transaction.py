@@ -20,6 +20,9 @@ from backend.bot.keyboards.transaction_keyboard import (
 from backend.bot.utils.emoji_animation import message_kwargs_for_animation
 from backend.models.expense import Expense
 from backend.services.dashboard_service import get_user_by_id
+from backend.services.expense_source_resolver import (
+    resolve_source_label_for_expense,
+)
 from backend.services.telegram_service import send_message
 
 # Legacy category codes (from earlier phases) → new shared codes.
@@ -50,6 +53,10 @@ async def send_transaction_confirmation(
     if not user or not user.telegram_id:
         return
 
+    is_expense = expense.transaction_type == "expense"
+    source_label = (
+        await resolve_source_label_for_expense(db, expense) if is_expense else None
+    )
     text = format_transaction_confirmation(
         merchant=expense.merchant or expense.note or "Giao dịch",
         amount=float(expense.amount),
@@ -57,13 +64,15 @@ async def send_transaction_confirmation(
         time=expense.created_at,
         daily_spent=daily_spent,
         daily_budget=daily_budget,
+        source_label=source_label,
+        show_edit_hint=is_expense,
     )
-    keyboard = transaction_actions_keyboard(str(expense.id))
+    reply_markup = transaction_actions_keyboard(str(expense.id))
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode=None,
-        reply_markup=keyboard,
+        parse_mode="HTML",
+        reply_markup=reply_markup,
         **message_kwargs_for_animation(text, "transaction"),
     )
 
@@ -98,6 +107,19 @@ async def send_transaction_batch_confirmation(
     if not user or not user.telegram_id:
         return
 
+    all_expense = all(e.transaction_type == "expense" for e in expenses)
+    # Pick the most common source label across the batch — if every item
+    # was charged to the same source, show it; otherwise omit (mixed batches
+    # are rare and we'd rather under-show than mislead).
+    source_label: str | None = None
+    if all_expense:
+        labels = [
+            await resolve_source_label_for_expense(db, e) for e in expenses
+        ]
+        unique = {label for label in labels if label}
+        if len(unique) == 1 and len(labels) == len(expenses):
+            source_label = next(iter(unique))
+
     text = format_transaction_batch_confirmation(
         items=[
             (
@@ -108,12 +130,17 @@ async def send_transaction_batch_confirmation(
             for expense in expenses
         ],
         time=max((expense.created_at for expense in expenses), default=None),
+        source_label=source_label,
+        show_edit_hint=all_expense,
+    )
+    reply_markup = (
+        None if all_expense else transaction_batch_actions_keyboard(batch_id)
     )
     await send_message(
         chat_id=user.telegram_id,
         text=text,
-        parse_mode=None,
-        reply_markup=transaction_batch_actions_keyboard(batch_id),
+        parse_mode="HTML",
+        reply_markup=reply_markup,
         **message_kwargs_for_animation(text, "transaction"),
     )
 

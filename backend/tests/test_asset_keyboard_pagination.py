@@ -109,8 +109,25 @@ class TestDashboardKeyboardSize:
             cbs = [b["callback_data"] for b in first_row]
             assert all(cb.startswith("asset:sort:") for cb in cbs)
 
+    def test_delete_button_uses_compact_icon_for_more_edit_label_space(self):
+        kb = asset_dashboard_edit_keyboard(_rows(1))
+        delete_btn = kb["inline_keyboard"][1][1]
+        assert delete_btn["text"] == "🗑"
+
     def test_returns_none_for_empty(self):
         assert asset_dashboard_edit_keyboard([]) is None
+
+    def test_edit_label_not_truncated_when_length_is_48(self):
+        label = "A" * 48
+        kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
+        edit_btn = kb["inline_keyboard"][1][0]
+        assert edit_btn["text"] == f"✏️ {label}"
+
+    def test_edit_label_truncates_at_49_with_ellipsis(self):
+        label = "B" * 49
+        kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
+        edit_btn = kb["inline_keyboard"][1][0]
+        assert edit_btn["text"] == f"✏️ {'B' * 45}…"
 
 
 class TestManageListKeyboards:
