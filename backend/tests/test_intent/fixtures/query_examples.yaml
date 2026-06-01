@@ -319,6 +319,22 @@ edge_cases:
     expected_intent: action_add_goal
     notes: "Add-goal wizard alt form (#659)."
 
+  - text: "thêm thu nhập"
+    expected_intent: action_add_income
+    notes: "Add-income wizard — 'thu nhập' product keyword."
+
+  - text: "thêm thu nhập mới"
+    expected_intent: action_add_income
+    notes: "Add-income wizard, matches '+ thêm thu nhập mới' list button."
+
+  - text: "tạo thu nhập mới"
+    expected_intent: action_add_income
+    notes: "Add-income wizard alt form."
+
+  - text: "thêm nguồn thu nhập"
+    expected_intent: action_add_income
+    notes: "Add-income wizard, 'nguồn thu nhập' phrasing."
+
   - text: "chi tiêu dashboard"
     expected_intent: nav_expense_dashboard
     notes: "Expense dashboard miniapp link (#655)."

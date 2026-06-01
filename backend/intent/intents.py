@@ -41,6 +41,7 @@ class IntentType(str, Enum):
     ACTION_EDIT_ASSET = "action_edit_asset"
     ACTION_DELETE_ASSET = "action_delete_asset"
     ACTION_ADD_GOAL = "action_add_goal"
+    ACTION_ADD_INCOME = "action_add_income"
 
     # ----- Navigation intents -----
     NAV_EXPENSE_DASHBOARD = "nav_expense_dashboard"
