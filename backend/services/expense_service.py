@@ -13,6 +13,7 @@ from backend.models.credit_card import CreditCard
 from backend.models.transaction import Transaction
 from backend.wealth.models.asset import Asset
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
+from backend.services.expense_source_resolver import DEFAULT_SOURCE_RAW_DATA_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,13 @@ class SourceResolution(NamedTuple):
     warning: dict | None
     source_type: str | None
     e_wallet_provider: str | None
+
+
+def _raw_data_without_default_source_marker(raw_data: dict | None) -> dict | None:
+    """Remove the profile-default marker once the user explicitly edits source."""
+    cleaned = dict(raw_data or {})
+    cleaned.pop(DEFAULT_SOURCE_RAW_DATA_KEY, None)
+    return cleaned or None
 
 
 def _transaction_direction(transaction_type: str | None) -> int:
@@ -486,12 +494,16 @@ async def update_expense(
     update_data = data.model_dump(exclude_unset=True)
     if (
         "source_asset_id" in update_data
+        or "source_credit_card_id" in update_data
         or "source_type" in update_data
         or "e_wallet_provider" in update_data
     ):
+        update_data["raw_data"] = _raw_data_without_default_source_marker(
+            update_data.get("raw_data", expense.raw_data)
+        )
         clear_source = (
-            "source_asset_id" in update_data and update_data["source_asset_id"] is None
-        ) or ("source_type" in update_data and update_data["source_type"] is None)
+            "source_type" in update_data and update_data["source_type"] is None
+        )
         if clear_source:
             update_data["source_asset_id"] = None
             update_data["source_type"] = None

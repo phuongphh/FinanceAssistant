@@ -22,6 +22,7 @@ from backend.models.expense import Expense
 from backend.profile.models.user_profile import UserProfile
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_source_resolver as resolver
+from backend.services import expense_service
 from backend.wealth.models.asset import Asset
 
 
@@ -108,6 +109,7 @@ class TestApplyDefaultSource:
         )
         result = await resolver.apply_default_source(db, _mk_user_id(), data)
         assert result is data
+        assert result.raw_data is None
 
     async def test_noop_when_no_profile(self):
         data = _base_expense_payload()
@@ -123,7 +125,7 @@ class TestApplyDefaultSource:
         result = await resolver.apply_default_source(db, _mk_user_id(), data)
         assert result is data
 
-    async def test_applies_cash(self):
+    async def test_applies_cash_and_marks_default_source(self):
         data = _base_expense_payload()
         db = _db_with_profile(
             UserProfile(user_id=_mk_user_id(), default_expense_source="cash")
@@ -132,6 +134,20 @@ class TestApplyDefaultSource:
         assert result.source_type == "cash"
         assert result.source_asset_id is None
         assert result.source_credit_card_id is None
+        assert result.raw_data == {resolver.DEFAULT_SOURCE_RAW_DATA_KEY: True}
+
+    async def test_preserves_existing_raw_data_when_marking_default_source(self):
+        data = _base_expense_payload().model_copy(
+            update={"raw_data": {"parser": "quick"}}
+        )
+        db = _db_with_profile(
+            UserProfile(user_id=_mk_user_id(), default_expense_source="cash")
+        )
+        result = await resolver.apply_default_source(db, _mk_user_id(), data)
+        assert result.raw_data == {
+            "parser": "quick",
+            resolver.DEFAULT_SOURCE_RAW_DATA_KEY: True,
+        }
 
     async def test_applies_credit_card(self):
         card_id = uuid.uuid4()
@@ -226,6 +242,25 @@ class TestResolveSourceLabel:
         label = await resolver.resolve_source_label_for_expense(db, exp)
         assert label == "Thẻ tín dụng [Vietcombank]"
 
+    async def test_credit_card_default_source_gets_default_marker(self):
+        uid = _mk_user_id()
+        card_id = uuid.uuid4()
+        card = CreditCard(
+            user_id=uid,
+            bank_name="Msb",
+            credit_limit=Decimal("50000000"),
+            closing_date=15,
+        )
+        card.id = card_id
+        exp = _expense(
+            user_id=uid, source_type="credit_card", source_credit_card_id=card_id
+        )
+        exp.raw_data = {resolver.DEFAULT_SOURCE_RAW_DATA_KEY: True}
+        db = MagicMock()
+        db.get = AsyncMock(return_value=card)
+        label = await resolver.resolve_source_label_for_expense(db, exp)
+        assert label == "Thẻ tín dụng [Msb] (mặc định)"
+
     async def test_bank_account_with_name_suffix(self):
         uid = _mk_user_id()
         aid = uuid.uuid4()
@@ -278,3 +313,20 @@ class TestResolveSourceLabel:
         db.get = AsyncMock(return_value=asset)
         label = await resolver.resolve_source_label_for_expense(db, exp)
         assert label == "Tài khoản thanh toán"
+
+
+class TestDefaultSourceMarkerCleanup:
+    def test_removes_only_default_marker_when_user_changes_source(self):
+        raw_data = {
+            resolver.DEFAULT_SOURCE_RAW_DATA_KEY: True,
+            "source_warning": {"kind": "low_balance"},
+        }
+
+        assert expense_service._raw_data_without_default_source_marker(raw_data) == {
+            "source_warning": {"kind": "low_balance"}
+        }
+
+    def test_returns_none_when_marker_was_the_only_raw_data(self):
+        raw_data = {resolver.DEFAULT_SOURCE_RAW_DATA_KEY: True}
+
+        assert expense_service._raw_data_without_default_source_marker(raw_data) is None
