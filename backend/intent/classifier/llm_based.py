@@ -73,9 +73,10 @@ INTENTS:
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Ghi giao dịch nhanh (tiền ra/vào). "được cho/thưởng/lì xì/tìm/nhặt X" là tiền vào.
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"
-- action_edit_asset: Muốn sửa / cập nhật tài sản đã có. Ví dụ: "sửa đất Ba Tư", "sửa cổ phiếu FPT thành 200 cổ", "cập nhật bất động sản". Khi user nói "thành <giá trị>" / "= <giá trị>" thì capture vào new_value để handler áp dụng update inline.
+- action_edit_asset: Muốn sửa / cập nhật tài sản đã có. Ví dụ: "sửa đất Ba Tư", "sửa FPT thành 200 cổ". Khi user nói "thành/= <giá trị>" thì capture vào new_value.
 - action_delete_asset: Muốn xoá / bỏ tài sản đã có. Ví dụ: "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT", "huỷ bất động sản"
 - action_add_goal: Muốn thêm mục tiêu tài chính mới. Ví dụ: "thêm mục tiêu", "tạo mục tiêu mới", "đặt goal"
+- action_add_income: Thêm nguồn thu nhập mới, KHÔNG kèm số tiền. Ví dụ: "thêm thu nhập".
 - nav_expense_dashboard: Muốn mở dashboard / bảng điều khiển chi tiêu. Ví dụ: "chi tiêu dashboard", "mở dashboard chi tiêu", "bảng điều khiển chi phí"
 - advisory: Hỏi lời khuyên đầu tư / tài chính
 - planning: Hỏi cách lập kế hoạch

@@ -60,6 +60,7 @@ WRITE_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
     }
 )
 
@@ -72,6 +73,7 @@ _WIZARD_LAUNCHING_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
@@ -92,6 +94,7 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
@@ -431,6 +434,12 @@ class IntentDispatcher:
             )
 
             return ActionAddGoalHandler()
+        if intent == IntentType.ACTION_ADD_INCOME:
+            from backend.intent.handlers.action_add_income import (
+                ActionAddIncomeHandler,
+            )
+
+            return ActionAddIncomeHandler()
         if intent == IntentType.NAV_EXPENSE_DASHBOARD:
             from backend.intent.handlers.nav_expense_dashboard import (
                 NavExpenseDashboardHandler,

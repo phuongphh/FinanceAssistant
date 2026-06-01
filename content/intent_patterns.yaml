@@ -509,6 +509,26 @@ action_add_goal:
     - pattern: '^(?:muc\s*tieu|goals?)\s+moi\b'
       confidence: 0.92
 
+action_add_income:
+  description: "User wants to add a new income stream (salary, freelance, rental, ...)."
+  # High confidence so it beats query_income when the user is initiating an
+  # add (e.g. "thêm thu nhập"). Opens the income wizard ("+ thêm thu nhập"),
+  # which collects type + schedule + amount. This is NOT a quick income log
+  # — that carries an amount and routes to action_quick_transaction.
+  # "thu nhập" is a product keyword here, mirroring "tài sản" (action_add_asset)
+  # and "mục tiêu" (action_add_goal).
+  patterns:
+    # "thêm thu nhập" / "tạo thu nhập mới" / "thêm nguồn thu nhập"
+    - pattern: '^(?:them|tao|nhap|ghi|moi)\s+(?:moi\s+)?(?:nguon\s+)?thu\s*nhap\b'
+      confidence: 0.95
+    # "thu nhập mới" / "nguồn thu nhập mới"
+    - pattern: '^(?:nguon\s+)?thu\s*nhap\s+moi\b'
+      confidence: 0.92
+    # "thêm lương" — salary is the dominant stream type. Negative lookahead
+    # on a trailing amount keeps "thêm lương 20tr" routed to a quick log.
+    - pattern: '^(?:them|tao|nhap)\s+(?:moi\s+)?luong\b(?!\s*[+\-]?\s*[\d.,]+)'
+      confidence: 0.9
+
 nav_expense_dashboard:
   description: "User wants to open the Expense Dashboard miniapp."
   patterns:
