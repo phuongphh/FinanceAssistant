@@ -292,6 +292,13 @@ action_quick_transaction:
     # ``backend/intent/income_semantics.py``.
     - pattern: '\bduoc\s+(?:\w+\s+){0,2}?(?:cho|tang|bieu|thuong|li\s*xi|mung\s*tuoi|mung|ho\s*tro|hoan)\b[^?\n]{0,40}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
       confidence: 0.9
+    # "Found money": "tìm/nhặt/lượm được 200k dưới gối" — cash picked up is
+    # money-in. The amount must come DIRECTLY after "được" (only a sign in
+    # between) and carry a money suffix, so "tìm được thắt lưng 500k" (an
+    # object worth 500k, no purchase yet) does NOT match. Kept in sync with
+    # ``_FOUND_MONEY_RE`` in ``backend/intent/income_semantics.py``.
+    - pattern: '\b(?:tim|nhat|luom)\s+duoc\s+[+\-]?\s*\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.9
     # "trừ 50k khỏi ví momo" — explicit expense from named asset.
     - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9

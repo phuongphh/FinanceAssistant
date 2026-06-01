@@ -34,9 +34,15 @@ from backend.intent.income_semantics import (
         # purchase ("mua") — the spend keyword must not veto them.
         "được hoàn tiền 200k do mua hàng lỗi",
         "được hoàn 200k tiền mua vé",
+        # Found money: cash picked up is money-in even though "tìm/nhặt
+        # được" is a resultative verb — the amount sits right after "được".
+        "tìm được 200k dưới gối",
+        "nhặt được 50k ngoài đường",
+        "lượm được 100k",
         # tone-less typing must behave identically
         "duoc bo cho 500k",
         "duoc li xi 50k",
+        "tim duoc 200k duoi goi",
     ],
 )
 def test_duoc_money_in_positive(text: str) -> None:
@@ -59,6 +65,12 @@ def test_duoc_money_in_positive(text: str) -> None:
         "được cho 1tr nhưng mua quà hết",
         # A refund that is then re-spent flips back to expense.
         "được hoàn 200k rồi tiêu hết",
+        # Found an OBJECT worth X (an item, not cash) — no money moved and
+        # no "buy" action yet, so it is NOT a transaction. The amount comes
+        # AFTER the object noun, not directly after "được".
+        "tìm được thắt lưng 500k",
+        "nhặt được cái ví 2tr",
+        "tìm được quán ngon 150k",
         # No giving verb following "được".
         "được rồi để mai tính",
         "hôm nay được nghỉ",
@@ -113,6 +125,9 @@ def test_wallet_topup() -> None:
         ("được mừng tuổi 100k", True),
         # Refund inflow that names the original purchase is still income.
         ("được hoàn 200k tiền mua vé", True),
+        # Found money is income; a found object (worth X) is not.
+        ("tìm được 200k dưới gối", True),
+        ("tìm được thắt lưng 500k", False),
     ],
 )
 def test_looks_like_income(text: str, expected: bool) -> None:

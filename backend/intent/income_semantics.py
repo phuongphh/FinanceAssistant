@@ -26,6 +26,12 @@ Design notes
 * "được" is also a *resultative particle* ("mua được áo" = managed to buy
   a shirt). Those are EXPENSES, so a leading action verb immediately
   before "được" vetoes the money-in reading.
+* The resultative veto has ONE income exception — *found money*. A finding
+  verb + "được" followed DIRECTLY by a money amount ("tìm được 200k dưới
+  gối", "nhặt được 50k") means cash was received, so it IS money-in. The
+  amount must come right after "được": "tìm được thắt lưng 500k" names an
+  OBJECT worth 500k (no money moved, no "buy" action yet) and is therefore
+  NOT a transaction.
 * A mixed sentence that also carries a spend verb ("được thưởng 5tr rồi
   tiêu hết") lets the expense reading win — consistent with the existing
   keyword balancing in the handler.
@@ -77,6 +83,21 @@ _DUOC_INCOME_RE = re.compile(
 # list below instead.
 _RESULTATIVE_DUOC_RE = re.compile(
     r"\b(?:mua|tim|lam|an|choi|hoc|di|xem|dat|gianh)\s+duoc\b"
+)
+
+# "Found money" — the income exception to the resultative veto. A finding
+# verb ("tìm/nhặt/lượm được") followed DIRECTLY by a money amount means the
+# user picked up cash ("tìm được 200k dưới gối", "nhặt được 50k"). The
+# amount must sit right after "được" (allowing only a +/- sign), so an
+# object noun in between — "tìm được thắt lưng 500k" (found a belt worth
+# 500k, no money moved) — does NOT match and stays a non-transaction.
+# A currency unit (or dotted-thousands grouping) is required so a bare
+# count ("tìm được 2 cái") never books as money. Keep the unit list in
+# sync with ``_DUOC_AMOUNT_RE`` in the message handler.
+_FOUND_MONEY_RE = re.compile(
+    r"\b(?:tim|nhat|luom)\s+duoc\s+[+\-]?\s*"
+    r"(?:\d{1,3}(?:[.,]\d{3})+(?:\s*(?:ty|ti|trieu|tr|nghin|ngan|k|d|vnd|m))?"
+    r"|\d+(?:[.,]\d+)?\s*(?:ty|ti|trieu|tr|nghin|ngan|k|d|vnd|m))"
 )
 
 # Question-shaped inputs ("được thưởng bao nhiêu?") must never be treated
@@ -179,17 +200,26 @@ def is_duoc_money_in(text: str) -> bool:
     norm = strip_diacritics(text.lower())
     if _QUESTION_RE.search(norm):
         return False
+
+    # Found money ("tìm được 200k dưới gối") is the income exception to the
+    # resultative veto: cash received, not an object acquired. It wins over
+    # the "tìm/mua được" veto below — but ONLY when an amount sits directly
+    # after "được", so "tìm được thắt lưng 500k" still falls through.
+    found_money = bool(_FOUND_MONEY_RE.search(norm))
+
     match = _DUOC_INCOME_RE.search(norm)
-    if not match:
-        return False
-    if _RESULTATIVE_DUOC_RE.search(norm):
-        return False
+    if not found_money:
+        if not match:
+            return False
+        if _RESULTATIVE_DUOC_RE.search(norm):
+            return False
+
     # A spend verb elsewhere in the sentence means the money flowed back
     # OUT — let the expense reading win, mirroring looks_like_income.
     # Exception: a refund ("được hoàn ... tiền mua vé") inherently names the
     # original purchase, so a bare "mua" must NOT veto the refund inflow.
     # An explicit re-spend ("được hoàn 200k rồi tiêu hết") still wins.
-    is_refund = "hoan" in match.group(0)
+    is_refund = bool(match and "hoan" in match.group(0))
     veto_keywords = _REFUND_VETO_KEYWORDS if is_refund else EXPENSE_KEYWORDS
     if any(kw in norm for kw in veto_keywords):
         return False

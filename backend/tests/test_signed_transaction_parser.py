@@ -85,6 +85,8 @@ def test_plus_sign_routes_through_income_guard() -> None:
         # Refund inflow: the "mua" reference to the original purchase must
         # not block the money-in parse.
         ("được hoàn 200k tiền mua vé", 200_000, "hoàn tiền mua vé"),
+        # Found money: cash picked up records as money-in.
+        ("tìm được 200k dưới gối", 200_000, "tìm được dưới gối"),
     ],
 )
 def test_parse_duoc_money_in_accepts(
@@ -105,6 +107,7 @@ def test_parse_duoc_money_in_accepts(
     [
         "mua được áo 200k",  # resultative được → expense, not income
         "tìm được quán ngon 150k",
+        "tìm được thắt lưng 500k",  # found an OBJECT worth 500k, not cash
         "được thưởng bao nhiêu?",  # question
         "được thưởng 5tr rồi tiêu hết",  # spend verb wins
         "được nghỉ hôm nay",  # no amount, no giving verb
