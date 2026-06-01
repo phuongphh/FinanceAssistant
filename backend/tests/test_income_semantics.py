@@ -30,6 +30,10 @@ from backend.intent.income_semantics import (
         "được biếu 2tr",
         "được sếp thưởng 5tr",
         "được công ty hỗ trợ 3tr",
+        # Refunds are money-IN even though they reference the original
+        # purchase ("mua") — the spend keyword must not veto them.
+        "được hoàn tiền 200k do mua hàng lỗi",
+        "được hoàn 200k tiền mua vé",
         # tone-less typing must behave identically
         "duoc bo cho 500k",
         "duoc li xi 50k",
@@ -53,6 +57,8 @@ def test_duoc_money_in_positive(text: str) -> None:
         # Mixed sentence with a spend verb → expense reading wins.
         "được thưởng 5tr rồi tiêu hết",
         "được cho 1tr nhưng mua quà hết",
+        # A refund that is then re-spent flips back to expense.
+        "được hoàn 200k rồi tiêu hết",
         # No giving verb following "được".
         "được rồi để mai tính",
         "hôm nay được nghỉ",
@@ -98,6 +104,15 @@ def test_wallet_topup() -> None:
         ("lương tháng này tiêu hết 5tr", False),
         # "công ty trả lương 20tr" — paying salary is income to the user.
         ("công ty trả lương 20tr", True),
+        # Lucky money WITHOUT a receiving cue = the user is GIVING it →
+        # expense, not income.
+        ("lì xì cháu 500k", False),
+        ("mừng tuổi cho con 100k", False),
+        # ...but a receiving cue ("nhận"/"được") makes it income.
+        ("nhận lì xì 500k", True),
+        ("được mừng tuổi 100k", True),
+        # Refund inflow that names the original purchase is still income.
+        ("được hoàn 200k tiền mua vé", True),
     ],
 )
 def test_looks_like_income(text: str, expected: bool) -> None:

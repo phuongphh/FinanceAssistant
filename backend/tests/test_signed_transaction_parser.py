@@ -82,6 +82,9 @@ def test_plus_sign_routes_through_income_guard() -> None:
         ("được lì xì 50k trên momo", 50_000, "lì xì trên momo"),
         ("được mẹ cho 1tr", 1_000_000, "mẹ cho"),
         ("được mừng tuổi 100k", 100_000, "mừng tuổi"),
+        # Refund inflow: the "mua" reference to the original purchase must
+        # not block the money-in parse.
+        ("được hoàn 200k tiền mua vé", 200_000, "hoàn tiền mua vé"),
     ],
 )
 def test_parse_duoc_money_in_accepts(

@@ -89,6 +89,19 @@ _AMOUNT_TOKEN_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Stricter amount matcher for the "được" money-in fast-path. Unlike
+# ``_AMOUNT_TOKEN_RE`` it REQUIRES a currency unit (or dotted-thousands
+# grouping) so a plain count is never mistaken for money: "được mẹ cho 2
+# quả cam" must NOT record a 2đ money-in and steal the message from the
+# intent pipeline. This mirrors the Tier-1 YAML rule, which also demands
+# a money suffix for this shape. Keep the unit list in sync with
+# ``_AMOUNT_TOKEN_PATTERN`` above.
+_DUOC_AMOUNT_RE = re.compile(
+    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd))?"
+    r"|\d+(?:[.,]\d+)?\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)",
+    re.IGNORECASE,
+)
+
 # Question-shaped inputs ("200k là bao nhiêu USD") must NOT be parsed as
 # expense entries. The list is narrow on purpose — real expense notes
 # don't use these phrases.
@@ -176,7 +189,10 @@ def _parse_duoc_money_in(text: str) -> dict | None:
     if not is_duoc_money_in(text):
         return None
 
-    amount_match = _AMOUNT_TOKEN_RE.search(text)
+    # Require a currency-denominated amount (see ``_DUOC_AMOUNT_RE``) so
+    # non-cash gifts like "được mẹ cho 2 quả cam" fall through to the
+    # intent pipeline instead of being booked as a 2đ money-in.
+    amount_match = _DUOC_AMOUNT_RE.search(text)
     if not amount_match:
         return None
     amount_token = amount_match.group("amt").strip()

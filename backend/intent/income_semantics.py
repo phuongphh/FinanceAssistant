@@ -113,8 +113,12 @@ INCOME_KEYWORDS: tuple[str, ...] = (
     "duoc li xi",
     "duoc mung tuoi",
     "duoc ho tro",
-    "li xi",
-    "mung tuoi",
+    # Lucky money needs a RECEIVING cue: bare "li xi" / "mung tuoi" also
+    # cover the GIVING case ("lì xì cháu 500k", "mừng tuổi cho con 100k"),
+    # which is an expense — so require "được"/"nhận" before counting it as
+    # income. ("duoc li xi"/"duoc mung tuoi" above handle the "được" form.)
+    "nhan li xi",
+    "nhan mung tuoi",
     "thu nhap",
     "kiem duoc",
     "ban duoc",
@@ -136,6 +140,14 @@ EXPENSE_KEYWORDS: tuple[str, ...] = (
     "thanh toan",
     "bo tien",
     "het",
+)
+
+# Spend verbs that still veto a *refund* inflow. "mua" is excluded because
+# a refund sentence ("được hoàn 200k tiền mua vé") references the original
+# purchase, not a new outflow — only an explicit re-spend ("tiêu", "hết")
+# should flip a refund back to expense.
+_REFUND_VETO_KEYWORDS: tuple[str, ...] = tuple(
+    kw for kw in EXPENSE_KEYWORDS if kw != "mua"
 )
 
 
@@ -167,13 +179,19 @@ def is_duoc_money_in(text: str) -> bool:
     norm = strip_diacritics(text.lower())
     if _QUESTION_RE.search(norm):
         return False
-    if not _DUOC_INCOME_RE.search(norm):
+    match = _DUOC_INCOME_RE.search(norm)
+    if not match:
         return False
     if _RESULTATIVE_DUOC_RE.search(norm):
         return False
     # A spend verb elsewhere in the sentence means the money flowed back
     # OUT — let the expense reading win, mirroring looks_like_income.
-    if any(kw in norm for kw in EXPENSE_KEYWORDS):
+    # Exception: a refund ("được hoàn ... tiền mua vé") inherently names the
+    # original purchase, so a bare "mua" must NOT veto the refund inflow.
+    # An explicit re-spend ("được hoàn 200k rồi tiêu hết") still wins.
+    is_refund = "hoan" in match.group(0)
+    veto_keywords = _REFUND_VETO_KEYWORDS if is_refund else EXPENSE_KEYWORDS
+    if any(kw in norm for kw in veto_keywords):
         return False
     return True
 
