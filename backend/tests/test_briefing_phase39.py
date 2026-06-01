@@ -48,6 +48,7 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
 
     with patch("backend.briefing.morning_briefing.net_worth_calculator.calculate", AsyncMock(return_value=breakdown)), \
          patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change", AsyncMock(return_value=change)), \
+         patch("backend.briefing.morning_briefing.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
          patch("backend.briefing.morning_briefing.get_crypto_quote", AsyncMock(return_value=_quote("BTC", "100", "crypto", stale=True))), \
          patch("backend.briefing.morning_briefing.get_gold_quote", AsyncMock(return_value=_quote("SJC_GOLD", "90000000", "gold"))), \
          patch("backend.briefing.morning_briefing.get_relevant_news", AsyncMock(return_value=[])), \
@@ -164,3 +165,58 @@ async def test_briefing_diversification_line_always_rendered():
     result = await _render_with_performers((None, None))
     assert "Đa dạng hóa:" in result.text
     assert "/100" in result.text
+
+
+def test_briefing_localizes_gold_market_symbols_from_vi_subtype_labels():
+    from backend.briefing.morning_briefing import _localized_holding_label
+
+    assert _localized_holding_label("SJC_GOLD", "gold") == "Vàng SJC"
+    assert _localized_holding_label("RING_24K", "gold") == "Vàng nhẫn"
+    assert _localized_holding_label("SJC_GOLD", "stock") == "SJC_GOLD"
+
+
+@pytest.mark.asyncio
+async def test_briefing_quick_insight_uses_vietnamese_gold_label_not_provider_code():
+    only_id = uuid.uuid4()
+    performer = {
+        "asset_id": only_id,
+        "symbol": "SJC_GOLD",
+        "asset_type": "gold",
+        "current_value": Decimal("100"),
+        "cost_basis_value": Decimal("95"),
+        "return_pct": Decimal("5.3"),
+    }
+    result = await _render_with_performers((performer, performer))
+
+    assert "Hiệu suất: Vàng SJC +5.3%" in result.text
+    assert "SJC_GOLD" not in result.sections["insights"]
+
+
+@pytest.mark.asyncio
+async def test_briefing_pair_insight_localizes_all_gold_provider_codes():
+    best_id = uuid.uuid4()
+    worst_id = uuid.uuid4()
+    performers = (
+        {
+            "asset_id": best_id,
+            "symbol": "SJC_GOLD",
+            "asset_type": "gold",
+            "current_value": Decimal("110"),
+            "cost_basis_value": Decimal("100"),
+            "return_pct": Decimal("10"),
+        },
+        {
+            "asset_id": worst_id,
+            "symbol": "RING_24K",
+            "asset_type": "gold",
+            "current_value": Decimal("95"),
+            "cost_basis_value": Decimal("100"),
+            "return_pct": Decimal("-5"),
+        },
+    )
+    result = await _render_with_performers(performers)
+
+    assert "Tốt nhất: Vàng SJC +10.0%" in result.text
+    assert "yếu nhất: Vàng nhẫn -5.0%" in result.text
+    assert "SJC_GOLD" not in result.sections["insights"]
+    assert "RING_24K" not in result.sections["insights"]

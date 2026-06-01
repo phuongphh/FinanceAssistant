@@ -24,7 +24,7 @@ from backend.market_data.client import get_crypto_quote, get_gold_quote
 from backend.models.bank_rate import BankRateSnapshot
 from backend.models.market_snapshot import MarketSnapshot
 from backend.models.user import User
-from backend.wealth.asset_types import get_label
+from backend.wealth.asset_types import get_label, get_subtypes
 from backend.wealth.ladder import WealthLevel, detect_level
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import net_worth_calculator
@@ -161,6 +161,31 @@ def _news_lines(news: list[Any]) -> str:
         return "• Chưa có tin nổi bật cho danh mục của bạn."
     return "\n".join(f"• {item.title}" for item in news[:3])
 
+
+_GOLD_MARKET_SYMBOL_TO_SUBTYPE = {
+    "SJC_GOLD": "sjc",
+    "RING_24K": "nhan",
+}
+
+
+def _localized_holding_label(symbol: Any, asset_type: str | None = None) -> str:
+    """Return a user-facing Vietnamese label for market symbols.
+
+    Performance analytics keep provider symbols such as ``SJC_GOLD`` so price
+    lookups stay unambiguous. Briefing copy should not leak those internal
+    codes; for gold, reuse the YAML-backed Vietnamese subtype labels that power
+    the rest of the wealth platform.
+    """
+    raw = str(symbol or "").strip()
+    if not raw:
+        return ""
+    if str(asset_type or "").strip().lower() == "gold":
+        subtype = _GOLD_MARKET_SYMBOL_TO_SUBTYPE.get(raw.upper())
+        if subtype:
+            label = get_subtypes("gold").get(subtype)
+            if label:
+                return label
+    return raw
 
 
 async def _twin_briefing_line(db: AsyncSession, user_id) -> str:
@@ -352,16 +377,16 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
             # so collapse to a single-asset line.
             insight_lines.append(
                 insight_templates["performance_single"].format(
-                    symbol=top["symbol"],
+                    symbol=_localized_holding_label(top["symbol"], top.get("asset_type")),
                     pct=_signed_pct(top["return_pct"]),
                 )
             )
         else:
             insight_lines.append(
                 insight_templates["performance_pair"].format(
-                    best_symbol=top["symbol"],
+                    best_symbol=_localized_holding_label(top["symbol"], top.get("asset_type")),
                     best_pct=_signed_pct(top["return_pct"]),
-                    worst_symbol=bottom["symbol"],
+                    worst_symbol=_localized_holding_label(bottom["symbol"], bottom.get("asset_type")),
                     worst_pct=_signed_pct(bottom["return_pct"]),
                 )
             )
