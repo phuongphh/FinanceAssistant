@@ -287,10 +287,6 @@ submenu_expenses:
       callback: "menu:expenses:manage"
       description: "Hướng dẫn thêm/sửa/xoá chi tiêu"
 
-    - label: "💚 Tiền vào"
-      callback: "menu:expenses:manage"
-      description: "Ghi nhận thưởng, lì xì, hoàn tiền vào nguồn tiền"
-
     - label: "🔄 Khoản định kỳ"
       callback: "menu:expenses:recurring"
       description: "Thuê nhà, internet, gym… + nhắc nhở"
