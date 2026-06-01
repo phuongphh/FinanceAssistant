@@ -160,6 +160,87 @@ async def test_fetch_batch_uses_provider_batch_once():
     assert secondary.calls == 0
 
 
+class BatchProviderStub(BaseProvider):
+    """Provider returning a configurable subset of requested symbols per batch.
+
+    ``returns`` lists which requested symbols the provider answers with; a
+    missing or empty entry models a 200-but-empty / shape-drifted response
+    that raises no exception.
+    """
+
+    def __init__(self, name: str, returns: set[str] | None) -> None:
+        self.name = name
+        self.returns = returns
+        self.batch_calls = 0
+        self.calls = 0
+
+    @property
+    def asset_type(self) -> str:
+        return "stock"
+
+    async def fetch_quote(self, symbol: str) -> PriceQuote:
+        self.calls += 1
+        return PriceQuote(
+            symbol=symbol,
+            price=Decimal("100"),
+            currency="VND",
+            asset_type="stock",
+            fetched_at=datetime(2026, 5, 8, tzinfo=timezone.utc),
+            source=self.name,
+        )
+
+    async def fetch_batch(self, symbols: list[str]) -> list[PriceQuote]:
+        self.batch_calls += 1
+        allowed = self.returns if self.returns is not None else set(symbols)
+        return [
+            await self.fetch_quote(symbol) for symbol in symbols if symbol in allowed
+        ]
+
+
+@pytest.mark.asyncio
+async def test_empty_primary_batch_falls_back_to_secondary():
+    redis = FakeAsyncRedis()
+    primary = BatchProviderStub("vndirect", returns=set())  # 200-but-empty
+    secondary = BatchProviderStub("ssi", returns={"VNM", "FPT"})
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    quotes = await dispatcher.fetch_batch(["VNM", "FPT"])
+
+    assert sorted(quote.symbol for quote in quotes) == ["FPT", "VNM"]
+    assert all(quote.source == "ssi" for quote in quotes)
+    assert secondary.batch_calls == 1
+    # empty-but-OK primary batch must count as a failure, not a success reset
+    assert await redis.get(health_failures_key("vndirect")) == "1"
+
+
+@pytest.mark.asyncio
+async def test_partial_primary_batch_fills_gap_from_secondary():
+    redis = FakeAsyncRedis()
+    primary = BatchProviderStub("vndirect", returns={"VNM"})
+    secondary = BatchProviderStub("ssi", returns={"FPT", "HPG"})
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    quotes = await dispatcher.fetch_batch(["VNM", "FPT", "HPG"])
+
+    by_symbol = {quote.symbol: quote.source for quote in quotes}
+    assert by_symbol == {"VNM": "vndirect", "FPT": "ssi", "HPG": "ssi"}
+    assert primary.batch_calls == 1
+    assert secondary.batch_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_partial_primary_batch_kept_when_secondary_fails():
+    redis = FakeAsyncRedis()
+    primary = BatchProviderStub("vndirect", returns={"VNM"})
+    secondary = ProviderStub("ssi", fail_times=99)
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    quotes = await dispatcher.fetch_batch(["VNM", "FPT"])
+
+    assert [quote.symbol for quote in quotes] == ["VNM"]
+    assert quotes[0].source == "vndirect"
+
+
 @pytest.mark.asyncio
 async def test_fetch_batch_skips_open_secondary_circuit():
     redis = FakeAsyncRedis()
