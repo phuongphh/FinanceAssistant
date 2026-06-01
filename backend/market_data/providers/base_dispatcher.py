@@ -13,6 +13,7 @@ from backend.market_data.cache.cache_keys import (
     health_open_until_key,
 )
 from backend.market_data.exceptions import (
+    MarketDataError,
     ParserError,
     ProviderUnavailable,
     RateLimitError,
@@ -137,9 +138,12 @@ class Dispatcher:
             )
         try:
             secondary_quotes = await self._call_secondary_batch(missing)
-        except _RETRYABLE_ERRORS:
-            # Keep whatever the primary gave us; only surface the error when we
-            # have nothing at all (preserves the single-quote raise contract).
+        except MarketDataError:
+            # Keep whatever the primary already gave us; only surface the error
+            # when we have nothing at all (preserves the single-quote raise
+            # contract). This also covers non-retryable errors such as
+            # SymbolNotFound for one missing ticker, which must not discard the
+            # valid quotes the primary returned for the rest of the batch.
             if quotes:
                 return quotes
             raise

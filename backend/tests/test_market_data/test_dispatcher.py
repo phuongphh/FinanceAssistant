@@ -12,7 +12,7 @@ from backend.market_data.cache.cache_keys import (
     health_failures_key,
     health_open_until_key,
 )
-from backend.market_data.exceptions import ProviderUnavailable
+from backend.market_data.exceptions import ProviderUnavailable, SymbolNotFound
 from backend.market_data.normalizer import PriceQuote
 from backend.market_data.providers.base_dispatcher import Dispatcher
 from backend.tests.test_market_data.fakes import FakeAsyncRedis
@@ -239,6 +239,44 @@ async def test_partial_primary_batch_kept_when_secondary_fails():
 
     assert [quote.symbol for quote in quotes] == ["VNM"]
     assert quotes[0].source == "vndirect"
+
+
+@pytest.mark.asyncio
+async def test_partial_primary_batch_kept_when_secondary_raises_symbol_not_found():
+    """A non-retryable secondary error must not discard valid primary quotes."""
+
+    class SymbolNotFoundProvider(BatchProviderStub):
+        async def fetch_batch(self, symbols: list[str]) -> list[PriceQuote]:
+            self.batch_calls += 1
+            raise SymbolNotFound(self.name)
+
+    redis = FakeAsyncRedis()
+    primary = BatchProviderStub("vndirect", returns={"VNM"})
+    secondary = SymbolNotFoundProvider("ssi", returns=None)
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    quotes = await dispatcher.fetch_batch(["VNM", "FPT"])
+
+    assert [quote.symbol for quote in quotes] == ["VNM"]
+    assert quotes[0].source == "vndirect"
+
+
+@pytest.mark.asyncio
+async def test_empty_primary_batch_propagates_secondary_symbol_not_found():
+    """With no primary quotes, a non-retryable secondary error still surfaces."""
+
+    class SymbolNotFoundProvider(BatchProviderStub):
+        async def fetch_batch(self, symbols: list[str]) -> list[PriceQuote]:
+            self.batch_calls += 1
+            raise SymbolNotFound(self.name)
+
+    redis = FakeAsyncRedis()
+    primary = BatchProviderStub("vndirect", returns=set())
+    secondary = SymbolNotFoundProvider("ssi", returns=None)
+    dispatcher = Dispatcher(primary, secondary, redis)
+
+    with pytest.raises(SymbolNotFound):
+        await dispatcher.fetch_batch(["VNM", "FPT"])
 
 
 @pytest.mark.asyncio
