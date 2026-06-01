@@ -281,6 +281,17 @@ action_quick_transaction:
     # "nhận lương 20tr vào tiền mặt"
     - pattern: '^(?:nhan|duoc|thuong|luong)\s+(?:luong\s+)?[\d.,]+.*(?:vao|tai|o|trong)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9
+    # "được bố cho 500k" / "được thưởng 200k" / "được lì xì 50k trên
+    # momo" / "được mẹ cho 1tr" — the Chi tiêu menu PROMISES these are
+    # recorded as money-in. "được" + an optional giver (bố/mẹ/sếp) + a
+    # giving verb (cho/tặng/biếu/thưởng/lì xì/mừng tuổi/hỗ trợ/hoàn) +
+    # an amount with a money suffix. The message-layer fast-path records
+    # the transaction; this rule keeps the LLM tier from having to. Money
+    # suffix is mandatory so resultative "được" ("mua được áo") and bare
+    # numbers don't match. Kept in sync with ``_GIVING_VERBS`` in
+    # ``backend/intent/income_semantics.py``.
+    - pattern: '\bduoc\s+(?:\w+\s+){0,2}?(?:cho|tang|bieu|thuong|li\s*xi|mung\s*tuoi|mung|ho\s*tro|hoan)\b[^?\n]{0,40}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.9
     # "trừ 50k khỏi ví momo" — explicit expense from named asset.
     - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9

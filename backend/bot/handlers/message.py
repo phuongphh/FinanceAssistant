@@ -28,6 +28,7 @@ from backend.bot.handlers import free_form_text as intent_layer
 from backend.bot.handlers.transaction import send_transaction_confirmation
 from backend.bot.keyboards.transaction_keyboard import transaction_source_keyboard
 from backend.intent import pending_action
+from backend.intent.income_semantics import is_duoc_money_in
 from backend.intent.dispatcher import (
     OUTCOME_CLARIFY_SENT,
     OUTCOME_CONFIRM_SENT,
@@ -154,6 +155,46 @@ def _parse_signed_transaction(text: str) -> dict | None:
         "merchant": merchant,
         "note": text[:1000],
         "transaction_type": "money_in" if sign == "+" else "expense",
+    }
+
+
+def _parse_duoc_money_in(text: str) -> dict | None:
+    """Parse the "được <giver> cho/tặng/lì xì/thưởng… <amount>" money-in shape.
+
+    Vietnamese users log received money with the verb **"được"** far more
+    often than with a leading ``+``. The Chi tiêu menu promises that
+    "được bố cho 500k", "được thưởng 200k", "được lì xì 50k" are recorded
+    as money-in, so we catch them here — before the intent pipeline — and
+    route straight to the source-picker wizard, mirroring the ``+`` path.
+
+    Returns a money-in ``parsed`` dict (same shape as
+    :func:`_parse_signed_transaction`) or ``None`` when the text isn't a
+    "được"-gift with an extractable amount.
+    """
+    if _QUESTION_HINT_RE.search(text):
+        return None
+    if not is_duoc_money_in(text):
+        return None
+
+    amount_match = _AMOUNT_TOKEN_RE.search(text)
+    if not amount_match:
+        return None
+    amount_token = amount_match.group("amt").strip()
+    amount_decimal = parse_amount(amount_token)
+    if amount_decimal is None or amount_decimal <= 0:
+        return None
+
+    merchant = f"{text[:amount_match.start()]} {text[amount_match.end():]}"
+    merchant = re.sub(r"\s+", " ", merchant).strip(" ,-+;:")
+    # Drop the leading "được" so the source label reads "bố cho" /
+    # "thưởng" / "lì xì" rather than "được bố cho".
+    merchant = re.sub(r"(?i)^được\s+", "", merchant)[:500]
+
+    return {
+        "amount": float(amount_decimal),
+        "merchant": merchant,
+        "note": text[:1000],
+        "transaction_type": "money_in",
     }
 
 
@@ -321,6 +362,15 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
             if await _record_signed_expense_with_default(db, user, signed):
                 return True
         return await _start_source_prompt(db, chat_id, user, signed)
+
+    # Fast-path for "được <giver> cho/tặng/lì xì/thưởng <amount>" money-in
+    # (e.g. "được bố cho 500k"). The Chi tiêu menu promises these are
+    # recorded as money-in, so we route them to the source picker just
+    # like a leading "+", rather than letting them fall through to the
+    # expense pipeline.
+    duoc_money_in = _parse_duoc_money_in(text)
+    if duoc_money_in is not None:
+        return await _start_source_prompt(db, chat_id, user, duoc_money_in)
 
     # Phase 3.5 — full intent flow with confirm/clarify state handling.
     outcome = await intent_layer.classify_and_dispatch(

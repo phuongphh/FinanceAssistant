@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.bot.handlers.message import _parse_signed_transaction
+from backend.bot.handlers.message import (
+    _parse_duoc_money_in,
+    _parse_signed_transaction,
+)
 from backend.intent.handlers.action_quick_transaction import (
     _has_leading_plus_sign,
     _looks_like_income,
@@ -69,3 +72,42 @@ def test_plus_sign_routes_through_income_guard() -> None:
     assert _looks_like_income("+200k") is True
     assert _looks_like_income("-200k") is False
     assert _looks_like_income("200k cà phê") is False
+
+
+@pytest.mark.parametrize(
+    "text,expected_amount,expected_merchant",
+    [
+        ("được bố cho 500k", 500_000, "bố cho"),
+        ("được thưởng 200k", 200_000, "thưởng"),
+        ("được lì xì 50k trên momo", 50_000, "lì xì trên momo"),
+        ("được mẹ cho 1tr", 1_000_000, "mẹ cho"),
+        ("được mừng tuổi 100k", 100_000, "mừng tuổi"),
+    ],
+)
+def test_parse_duoc_money_in_accepts(
+    text: str, expected_amount: float, expected_merchant: str
+) -> None:
+    """'được <giver> cho/tặng/lì xì/thưởng <amount>' must parse as money-in
+    so the Chi tiêu menu promise ('được bố cho 500k' → tiền vào) holds."""
+    parsed = _parse_duoc_money_in(text)
+    assert parsed is not None, f"expected a money-in parse for {text!r}"
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == expected_amount
+    assert parsed["merchant"] == expected_merchant
+    assert parsed["note"] == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "mua được áo 200k",  # resultative được → expense, not income
+        "tìm được quán ngon 150k",
+        "được thưởng bao nhiêu?",  # question
+        "được thưởng 5tr rồi tiêu hết",  # spend verb wins
+        "được nghỉ hôm nay",  # no amount, no giving verb
+        "50k cà phê",  # plain expense
+        "",
+    ],
+)
+def test_parse_duoc_money_in_rejects(text: str) -> None:
+    assert _parse_duoc_money_in(text) is None

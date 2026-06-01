@@ -367,6 +367,24 @@ edge_cases:
     expected_min_confidence: 0.8
     notes: "Salary income credited to a cash account (#656)."
 
+  # "được <giver> cho/tặng/lì xì/thưởng <amount>" money-in — the Chi
+  # tiêu menu PROMISES these are recorded as money-in. Previously
+  # "được bố cho 500k" fell through and got mis-recorded as an expense.
+  - text: "được bố cho 500k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Gift money-in — headline regression (được + giver + cho)."
+
+  - text: "được thưởng 200k"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Bonus money-in via 'được thưởng'."
+
+  - text: "được lì xì 50k trên momo"
+    expected_intent: action_quick_transaction
+    expected_min_confidence: 0.85
+    notes: "Lucky-money money-in via 'được lì xì'."
+
   # Expense-lead verb + description + amount — the colloquial Vietnamese
   # shape where users name what they bought between the verb and the
   # number ("chi vé công viên nước 500k"). Previously fell to the LLM
