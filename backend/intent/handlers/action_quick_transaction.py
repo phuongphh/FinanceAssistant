@@ -32,6 +32,18 @@ from backend.bot.handlers.transaction import (
 )
 from backend.intent.clarifier import build_message_from_key
 from backend.intent.handlers.base import IntentHandler
+# Income vs. expense semantics live in ONE place —
+# ``backend/intent/income_semantics.py``. The message-layer fast-path
+# (which records the transaction), the rule-based tier, and this expense
+# handler (defence-in-depth income guard) must all agree, so we import
+# the shared detectors rather than maintain a divergent copy. Diverging
+# copies were the root cause of "được bố cho 500k" being silently
+# mis-recorded as an expense. The ``_`` aliases stay importable for
+# backward compatibility (tests reach into this module).
+from backend.intent.income_semantics import (
+    has_leading_plus_sign as _has_leading_plus_sign,
+    looks_like_income as _looks_like_income,
+)
 from backend.intent.intents import IntentResult
 from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
@@ -40,6 +52,12 @@ from backend.services.expense_source_resolver import apply_default_source
 from backend.services.llm_service import call_llm
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "ActionQuickTransactionHandler",
+    "_has_leading_plus_sign",
+    "_looks_like_income",
+]
 
 
 # Same prompt the legacy fallback in message.py uses — kept here so the
@@ -120,130 +138,6 @@ _FALLBACK_REPLY = (
     "Mình chưa nhận ra số tiền trong câu này 🌱 — bạn thử gõ rõ hơn"
     " như '50k cà phê' hoặc '150 ngàn ăn trưa' nhé."
 )
-
-
-# Wallet top-up shape: "thêm/cộng/nạp/nhận X vào ví|tài khoản Y" —
-# the user is explicitly moving money INTO a wallet/account, which is
-# income from the cash-flow perspective. Without this guard the
-# verbs (thêm, cộng, nạp) flow through the expense recorder because
-# they're not in _INCOME_KEYWORDS — silently corrupting expense
-# history (caught by code review on PR #669).
-_WALLET_TOPUP_RE = re.compile(
-    r"^\s*(?:them|cong|nap|nhan|cho|gui|bo|duoc|nop)\s+[+\-]?\s*[\d.,]+"
-    r".*?\b(?:vao|into|toi|den)\s+"
-    r"(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|"
-    r"vcb|acb|tcb|mb|tpb|techcom|sacombank|bidv|vietinbank)\b",
-    re.IGNORECASE,
-)
-
-
-def _looks_like_wallet_topup(text: str) -> bool:
-    """True when the message reads as a wallet/account top-up.
-
-    Distinct from generic income (no salary verb) but still income from
-    the expense-recorder's perspective — recording these as expenses
-    inverts cash flow on the user's books.
-    """
-    if not text:
-        return False
-    return bool(_WALLET_TOPUP_RE.search(_strip_diacritics(text.lower())))
-
-
-# Verbs that indicate the user is receiving money (income), NOT spending.
-# Detected on the diacritic-stripped lowercased text to be tolerant of
-# typos. If any of these match, the handler bails before recording an
-# expense — see issues #656, #661.
-_INCOME_KEYWORDS: tuple[str, ...] = (
-    "nhan luong",
-    "nhan thuong",
-    "nhan tien",
-    "luong",
-    # NOTE: bare "thuong" is intentionally OMITTED — after diacritic
-    # stripping it collides with the common adverb "thường" (usually,
-    # often), which would swallow ordinary expenses like
-    # "thường ăn sáng 50k". Only phrasal forms are listed.
-    "thuong tet",
-    "tien thuong",
-    "duoc thuong",
-    "duoc tang",
-    "duoc cho",
-    "thu nhap",
-    "kiem duoc",
-    "ban duoc",
-    "hoan tien",
-    "lai ngan hang",
-    "co tuc",
-    "freelance",
-    "lam them",
-)
-
-# Verbs that explicitly mean "spend" — used to override the income check
-# in mixed sentences like "lương tháng này tiêu hết 5tr" (expense wins).
-# NOTE: bare "tra" is intentionally OMITTED — it is a substring of
-# "tra luong" / "tra thuong" (paying salary/bonus, which is income from
-# the user's perspective), so including it would break "công ty trả
-# lương 20tr". The phrasal "tra tien" still covers genuine spending.
-_EXPENSE_KEYWORDS: tuple[str, ...] = (
-    "tieu",
-    "chi tieu",
-    "tra tien",
-    "mua",
-    "thanh toan",
-    "bo tien",
-    "het",
-)
-
-
-def _strip_diacritics(text: str) -> str:
-    import unicodedata
-
-    return "".join(
-        ch
-        for ch in unicodedata.normalize("NFD", text)
-        if unicodedata.category(ch) != "Mn"
-    ).replace("đ", "d").replace("Đ", "D")
-
-
-def _has_leading_plus_sign(text: str) -> bool:
-    """True if the message starts with an explicit ``+`` before a number.
-
-    Convention: a leading ``+`` is the user's most direct signal that
-    this is money-in, not expense. The fast-path in ``message.py``
-    normally catches these before they reach the intent classifier; this
-    is a belt-and-suspenders check so signed input is never silently
-    recorded as expense even if routing changes.
-    """
-    return bool(re.match(r"^\s*\+\s*\d", text or ""))
-
-
-def _looks_like_income(text: str) -> bool:
-    """True if the message reads as income rather than expense.
-
-    Used as a pre-check in the expense handler to avoid mis-recording
-    "nhận lương 20tr vào tiền mặt" as an expense (#656). If the message
-    contains BOTH income and expense verbs, expense wins — the user is
-    describing what they did with the money, not the receipt itself.
-
-    Also fires when the message starts with an explicit ``+`` sign so
-    "+200k" never gets recorded as an expense.
-    """
-    if not text:
-        return False
-    if _has_leading_plus_sign(text):
-        return True
-    # Explicit wallet top-ups ("thêm 3tr vào ví momo") are always
-    # income, regardless of which verb leads. Check before the
-    # keyword/expense balancing because the topup phrasing is
-    # unambiguous — there is no "thêm 3tr vào ví momo để tiêu" reading
-    # that makes the money flow OUT.
-    if _looks_like_wallet_topup(text):
-        return True
-    norm = _strip_diacritics(text.lower())
-    has_income = any(kw in norm for kw in _INCOME_KEYWORDS)
-    if not has_income:
-        return False
-    has_expense = any(kw in norm for kw in _EXPENSE_KEYWORDS)
-    return not has_expense
 
 
 class ActionQuickTransactionHandler(IntentHandler):

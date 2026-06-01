@@ -71,7 +71,7 @@ INTENTS:
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể
 - query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
 - action_record_saving: Muốn ghi tiết kiệm
-- action_quick_transaction: Muốn ghi giao dịch nhanh
+- action_quick_transaction: Ghi giao dịch nhanh (tiền ra/vào). "được cho/thưởng/lì xì/tìm/nhặt X" là tiền vào.
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"
 - action_edit_asset: Muốn sửa / cập nhật tài sản đã có. Ví dụ: "sửa đất Ba Tư", "sửa cổ phiếu FPT thành 200 cổ", "cập nhật bất động sản". Khi user nói "thành <giá trị>" / "= <giá trị>" thì capture vào new_value để handler áp dụng update inline.
 - action_delete_asset: Muốn xoá / bỏ tài sản đã có. Ví dụ: "xoá tài sản ACB", "xoá ví zalopay", "xoá cổ phiếu FPT", "huỷ bất động sản"
