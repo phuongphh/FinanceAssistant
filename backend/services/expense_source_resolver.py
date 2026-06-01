@@ -32,6 +32,9 @@ from backend.wealth.models.asset import Asset
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SOURCE_RAW_DATA_KEY = "source_from_default_expense_source"
+DEFAULT_SOURCE_SUFFIX = " (mặc định)"
+
 _CONTENT_PATH = (
     Path(__file__).resolve().parents[2] / "content" / "transaction_copy.yaml"
 )
@@ -101,13 +104,24 @@ async def apply_default_source(
     if not source_type:
         return data
 
+    raw_data = dict(data.raw_data or {})
+    raw_data[DEFAULT_SOURCE_RAW_DATA_KEY] = True
     return data.model_copy(
         update={
             "source_type": source_type,
             "source_asset_id": asset_id,
             "source_credit_card_id": card_id,
+            "raw_data": raw_data,
         }
     )
+
+
+def _with_default_suffix(label: str, expense: Expense) -> str:
+    """Append the UI marker when the source came from profile default."""
+    raw_data = expense.raw_data or {}
+    if raw_data.get(DEFAULT_SOURCE_RAW_DATA_KEY):
+        return f"{label}{DEFAULT_SOURCE_SUFFIX}"
+    return label
 
 
 async def resolve_source_label_for_expense(
@@ -132,13 +146,13 @@ async def resolve_source_label_for_expense(
         if card and card.user_id == expense.user_id:
             bank = (card.bank_name or "").strip()
             if bank:
-                return f"{base} [{bank}]"
-        return base
+                return _with_default_suffix(f"{base} [{bank}]", expense)
+        return _with_default_suffix(base, expense)
 
     if expense.source_asset_id:
         asset = await db.get(Asset, expense.source_asset_id)
         if asset and asset.user_id == expense.user_id:
             name = (asset.name or "").strip()
             if name:
-                return f"{base} [{name}]"
-    return base
+                return _with_default_suffix(f"{base} [{name}]", expense)
+    return _with_default_suffix(base, expense)

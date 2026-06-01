@@ -81,6 +81,8 @@ class TestTransactionConfirmation:
         )
         assert "Chi từ: Thẻ tín dụng [Vietcombank]" in result
         assert "chi tiêu đã được ghi lại" in result
+        assert "Nếu thông tin chưa chính xác" in result
+        assert "click vào các nhãn ở dưới để sửa lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
 
@@ -113,6 +115,8 @@ class TestTransactionBatchConfirmation:
         )
         assert "Chi từ: Tiền mặt" in result
         assert "chi tiêu đã được ghi lại" in result
+        assert "Nếu thông tin chưa chính xác" in result
+        assert "click vào các nhãn ở dưới để sửa lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
 
