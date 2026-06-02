@@ -262,7 +262,12 @@ async def _record_transaction_with_default(
         merchant=merchant or "Giao dịch",
         note=parsed.get("note"),
         source="manual",
-        category="other",
+        # Money-in must reach create_expense at the schema default so it
+        # normalizes to the "income" category — matching the source-picker
+        # path. Hardcoding "other" here (as the expense fast-path does) would
+        # record default-sourced income under a spending bucket and skew
+        # category analytics.
+        category="needs_review" if tx_type == "money_in" else "other",
         expense_date=date.today(),
         transaction_type=tx_type,
     )

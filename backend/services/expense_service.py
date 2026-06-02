@@ -13,7 +13,10 @@ from backend.models.credit_card import CreditCard
 from backend.models.transaction import Transaction
 from backend.wealth.models.asset import Asset
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
-from backend.services.expense_source_resolver import DEFAULT_SOURCE_RAW_DATA_KEY
+from backend.services.expense_source_resolver import (
+    DEFAULT_MONEY_IN_SOURCE_RAW_DATA_KEY,
+    DEFAULT_SOURCE_RAW_DATA_KEY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,7 @@ def _raw_data_without_default_source_marker(raw_data: dict | None) -> dict | Non
     """Remove the profile-default marker once the user explicitly edits source."""
     cleaned = dict(raw_data or {})
     cleaned.pop(DEFAULT_SOURCE_RAW_DATA_KEY, None)
+    cleaned.pop(DEFAULT_MONEY_IN_SOURCE_RAW_DATA_KEY, None)
     return cleaned or None
 
 
