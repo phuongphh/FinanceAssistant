@@ -477,6 +477,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #912 | Pre-Phase | Tech debt: i18n hóa 6 chuỗi onboarding + gỡ env-read khỏi service layer | [pre-phase/issue-912.md](by-phase/pre-phase/issue-912.md) |
 | #919 | Pre-Phase | NLU: \"được bố cho 500k\" không được nhận diện là money-in trong menu Chi tiêu | [pre-phase/issue-919.md](by-phase/pre-phase/issue-919.md) |
 | #922 | Pre-Phase | default_money_in_source: configurable default income source + money-in confirm UX | [pre-phase/issue-922.md](by-phase/pre-phase/issue-922.md) |
+| #924 | Pre-Phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [pre-phase/issue-924.md](by-phase/pre-phase/issue-924.md) |
 
-**Total:** 473 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 455 Pre-Phase)
+**Total:** 474 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 456 Pre-Phase)
