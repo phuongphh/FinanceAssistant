@@ -126,6 +126,11 @@ _DASHBOARD_SORT_BY_USER: dict[uuid.UUID, str] = {}
 # (after edit / cancel-delete) land back on the same page instead of jumping
 # to the top. Cleared implicitly on sort change.
 _DASHBOARD_PAGE_BY_USER: dict[uuid.UUID, int] = {}
+# Tracks whether each user's dashboard report is in "edit" (tap an asset to
+# edit) or "delete" (tap an asset to delete) mode. Tapping an asset is the
+# primary action, so the mode decides what that tap does; the 🗑/✏️ footer
+# toggles between them. Defaults to "edit" — the common case.
+_DASHBOARD_MODE_BY_USER: dict[uuid.UUID, str] = {}
 
 
 def _safe_int(value: str | None, default: int = 0) -> int:
@@ -326,14 +331,22 @@ async def show_asset_dashboard_report(
     *,
     sort: str | None = None,
     page: int | None = None,
+    mode: str | None = None,
     message_id: int | None = None,
 ) -> None:
     """Render the asset dashboard report with inline row actions.
+
+    ``mode`` is ``"edit"`` (tap an asset to edit) or ``"delete"`` (tap an asset
+    to delete); when ``None`` we reuse the user's last mode (default ``"edit"``).
 
     Rows are paginated so the keyboard markup stays under Telegram's ~10 KB
     practical reply_markup limit (a user with ~50 assets used to hit it
     and silently get no response — see asset_dashboard_edit_keyboard).
     """
+    mode_key = mode or _DASHBOARD_MODE_BY_USER.get(user.id, "edit")
+    if mode_key not in ("edit", "delete"):
+        mode_key = "edit"
+    _DASHBOARD_MODE_BY_USER[user.id] = mode_key
     sort_key = normalize_sort(sort or _dashboard_sort_for_user(user))
     _DASHBOARD_SORT_BY_USER[user.id] = sort_key
     assets = _sort_assets_for_dashboard(
@@ -341,6 +354,7 @@ async def show_asset_dashboard_report(
     )
     if not assets:
         _DASHBOARD_PAGE_BY_USER.pop(user.id, None)
+        _DASHBOARD_MODE_BY_USER.pop(user.id, None)
         text = (
             "📊 <b>Báo cáo</b>\n\n"
             "Bạn chưa có tài sản nào. Tap /themtaisan để bắt đầu nhé."
@@ -358,14 +372,20 @@ async def show_asset_dashboard_report(
         page = _DASHBOARD_PAGE_BY_USER.get(user.id, 0)
     page = clamp_page(page, len(rows))
     _DASHBOARD_PAGE_BY_USER[user.id] = page
+    if mode_key == "delete":
+        hint = "\n🗑️ Chạm một tài sản để xoá. Đổi ý? Tap ✏️ Quay lại sửa."
+    else:
+        hint = "\n👆 Chạm một tài sản để sửa. Muốn xoá? Tap 🗑 Xoá tài sản."
     text = (
         format_asset_list(assets).replace(
             "📊 <b>Tài sản của bạn</b>", "📊 <b>Báo cáo</b>", 1
         )
         + f"\n\nSắp xếp: <b>{html.escape(_dashboard_sort_label(sort_key))}</b>"
-        + "\n👆 Dùng ✏️ để sửa, 🗑️ để xoá."
+        + hint
     )
-    markup = asset_dashboard_edit_keyboard(rows, current_sort=sort_key, page=page)
+    markup = asset_dashboard_edit_keyboard(
+        rows, current_sort=sort_key, page=page, mode=mode_key
+    )
     if message_id is not None:
         await edit_message_text(
             chat_id=chat_id,
@@ -3359,13 +3379,21 @@ async def handle_dashboard_callback(db: AsyncSession, callback_query: dict) -> b
                 db, chat_id, user, sort=sort_key, page=0, message_id=message_id
             )
             return
-        if action == "page" and arg is not None:
+        if action in ("page", "dpage") and arg is not None:
             try:
                 page_idx = int(arg)
             except ValueError:
                 page_idx = 0
             await show_asset_dashboard_report(
                 db, chat_id, user, page=page_idx, message_id=message_id
+            )
+            return
+        if action == "mode" and arg in ("edit", "delete"):
+            # Toggle tap-to-edit / tap-to-delete. Reset to the first page so the
+            # rows the user is about to tap match what they see.
+            _DASHBOARD_PAGE_BY_USER[user.id] = 0
+            await show_asset_dashboard_report(
+                db, chat_id, user, page=0, mode=arg, message_id=message_id
             )
             return
         if action == "noop":

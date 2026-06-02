@@ -53,9 +53,9 @@ class TestPageSlice:
 class TestDashboardKeyboardSize:
     def test_single_page_when_under_page_size(self):
         kb = asset_dashboard_edit_keyboard(_rows(5))
-        # 1 sort row + 5 assets × 1 combined row + back row = 7 rows
-        # (no pagination row when everything fits on one page).
-        assert len(kb["inline_keyboard"]) == 7
+        # 1 sort row + 5 full-width asset rows + "🗑 Xoá tài sản" toggle row
+        # + back row = 8 rows (no pagination row when everything fits).
+        assert len(kb["inline_keyboard"]) == 8
 
     def test_paginates_at_page_size(self):
         kb = asset_dashboard_edit_keyboard(_rows(ASSET_LIST_PAGE_SIZE * 3))
@@ -110,41 +110,55 @@ class TestDashboardKeyboardSize:
             cbs = [b["callback_data"] for b in first_row]
             assert all(cb.startswith("asset:sort:") for cb in cbs)
 
-    def test_card_layout_single_row_actions_then_content(self):
+    def test_edit_mode_row_is_full_width_tap_to_edit(self):
         asset_id = uuid.uuid4()
         kb = asset_dashboard_edit_keyboard([(asset_id, "🏛️ VCB")])
-        # Row 0 = sort controls, row 1 = ✏️ / 🗑 action icons then content.
+        # Row 0 = sort controls, row 1 = the asset as a single full-width
+        # button (the whole row width goes to the name; tapping it edits).
         card_row = kb["inline_keyboard"][1]
-        assert [b["text"] for b in card_row] == ["✏️", "🗑", "🏛️ VCB"]
+        assert len(card_row) == 1
+        assert card_row[0]["text"] == "🏛️ VCB"
         assert card_row[0]["callback_data"] == f"asset:edit:{asset_id}"
-        assert card_row[1]["callback_data"] == f"asset:delete:{asset_id}"
-        assert card_row[2]["callback_data"] == "asset:noop"
 
-    def test_actions_precede_content_on_same_row(self):
-        # The two action icons lead the row; the content (no-op) trails it so
-        # the whole asset fits on a single line.
+    def test_edit_mode_has_delete_toggle_footer(self):
         kb = asset_dashboard_edit_keyboard(_rows(1))
-        card_row = kb["inline_keyboard"][1]
-        assert len(card_row) == 3
-        action_cbs = [card_row[0]["callback_data"], card_row[1]["callback_data"]]
-        assert any(cb.startswith("asset:edit:") for cb in action_cbs)
-        assert any(cb.startswith("asset:delete:") for cb in action_cbs)
-        assert card_row[2]["callback_data"] == "asset:noop"
+        cbs = {b.get("callback_data") for row in kb["inline_keyboard"] for b in row}
+        assert "asset:mode:delete" in cbs
+
+    def test_delete_mode_row_is_full_width_tap_to_delete(self):
+        asset_id = uuid.uuid4()
+        kb = asset_dashboard_edit_keyboard([(asset_id, "🏛️ VCB")], mode="delete")
+        # Delete-mode drops the sort row, so the first row is the asset itself.
+        card_row = kb["inline_keyboard"][0]
+        assert len(card_row) == 1
+        assert card_row[0]["text"] == "🗑 🏛️ VCB"
+        assert card_row[0]["callback_data"] == f"asset:delete:{asset_id}"
+        cbs = {b.get("callback_data") for row in kb["inline_keyboard"] for b in row}
+        # Toggle back to edit-mode is offered.
+        assert "asset:mode:edit" in cbs
+
+    def test_delete_mode_pagination_uses_dpage(self):
+        single = asset_dashboard_edit_keyboard(_rows(3), mode="delete")
+        multi = asset_dashboard_edit_keyboard(_rows(20), mode="delete")
+        single_cbs = {b.get("callback_data") for row in single["inline_keyboard"] for b in row}
+        multi_cbs = {b.get("callback_data") for row in multi["inline_keyboard"] for b in row}
+        assert not any(cb and cb.startswith("asset:dpage:") for cb in single_cbs)
+        assert any(cb and cb.startswith("asset:dpage:") for cb in multi_cbs)
 
     def test_returns_none_for_empty(self):
         assert asset_dashboard_edit_keyboard([]) is None
 
-    def test_label_not_truncated_when_length_is_24(self):
-        label = "A" * 24
+    def test_label_not_truncated_when_length_is_56(self):
+        label = "A" * 56
         kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
-        label_btn = kb["inline_keyboard"][1][2]
+        label_btn = kb["inline_keyboard"][1][0]
         assert label_btn["text"] == label
 
-    def test_label_truncates_at_25_with_ellipsis(self):
-        label = "B" * 25
+    def test_label_truncates_at_57_with_ellipsis(self):
+        label = "B" * 57
         kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
-        label_btn = kb["inline_keyboard"][1][2]
-        assert label_btn["text"] == f"{'B' * 23}…"
+        label_btn = kb["inline_keyboard"][1][0]
+        assert label_btn["text"] == f"{'B' * 55}…"
 
 
 class TestManageListKeyboards:
@@ -194,21 +208,24 @@ class TestManageListKeyboards:
         ]
         assert not page_cbs
 
-    def test_edit_list_card_has_edit_and_delete_actions(self):
+    def test_edit_list_row_is_full_width_tap_to_edit(self):
         asset_id = uuid.uuid4()
         kb = asset_edit_list_keyboard(
             [(asset_id, "📈 FPT")], asset_type="stock"
         )
+        # The asset is a single full-width button; tapping it edits and keeps
+        # the return-to-portfolio asset_type suffix.
         card_row = kb["inline_keyboard"][0]
-        assert [b["text"] for b in card_row] == ["✏️", "🗑", "📈 FPT"]
-        assert card_row[2]["callback_data"] == "asset_manage:noop"
-        # Edit keeps the return-to-portfolio asset_type suffix; delete routes
-        # through the existing confirmation guard.
+        assert len(card_row) == 1
+        assert card_row[0]["text"] == "📈 FPT"
         assert card_row[0]["callback_data"] == f"asset_manage:edit:{asset_id}:stock"
-        assert (
-            card_row[1]["callback_data"]
-            == f"asset_manage:delete_confirm:{asset_id}"
-        )
+
+    def test_edit_list_has_delete_footer_reusing_delete_flow(self):
+        kb = asset_edit_list_keyboard([(uuid.uuid4(), "📈 FPT")], asset_type="stock")
+        cbs = {b.get("callback_data") for row in kb["inline_keyboard"] for b in row}
+        # Delete lives behind a footer that reuses the existing delete-list
+        # flow rather than stealing per-row width.
+        assert "asset_manage:delete_type:stock" in cbs
 
     def test_edit_list_callbacks_within_telegram_cap(self):
         # Market edit list is rendered for market asset types (stock/crypto/

@@ -39,24 +39,17 @@ async def test_show_asset_edit_list_filters_by_subtype():
         await asset_entry.show_asset_edit_list(db, chat_id, user, "stock", subtype="fund")
 
     markup = send_message.await_args.kwargs["reply_markup"]
-    # Each asset renders as a single row: ✏️ / 🗑 action icons then the content
-    # label (asset_manage:noop), so read the label off the no-op button.
-    labels = [
-        b["text"]
-        for row in markup["inline_keyboard"]
-        for b in row
-        if b.get("callback_data") == "asset_manage:noop"
-    ]
-    assert len(labels) == 1
-    assert "TCEF" in labels[0]
-    # The subtype filter must keep the edit action wired to the fund only.
-    edit_cbs = [
-        b["callback_data"]
+    # Each asset renders as a single full-width button; tapping it edits, so the
+    # label and the edit callback live on the same button.
+    edit_buttons = [
+        b
         for row in markup["inline_keyboard"]
         for b in row
         if b.get("callback_data", "").startswith("asset_manage:edit:")
     ]
-    assert len(edit_cbs) == 1
+    # The subtype filter must keep exactly the fund row.
+    assert len(edit_buttons) == 1
+    assert "TCEF" in edit_buttons[0]["text"]
 
 
 @pytest.mark.asyncio

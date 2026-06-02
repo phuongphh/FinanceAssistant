@@ -34,6 +34,8 @@ Callback prefix convention (see ``backend/bot/keyboards/common.py``):
 
     asset:sort:<sort_key>                 — sort dashboard rows (default is value_desc)
     asset:page:<page>                     — switch dashboard page (current sort kept server-side)
+    asset:mode:<edit|delete>              — toggle dashboard between edit-tap and delete-tap
+    asset:dpage:<page>                    — switch dashboard page while in delete-mode
     asset:edit:<asset_uuid>               — edit one asset from dashboard report
     asset:delete:<asset_uuid>             — show inline delete confirmation
     asset:delete_yes:<asset_uuid>         — confirm inline soft delete
@@ -123,25 +125,19 @@ def _pagination_row(
     ]
 
 
-# --- Unified asset "card" rows -------------------------------------------
-# Telegram renders every button *within a row* at equal width, so the old
-# ``[✏️ <label>] [🗑]`` layout forced the trash icon to claim ~50% of the row.
-# We keep each asset on a single line — ``[✏️] [🗑] [<content>]`` — to maximise
-# list density (see more assets without scrolling). With three buttons the
-# content gets ~1/3 of the width and Telegram truncates the visible text on its
-# own; that's an accepted product trade-off ("see more assets" over showing the
-# full name). Every card-style edit screen shares this helper so the layout
-# stays consistent.
+# --- Unified asset picker rows -------------------------------------------
+# Telegram renders every button *within a row* at equal width regardless of its
+# text, so any second button on a row halves the space the asset name can use.
+# To keep each asset name on one line *and* give it the full row width we render
+# exactly **one** button per asset — tapping it is the primary action (edit, or
+# delete while in delete-mode). Secondary actions live behind a mode toggle /
+# separate screen instead of stealing row width. Every card-style edit screen
+# shares this helper so the layout stays consistent.
 
-CARD_EDIT_LABEL = "✏️"
-CARD_DELETE_LABEL = "🗑"
-# One row per asset: ``✏️``  ``🗑``  ``<content>``. Telegram splits a row's
-# width equally across its buttons regardless of text, so with three buttons
-# the content gets ~1/3 of the row and Telegram truncates the visible text on
-# its own. We still cap the label so the serialized markup stays small; the cap
-# is tight because the content button is narrow by design (denser list, one line
-# per asset — the product trade-off is "see more assets" over "full name").
-_CARD_LABEL_MAX = 24
+# Telegram caps button labels at 64 bytes. A full-width row comfortably shows
+# ~56 characters before the client truncates, so we cap there: the markup stays
+# small while the name gets room to breathe (no premature ``…``).
+_CARD_LABEL_MAX = 56
 
 
 def _clean_card_label(label: str) -> str:
@@ -152,28 +148,30 @@ def _clean_card_label(label: str) -> str:
     return clean
 
 
-def _asset_card_rows(
+def _asset_picker_rows(
     items,
     *,
-    edit_cb,
-    delete_cb,
-    noop_cb: str = "asset:noop",
+    row_cb,
+    label_prefix: str = "",
 ) -> list[list[dict]]:
-    """One row per asset: ``✏️`` / ``🗑`` action icons then the content label.
+    """One full-width button per asset; tapping it triggers ``row_cb``.
 
-    ``edit_cb`` / ``delete_cb`` are callables mapping an asset id to the
-    callback_data string for that action, so each screen keeps its own routing
-    prefix while sharing one visual layout. The content button is backed by
-    ``noop_cb`` (a tap is a deliberate no-op — the actions are the two icons).
+    ``row_cb`` is a callable mapping an asset id to the callback_data string for
+    the row's primary action (edit, or delete in delete-mode), so each screen
+    keeps its own routing prefix while sharing one visual layout. Giving the
+    asset its own full-width button keeps the name on a single line without the
+    width loss a second in-row action button would cost. ``label_prefix`` (e.g.
+    ``"🗑 "``) marks the active mode.
     """
     rows: list[list[dict]] = []
     for item in items:
         asset_id, label = item[0], item[1]
         rows.append(
             [
-                {"text": CARD_EDIT_LABEL, "callback_data": edit_cb(asset_id)},
-                {"text": CARD_DELETE_LABEL, "callback_data": delete_cb(asset_id)},
-                {"text": _clean_card_label(label), "callback_data": noop_cb},
+                {
+                    "text": label_prefix + _clean_card_label(label),
+                    "callback_data": row_cb(asset_id),
+                }
             ]
         )
     return rows
@@ -768,17 +766,19 @@ def asset_edit_list_keyboard(
     asset_type: str,
     page: int = 0,
 ) -> InlineKeyboardMarkup:
-    """Render filtered edit/delete cards plus navigation for portfolio context."""
+    """Render a full-width edit picker plus navigation for portfolio context.
+
+    Tapping an asset opens its edit wizard (then returns to the market
+    portfolio). Delete lives behind the ``🗑 Xoá tài sản`` footer, which reuses
+    the existing delete-list flow (``asset_manage:delete_type:<type>``) so the
+    asset name keeps the whole row width.
+    """
     page_items, page, total_pages = _page_slice(candidates, page)
-    rows = _asset_card_rows(
+    rows = _asset_picker_rows(
         page_items,
-        edit_cb=lambda aid: build_callback(
+        row_cb=lambda aid: build_callback(
             CB_ASSET_MANAGE, "edit", str(aid), asset_type
         ),
-        delete_cb=lambda aid: build_callback(
-            CB_ASSET_MANAGE, "delete_confirm", str(aid)
-        ),
-        noop_cb=build_callback(CB_ASSET_MANAGE, "noop"),
     )
     nav = _pagination_row(
         page,
@@ -788,6 +788,16 @@ def asset_edit_list_keyboard(
     )
     if nav is not None:
         rows.append(nav)
+    rows.append(
+        [
+            {
+                "text": "🗑 Xoá tài sản",
+                "callback_data": build_callback(
+                    CB_ASSET_MANAGE, "delete_type", asset_type
+                ),
+            }
+        ]
+    )
     rows.append(
         [
             {
@@ -951,8 +961,18 @@ def asset_dashboard_edit_keyboard(
     *,
     current_sort: str = "value_desc",
     page: int = 0,
+    mode: str = "edit",
 ) -> InlineKeyboardMarkup | None:
-    """Sort controls plus compact edit/delete buttons per dashboard row.
+    """Full-width asset picker for the dashboard report.
+
+    Each asset is its own full-width button so the name gets the whole row (one
+    line, no width halving) — the product trade-off resolved in favour of
+    readable names over an always-visible per-row delete icon.
+
+    ``mode="edit"`` (default): sort controls on top; tapping an asset opens its
+    edit wizard; a ``🗑 Xoá tài sản`` footer toggles to delete-mode.
+    ``mode="delete"``: tapping an asset opens its delete confirmation; an
+    ``✏️ Quay lại sửa`` footer toggles back.
 
     Rows are paginated at :data:`ASSET_LIST_PAGE_SIZE` per page so the
     serialized markup stays under Telegram's ~10 KB practical limit.
@@ -961,6 +981,33 @@ def asset_dashboard_edit_keyboard(
         return None
 
     page_items, page, total_pages = _page_slice(rows, page)
+
+    if mode == "delete":
+        keyboard = list(
+            _asset_picker_rows(
+                page_items,
+                row_cb=lambda aid: build_callback(CB_ASSET_ROW, "delete", aid),
+                label_prefix="🗑 ",
+            )
+        )
+        nav = _pagination_row(
+            page,
+            total_pages,
+            prev_cb=build_callback(CB_ASSET_ROW, "dpage", page - 1),
+            next_cb=build_callback(CB_ASSET_ROW, "dpage", page + 1),
+        )
+        if nav is not None:
+            keyboard.append(nav)
+        keyboard.append(
+            [
+                {
+                    "text": "✏️ Quay lại sửa",
+                    "callback_data": build_callback(CB_ASSET_ROW, "mode", "edit"),
+                }
+            ]
+        )
+        keyboard.append([{"text": "◀️ Quay về", "callback_data": "menu:assets"}])
+        return {"inline_keyboard": keyboard}
 
     def sort_button(key: str, label: str) -> dict:
         prefix = "✅ " if key == current_sort else ""
@@ -977,10 +1024,9 @@ def asset_dashboard_edit_keyboard(
         ],
     ]
     keyboard.extend(
-        _asset_card_rows(
+        _asset_picker_rows(
             page_items,
-            edit_cb=lambda aid: build_callback(CB_ASSET_ROW, "edit", aid),
-            delete_cb=lambda aid: build_callback(CB_ASSET_ROW, "delete", aid),
+            row_cb=lambda aid: build_callback(CB_ASSET_ROW, "edit", aid),
         )
     )
     nav = _pagination_row(
@@ -991,6 +1037,14 @@ def asset_dashboard_edit_keyboard(
     )
     if nav is not None:
         keyboard.append(nav)
+    keyboard.append(
+        [
+            {
+                "text": "🗑 Xoá tài sản",
+                "callback_data": build_callback(CB_ASSET_ROW, "mode", "delete"),
+            }
+        ]
+    )
     keyboard.append([{"text": "◀️ Quay về", "callback_data": "menu:assets"}])
     return {"inline_keyboard": keyboard}
 
