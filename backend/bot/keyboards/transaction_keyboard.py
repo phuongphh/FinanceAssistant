@@ -5,7 +5,7 @@ Returns raw Telegram `InlineKeyboardMarkup` dicts (JSON-serialisable) vì
 """
 
 from backend.bot.keyboards.common import CallbackPrefix, build_callback
-from backend.config.categories import get_all_categories
+from backend.config.categories import get_all_categories, get_all_income_categories
 
 InlineKeyboardMarkup = dict
 """Alias for clarity — we build raw dicts matching Telegram's schema."""
@@ -61,9 +61,33 @@ def transaction_actions_with_done_keyboard(
     }
 
 
-def source_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
-    """Picker chọn nguồn tiền khi user sửa expense (mirror category_picker)."""
+def source_picker_keyboard(
+    transaction_id: str, *, allow_credit_card: bool = True
+) -> InlineKeyboardMarkup:
+    """Picker chọn nguồn tiền khi user sửa expense (mirror category_picker).
+
+    ``allow_credit_card=False`` hides the credit-card option for money-in
+    transactions — money can never *arrive* into a credit card, so the edit
+    flow must enforce the same restriction as the default-source picker.
+    """
     tx = str(transaction_id)
+    wallet_row: list[dict] = [
+        {
+            "text": "👛 Ví điện tử",
+            "callback_data": build_callback(
+                CallbackPrefix.CHANGE_SOURCE, tx, "wallet"
+            ),
+        },
+    ]
+    if allow_credit_card:
+        wallet_row.append(
+            {
+                "text": "💳 Thẻ tín dụng",
+                "callback_data": build_callback(
+                    CallbackPrefix.CHANGE_SOURCE, tx, "card"
+                ),
+            }
+        )
     rows: list[list[dict]] = [
         [
             {
@@ -79,20 +103,7 @@ def source_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
                 ),
             },
         ],
-        [
-            {
-                "text": "👛 Ví điện tử",
-                "callback_data": build_callback(
-                    CallbackPrefix.CHANGE_SOURCE, tx, "wallet"
-                ),
-            },
-            {
-                "text": "💳 Thẻ tín dụng",
-                "callback_data": build_callback(
-                    CallbackPrefix.CHANGE_SOURCE, tx, "card"
-                ),
-            },
-        ],
+        wallet_row,
         [
             {
                 "text": "❌ Hủy",
@@ -123,10 +134,20 @@ def transaction_batch_actions_keyboard(batch_id: str) -> InlineKeyboardMarkup:
     }
 
 
-def category_picker_keyboard(transaction_id: str) -> InlineKeyboardMarkup:
-    """Keyboard hiện danh mục khi user tap 'Đổi danh mục'. 2 cột x N hàng."""
+def category_picker_keyboard(
+    transaction_id: str, *, transaction_type: str = "expense"
+) -> InlineKeyboardMarkup:
+    """Keyboard hiện danh mục khi user tap 'Đổi danh mục'. 2 cột x N hàng.
+
+    Money-in transactions get the income taxonomy (Lương/Thưởng, Cổ tức…)
+    rather than spending buckets, which would mis-categorize income.
+    """
     tx = str(transaction_id)
-    categories = get_all_categories()
+    categories = (
+        get_all_income_categories()
+        if transaction_type == "money_in"
+        else get_all_categories()
+    )
     rows: list[list[dict]] = []
 
     for i in range(0, len(categories), 2):

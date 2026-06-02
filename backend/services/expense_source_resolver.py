@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.credit_card import CreditCard
@@ -33,7 +32,13 @@ from backend.wealth.models.asset import Asset
 logger = logging.getLogger(__name__)
 
 DEFAULT_SOURCE_RAW_DATA_KEY = "source_from_default_expense_source"
+DEFAULT_MONEY_IN_SOURCE_RAW_DATA_KEY = "source_from_default_money_in_source"
 DEFAULT_SOURCE_SUFFIX = " (mặc định)"
+
+# Money-in never funds from a credit card — only cash, bank accounts, and
+# e-wallets are valid incoming sources. We reject a credit_card key defensively
+# in case a stale/hand-edited profile value slips through.
+_MONEY_IN_ALLOWED_SOURCE_TYPES = frozenset({"cash", "bank_account", "e_wallet"})
 
 _CONTENT_PATH = (
     Path(__file__).resolve().parents[2] / "content" / "transaction_copy.yaml"
@@ -84,12 +89,16 @@ async def apply_default_source(
 ) -> ExpenseCreate:
     """Return a copy of ``data`` with the user's default source applied.
 
+    Handles both expense (``default_expense_source``) and money-in
+    (``default_money_in_source``) transactions, reading the matching
+    profile column for each.
+
     No-op when:
-      - the transaction is money-in (incoming flow keeps current UX);
-      - the user has no default configured;
+      - the transaction type is neither expense nor money-in;
+      - the user has no matching default configured;
       - the caller has already specified a source (explicit > default).
     """
-    if data.transaction_type != "expense":
+    if data.transaction_type not in ("expense", "money_in"):
         return data
     if (
         data.source_type
@@ -99,13 +108,28 @@ async def apply_default_source(
         return data
 
     profile = await db.get(UserProfile, user_id)
-    key = profile.default_expense_source if profile else None
+    is_money_in = data.transaction_type == "money_in"
+    if profile is None:
+        key = None
+    elif is_money_in:
+        key = profile.default_money_in_source
+    else:
+        key = profile.default_expense_source
     source_type, asset_id, card_id = _parse_source_key(key)
     if not source_type:
         return data
+    # Money-in can never originate from a credit card — drop a stale key
+    # rather than create a nonsensical incoming-from-credit transaction.
+    if is_money_in and source_type not in _MONEY_IN_ALLOWED_SOURCE_TYPES:
+        return data
 
     raw_data = dict(data.raw_data or {})
-    raw_data[DEFAULT_SOURCE_RAW_DATA_KEY] = True
+    raw_data_key = (
+        DEFAULT_MONEY_IN_SOURCE_RAW_DATA_KEY
+        if is_money_in
+        else DEFAULT_SOURCE_RAW_DATA_KEY
+    )
+    raw_data[raw_data_key] = True
     return data.model_copy(
         update={
             "source_type": source_type,
@@ -119,7 +143,9 @@ async def apply_default_source(
 def _with_default_suffix(label: str, expense: Expense) -> str:
     """Append the UI marker when the source came from profile default."""
     raw_data = expense.raw_data or {}
-    if raw_data.get(DEFAULT_SOURCE_RAW_DATA_KEY):
+    if raw_data.get(DEFAULT_SOURCE_RAW_DATA_KEY) or raw_data.get(
+        DEFAULT_MONEY_IN_SOURCE_RAW_DATA_KEY
+    ):
         return f"{label}{DEFAULT_SOURCE_SUFFIX}"
     return label
 
@@ -129,11 +155,12 @@ async def resolve_source_label_for_expense(
 ) -> str | None:
     """Build the Vietnamese label shown on the confirmation card.
 
-    Returns ``None`` for money-in or when no source could be resolved.
-    The card line is decorative — silently dropping it is preferable
-    to surfacing a stale or wrong-looking label.
+    Works for both expense and money-in transactions. Returns ``None``
+    when no source could be resolved. The card line is decorative —
+    silently dropping it is preferable to surfacing a stale or
+    wrong-looking label.
     """
-    if expense.transaction_type != "expense":
+    if expense.transaction_type not in ("expense", "money_in"):
         return None
     source_type = expense.source_type
     if not source_type:
