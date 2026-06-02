@@ -96,7 +96,7 @@ _SUGGESTIONS: dict[IntentType, tuple[str, ...]] = {
     ),
     IntentType.QUERY_GOALS: (
         "Bạn muốn cập nhật tiến độ không?",
-        "Đặt thêm mục tiêu mới nhé? Tap /muctieu",
+        "💡 _Đặt thêm mục tiêu mới nhé? Hãy gõ \"thêm mục tiêu\"_",
         "Muốn xem deadline gần nhất không? ⏰",
     ),
     IntentType.QUERY_GOAL_PROGRESS: (

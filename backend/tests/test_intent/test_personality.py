@@ -143,6 +143,31 @@ def test_query_assets_has_5plus_suggestions():
     assert len(suggestions) >= 5
 
 
+def test_query_goals_add_goal_tip_uses_guidance_format():
+    """Goal-list add tip should match app guidance format.
+
+    Guidance tips use a lightbulb icon and Markdown italics, and should
+    invite the natural-language add-goal command instead of /muctieu.
+    """
+    suggestions = get_suggestions_for_intent(IntentType.QUERY_GOALS)
+
+    assert '💡 _Đặt thêm mục tiêu mới nhé? Hãy gõ "thêm mục tiêu"_' in suggestions
+    assert "Đặt thêm mục tiêu mới nhé? Tap /muctieu" not in suggestions
+
+
+def test_query_goals_personality_can_emit_formatted_add_goal_tip():
+    user = _user("An")
+    base = "🎯 Mục tiêu của An:"
+
+    for seed in range(200):
+        out = add_personality(base, user, IntentType.QUERY_GOALS, rng_seed=seed)
+        if '💡 _Đặt thêm mục tiêu mới nhé? Hãy gõ "thêm mục tiêu"_' in out:
+            assert out.endswith('💡 _Đặt thêm mục tiêu mới nhé? Hãy gõ "thêm mục tiêu"_')
+            return
+
+    pytest.fail("Could not find a seed that emits the formatted add-goal tip")
+
+
 # ---------------------- forbidden phrase catalogue ----------------------
 
 
