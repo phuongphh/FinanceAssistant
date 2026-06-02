@@ -41,6 +41,7 @@ def format_transaction_confirmation(
     daily_budget: float | None = None,
     source_label: str | None = None,
     show_edit_hint: bool = False,
+    transaction_type: str = "expense",
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi giao dịch thành công.
 
@@ -72,10 +73,17 @@ def format_transaction_confirmation(
     if context_parts:
         lines.append("  •  ".join(context_parts))
 
+    is_money_in = transaction_type == "money_in"
+
     if source_label:
-        source_template = _confirmation_copy(
-            "source_prefix", "💳 Chi từ: {source}"
-        )
+        if is_money_in:
+            source_template = _confirmation_copy(
+                "source_prefix_money_in", "💰 Nhận vào: {source}"
+            )
+        else:
+            source_template = _confirmation_copy(
+                "source_prefix", "💳 Chi từ: {source}"
+            )
         lines.append(source_template.format(source=_html_escape(source_label)))
 
     if daily_spent is not None and daily_budget is not None and daily_budget > 0:
@@ -99,7 +107,8 @@ def format_transaction_confirmation(
             )
 
     if show_edit_hint:
-        hint = _confirmation_copy("edit_hint")
+        hint_key = "edit_hint_money_in" if is_money_in else "edit_hint"
+        hint = _confirmation_copy(hint_key) or _confirmation_copy("edit_hint")
         if hint:
             lines.append("")
             lines.append(hint.strip())

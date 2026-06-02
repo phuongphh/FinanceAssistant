@@ -2,7 +2,9 @@ confirmation:
   title_done: "✅ Đã ghi xong!"
   batch_title: "✅ Đã ghi xong {count} khoản!"
   source_prefix: "💳 Chi từ: {source}"
+  source_prefix_money_in: "💰 Nhận vào: {source}"
   edit_hint: "<i>💡 chi tiêu đã được ghi lại, nếu đúng bạn không cần làm gì thêm! Nếu thông tin chưa chính xác, hãy click vào các nhãn ở dưới để sửa lại.</i>"
+  edit_hint_money_in: "<i>💡 khoản tiền vào đã được ghi lại, nếu đúng bạn không cần làm gì thêm! Nếu thông tin chưa chính xác, hãy click vào các nhãn ở dưới để sửa lại.</i>"
 
 source_labels:
   cash: "Tiền mặt"

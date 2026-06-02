@@ -114,6 +114,14 @@ def profile_keyboard(*, editable: bool = True) -> dict[str, list[list[dict[str, 
                         "callback_data": "profile:default_expense_source",
                     }
                 ],
+                [
+                    {
+                        "text": _copy(
+                            "keyboards", "profile", "default_money_in_source"
+                        ),
+                        "callback_data": "profile:default_money_in_source",
+                    }
+                ],
             ]
         )
     rows.append(
@@ -439,6 +447,18 @@ async def handle_profile_callback(
     if action == "set_default_expense_source" and len(parts) >= 3:
         source_key = ":".join(parts[2:])
         await _set_default_expense_source(
+            db, chat_id, message_id, user, profile, source_key
+        )
+        return True
+    if action == "default_money_in_source":
+        await _render_default_money_in_source(db, chat_id, message_id, user, profile)
+        return True
+    if action == "change_default_money_in_source":
+        await _render_default_money_in_source_options(db, chat_id, message_id, user)
+        return True
+    if action == "set_default_money_in_source" and len(parts) >= 3:
+        source_key = ":".join(parts[2:])
+        await _set_default_money_in_source(
             db, chat_id, message_id, user, profile, source_key
         )
         return True
@@ -983,6 +1003,147 @@ async def _set_default_expense_source(
         text=_copy("default_expense_source", "changed_message").format(source=labels[source_key]),
     )
     await _render_default_expense_source(db, chat_id, message_id, user, profile)
+
+
+async def _money_in_source_options(
+    user_id: Any, db: AsyncSession
+) -> list[tuple[str, str]]:
+    """Source options for incoming money.
+
+    Mirrors :func:`_expense_source_options` but deliberately omits credit
+    cards — money can never *arrive* into a credit card. Only cash, bank
+    accounts and e-wallets are valid destinations for money-in.
+    """
+    cash_options: list[tuple[str, str]] = [("cash", "Tiền mặt")]
+    bank_options: list[tuple[str, str]] = []
+    wallet_options: list[tuple[str, str]] = []
+
+    assets = (
+        (
+            await db.execute(
+                select(Asset)
+                .where(
+                    Asset.user_id == user_id,
+                    Asset.asset_type == "cash",
+                    Asset.is_active.is_(True),
+                )
+                .order_by(Asset.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for asset in assets:
+        subtype = (asset.subtype or "").lower()
+        asset_name = str(asset.name or "").strip()
+        if subtype in {"bank_checking", "bank_account"}:
+            bank_options.append(
+                (f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset_name}]")
+            )
+        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay", "e_wallet"}:
+            wallet_options.append(
+                (f"e_wallet:{asset.id}", f"Ví điện tử [{asset_name}]")
+            )
+
+    def _sort_alpha(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
+        return sorted(items, key=lambda pair: pair[1].casefold())
+
+    return cash_options + _sort_alpha(bank_options) + _sort_alpha(wallet_options)
+
+
+async def _render_default_money_in_source(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    profile: UserProfile,
+) -> None:
+    options = await _money_in_source_options(user.id, db)
+    label = _resolve_source_label(options, profile.default_money_in_source)
+    text = _copy("default_money_in_source", "panel").format(source=label)
+    markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _copy("default_money_in_source", "change_button"),
+                    "callback_data": "profile:change_default_money_in_source",
+                }
+            ],
+            [
+                {
+                    "text": _copy("default_money_in_source", "back_button"),
+                    "callback_data": "profile:view",
+                }
+            ],
+        ]
+    }
+    if message_id is None:
+        await send_message(chat_id=chat_id, text=text, reply_markup=markup)
+        return
+    await edit_message_text(
+        chat_id=chat_id, message_id=message_id, text=text, reply_markup=markup
+    )
+
+
+async def _render_default_money_in_source_options(
+    db: AsyncSession, chat_id: int, message_id: int | None, user: User
+) -> None:
+    options = await _money_in_source_options(user.id, db)
+    tokenized_options = [
+        (_source_token(i), key, label) for i, (key, label) in enumerate(options)
+    ]
+    rows = [
+        [
+            {
+                "text": label,
+                "callback_data": f"profile:set_default_money_in_source:{token}",
+            }
+        ]
+        for token, _key, label in tokenized_options
+    ]
+    rows.append(
+        [
+            {
+                "text": _copy("default_money_in_source", "back_button"),
+                "callback_data": "profile:default_money_in_source",
+            }
+        ]
+    )
+    markup = {"inline_keyboard": rows}
+    text = _copy("default_money_in_source", "picker_title")
+    if message_id is None:
+        await send_message(chat_id=chat_id, text=text, reply_markup=markup)
+        return
+    await edit_message_text(
+        chat_id=chat_id, message_id=message_id, text=text, reply_markup=markup
+    )
+
+
+async def _set_default_money_in_source(
+    db: AsyncSession,
+    chat_id: int,
+    message_id: int | None,
+    user: User,
+    profile: UserProfile,
+    source_key: str,
+) -> None:
+    options = await _money_in_source_options(user.id, db)
+    source_key = _decode_source_token(source_key, options)
+    labels = dict(options)
+    if source_key not in labels:
+        await send_message(
+            chat_id=chat_id, text=_copy("default_money_in_source", "invalid")
+        )
+        return
+    profile.default_money_in_source = source_key
+    await db.flush()
+    await send_message(
+        chat_id=chat_id,
+        text=_copy("default_money_in_source", "changed_message").format(
+            source=labels[source_key]
+        ),
+    )
+    await _render_default_money_in_source(db, chat_id, message_id, user, profile)
 
 
 def _source_token(index: int) -> str:

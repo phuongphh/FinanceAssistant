@@ -233,9 +233,10 @@ async def _rerender_transaction_message(
     edited: bool = False,
     db: AsyncSession | None = None,
 ) -> None:
-    is_expense = expense.transaction_type == "expense"
+    tx_type = expense.transaction_type or "expense"
+    is_card_type = tx_type in ("expense", "money_in")
     source_label = None
-    if is_expense and db is not None:
+    if is_card_type and db is not None:
         try:
             source_label = await resolve_source_label_for_expense(db, expense)
         except Exception:
@@ -247,7 +248,8 @@ async def _rerender_transaction_message(
         category_code=_normalize_category(expense.category),
         time=expense.created_at,
         source_label=source_label,
-        show_edit_hint=is_expense,
+        show_edit_hint=is_card_type,
+        transaction_type=tx_type,
     )
     reply_markup = (
         transaction_actions_with_done_keyboard(str(expense.id))

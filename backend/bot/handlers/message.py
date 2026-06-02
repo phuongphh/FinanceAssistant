@@ -240,16 +240,22 @@ async def _start_source_prompt(
     return True
 
 
-async def _record_signed_expense_with_default(
+async def _record_transaction_with_default(
     db: AsyncSession, user, parsed: dict
 ) -> bool:
-    """Record an expense from the signed/amount-led fast-path using the
-    user's ``default_expense_source``.
+    """Record a transaction from the signed/amount-led fast-path using the
+    user's matching default source.
 
-    Returns True when the expense was created and the confirmation card
-    was sent — caller then skips the wizard. Returns False when the user
-    has no default source configured (caller falls back to the picker).
+    Works for both expense (``default_expense_source``) and money-in
+    (``default_money_in_source``) transactions — :func:`apply_default_source`
+    reads the right profile column based on ``transaction_type``.
+
+    Returns True when the transaction was created and the rich confirmation
+    card was sent — caller then skips the wizard. Returns False when the
+    user has no matching default configured (caller falls back to the
+    source picker).
     """
+    tx_type = parsed.get("transaction_type", "expense")
     merchant = (parsed.get("merchant") or parsed.get("note") or "Giao dịch").strip()
     expense_data = ExpenseCreate(
         amount=float(parsed["amount"]),
@@ -258,6 +264,7 @@ async def _record_signed_expense_with_default(
         source="manual",
         category="other",
         expense_date=date.today(),
+        transaction_type=tx_type,
     )
     resolved = await apply_default_source(db, user.id, expense_data)
     if not resolved.source_type:
@@ -372,20 +379,23 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
         return True
 
     # Fast-path for explicit +/- expense syntax before generic intent routing.
+    # Both expense and money-in first try the user's matching default source
+    # (rich confirm card, no extra tap); only fall back to the picker when
+    # no default is configured.
     signed = _parse_signed_transaction(text)
     if signed is not None:
-        if signed["transaction_type"] == "expense":
-            if await _record_signed_expense_with_default(db, user, signed):
-                return True
+        if await _record_transaction_with_default(db, user, signed):
+            return True
         return await _start_source_prompt(db, chat_id, user, signed)
 
     # Fast-path for "được <giver> cho/tặng/lì xì/thưởng <amount>" money-in
     # (e.g. "được bố cho 500k"). The Chi tiêu menu promises these are
-    # recorded as money-in, so we route them to the source picker just
-    # like a leading "+", rather than letting them fall through to the
-    # expense pipeline.
+    # recorded as money-in. Try the default money-in source first; fall
+    # back to the source picker when none is configured.
     duoc_money_in = _parse_duoc_money_in(text)
     if duoc_money_in is not None:
+        if await _record_transaction_with_default(db, user, duoc_money_in):
+            return True
         return await _start_source_prompt(db, chat_id, user, duoc_money_in)
 
     # Phase 3.5 — full intent flow with confirm/clarify state handling.
