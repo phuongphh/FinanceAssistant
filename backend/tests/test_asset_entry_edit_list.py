@@ -39,9 +39,23 @@ async def test_show_asset_edit_list_filters_by_subtype():
         await asset_entry.show_asset_edit_list(db, chat_id, user, "stock", subtype="fund")
 
     markup = send_message.await_args.kwargs["reply_markup"]
-    labels = [row[0]["text"] for row in markup["inline_keyboard"] if row and row[0].get("callback_data", "").startswith("asset_manage:edit:")]
+    # Each asset renders as a full-width content label row (asset_manage:noop)
+    # followed by an ✏️/🗑 action row, so read the label off the content row.
+    labels = [
+        row[0]["text"]
+        for row in markup["inline_keyboard"]
+        if row and row[0].get("callback_data") == "asset_manage:noop"
+    ]
     assert len(labels) == 1
     assert "TCEF" in labels[0]
+    # The subtype filter must keep the edit action wired to the fund only.
+    edit_cbs = [
+        b["callback_data"]
+        for row in markup["inline_keyboard"]
+        for b in row
+        if b.get("callback_data", "").startswith("asset_manage:edit:")
+    ]
+    assert len(edit_cbs) == 1
 
 
 @pytest.mark.asyncio

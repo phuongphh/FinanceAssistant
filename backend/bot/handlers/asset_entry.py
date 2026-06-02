@@ -3419,6 +3419,10 @@ async def handle_asset_manage_callback(db: AsyncSession, callback_query: dict) -
     arg = parts[1] if len(parts) > 1 else None
 
     async def _act() -> None:
+        if action == "noop":
+            # Content-label tap on an asset card — deliberate no-op; the
+            # ✏️/🗑 buttons below carry the real actions.
+            return
         if action == "menu":
             await show_asset_manage_menu(db, chat_id, user)
             return

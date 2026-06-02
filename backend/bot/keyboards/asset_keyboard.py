@@ -123,6 +123,57 @@ def _pagination_row(
     ]
 
 
+# --- Unified asset "card" rows -------------------------------------------
+# Telegram renders every button *within a row* at equal width, so the old
+# ``[✏️ <label>] [🗑]`` single-row layout forced the trash icon to claim ~50%
+# of the row — squeezing long asset labels (e.g. "🏛️ VCB — 100 tỷ") until they
+# were unreadable. Splitting each asset into a full-width content label row plus
+# a dedicated ✏️/🗑 action row gives the label the whole width back while keeping
+# both actions one tap away. Every card-style edit screen shares this helper so
+# the layout stays consistent.
+
+CARD_EDIT_LABEL = "✏️ Sửa"
+CARD_DELETE_LABEL = "🗑 Xoá"
+# Content sits on its own full-width row now, but we still trim pathological
+# labels so the serialized markup stays small and the row never wraps oddly.
+_CARD_LABEL_MAX = 48
+
+
+def _clean_card_label(label: str) -> str:
+    """Collapse whitespace and trim over-long labels with an ellipsis."""
+    clean = " ".join(str(label).split())
+    if len(clean) > _CARD_LABEL_MAX:
+        clean = clean[: _CARD_LABEL_MAX - 3].rstrip() + "…"
+    return clean
+
+
+def _asset_card_rows(
+    items,
+    *,
+    edit_cb,
+    delete_cb,
+    noop_cb: str = "asset:noop",
+) -> list[list[dict]]:
+    """Two rows per asset: a full-width content label then ``✏️ Sửa`` / ``🗑 Xoá``.
+
+    ``edit_cb`` / ``delete_cb`` are callables mapping an asset id to the
+    callback_data string for that action, so each screen keeps its own routing
+    prefix while sharing one visual layout. ``noop_cb`` backs the content label
+    (a tap is a deliberate no-op — the explicit action buttons live below it).
+    """
+    rows: list[list[dict]] = []
+    for item in items:
+        asset_id, label = item[0], item[1]
+        rows.append([{"text": _clean_card_label(label), "callback_data": noop_cb}])
+        rows.append(
+            [
+                {"text": CARD_EDIT_LABEL, "callback_data": edit_cb(asset_id)},
+                {"text": CARD_DELETE_LABEL, "callback_data": delete_cb(asset_id)},
+            ]
+        )
+    return rows
+
+
 def asset_type_picker_keyboard() -> InlineKeyboardMarkup:
     """Layout asset types for thumb-friendly tapping."""
     return {
@@ -712,19 +763,18 @@ def asset_edit_list_keyboard(
     asset_type: str,
     page: int = 0,
 ) -> InlineKeyboardMarkup:
-    """Render filtered edit rows plus navigation for market portfolio context."""
+    """Render filtered edit/delete cards plus navigation for portfolio context."""
     page_items, page, total_pages = _page_slice(candidates, page)
-    rows = [
-        [
-            {
-                "text": f"✏️ {label}"[:60],
-                "callback_data": build_callback(
-                    CB_ASSET_MANAGE, "edit", str(asset_id), asset_type
-                ),
-            }
-        ]
-        for asset_id, label in page_items
-    ]
+    rows = _asset_card_rows(
+        page_items,
+        edit_cb=lambda aid: build_callback(
+            CB_ASSET_MANAGE, "edit", str(aid), asset_type
+        ),
+        delete_cb=lambda aid: build_callback(
+            CB_ASSET_MANAGE, "delete_confirm", str(aid)
+        ),
+        noop_cb=build_callback(CB_ASSET_MANAGE, "noop"),
+    )
     nav = _pagination_row(
         page,
         total_pages,
@@ -921,24 +971,13 @@ def asset_dashboard_edit_keyboard(
             sort_button("alpha", "A-Z 🔤"),
         ],
     ]
-    for asset_id, label in page_items:
-        clean = " ".join(str(label).split())
-        # Keep delete CTA as a single icon so the edit button can claim
-        # most of the row width in Telegram (roughly 9:1 visual split).
-        if len(clean) > 48:
-            clean = clean[:45].rstrip() + "…"
-        keyboard.append(
-            [
-                {
-                    "text": f"✏️ {clean}",
-                    "callback_data": build_callback(CB_ASSET_ROW, "edit", asset_id),
-                },
-                {
-                    "text": "🗑",
-                    "callback_data": build_callback(CB_ASSET_ROW, "delete", asset_id),
-                },
-            ]
+    keyboard.extend(
+        _asset_card_rows(
+            page_items,
+            edit_cb=lambda aid: build_callback(CB_ASSET_ROW, "edit", aid),
+            delete_cb=lambda aid: build_callback(CB_ASSET_ROW, "delete", aid),
         )
+    )
     nav = _pagination_row(
         page,
         total_pages,
