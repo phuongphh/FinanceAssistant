@@ -43,7 +43,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     transaction_actions_with_done_keyboard,
     transaction_source_keyboard,
 )
-from backend.config.categories import get_all_categories
+from backend.config.categories import get_all_categories, get_all_income_categories
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 from backend.services import expense_service, wizard_service
@@ -62,6 +62,9 @@ logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
 _VALID_EXPENSE_CATEGORY_CODES = frozenset(cat.code for cat in get_all_categories())
+_VALID_INCOME_CATEGORY_CODES = frozenset(
+    cat.code for cat in get_all_income_categories()
+)
 
 
 async def _handle_source_selection_callback(
@@ -396,17 +399,25 @@ async def _handle_change_category(*, db, user, args, callback_id, chat_id, messa
         )
         return
 
+    is_money_in = (expense.transaction_type or "expense") == "money_in"
+
     if len(args) == 1:
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=category_picker_keyboard(str(expense.id)),
+            reply_markup=category_picker_keyboard(
+                str(expense.id),
+                transaction_type="money_in" if is_money_in else "expense",
+            ),
         )
         await answer_callback(callback_id)
         return
 
     new_code = str(args[1]).strip().lower()
-    if new_code not in _VALID_EXPENSE_CATEGORY_CODES:
+    valid_codes = (
+        _VALID_INCOME_CATEGORY_CODES if is_money_in else _VALID_EXPENSE_CATEGORY_CODES
+    )
+    if new_code not in valid_codes:
         await answer_callback(
             callback_id,
             text="Danh mục không hợp lệ — bạn chọn lại trong danh sách nhé.",
@@ -711,6 +722,8 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
         )
         return
 
+    is_money_in = (expense.transaction_type or "expense") == "money_in"
+
     if len(args) == 1:
         await wizard_service.start_flow(
             db,
@@ -726,12 +739,23 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=source_picker_keyboard(str(expense.id)),
+            reply_markup=source_picker_keyboard(
+                str(expense.id), allow_credit_card=not is_money_in
+            ),
         )
         await answer_callback(callback_id)
         return
 
     kind = str(args[1]).strip().lower()
+    if kind == "card" and is_money_in:
+        # Defensive: the picker hides this button for money-in, but reject a
+        # stale/forged callback too — money can't arrive into a credit card.
+        await answer_callback(
+            callback_id,
+            text="Tiền nhận vào không thể vào thẻ tín dụng nhé 🌱",
+            show_alert=True,
+        )
+        return
     if kind == "cash":
         updated = await expense_service.update_expense(
             db,

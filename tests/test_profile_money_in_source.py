@@ -42,6 +42,9 @@ def _asset(name, subtype):
         asset_type="cash",
         is_active=True,
         created_at=None,
+        # _expense_source_options also runs a credit-card query against the
+        # same FakeDB rows; a bank_name keeps that iteration from crashing.
+        bank_name="",
     )
 
 
@@ -60,6 +63,36 @@ async def test_money_in_options_exclude_credit_cards():
     assert f"bank_account:{bank.id}" in keys
     assert f"e_wallet:{wallet.id}" in keys
     assert not any(k.startswith("credit_card:") for k in keys)
+
+
+@pytest.mark.asyncio
+async def test_money_in_options_exclude_provider_less_e_wallet():
+    """Generic provider-less ``e_wallet`` is not selectable — it would crash
+    the transaction fast-path (no e_wallet_provider to resolve)."""
+    bank = _asset("Techcombank", "bank_account")
+    momo = _asset("Momo", "momo")
+    generic = _asset("Ví chung", "e_wallet")
+    db = FakeDB([bank, momo, generic])
+
+    options = await profile_menu._money_in_source_options(uuid.uuid4(), db)
+
+    keys = [key for key, _ in options]
+    assert f"e_wallet:{momo.id}" in keys
+    assert f"e_wallet:{generic.id}" not in keys
+
+
+@pytest.mark.asyncio
+async def test_expense_options_exclude_provider_less_e_wallet():
+    """Same exclusion applies to the expense default-source builder."""
+    momo = _asset("Momo", "momo")
+    generic = _asset("Ví chung", "e_wallet")
+    db = FakeDB([momo, generic])
+
+    options = await profile_menu._expense_source_options(uuid.uuid4(), db)
+
+    keys = [key for key, _ in options]
+    assert f"e_wallet:{momo.id}" in keys
+    assert f"e_wallet:{generic.id}" not in keys
 
 
 @pytest.mark.asyncio

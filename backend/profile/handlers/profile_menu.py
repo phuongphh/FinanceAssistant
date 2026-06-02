@@ -926,7 +926,11 @@ async def _expense_source_options(user_id: Any, db: AsyncSession) -> list[tuple[
         asset_name = str(asset.name or "").strip()
         if subtype in {"bank_checking", "bank_account"}:
             bank_options.append((f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset_name}]"))
-        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay", "e_wallet"}:
+        # Provider-less generic "e_wallet" is intentionally excluded: it has
+        # no e_wallet_provider, so resolve_source_asset_for_payload raises and
+        # the transaction fast-path crashes. Only provider-tagged wallets are
+        # selectable as a default source.
+        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay"}:
             wallet_options.append((f"e_wallet:{asset.id}", f"Ví điện tử [{asset_name}]"))
 
     def _sort_alpha(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -1040,7 +1044,11 @@ async def _money_in_source_options(
             bank_options.append(
                 (f"bank_account:{asset.id}", f"Tài khoản thanh toán [{asset_name}]")
             )
-        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay", "e_wallet"}:
+        # Provider-less generic "e_wallet" is intentionally excluded: it has
+        # no e_wallet_provider, so resolve_source_asset_for_payload raises and
+        # the transaction fast-path crashes. Only provider-tagged wallets are
+        # selectable as a default source.
+        elif subtype in {"momo", "vnpay", "zalopay", "viettelpay"}:
             wallet_options.append(
                 (f"e_wallet:{asset.id}", f"Ví điện tử [{asset_name}]")
             )
