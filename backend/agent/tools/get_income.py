@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.tools.base import Tool
+from backend.wealth import income_types as _income_types
 from backend.agent.tools.schemas import (
     GetIncomeInput,
     GetIncomeOutput,
@@ -118,6 +119,7 @@ class GetIncomeTool(Tool):
         return IncomeStreamItem(
             name=stream.name,
             stream_type=stream.stream_type,
+            stream_type_label=_income_types.get_label(stream.stream_type),
             is_passive=stream.is_passive,
             amount=Decimal(stream.amount or 0),
             currency=stream.currency or "VND",

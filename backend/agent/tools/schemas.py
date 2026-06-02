@@ -326,10 +326,16 @@ class ForecastCashflowInput(_StrictBase):
 
 
 class AssetItem(BaseModel):
-    """One asset row in a tool result."""
+    """One asset row in a tool result.
+
+    ``asset_type_label`` is the Vietnamese display name (e.g. "Cổ phiếu",
+    "Bất động sản"). The LLM must use this label in user-facing output;
+    ``asset_type`` is the English code kept only for downstream filtering.
+    """
 
     name: str
     asset_type: str
+    asset_type_label: str
     ticker: Optional[str] = None
     quantity: Optional[float] = None
     current_value: Decimal
@@ -345,9 +351,17 @@ class GetAssetsOutput(BaseModel):
 
 
 class TransactionItem(BaseModel):
+    """One transaction row in a tool result.
+
+    ``category_label`` is the Vietnamese display name (e.g. "Ăn uống",
+    "Chuyển khoản"). The LLM must use this label in user-facing output;
+    ``category`` is the English code kept only for downstream filtering.
+    """
+
     date: date
     merchant: Optional[str] = None
     category: str
+    category_label: str
     amount: Decimal
     note: Optional[str] = None
 
@@ -458,6 +472,7 @@ class IncomeStreamItem(BaseModel):
 
     name: str
     stream_type: str
+    stream_type_label: str
     is_passive: bool
     amount: Decimal
     currency: str = "VND"

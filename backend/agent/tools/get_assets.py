@@ -29,6 +29,7 @@ from backend.agent.tools.schemas import (
     SortOrder,
 )
 from backend.models.user import User
+from backend.wealth import asset_types as _asset_types
 from backend.wealth.models.asset import Asset
 from backend.wealth.services import asset_service
 
@@ -207,6 +208,7 @@ class GetAssetsTool(Tool):
         return AssetItem(
             name=asset.name,
             asset_type=asset.asset_type,
+            asset_type_label=_asset_types.get_label(asset.asset_type),
             ticker=ticker,
             quantity=quantity_f,
             current_value=current,
