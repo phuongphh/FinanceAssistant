@@ -125,25 +125,30 @@ def _pagination_row(
 
 # --- Unified asset "card" rows -------------------------------------------
 # Telegram renders every button *within a row* at equal width, so the old
-# ``[✏️ <label>] [🗑]`` single-row layout forced the trash icon to claim ~50%
-# of the row — squeezing long asset labels (e.g. "🏛️ VCB — 100 tỷ") until they
-# were unreadable. Splitting each asset into a full-width content label row plus
-# a dedicated ✏️/🗑 action row gives the label the whole width back while keeping
-# both actions one tap away. Every card-style edit screen shares this helper so
-# the layout stays consistent.
+# ``[✏️ <label>] [🗑]`` layout forced the trash icon to claim ~50% of the row.
+# We keep each asset on a single line — ``[✏️] [🗑] [<content>]`` — to maximise
+# list density (see more assets without scrolling). With three buttons the
+# content gets ~1/3 of the width and Telegram truncates the visible text on its
+# own; that's an accepted product trade-off ("see more assets" over showing the
+# full name). Every card-style edit screen shares this helper so the layout
+# stays consistent.
 
-CARD_EDIT_LABEL = "✏️ Sửa"
-CARD_DELETE_LABEL = "🗑 Xoá"
-# Content sits on its own full-width row now, but we still trim pathological
-# labels so the serialized markup stays small and the row never wraps oddly.
-_CARD_LABEL_MAX = 48
+CARD_EDIT_LABEL = "✏️"
+CARD_DELETE_LABEL = "🗑"
+# One row per asset: ``✏️``  ``🗑``  ``<content>``. Telegram splits a row's
+# width equally across its buttons regardless of text, so with three buttons
+# the content gets ~1/3 of the row and Telegram truncates the visible text on
+# its own. We still cap the label so the serialized markup stays small; the cap
+# is tight because the content button is narrow by design (denser list, one line
+# per asset — the product trade-off is "see more assets" over "full name").
+_CARD_LABEL_MAX = 24
 
 
 def _clean_card_label(label: str) -> str:
     """Collapse whitespace and trim over-long labels with an ellipsis."""
     clean = " ".join(str(label).split())
     if len(clean) > _CARD_LABEL_MAX:
-        clean = clean[: _CARD_LABEL_MAX - 3].rstrip() + "…"
+        clean = clean[: _CARD_LABEL_MAX - 1].rstrip() + "…"
     return clean
 
 
@@ -154,21 +159,21 @@ def _asset_card_rows(
     delete_cb,
     noop_cb: str = "asset:noop",
 ) -> list[list[dict]]:
-    """Two rows per asset: a full-width content label then ``✏️ Sửa`` / ``🗑 Xoá``.
+    """One row per asset: ``✏️`` / ``🗑`` action icons then the content label.
 
     ``edit_cb`` / ``delete_cb`` are callables mapping an asset id to the
     callback_data string for that action, so each screen keeps its own routing
-    prefix while sharing one visual layout. ``noop_cb`` backs the content label
-    (a tap is a deliberate no-op — the explicit action buttons live below it).
+    prefix while sharing one visual layout. The content button is backed by
+    ``noop_cb`` (a tap is a deliberate no-op — the actions are the two icons).
     """
     rows: list[list[dict]] = []
     for item in items:
         asset_id, label = item[0], item[1]
-        rows.append([{"text": _clean_card_label(label), "callback_data": noop_cb}])
         rows.append(
             [
                 {"text": CARD_EDIT_LABEL, "callback_data": edit_cb(asset_id)},
                 {"text": CARD_DELETE_LABEL, "callback_data": delete_cb(asset_id)},
+                {"text": _clean_card_label(label), "callback_data": noop_cb},
             ]
         )
     return rows

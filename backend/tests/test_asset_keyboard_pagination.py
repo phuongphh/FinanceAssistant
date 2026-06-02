@@ -53,9 +53,9 @@ class TestPageSlice:
 class TestDashboardKeyboardSize:
     def test_single_page_when_under_page_size(self):
         kb = asset_dashboard_edit_keyboard(_rows(5))
-        # 1 sort row + 5 assets × (label row + action row) + back row = 12 rows
+        # 1 sort row + 5 assets × 1 combined row + back row = 7 rows
         # (no pagination row when everything fits on one page).
-        assert len(kb["inline_keyboard"]) == 12
+        assert len(kb["inline_keyboard"]) == 7
 
     def test_paginates_at_page_size(self):
         kb = asset_dashboard_edit_keyboard(_rows(ASSET_LIST_PAGE_SIZE * 3))
@@ -110,42 +110,41 @@ class TestDashboardKeyboardSize:
             cbs = [b["callback_data"] for b in first_row]
             assert all(cb.startswith("asset:sort:") for cb in cbs)
 
-    def test_card_layout_label_row_then_action_row(self):
+    def test_card_layout_single_row_actions_then_content(self):
         asset_id = uuid.uuid4()
-        kb = asset_dashboard_edit_keyboard([(asset_id, "🏛️ VCB — 100 tỷ")])
-        # Row 0 = sort controls, row 1 = full-width content label,
-        # row 2 = ✏️ Sửa / 🗑 Xoá action buttons.
-        label_row = kb["inline_keyboard"][1]
-        action_row = kb["inline_keyboard"][2]
-        assert len(label_row) == 1
-        assert label_row[0]["text"] == "🏛️ VCB — 100 tỷ"
-        assert label_row[0]["callback_data"] == "asset:noop"
-        assert [b["text"] for b in action_row] == ["✏️ Sửa", "🗑 Xoá"]
-        assert action_row[0]["callback_data"] == f"asset:edit:{asset_id}"
-        assert action_row[1]["callback_data"] == f"asset:delete:{asset_id}"
+        kb = asset_dashboard_edit_keyboard([(asset_id, "🏛️ VCB")])
+        # Row 0 = sort controls, row 1 = ✏️ / 🗑 action icons then content.
+        card_row = kb["inline_keyboard"][1]
+        assert [b["text"] for b in card_row] == ["✏️", "🗑", "🏛️ VCB"]
+        assert card_row[0]["callback_data"] == f"asset:edit:{asset_id}"
+        assert card_row[1]["callback_data"] == f"asset:delete:{asset_id}"
+        assert card_row[2]["callback_data"] == "asset:noop"
 
-    def test_content_label_full_width_no_trailing_trash_icon(self):
-        # Regression: trash icon must not share the label's row (it claimed
-        # ~half the width and truncated the asset name).
+    def test_actions_precede_content_on_same_row(self):
+        # The two action icons lead the row; the content (no-op) trails it so
+        # the whole asset fits on a single line.
         kb = asset_dashboard_edit_keyboard(_rows(1))
-        label_row = kb["inline_keyboard"][1]
-        assert len(label_row) == 1
-        assert "🗑" not in label_row[0]["text"]
+        card_row = kb["inline_keyboard"][1]
+        assert len(card_row) == 3
+        action_cbs = [card_row[0]["callback_data"], card_row[1]["callback_data"]]
+        assert any(cb.startswith("asset:edit:") for cb in action_cbs)
+        assert any(cb.startswith("asset:delete:") for cb in action_cbs)
+        assert card_row[2]["callback_data"] == "asset:noop"
 
     def test_returns_none_for_empty(self):
         assert asset_dashboard_edit_keyboard([]) is None
 
-    def test_label_not_truncated_when_length_is_48(self):
-        label = "A" * 48
+    def test_label_not_truncated_when_length_is_24(self):
+        label = "A" * 24
         kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
-        label_btn = kb["inline_keyboard"][1][0]
+        label_btn = kb["inline_keyboard"][1][2]
         assert label_btn["text"] == label
 
-    def test_label_truncates_at_49_with_ellipsis(self):
-        label = "B" * 49
+    def test_label_truncates_at_25_with_ellipsis(self):
+        label = "B" * 25
         kb = asset_dashboard_edit_keyboard([(uuid.uuid4(), label)])
-        label_btn = kb["inline_keyboard"][1][0]
-        assert label_btn["text"] == f"{'B' * 45}…"
+        label_btn = kb["inline_keyboard"][1][2]
+        assert label_btn["text"] == f"{'B' * 23}…"
 
 
 class TestManageListKeyboards:
@@ -198,18 +197,16 @@ class TestManageListKeyboards:
     def test_edit_list_card_has_edit_and_delete_actions(self):
         asset_id = uuid.uuid4()
         kb = asset_edit_list_keyboard(
-            [(asset_id, "📈 FPT — 6.2 tỷ")], asset_type="stock"
+            [(asset_id, "📈 FPT")], asset_type="stock"
         )
-        label_row = kb["inline_keyboard"][0]
-        action_row = kb["inline_keyboard"][1]
-        assert label_row[0]["text"] == "📈 FPT — 6.2 tỷ"
-        assert label_row[0]["callback_data"] == "asset_manage:noop"
-        assert [b["text"] for b in action_row] == ["✏️ Sửa", "🗑 Xoá"]
+        card_row = kb["inline_keyboard"][0]
+        assert [b["text"] for b in card_row] == ["✏️", "🗑", "📈 FPT"]
+        assert card_row[2]["callback_data"] == "asset_manage:noop"
         # Edit keeps the return-to-portfolio asset_type suffix; delete routes
         # through the existing confirmation guard.
-        assert action_row[0]["callback_data"] == f"asset_manage:edit:{asset_id}:stock"
+        assert card_row[0]["callback_data"] == f"asset_manage:edit:{asset_id}:stock"
         assert (
-            action_row[1]["callback_data"]
+            card_row[1]["callback_data"]
             == f"asset_manage:delete_confirm:{asset_id}"
         )
 
