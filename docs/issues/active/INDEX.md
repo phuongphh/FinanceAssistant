@@ -12,6 +12,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #93 | [Epic 1 / Phase 3A] Asset Data Model & Manual Entry | [issue-93.md](issue-93.md) |
 | #784 | [Story 1] Life Assurance Data Model & Service | [issue-784.md](issue-784.md) |
 | #787 | [Story 4] Life Assurance in Asset Report & Dashboard | [issue-787.md](issue-787.md) |
-| #927 | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [issue-927.md](issue-927.md) |
 
-**Total active:** 9
+**Total active:** 8
