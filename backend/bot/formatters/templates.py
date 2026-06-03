@@ -42,6 +42,7 @@ def format_transaction_confirmation(
     source_label: str | None = None,
     show_edit_hint: bool = False,
     transaction_type: str = "expense",
+    expense_date: date | None = None,
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi giao dịch thành công.
 
@@ -72,6 +73,15 @@ def format_transaction_confirmation(
         context_parts.append(time_vn.strftime("%H:%M"))
     if context_parts:
         lines.append("  •  ".join(context_parts))
+
+    # Only surface the date line when the user pinned a different day —
+    # showing "📅 Ngày giao dịch: <today>" on every confirmation is noise
+    # that buries the actually useful merchant/amount/source rows.
+    if expense_date is not None and expense_date != date.today():
+        date_template = _confirmation_copy(
+            "transaction_date", "📅 Ngày giao dịch: {date}"
+        )
+        lines.append(date_template.format(date=expense_date.strftime("%d/%m/%Y")))
 
     is_money_in = transaction_type == "money_in"
 
@@ -178,6 +188,7 @@ def format_transaction_batch_confirmation(
     time: datetime | None = None,
     source_label: str | None = None,
     show_edit_hint: bool = False,
+    expense_date: date | None = None,
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi nhiều giao dịch cùng lúc."""
     total = sum(amount for _, amount, _ in items)
@@ -197,6 +208,12 @@ def format_transaction_batch_confirmation(
     time_vn = _as_vn_time(time)
     if time_vn:
         lines.append(time_vn.strftime("%H:%M"))
+
+    if expense_date is not None and expense_date != date.today():
+        date_template = _confirmation_copy(
+            "transaction_date", "📅 Ngày giao dịch: {date}"
+        )
+        lines.append(date_template.format(date=expense_date.strftime("%d/%m/%Y")))
 
     if source_label:
         source_template = _confirmation_copy(

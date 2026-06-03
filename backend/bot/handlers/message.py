@@ -27,6 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.handlers import free_form_text as intent_layer
 from backend.bot.handlers.transaction import send_transaction_confirmation
 from backend.bot.keyboards.transaction_keyboard import transaction_source_keyboard
+from backend.bot.utils.transaction_date_extractor import (
+    extract_transaction_date,
+    strip_span,
+)
 from backend.intent import pending_action
 from backend.intent.income_semantics import is_duoc_money_in
 from backend.intent.dispatcher import (
@@ -148,6 +152,12 @@ def _parse_signed_transaction(text: str) -> dict | None:
         sign = None
         body = (amount_led.group("body") or "").strip()
 
+    # Strip any "ngày dd/mm[/yyyy]" phrase BEFORE searching for the
+    # amount so the date digits don't get mistaken for a price.
+    extracted_date = extract_transaction_date(body)
+    if extracted_date is not None:
+        body = strip_span(body, extracted_date.span)
+
     amount_match = _AMOUNT_TOKEN_RE.search(body)
     if not amount_match:
         return None
@@ -163,12 +173,16 @@ def _parse_signed_transaction(text: str) -> dict | None:
     merchant = f"{body[:amount_match.start()]} {body[amount_match.end():]}"
     merchant = re.sub(r"\s+", " ", merchant).strip(" ,-+;:")[:500]
 
-    return {
+    parsed = {
         "amount": float(amount_decimal),
         "merchant": merchant,
         "note": text[:1000],
         "transaction_type": "money_in" if sign == "+" else "expense",
     }
+    if extracted_date is not None:
+        # ISO string so the wizard draft stays JSONB-safe.
+        parsed["expense_date"] = extracted_date.value.isoformat()
+    return parsed
 
 
 def _parse_duoc_money_in(text: str) -> dict | None:
@@ -189,10 +203,16 @@ def _parse_duoc_money_in(text: str) -> dict | None:
     if not is_duoc_money_in(text):
         return None
 
+    # Strip the date phrase first so its digits don't shadow the amount.
+    working = text
+    extracted_date = extract_transaction_date(working)
+    if extracted_date is not None:
+        working = strip_span(working, extracted_date.span)
+
     # Require a currency-denominated amount (see ``_DUOC_AMOUNT_RE``) so
     # non-cash gifts like "được mẹ cho 2 quả cam" fall through to the
     # intent pipeline instead of being booked as a 2đ money-in.
-    amount_match = _DUOC_AMOUNT_RE.search(text)
+    amount_match = _DUOC_AMOUNT_RE.search(working)
     if not amount_match:
         return None
     amount_token = amount_match.group("amt").strip()
@@ -200,18 +220,21 @@ def _parse_duoc_money_in(text: str) -> dict | None:
     if amount_decimal is None or amount_decimal <= 0:
         return None
 
-    merchant = f"{text[:amount_match.start()]} {text[amount_match.end():]}"
+    merchant = f"{working[:amount_match.start()]} {working[amount_match.end():]}"
     merchant = re.sub(r"\s+", " ", merchant).strip(" ,-+;:")
     # Drop the leading "được" so the source label reads "bố cho" /
     # "thưởng" / "lì xì" rather than "được bố cho".
     merchant = re.sub(r"(?i)^được\s+", "", merchant)[:500]
 
-    return {
+    parsed = {
         "amount": float(amount_decimal),
         "merchant": merchant,
         "note": text[:1000],
         "transaction_type": "money_in",
     }
+    if extracted_date is not None:
+        parsed["expense_date"] = extracted_date.value.isoformat()
+    return parsed
 
 
 async def _start_source_prompt(
@@ -232,6 +255,16 @@ async def _start_source_prompt(
     sign = "+" if tx_type == "money_in" else "-"
     amount_line = f"{sign}{parsed['amount']:,.0f}đ"
     detail = f"{merchant} · {amount_line}" if merchant else amount_line
+    # Show the back-dated day in the prompt so the user can spot a mis-parse
+    # before choosing a source.
+    expense_date_iso = parsed.get("expense_date")
+    if expense_date_iso:
+        try:
+            picked = date.fromisoformat(expense_date_iso)
+            if picked != date.today():
+                detail = f"{detail}\n📅 {picked.strftime('%d/%m/%Y')}"
+        except ValueError:
+            pass
     await send_message(
         chat_id,
         f"{prompt}\n{detail}",
@@ -257,6 +290,13 @@ async def _record_transaction_with_default(
     """
     tx_type = parsed.get("transaction_type", "expense")
     merchant = (parsed.get("merchant") or parsed.get("note") or "Giao dịch").strip()
+    expense_date_iso = parsed.get("expense_date")
+    expense_date = date.today()
+    if expense_date_iso:
+        try:
+            expense_date = date.fromisoformat(expense_date_iso)
+        except ValueError:
+            pass
     expense_data = ExpenseCreate(
         amount=float(parsed["amount"]),
         merchant=merchant or "Giao dịch",
@@ -268,7 +308,7 @@ async def _record_transaction_with_default(
         # record default-sourced income under a spending bucket and skew
         # category analytics.
         category="needs_review" if tx_type == "money_in" else "other",
-        expense_date=date.today(),
+        expense_date=expense_date,
         transaction_type=tx_type,
     )
     resolved = await apply_default_source(db, user.id, expense_data)
@@ -438,12 +478,19 @@ async def handle_text_message(db: AsyncSession, message: dict) -> bool:
 
     if parsed and parsed.get("is_expense") and float(parsed.get("amount", 0)) > 0:
         source_type, source_card_id = await _extract_credit_card_source(db, user.id, text)
+        # Tier-1.5: even though the LLM JSON omits dates, recover any
+        # ``ngày dd/mm`` hint the user typed so the fallback path matches
+        # the fast-path behaviour.
+        extracted_date = extract_transaction_date(text)
+        expense_date_value = (
+            extracted_date.value if extracted_date is not None else date.today()
+        )
         expense_data = ExpenseCreate(
             amount=float(parsed["amount"]),
             merchant=parsed.get("merchant") or text,
             note=text,
             source="manual",
-            expense_date=date.today(),
+            expense_date=expense_date_value,
             source_type=source_type,
             source_credit_card_id=source_card_id,
         )
