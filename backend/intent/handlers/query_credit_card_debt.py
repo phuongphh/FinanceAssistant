@@ -25,7 +25,8 @@ class QueryCreditCardDebtHandler(IntentHandler):
         name = user.display_name or "bạn"
         return (
             f"💳 {name} chưa có thẻ tín dụng nào trong hệ thống.\n\n"
-            "Thêm thẻ tại /thetindung để mình theo dõi dư nợ giúp nhé."
+            "Vào /menu → *Chi tiêu* → *Thẻ tín dụng* để thêm thẻ, "
+            "mình sẽ theo dõi dư nợ giúp nhé."
         )
 
     def _format(self, cards, user: User) -> str:
