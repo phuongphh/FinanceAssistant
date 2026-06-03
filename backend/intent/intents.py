@@ -33,6 +33,7 @@ class IntentType(str, Enum):
     QUERY_GOALS = "query_goals"
     QUERY_GOAL_PROGRESS = "query_goal_progress"
     QUERY_TWIN = "query_twin"
+    QUERY_CREDIT_CARD_DEBT = "query_credit_card_debt"
 
     # ----- Action intents (write) -----
     ACTION_RECORD_SAVING = "action_record_saving"

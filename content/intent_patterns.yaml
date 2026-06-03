@@ -599,3 +599,35 @@ query_twin:
       confidence: 0.95
     - pattern: "\b(10 nam toi|nam 2036|tai san tuong lai)\b"
       confidence: 0.86
+
+query_credit_card_debt:
+  description: "User asks to see outstanding balances across their credit cards."
+  # Each pattern is guarded with a negative lookahead that rejects any input
+  # containing a money amount (e.g. "10tr", "500k", "1 tỷ"). This prevents
+  # repayment transactions like "trả nợ thẻ tín dụng 10tr" from being routed
+  # to the read-only debt summary — they must reach action_quick_transaction.
+  patterns:
+    # "dư nợ tín dụng" / "du no tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+tin\s*dung'
+      confidence: 0.96
+    # "dư nợ thẻ tín dụng" / "du no the tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+(?:the\s+)?tin\s*dung'
+      confidence: 0.96
+    # "dư nợ thẻ" — short form when context is clear
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+the(?:\s|$)'
+      confidence: 0.9
+    # "nợ tín dụng" / "no tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b)no\s+tin\s*dung'
+      confidence: 0.9
+    # "nợ thẻ tín dụng"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*no\s+the\s+tin\s*dung'
+      confidence: 0.92
+    # "thẻ tín dụng nợ bao nhiêu"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*the\s+tin\s*dung.*no\s+bao\s*nhieu'
+      confidence: 0.93
+    # "nợ thẻ bao nhiêu"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*no\s+the.*bao\s*nhieu'
+      confidence: 0.88
+    # English fallback: "credit card debt", "credit card balance"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*credit\s+card\s+(?:debt|balance|owe)'
+      confidence: 0.92

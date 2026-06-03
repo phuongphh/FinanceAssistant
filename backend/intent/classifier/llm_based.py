@@ -70,6 +70,7 @@ INTENTS:
 - query_goals: Hỏi mục tiêu của user
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể
 - query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
+- query_credit_card_debt: Hỏi dư nợ thẻ tín dụng
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Ghi giao dịch nhanh (tiền ra/vào). "được cho/thưởng/lì xì/tìm/nhặt X" là tiền vào.
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"

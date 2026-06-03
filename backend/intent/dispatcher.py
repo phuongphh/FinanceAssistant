@@ -49,6 +49,7 @@ READ_INTENTS = frozenset(
         IntentType.QUERY_MARKET,
         IntentType.QUERY_GOALS,
         IntentType.QUERY_GOAL_PROGRESS,
+        IntentType.QUERY_CREDIT_CARD_DEBT,
     }
 )
 
@@ -406,6 +407,12 @@ class IntentDispatcher:
             )
 
             return QueryGoalProgressHandler()
+        if intent == IntentType.QUERY_CREDIT_CARD_DEBT:
+            from backend.intent.handlers.query_credit_card_debt import (
+                QueryCreditCardDebtHandler,
+            )
+
+            return QueryCreditCardDebtHandler()
         if intent == IntentType.ADVISORY:
             from backend.intent.handlers.advisory import AdvisoryHandler
 
