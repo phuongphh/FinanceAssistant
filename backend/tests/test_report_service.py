@@ -287,3 +287,118 @@ class TestBuildReportPrompt:
         # Doesn't crash, doesn't fabricate a percentage.
         assert "không tính được" in prompt
         assert "Khởi Đầu" in prompt
+
+
+class TestLevelGuidanceVietnameseOnly:
+    """Issue #927 — Tier 3 report prompts leaked English jargon
+    ("NW", "passive income", "rental", "cashflow", "allocate"...) into
+    the user-facing summary. Guard against regressions: every level's
+    guidance must be Vietnamese-only, with the exception of preserved
+    test-asserted phrases for the HNW level."""
+
+    # Tokens that are strictly forbidden in any user-bound prompt text.
+    # Excludes finance terms like P/E or ticker symbols (those are OK).
+    _FORBIDDEN = [
+        "NW",
+        "passive income",
+        "active income",
+        "cashflow",
+        "allocate",
+        "allocation",
+        "rebalance",
+        "saving rate",
+        "emergency fund",
+        "rental",
+        "family-office",
+        "trustee",
+        "income streams",
+        " gap ",
+        "DCA",
+    ]
+
+    @pytest.mark.parametrize("level", list(WealthLevel))
+    def test_no_english_jargon_in_guidance(self, level: WealthLevel):
+        text = _LEVEL_GUIDANCE[level]
+        for token in self._FORBIDDEN:
+            assert token.lower() not in text.lower(), (
+                f"Forbidden English token {token!r} found in "
+                f"_LEVEL_GUIDANCE[{level.name}]: {text!r}"
+            )
+
+
+@pytest.mark.asyncio
+class TestBuildWealthContextVietnameseLabels:
+    """`_build_wealth_context` assembles income_str — must use VN
+    labels, never the English DB code (salary/rental/dividend)."""
+
+    async def test_income_str_uses_vietnamese_stream_labels(self):
+        import uuid as _uuid
+
+        from backend.services.report_service import _build_wealth_context
+
+        user_id = _uuid.uuid4()
+
+        # Fake net-worth breakdown.
+        fake_breakdown = MagicMock()
+        fake_breakdown.total = Decimal("5_000_000_000")
+        fake_breakdown.asset_count = 1
+        fake_breakdown.by_type = {"stock": Decimal("5_000_000_000")}
+
+        # Fake income streams.
+        salary = MagicMock()
+        salary.name = "Lương FPT"
+        salary.stream_type = "salary"
+        salary.monthly_equivalent = Decimal("30_000_000")
+        rental = MagicMock()
+        rental.name = "Nhà Q7"
+        rental.stream_type = "rental"
+        rental.monthly_equivalent = Decimal("13_500_000")
+
+        scalars = MagicMock()
+        scalars.all.return_value = [salary, rental]
+        result = MagicMock()
+        result.scalars.return_value = scalars
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        with patch(
+            "backend.services.report_service.net_worth_calculator.calculate",
+            new=AsyncMock(return_value=fake_breakdown),
+        ):
+            ctx = await _build_wealth_context(db, user_id, total_expense=1_000_000)
+
+        income_str = ctx["income_str"]
+        # English DB codes MUST NOT appear in the user-bound text.
+        assert "salary" not in income_str
+        assert "rental" not in income_str
+        # Vietnamese labels must be present (from income_types YAML).
+        from backend.wealth import income_types as _it
+        assert _it.get_label("salary") in income_str
+        assert _it.get_label("rental") in income_str
+
+    async def test_empty_income_uses_vietnamese_fallback(self):
+        import uuid as _uuid
+
+        from backend.services.report_service import _build_wealth_context
+
+        fake_breakdown = MagicMock()
+        fake_breakdown.total = Decimal(0)
+        fake_breakdown.asset_count = 0
+        fake_breakdown.by_type = {}
+
+        scalars = MagicMock()
+        scalars.all.return_value = []
+        result = MagicMock()
+        result.scalars.return_value = scalars
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        with patch(
+            "backend.services.report_service.net_worth_calculator.calculate",
+            new=AsyncMock(return_value=fake_breakdown),
+        ):
+            ctx = await _build_wealth_context(db, _uuid.uuid4(), total_expense=0)
+
+        assert "income streams" not in ctx["income_str"]
+        assert "gap" not in ctx["income_str"]
+        assert "nguồn thu nhập" in ctx["income_str"]

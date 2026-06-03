@@ -241,6 +241,36 @@ class TestEmptyAndEdges:
         assert out.count == 0
         assert out.total_value == Decimal(0)
 
+    async def test_asset_type_label_is_vietnamese(self):
+        """Issue #927 — every asset item must carry a Vietnamese
+        ``asset_type_label`` (e.g. real_estate → 'Bất động sản')."""
+        from backend.wealth import asset_types as _asset_types
+
+        rows = [
+            _make_asset(
+                name="Nhà Q7",
+                asset_type="real_estate",
+                current_value=Decimal("3_000_000_000"),
+                initial_value=Decimal("2_500_000_000"),
+            ),
+            _make_asset(
+                name="VNM",
+                asset_type="stock",
+                current_value=Decimal("110_000_000"),
+                initial_value=Decimal("100_000_000"),
+                ticker="VNM",
+            ),
+        ]
+        tool = GetAssetsTool()
+        out = await tool.execute(GetAssetsInput(), _user(), _mock_db_returning(rows))
+
+        for item in out.assets:
+            assert item.asset_type_label == _asset_types.get_label(item.asset_type)
+            # Must not echo the raw English code (defensive — both
+            # `real_estate` and `stock` have YAML labels, so the helper
+            # never returns the code itself unless the YAML is broken).
+            assert item.asset_type_label != item.asset_type
+
     async def test_total_value_sums_filtered(self):
         tool = GetAssetsTool()
         db = _mock_db_returning(_mixed_portfolio())

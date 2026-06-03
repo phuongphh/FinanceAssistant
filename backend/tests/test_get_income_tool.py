@@ -145,6 +145,28 @@ class TestExecute:
         assert result.count == 0
         assert result.passive_ratio is None
 
+    async def test_stream_type_label_is_vietnamese(self):
+        """Issue #927 — every income item must carry a Vietnamese
+        ``stream_type_label`` derived from income_types YAML."""
+        from backend.wealth import income_types as _income_types
+
+        user = _user()
+        salary = _stream("salary", Decimal("30000000"), is_passive=False)
+        rental = _stream("rental", Decimal("13500000"), is_passive=True)
+        with patch(
+            "backend.agent.tools.get_income.income_service.get_active_streams",
+            new=AsyncMock(return_value=[salary, rental]),
+        ):
+            tool = GetIncomeTool()
+            result = await tool.execute(GetIncomeInput(), user, db=None)
+
+        labels = {s.stream_type: s.stream_type_label for s in result.streams}
+        assert labels["salary"] == _income_types.get_label("salary")
+        assert labels["rental"] == _income_types.get_label("rental")
+        # Whatever the YAML returns, it must NOT be the raw English code.
+        assert labels["salary"] != "salary"
+        assert labels["rental"] != "rental"
+
     async def test_monthly_equivalent_in_output(self):
         """Output items carry the normalised monthly figure so the
         LLM formatter doesn't need to redo schedule math."""

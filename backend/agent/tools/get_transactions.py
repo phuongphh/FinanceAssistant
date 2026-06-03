@@ -23,6 +23,7 @@ from backend.agent.tools.schemas import (
     TransactionFilter,
     TransactionItem,
 )
+from backend.config.categories import get_category
 from backend.models.expense import Expense
 from backend.models.user import User
 
@@ -146,6 +147,7 @@ class GetTransactionsTool(Tool):
             else date_cls.today(),
             merchant=row.merchant,
             category=row.category,
+            category_label=get_category(row.category).name_vi,
             amount=Decimal(row.amount or 0),
             note=row.note,
         )

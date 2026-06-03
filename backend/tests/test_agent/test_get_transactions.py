@@ -111,6 +111,24 @@ class TestGetTransactions:
         )
         assert [int(t.amount) for t in out.transactions] == [900_000, 300_000]
 
+    async def test_category_label_is_vietnamese(self):
+        """Issue #927 — every transaction item must carry a Vietnamese
+        ``category_label`` so the LLM doesn't echo the English DB code."""
+        rows = [
+            _expense(day=date(2026, 5, 1), amount=50_000, category="food"),
+            _expense(day=date(2026, 5, 2), amount=80_000, category="transport"),
+            _expense(day=date(2026, 5, 3), amount=20_000, category="transfer"),
+            _expense(day=date(2026, 5, 4), amount=10_000, category="other"),
+        ]
+        tool = GetTransactionsTool()
+        out = await tool.execute(
+            GetTransactionsInput(sort="date_asc"),
+            _user(),
+            _mock_db(sorted(rows, key=lambda r: r.expense_date, reverse=True)),
+        )
+        labels = [t.category_label for t in out.transactions]
+        assert labels == ["Ăn uống", "Di chuyển", "Chuyển khoản", "Khác"]
+
     async def test_total_amount_aggregates(self):
         rows = [
             _expense(day=date(2026, 5, 1), amount=100_000),

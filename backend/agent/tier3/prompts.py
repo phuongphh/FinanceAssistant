@@ -33,37 +33,67 @@ DISCLAIMER = (
 # advisory handler. If those drift, both should update together.
 _LEVEL_FOCUS = {
     WealthLevel.STARTER: (
-        "User chưa có tài sản đáng kể. Focus vào emergency fund "
+        "User chưa có tài sản đáng kể. Tập trung vào quỹ dự phòng "
         "(3-6 tháng chi tiêu) trước khi nghĩ đến đầu tư. Ngôn ngữ "
-        "đơn giản, giáo dục. Tránh jargon (P/E, allocation %)."
+        "đơn giản, giáo dục. Tránh thuật ngữ chuyên ngành (P/E, "
+        "tỷ trọng phân bổ %)."
     ),
     WealthLevel.YOUNG_PROFESSIONAL: (
-        "User đang xây tài sản. Focus tăng saving rate, DCA định "
-        "kỳ, diversify giữa cash / stock / fund. Có thể đề cập "
-        "% allocation. Tone thân thiện, growth-oriented."
+        "User đang xây tài sản. Tập trung tăng tỷ lệ tiết kiệm, "
+        "đầu tư đều đặn định kỳ, đa dạng hoá giữa tiền mặt / cổ phiếu "
+        "/ quỹ. Có thể đề cập tỷ trọng phân bổ %. Tone thân thiện, "
+        "hướng đến tăng trưởng."
     ),
     WealthLevel.MASS_AFFLUENT: (
-        "User đã có portfolio. Focus rebalance, tỷ lệ cash / stock "
-        "/ real_estate, passive income coverage, tax-efficiency. "
-        "Frame mọi gợi ý theo % net worth. KHÔNG dùng "
-        "'thu nhập − chi tiêu = tiền dư' để quyết định invest size."
+        "User đã có danh mục tài sản. Tập trung tái cân bằng, tỷ lệ "
+        "tiền mặt / cổ phiếu / bất động sản, mức bao phủ của thu nhập "
+        "thụ động, tối ưu thuế. Khung mọi gợi ý theo % tổng tài sản. "
+        "KHÔNG dùng 'thu nhập − chi tiêu = tiền dư' để quyết định "
+        "quy mô đầu tư."
     ),
     WealthLevel.HIGH_NET_WORTH: (
-        "User HNW. Focus portfolio allocation %, passive income / "
-        "chi tiêu coverage, dòng tiền BĐS/cổ tức/lãi, rebalancing "
-        "thresholds, tax planning. Tone Trợ lý Tài sản strategic. "
-        "TUYỆT ĐỐI tránh dùng monthly_income − expenses làm proxy "
-        "cho 'tiền dư đầu tư'."
+        "User Tinh Hoa. Tập trung tỷ trọng phân bổ danh mục %, mức "
+        "bao phủ thu nhập thụ động / chi tiêu, dòng tiền bất động "
+        "sản / cổ tức / lãi, ngưỡng tái cân bằng, tối ưu thuế. "
+        "Tone Trợ lý Tài sản chiến lược. TUYỆT ĐỐI tránh dùng "
+        "thu nhập tháng − chi tiêu làm cơ sở cho 'tiền dư đầu tư'."
     ),
     WealthLevel.VIP: (
-        "User Đỉnh Cao (≥30 tỷ). Focus bảo toàn tài sản đa thế hệ, "
-        "estate planning, alternative investments (private equity, "
-        "BĐS lớn, vàng, art), tax/legal structure, horizon 10+ năm. "
-        "Tone ngắn gọn, strategic, không jargon thừa. TUYỆT ĐỐI tránh "
-        "cashflow/budget analysis — vô nghĩa ở level này. Frame mọi "
-        "advice theo % portfolio và risk to legacy."
+        "User Đỉnh Cao (≥30 tỷ). Tập trung bảo toàn tài sản đa thế "
+        "hệ, hoạch định thừa kế, các kênh đầu tư thay thế (quỹ cá "
+        "nhân, bất động sản lớn, vàng, sưu tầm), cấu trúc thuế/pháp "
+        "lý, tầm nhìn 10+ năm. Tone ngắn gọn, chiến lược, không "
+        "thuật ngữ thừa. TUYỆT ĐỐI tránh phân tích dòng tiền/ngân "
+        "sách — vô nghĩa ở level này. Khung mọi gợi ý theo % danh "
+        "mục và rủi ro với tài sản kế thừa."
     ),
 }
+
+
+# Hard rule appended to every Tier 3 prompt to stop the LLM from
+# echoing English category/jargon tokens that bleed through from the
+# DB or from training data. Bug ref: issue #927.
+_VIETNAMESE_OUTPUT_RULE = """QUY TẮC NGÔN NGỮ (BẮT BUỘC):
+- Mọi câu trả lời cho user PHẢI 100% bằng tiếng Việt.
+- KHÔNG echo code danh mục tiếng Anh từ tool output (food, transport,
+  housing, shopping, transfer, other, salary, freelance, rental,
+  dividend, interest, stock, real_estate, crypto, gold, cash...).
+  Khi tool trả về cả ``category`` và ``category_label`` (hoặc
+  ``stream_type_label`` / ``asset_type_label``), CHỈ dùng nhãn
+  ``*_label`` tiếng Việt trong văn bản hiển thị cho user.
+- Thay các thuật ngữ tiếng Anh phổ biến bằng tiếng Việt:
+    • "NW" / "net worth" → "tổng tài sản"
+    • "passive income" → "thu nhập thụ động"
+    • "active income" → "thu nhập chủ động"
+    • "cashflow" → "dòng tiền"
+    • "allocate" / "allocation" → "phân bổ" / "tỷ trọng phân bổ"
+    • "rebalance" → "tái cân bằng"
+    • "DCA" → "đầu tư đều đặn định kỳ"
+    • "saving rate" → "tỷ lệ tiết kiệm"
+    • "emergency fund" → "quỹ dự phòng"
+    • "rental" → "cho thuê" / "thu nhập từ cho thuê"
+    • "reply" → "trả lời"
+- Tên tài sản (ticker như VNM, HPG, BTC) và đơn vị tiền tệ giữ nguyên."""
 
 
 def build_reasoning_prompt(
@@ -100,6 +130,8 @@ QUY TẮC HARD (KHÔNG ĐƯỢC VI PHẠM):
 3. LUÔN kết thúc với disclaimer chính xác: "{DISCLAIMER.strip('_').strip()}"
 4. Đưa ra 2-3 options cho user cân nhắc, không 1 prescription.
 5. Nếu thiếu data, hỏi user thay vì đoán.
+
+{_VIETNAMESE_OUTPUT_RULE}
 
 QUY TẮC TONE:
 - Xưng "mình", gọi user là "bạn" hoặc "{user_name}".
