@@ -17,17 +17,30 @@ from __future__ import annotations
 from datetime import date, datetime
 
 
-def _as_date(value: date | datetime) -> date:
-    return value.date() if isinstance(value, datetime) else value
+def _as_date(value: date | datetime | str) -> date:
+    """Coerce input to a ``date``.
+
+    Accepts ``date`` / ``datetime`` directly, plus ISO-8601 strings —
+    Pydantic's ``model_dump(mode="json")`` serializes dates to ISO
+    strings (used by the Tier 2 agent's tool-result envelope), so the
+    formatter must tolerate that shape or successful queries crash
+    during rendering with ``AttributeError: 'str' object has no
+    attribute 'year'``.
+    """
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
 
 
-def format_date_vi(value: date | datetime) -> str:
+def format_date_vi(value: date | datetime | str) -> str:
     """Return ``DD/MM/YYYY`` — the canonical Vietnamese date form."""
     return _as_date(value).strftime("%d/%m/%Y")
 
 
 def format_date_vi_short(
-    value: date | datetime, *, ref_date: date | None = None
+    value: date | datetime | str, *, ref_date: date | None = None
 ) -> str:
     """Return ``DD/MM`` when ``value`` shares the year with ``ref_date``,
     otherwise ``DD/MM/YYYY``.

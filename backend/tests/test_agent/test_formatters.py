@@ -327,3 +327,25 @@ class TestTransactionsFormatter:
         )
         assert "📌" in out
         assert "made_up_code" not in out
+
+    def test_handles_iso_string_dates_from_model_dump_json(self):
+        """Regression: ``DBAgent`` envelopes tool results with
+        ``model_dump(mode="json")``, which serializes ``date`` to an
+        ISO string. The formatter must accept that shape or the entire
+        Tier 2 path crashes with ``AttributeError`` on a successful
+        query."""
+        out = format_transactions_response(
+            {
+                "transactions": [
+                    {"date": "2026-05-28", "merchant": "Highlands",
+                     "category": "food", "amount": "85000", "note": None},
+                ],
+                "total_amount": "85000",
+                "count": 1,
+            },
+            _user(),
+            "chi tuần này",
+            _style(),
+        )
+        assert "28/05" in out
+        assert "2026-05-28" not in out
