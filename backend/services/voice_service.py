@@ -1,27 +1,27 @@
-"""Voice → text via OpenAI Whisper.
+"""Voice → text via the self-hosted STT provider (``stt.nuitruc.ai``).
 
 Phase 3A storytelling lets the user record a voice note instead of
 typing. This module owns the audio → transcript leg; the storytelling
 handler then feeds the transcript into the same DeepSeek extractor as
 text input.
 
-Why OpenAI Whisper specifically:
-- Vietnamese accuracy is high (better than Deepgram / Google for
-  conversational southern Vietnamese in our testing)
-- ~$0.006/min — for a 30-second voice note that's $0.003
-- Single API key already in the OpenAI ecosystem (we already use the
-  OpenAI SDK to talk to DeepSeek)
+Why a dedicated Vietnamese STT endpoint (replacing Whisper):
+- Vietnamese accuracy is materially better than Whisper-1 on
+  conversational southern accents in our testing
+- Self-hosted — no per-minute cost, no third-party data leak
+- OGG/Opus (Telegram's native voice format) is accepted natively, no
+  transcoding needed
 
-Cost guard: callers cap audio at 60 seconds upstream (Telegram voice
-notes have a hard 60s limit anyway). We don't enforce here so unit
-tests can exercise the full path.
+Public contract is unchanged: callers still get a ``str`` transcript or
+a ``VoiceTranscriptionError`` — the storytelling/voice_query handlers
+need no changes.
 """
 from __future__ import annotations
 
-import io
+import json
 import logging
 
-from openai import AsyncOpenAI
+import httpx
 
 from backend.config import get_settings
 
@@ -30,18 +30,45 @@ settings = get_settings()
 
 
 class VoiceTranscriptionError(Exception):
-    """Raised when Whisper fails or isn't configured."""
+    """Raised when the STT provider fails or returns no transcript."""
 
 
-def _get_client() -> AsyncOpenAI | None:
-    """Lazy-init OpenAI client so missing keys don't crash import.
+# Singleton client — HTTP/2 + connection pool reuse keeps cold-start
+# latency low across consecutive voice notes (e.g. quick back-to-back
+# storytelling messages). Lazily constructed so importing this module in
+# tests / CLI doesn't open sockets.
+_client: httpx.AsyncClient | None = None
 
-    Returns ``None`` when no key is configured — callers handle the
-    "voice off" path with a user-friendly message.
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.stt_api_timeout_seconds, connect=5.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            http2=True,
+        )
+    return _client
+
+
+def _mime_for(filename: str) -> str:
+    """Best-effort content-type from filename extension.
+
+    The provider sniffs the audio itself, but a correct content-type
+    helps when a proxy in front of it inspects the upload.
     """
-    if not settings.openai_api_key:
-        return None
-    return AsyncOpenAI(api_key=settings.openai_api_key)
+    lower = filename.lower()
+    if lower.endswith(".ogg") or lower.endswith(".oga") or lower.endswith(".opus"):
+        return "audio/ogg"
+    if lower.endswith(".mp3"):
+        return "audio/mpeg"
+    if lower.endswith(".wav"):
+        return "audio/wav"
+    if lower.endswith(".m4a") or lower.endswith(".mp4"):
+        return "audio/mp4"
+    if lower.endswith(".webm"):
+        return "audio/webm"
+    return "application/octet-stream"
 
 
 async def transcribe_vietnamese(
@@ -51,38 +78,56 @@ async def transcribe_vietnamese(
 ) -> str:
     """Transcribe a Telegram voice note as Vietnamese.
 
-    Telegram delivers voice as OGG/Opus by default — Whisper handles
-    that natively, no transcoding needed.
-
     Returns the transcript stripped of leading/trailing whitespace.
-    Raises ``VoiceTranscriptionError`` for missing config / API
-    failure / empty input — caller maps these to the storytelling
-    "thử lại nhé" branch.
+    Raises ``VoiceTranscriptionError`` for empty input, transport
+    failure, non-2xx response, malformed body, or an empty transcript —
+    the caller maps these to the storytelling "thử lại nhé" branch.
     """
     if not audio_bytes:
         raise VoiceTranscriptionError("empty audio")
 
-    client = _get_client()
-    if client is None:
-        raise VoiceTranscriptionError("OPENAI_API_KEY not configured")
+    headers: dict[str, str] = {"accept": "application/json"}
+    if settings.stt_api_key:
+        headers["Authorization"] = f"Bearer {settings.stt_api_key}"
 
-    # Whisper expects a file-like object with a ``.name`` attribute so
-    # the SDK can infer the format from the extension.
-    buffer = io.BytesIO(audio_bytes)
-    buffer.name = filename
+    files = {"file": (filename, audio_bytes, _mime_for(filename))}
+
+    client = _get_client()
+    try:
+        resp = await client.post(settings.stt_api_url, headers=headers, files=files)
+    except httpx.TimeoutException as exc:
+        # Log size only — never the audio itself.
+        logger.warning("STT provider timeout (audio_size=%d)", len(audio_bytes))
+        raise VoiceTranscriptionError("STT provider timeout") from exc
+    except httpx.HTTPError as exc:
+        logger.warning("STT provider transport error: %s", exc)
+        raise VoiceTranscriptionError(f"STT provider error: {exc}") from exc
+
+    if resp.status_code >= 400:
+        # Body may include validation hints; keep first 200 chars at debug.
+        logger.error("STT provider HTTP %d", resp.status_code)
+        logger.debug("STT provider body: %s", resp.text[:200])
+        raise VoiceTranscriptionError(f"STT provider HTTP {resp.status_code}")
 
     try:
-        response = await client.audio.transcriptions.create(
-            model="whisper-1",
-            file=buffer,
-            language="vi",
-            response_format="text",
-        )
-    except Exception as exc:  # noqa: BLE001 — surface as one error type
-        logger.warning("whisper transcription failed: %s", exc)
-        raise VoiceTranscriptionError(str(exc)) from exc
+        payload = resp.json()
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("STT provider returned non-JSON body")
+        raise VoiceTranscriptionError("STT provider returned non-JSON") from exc
 
-    transcript = (response or "").strip() if isinstance(response, str) else ""
+    transcript = ""
+    if isinstance(payload, dict):
+        raw = payload.get("transcript") or payload.get("text") or ""
+        if isinstance(raw, str):
+            transcript = raw.strip()
+
     if not transcript:
         raise VoiceTranscriptionError("empty transcript")
+
+    logger.info(
+        "STT transcribed: audio_size=%d transcript_len=%d processing_time=%s",
+        len(audio_bytes),
+        len(transcript),
+        payload.get("processing_time_seconds") if isinstance(payload, dict) else None,
+    )
     return transcript

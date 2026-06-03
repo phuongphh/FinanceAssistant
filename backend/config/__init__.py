@@ -50,9 +50,17 @@ class Settings(BaseSettings):
     ocr_api_url: str = "https://ocr.nuitruc.ai/api/v1/ocr/extract"
     ocr_api_key: str = ""  # Optional bearer token; empty = no auth header
     ocr_api_timeout_seconds: float = 20.0
-    # OpenAI key — currently used only for Whisper voice transcription.
-    # Empty in dev/CI is fine; the voice path falls back to a friendly
-    # "tính năng voice chưa bật" message.
+    # Speech-to-text provider (self-hosted, Vietnamese-tuned). Accepts a
+    # multipart audio upload and returns ``{"transcript": ...}``. Telegram
+    # voice notes (OGG/Opus) are accepted natively — no transcoding needed.
+    # 30s timeout covers the worst observed cold-start (~1s warm, but the
+    # service occasionally pauses on first hit after idle).
+    stt_api_url: str = "https://stt.nuitruc.ai/api/stt/upload"
+    stt_api_key: str = ""  # Optional bearer token; empty = no auth header
+    stt_api_timeout_seconds: float = 30.0
+    # OpenAI key — historically used for Whisper STT before we moved to
+    # ``stt.nuitruc.ai``. Kept here only because some legacy tests reference
+    # it; can be dropped once those are cleaned up.
     openai_api_key: str = ""
 
     # Groq (Tier 1 NLU classifier). DeepSeek V4-Flash is fast in
