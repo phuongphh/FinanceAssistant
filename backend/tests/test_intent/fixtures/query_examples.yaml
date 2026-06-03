@@ -172,6 +172,18 @@ canonical:
       time_range: "this_week"
     notes: "Goals report by time range should map to query_goals (#757)."
 
+  - text: "dư nợ tín dụng"
+    expected_intent: query_credit_card_debt
+    notes: "Canonical phrase from the highlighted Telegram chat — list debt balances per card."
+
+  - text: "dư nợ thẻ tín dụng"
+    expected_intent: query_credit_card_debt
+    notes: "Full phrasing with 'thẻ' qualifier."
+
+  - text: "thẻ tín dụng nợ bao nhiêu"
+    expected_intent: query_credit_card_debt
+    notes: "Question-form variant."
+
 
 edge_cases:
   # Edge cases — diacritics, typos, English, gibberish, OOS, greetings, etc.
