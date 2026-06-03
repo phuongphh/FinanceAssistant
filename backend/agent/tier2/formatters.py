@@ -29,9 +29,12 @@ from backend.bot.formatters.comparison import (
     format_comparison_block,
     metric_label_vi,
 )
+from backend.bot.formatters.dates import format_date_vi_short
 from backend.bot.formatters.money import format_money_full, format_money_short
+from backend.config.categories import get_category
 from backend.intent.wealth_adapt import LevelStyle, decorate, resolve_style
 from backend.models.user import User
+from backend.utils.time_vn import now_vn
 from backend.wealth.asset_types import get_label as asset_type_label
 
 # ---------------------------------------------------------------------------
@@ -198,22 +201,45 @@ def format_transactions_response(
     query: str,
     style: LevelStyle,
 ) -> str:
+    """Render a transaction listing in Vietnamese-native format.
+
+    Three formatting rules — each fixed a real production bug:
+
+    1. **Vietnamese dates.** Display ``DD/MM`` (current year) or
+       ``DD/MM/YYYY`` (cross-year), never ISO ``YYYY-MM-DD``. ISO
+       leaked when an earlier version stringified the date directly.
+    2. **Category emoji + label.** Spending rows show
+       ``🍜 Ăn uống`` instead of the raw English code ``food``. We
+       resolve via ``get_category`` so unknown codes fall back to
+       ``📌 Khác`` rather than echoing the code.
+    3. **Merchant fallback.** When a row has no merchant we use the
+       Vietnamese category label, not the raw code.
+    """
     txs = payload.get("transactions") or []
     name = user.display_name or "bạn"
     if not txs:
         return f"{name} chưa có giao dịch nào trong khoảng này."
 
+    # Use Vietnam-local today so a midnight-UTC server doesn't
+    # mis-classify same-year dates as cross-year (and vice-versa).
+    today_vn = now_vn().date()
+
     lines = [f"📒 Giao dịch ({len(txs)}):", ""]
     for t in txs:
-        d = t.get("date")
-        merchant = t.get("merchant") or t.get("category") or "—"
+        raw_date = t.get("date")
+        date_str = format_date_vi_short(raw_date, ref_date=today_vn) if raw_date else "—"
+        cat_code = t.get("category") or "other"
+        cat = get_category(cat_code)
+        merchant = t.get("merchant") or cat.name_vi
         amount = float(t.get("amount") or 0)
-        lines.append(f"• {d}  {merchant}  {format_money_short(amount)}")
+        lines.append(
+            f"{cat.emoji} {date_str} · {merchant} — {format_money_short(amount)}"
+        )
 
     total = float(payload.get("total_amount") or 0)
     if total > 0:
         lines.append("")
-        lines.append(f"Tổng: {format_money_full(total)}")
+        lines.append(f"Tổng: *{format_money_full(total)}*")
     return "\n".join(lines)
 
 

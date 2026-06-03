@@ -265,3 +265,65 @@ class TestTransactionsFormatter:
         )
         assert "Starbucks" in out and "Grab" in out
         assert "180,000đ" in out
+
+    def test_dates_are_vietnamese_not_iso(self):
+        """Regression: ISO ``2026-05-28`` reads wrong on a VN chat.
+        We render ``DD/MM`` for in-year rows."""
+        from datetime import date
+        out = format_transactions_response(
+            {
+                "transactions": [
+                    {"date": date(2026, 5, 28), "merchant": "Highlands",
+                     "category": "food", "amount": "85000", "note": None},
+                ],
+                "total_amount": "85000",
+                "count": 1,
+            },
+            _user(),
+            "chi tuần này",
+            _style(),
+        )
+        assert "28/05" in out
+        assert "2026-05-28" not in out
+
+    def test_category_emoji_replaces_english_code(self):
+        """Regression: production showed the raw code ``other`` instead of
+        the Vietnamese label. Now we emit ``📌 Khác`` (or per-code emoji+label)
+        and never echo the English code."""
+        from datetime import date
+        out = format_transactions_response(
+            {
+                "transactions": [
+                    {"date": date(2026, 5, 28), "merchant": None,
+                     "category": "other", "amount": "1000000", "note": None},
+                ],
+                "total_amount": "1000000",
+                "count": 1,
+            },
+            _user(),
+            "giao dịch lớn",
+            _style(),
+        )
+        # No raw English code in user-facing output.
+        assert " other " not in out and not out.endswith("other")
+        # Emoji + Vietnamese label is present.
+        assert "📌" in out
+        assert "Khác" in out
+
+    def test_unknown_category_falls_back_to_other(self):
+        from datetime import date
+        out = format_transactions_response(
+            {
+                "transactions": [
+                    {"date": date(2026, 5, 28), "merchant": "ABC",
+                     "category": "made_up_code", "amount": "50000", "note": None},
+                ],
+                "total_amount": "50000",
+                "count": 1,
+            },
+            _user(),
+            "test",
+            _style(),
+        )
+        assert "📌" in out
+        assert "made_up_code" not in out
