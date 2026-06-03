@@ -25,7 +25,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from backend.config.categories import get_category
+from backend.wealth.asset_types import get_label as get_asset_label
+from backend.wealth.income_types import get_label as get_income_label
 
 
 # ---------------------------------------------------------------------------
@@ -335,13 +339,19 @@ class AssetItem(BaseModel):
 
     name: str
     asset_type: str
-    asset_type_label: str
+    asset_type_label: Optional[str] = None
     ticker: Optional[str] = None
     quantity: Optional[float] = None
     current_value: Decimal
     cost_basis: Optional[Decimal] = None
     gain: Optional[Decimal] = None
     gain_pct: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _fill_label(self) -> "AssetItem":
+        if not self.asset_type_label:
+            self.asset_type_label = get_asset_label(self.asset_type)
+        return self
 
 
 class GetAssetsOutput(BaseModel):
@@ -361,9 +371,15 @@ class TransactionItem(BaseModel):
     date: date
     merchant: Optional[str] = None
     category: str
-    category_label: str
+    category_label: Optional[str] = None
     amount: Decimal
     note: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _fill_label(self) -> "TransactionItem":
+        if not self.category_label:
+            self.category_label = get_category(self.category).name_vi
+        return self
 
 
 class GetTransactionsOutput(BaseModel):
@@ -472,7 +488,7 @@ class IncomeStreamItem(BaseModel):
 
     name: str
     stream_type: str
-    stream_type_label: str
+    stream_type_label: Optional[str] = None
     is_passive: bool
     amount: Decimal
     currency: str = "VND"
@@ -481,6 +497,12 @@ class IncomeStreamItem(BaseModel):
     is_active: bool
     schedule_day: Optional[int] = None
     schedule_month: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _fill_label(self) -> "IncomeStreamItem":
+        if not self.stream_type_label:
+            self.stream_type_label = get_income_label(self.stream_type)
+        return self
 
 
 class GetIncomeOutput(BaseModel):
