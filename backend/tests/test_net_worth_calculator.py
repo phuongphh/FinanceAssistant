@@ -294,6 +294,65 @@ class TestCalculateChange:
 
 
 @pytest.mark.asyncio
+async def test_change_vs_last_month_end_uses_calendar_anchor(monkeypatch):
+    """Baseline must be the LAST day of the previous calendar month —
+    not ``today - 30 days``. That alignment is the entire point of the
+    helper: it keeps the headline delta consistent with the ⚖️ comparison
+    surface (which also reads the end-of-month snapshot)."""
+    captured: dict = {}
+
+    async def fake_historical(_db, _uid, target_date):
+        captured["target_date"] = target_date
+        return Decimal("100000000")
+
+    monkeypatch.setattr(nwc, "calculate_historical", fake_historical)
+    db = MagicMock()
+
+    today = date(2026, 6, 4)
+    change = await nwc.calculate_change_vs_last_month_end_from_current(
+        db, uuid.uuid4(), Decimal("110000000"), today=today
+    )
+
+    assert captured["target_date"] == date(2026, 5, 31)
+    assert change.previous == Decimal("100000000")
+    assert change.current == Decimal("110000000")
+    assert change.change_absolute == Decimal("10000000")
+    assert change.change_percentage == 10.0
+    assert change.period_label == "tháng trước"
+
+
+@pytest.mark.asyncio
+async def test_change_vs_last_month_end_handles_zero_baseline(monkeypatch):
+    """No snapshot ⇒ previous=0, pct stays 0 (never divide-by-zero)."""
+    monkeypatch.setattr(
+        nwc, "calculate_historical", AsyncMock(return_value=Decimal(0))
+    )
+    db = MagicMock()
+    change = await nwc.calculate_change_vs_last_month_end_from_current(
+        db, uuid.uuid4(), Decimal("5000000"), today=date(2026, 6, 4)
+    )
+    assert change.previous == Decimal(0)
+    assert change.change_percentage == 0.0
+
+
+@pytest.mark.asyncio
+async def test_change_vs_last_month_end_january_rolls_back_to_december(monkeypatch):
+    """Month boundary at year boundary: Jan 15 ⇒ Dec 31 prev year."""
+    captured: dict = {}
+
+    async def fake_historical(_db, _uid, target_date):
+        captured["target_date"] = target_date
+        return Decimal("0")
+
+    monkeypatch.setattr(nwc, "calculate_historical", fake_historical)
+    db = MagicMock()
+    await nwc.calculate_change_vs_last_month_end_from_current(
+        db, uuid.uuid4(), Decimal("0"), today=date(2026, 1, 15)
+    )
+    assert captured["target_date"] == date(2025, 12, 31)
+
+
+@pytest.mark.asyncio
 async def test_calculate_ytd_return_uses_jan_1_baseline(monkeypatch):
     historical = AsyncMock(return_value=Decimal("100000000"))
     monkeypatch.setattr(nwc, "calculate_historical", historical)

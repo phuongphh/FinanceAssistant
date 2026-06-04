@@ -191,3 +191,57 @@ def test_assets_follow_up_has_ytd_button_for_all_wealth_levels(level):
     ytd_button = next(f for f in fus if "YTD - Tài sản từ đầu năm đến nay" in f.label)
     assert ytd_button.intent == IntentType.QUERY_NET_WORTH
     assert ytd_button.parameters == {"time_range": "ytd"}
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_assets_follow_up_never_offers_plain_total_net_worth(level):
+    """The "Tổng net worth" / "Net worth tổng" plain shortcut was removed —
+    it duplicated the asset-list headline and confused users with a delta
+    computed on a rolling-30-day baseline. The two delta-aware buttons
+    (YTD and So với tháng trước) replace it across every wealth level."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(IntentType.QUERY_ASSETS, **kwargs)
+    for fu in fus:
+        # No bare net-worth headline button (i.e. QUERY_NET_WORTH with no
+        # time_range parameter) should appear in the assets follow-ups.
+        if fu.intent == IntentType.QUERY_NET_WORTH:
+            assert fu.parameters and "time_range" in fu.parameters
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_month_vs_previous_view_shows_only_goals_cta(level):
+    """The ⚖️ comparison surface keeps a single, focused next-step:
+    "🎯 Mục tiêu của tôi". Trend / Portfolio buttons are suppressed so
+    the user isn't pulled back into another net-worth view right after
+    seeing the delta."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(
+        IntentType.QUERY_NET_WORTH,
+        parameters={"time_range": "month_vs_previous"},
+        avoid_intent=IntentType.QUERY_NET_WORTH,
+        **kwargs,
+    )
+    assert len(fus) == 1
+    assert fus[0].intent == IntentType.QUERY_GOALS
+    assert "Mục tiêu" in fus[0].label
+    # No Portfolio button — explicit per UX requirement.
+    assert all(f.intent != IntentType.QUERY_PORTFOLIO for f in fus)
+
+
+def test_net_worth_follow_ups_unaffected_when_no_time_range():
+    """Sanity: the override only kicks in for month_vs_previous —
+    the default net-worth view still gets its rich pool."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH)
+    assert len(fus) > 1

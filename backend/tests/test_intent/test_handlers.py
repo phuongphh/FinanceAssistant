@@ -372,7 +372,7 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
             calculate_mock,
         ),
         patch(
-            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_vs_last_month_end_from_current",
             change_mock,
         ),
     ):
@@ -387,7 +387,7 @@ async def test_query_net_worth_handler_includes_change_when_baseline_exists():
     assert "tháng trước" in response
     assert "📈" in response or "📉" in response
     calculate_mock.assert_awaited_once()
-    change_mock.assert_awaited_once_with(ANY, ANY, Decimal("500000000"), period="month")
+    change_mock.assert_awaited_once_with(ANY, ANY, Decimal("500000000"))
 
 
 @pytest.mark.asyncio
@@ -422,7 +422,7 @@ async def test_query_net_worth_handler_shows_true_ytd_for_hnw():
             AsyncMock(return_value=breakdown),
         ),
         patch(
-            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_vs_last_month_end_from_current",
             AsyncMock(return_value=change),
         ),
         patch(
@@ -476,7 +476,7 @@ async def test_query_net_worth_handler_shows_dash_for_zero_ytd_base():
             AsyncMock(return_value=breakdown),
         ),
         patch(
-            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_from_current",
+            "backend.intent.handlers.query_net_worth.net_worth_calculator.calculate_change_vs_last_month_end_from_current",
             AsyncMock(return_value=change),
         ),
         patch(
