@@ -99,12 +99,12 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("📈 Cổ phiếu", IntentType.QUERY_PORTFOLIO),
     ),
     IntentType.QUERY_NET_WORTH: (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio của tôi", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("💼 Danh mục cổ phiếu", IntentType.QUERY_PORTFOLIO),
         FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS),
     ),
     IntentType.QUERY_PORTFOLIO: (
-        FollowUp("💼 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("💼 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("📊 Xem mã khác", IntentType.QUERY_MARKET),
         FollowUp("📊 Tài sản chi tiết", IntentType.QUERY_ASSETS),
     ),
@@ -125,7 +125,7 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("🍕 Loại khác", IntentType.QUERY_EXPENSES_BY_CATEGORY),
     ),
     IntentType.QUERY_INCOME: (
-        FollowUp("💸 Cashflow tháng này", IntentType.QUERY_CASHFLOW),
+        FollowUp("💸 Dòng tiền tháng này", IntentType.QUERY_CASHFLOW),
         FollowUp("📊 Chi tiêu tháng này", IntentType.QUERY_EXPENSES),
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
@@ -135,19 +135,19 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
     IntentType.QUERY_MARKET: (
-        FollowUp("💼 Portfolio của tôi", IntentType.QUERY_PORTFOLIO),
-        FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("💼 Danh mục cổ phiếu", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("💎 Tài sản chi tiết", IntentType.QUERY_ASSETS),
     ),
     IntentType.QUERY_GOALS: (
-        FollowUp("📊 Net worth", IntentType.QUERY_NET_WORTH),
+        FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("💼 Thu nhập", IntentType.QUERY_INCOME),
         FollowUp("💸 Chi tiêu tháng", IntentType.QUERY_EXPENSES),
     ),
     IntentType.QUERY_GOAL_PROGRESS: (
         FollowUp("📋 Tất cả mục tiêu", IntentType.QUERY_GOALS),
         FollowUp("💼 Thu nhập", IntentType.QUERY_INCOME),
-        FollowUp("💸 Cashflow tháng", IntentType.QUERY_CASHFLOW),
+        FollowUp("💸 Dòng tiền tháng", IntentType.QUERY_CASHFLOW),
     ),
 }
 
@@ -171,14 +171,14 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     # HNW / VIP previously surfaced a dedicated "💼 Portfolio analytics"
     # button on the net-worth view. It was removed by product request — the
     # analytics shortcut routed to the same QUERY_PORTFOLIO surface as the
-    # base "💼 Portfolio của tôi" button, so it added a second portfolio
+    # base "💼 Danh mục cổ phiếu" button, so it added a second portfolio
     # entry-point without adding information. Trend remains as the
     # HNW-flavored override; portfolio + goals come from the base pool.
     (IntentType.QUERY_NET_WORTH, WealthLevel.HIGH_NET_WORTH): (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.VIP): (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
     ),
 }
 
@@ -218,14 +218,19 @@ def get_follow_ups(
     category = str(params.get("category") or "").lower()
     if intent == IntentType.QUERY_MARKET and category in {"stock", "stocks", "crypto", "gold"}:
         asset_type = "stock" if category in {"stock", "stocks"} else category
+        portfolio_label = {
+            "stock": "💼 Danh mục cổ phiếu",
+            "crypto": "💼 Danh mục tiền số",
+            "gold": "💼 Danh mục vàng",
+        }[asset_type]
         pool.extend(
             (
                 FollowUp(
-                    "💼 Portfolio của tôi",
+                    portfolio_label,
                     IntentType.QUERY_PORTFOLIO,
                     {"asset_type": asset_type},
                 ),
-                FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
+                FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
                 FollowUp(
                     "💎 Tài sản chi tiết",
                     IntentType.QUERY_ASSETS,

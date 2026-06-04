@@ -66,7 +66,7 @@ def test_hnw_sees_advanced_overrides():
         IntentType.QUERY_NET_WORTH, wealth_level=WealthLevel.HIGH_NET_WORTH
     )
     labels = " ".join(fu.label for fu in fus).lower()
-    assert "trend" in labels or "phân bổ" in labels
+    assert "xu hướng" in labels or "phân bổ" in labels
 
 
 def test_callback_round_trips_intent_and_params():
@@ -105,7 +105,7 @@ def test_gold_market_follow_up_routes_portfolio_to_gold_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục vàng"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "gold"}
 
@@ -122,7 +122,7 @@ def test_crypto_market_follow_up_routes_portfolio_to_crypto_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục tiền số"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "crypto"}
 
@@ -134,7 +134,7 @@ def test_stock_market_follow_up_routes_portfolio_to_stock_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục cổ phiếu"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "stock"}
 
@@ -281,3 +281,146 @@ def test_month_vs_previous_view_excludes_portfolio_analytics(level):
     for fu in fus:
         assert fu.intent != IntentType.QUERY_PORTFOLIO
         assert "Portfolio" not in fu.label
+
+
+# ---------------------------------------------------------------------------
+# Vietnamese-only label guard
+# ---------------------------------------------------------------------------
+
+# Read-intents whose follow-up pools are surfaced to the user. We iterate
+# every wealth level (plus the unset case) and every dynamic market
+# category to exhaust the label surface.
+_READ_INTENTS_FOR_VI_AUDIT = [
+    IntentType.QUERY_ASSETS,
+    IntentType.QUERY_NET_WORTH,
+    IntentType.QUERY_PORTFOLIO,
+    IntentType.QUERY_EXPENSES,
+    IntentType.QUERY_EXPENSES_BY_CATEGORY,
+    IntentType.QUERY_INCOME,
+    IntentType.QUERY_CASHFLOW,
+    IntentType.QUERY_MARKET,
+    IntentType.QUERY_GOALS,
+    IntentType.QUERY_GOAL_PROGRESS,
+]
+
+_WEALTH_LEVELS_FOR_VI_AUDIT = [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.YOUNG_PROFESSIONAL,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+]
+
+# Words that must never appear in user-visible button labels — they are
+# English/finance jargon that the product copy explicitly forbids.
+_FORBIDDEN_LABEL_SUBSTRINGS = (
+    "Net worth",
+    "net worth",
+    "Portfolio",
+    "portfolio",
+    "Cashflow",
+    "cashflow",
+    "Trend",
+    "trend",
+)
+
+
+def _iter_all_follow_up_labels():
+    for intent in _READ_INTENTS_FOR_VI_AUDIT:
+        for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+            kwargs = {} if level is None else {"wealth_level": level}
+            for fu in get_follow_ups(intent, **kwargs):
+                yield (intent, level, fu.label)
+
+    # Dynamic market category branch — produces context-aware labels.
+    for category in ("stock", "stocks", "crypto", "gold"):
+        for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+            kwargs = {} if level is None else {"wealth_level": level}
+            for fu in get_follow_ups(
+                IntentType.QUERY_MARKET,
+                parameters={"category": category},
+                **kwargs,
+            ):
+                yield (IntentType.QUERY_MARKET, level, fu.label)
+
+    # The focused month_vs_previous comparison surface.
+    for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+        kwargs = {} if level is None else {"wealth_level": level}
+        for fu in get_follow_ups(
+            IntentType.QUERY_NET_WORTH,
+            parameters={"time_range": "month_vs_previous"},
+            avoid_intent=IntentType.QUERY_NET_WORTH,
+            **kwargs,
+        ):
+            yield (IntentType.QUERY_NET_WORTH, level, fu.label)
+
+
+def test_all_follow_up_labels_are_vietnamese():
+    """Every user-visible follow-up label must be Vietnamese.
+
+    Guard against regressions where English finance jargon ("Net worth",
+    "Portfolio", "Cashflow", "Trend") leaks back into button copy. The
+    product rule is that Bé Tiền speaks Vietnamese to the user — these
+    English terms have canonical Vietnamese equivalents and the labels
+    must use them.
+    """
+    violations: list[tuple[IntentType, object, str, str]] = []
+    for intent, level, label in _iter_all_follow_up_labels():
+        for banned in _FORBIDDEN_LABEL_SUBSTRINGS:
+            if banned in label:
+                violations.append((intent, level, label, banned))
+    assert not violations, (
+        "Found non-Vietnamese tokens in follow-up labels:\n"
+        + "\n".join(
+            f"  - intent={i.value} level={lv} label={lbl!r} banned={b!r}"
+            for i, lv, lbl, b in violations
+        )
+    )
+
+
+def test_net_worth_view_uses_tong_tai_san_label():
+    """`Net worth` must surface as `Tổng tài sản` across the read-intent
+    pools that link back to the headline net-worth view."""
+    seen_labels: set[str] = set()
+    for intent in (
+        IntentType.QUERY_PORTFOLIO,
+        IntentType.QUERY_MARKET,
+        IntentType.QUERY_GOALS,
+    ):
+        for fu in get_follow_ups(intent):
+            if fu.intent == IntentType.QUERY_NET_WORTH and not fu.parameters:
+                seen_labels.add(fu.label)
+    assert seen_labels, "Expected at least one net-worth follow-up entry"
+    for label in seen_labels:
+        assert "Tổng tài sản" in label, label
+
+
+def test_portfolio_entry_uses_danh_muc_co_phieu_label():
+    """`Portfolio của tôi` must surface as `Danh mục cổ phiếu` on the
+    net-worth view (where there's no asset_type context)."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH)
+    portfolio_buttons = [f for f in fus if f.intent == IntentType.QUERY_PORTFOLIO]
+    assert portfolio_buttons, "Expected a portfolio follow-up on net-worth view"
+    for fu in portfolio_buttons:
+        assert "Danh mục cổ phiếu" in fu.label, fu.label
+
+
+@pytest.mark.parametrize(
+    "category,expected_label",
+    [
+        ("stocks", "💼 Danh mục cổ phiếu"),
+        ("stock", "💼 Danh mục cổ phiếu"),
+        ("crypto", "💼 Danh mục tiền số"),
+        ("gold", "💼 Danh mục vàng"),
+    ],
+)
+def test_market_portfolio_label_is_category_specific(category, expected_label):
+    """The dynamic market-portfolio button names the actual asset class
+    rather than the generic English `Portfolio`."""
+    fus = get_follow_ups(
+        IntentType.QUERY_MARKET,
+        parameters={"category": category},
+        avoid_intent=IntentType.QUERY_MARKET,
+    )
+    assert fus[0].label == expected_label
