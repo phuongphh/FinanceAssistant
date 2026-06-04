@@ -94,6 +94,26 @@ def test_delete_asset_fund_extracts_subtype(classifier):
     assert result.parameters["asset_subtype"] == "fund"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "thêm thu nhập 20tr",
+        "ghi thu nhập 20tr vào ví momo",
+        "thêm lương 20tr",
+    ],
+)
+def test_amount_bearing_income_does_not_launch_wizard(text, classifier):
+    """Amount-bearing income phrases are money-in logs, not "add a stream"
+    requests. The Tier 1 add-income patterns carry a trailing-digit guard,
+    so these must NOT match action_add_income — they fall through to the
+    transaction/LLM fallback that can see the amount."""
+    result = classifier.classify(text)
+
+    assert result is None or result.intent != IntentType.ACTION_ADD_INCOME, (
+        f"{text!r} wrongly launched the add-income wizard"
+    )
+
+
 # ---------------------- correctness invariants ----------------------
 
 

@@ -475,6 +475,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #907 | Pre-Phase | Onboarding: resume nudge collides with name/salutation sub-steps ("two flows at once") | [pre-phase/issue-907.md](by-phase/pre-phase/issue-907.md) |
 | #910 | Phase 4 | [Phase 4.4] Gỡ bỏ "The Reading" — chữa 3 pain của first-5-minutes WOW | [phase-4/issue-910.md](by-phase/phase-4/issue-910.md) |
 | #912 | Pre-Phase | Tech debt: i18n hóa 6 chuỗi onboarding + gỡ env-read khỏi service layer | [pre-phase/issue-912.md](by-phase/pre-phase/issue-912.md) |
+| #919 | Pre-Phase | NLU: \"được bố cho 500k\" không được nhận diện là money-in trong menu Chi tiêu | [pre-phase/issue-919.md](by-phase/pre-phase/issue-919.md) |
+| #922 | Pre-Phase | default_money_in_source: configurable default income source + money-in confirm UX | [pre-phase/issue-922.md](by-phase/pre-phase/issue-922.md) |
+| #924 | Pre-Phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [pre-phase/issue-924.md](by-phase/pre-phase/issue-924.md) |
+| #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
 
-**Total:** 471 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 453 Pre-Phase)
+**Total:** 475 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 457 Pre-Phase)

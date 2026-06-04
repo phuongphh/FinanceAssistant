@@ -88,6 +88,7 @@ keyboards:
     notifications: "🔔 Cài thông báo"
     glossary: "❓ Giải thích các mục"
     default_expense_source: "💸 Nguồn chi tiêu thường xuyên"
+    default_money_in_source: "💰 Nguồn tiền vào thường xuyên"
     back: "◀️ Quay lại"
   age:
     none: "🚫 Không muốn nói"
@@ -154,3 +155,11 @@ default_expense_source:
   back_button: "◀️ Quay lại Profile"
   changed_message: "✅ Đã đổi nguồn chi tiêu thường xuyên sang: {source}."
   invalid: "Nguồn chi tiêu không hợp lệ."
+
+default_money_in_source:
+  panel: "💰 Nguồn tiền vào thường xuyên bạn đang dùng là *{source}*.\n\nBấm *Đổi nguồn* nếu bạn muốn thay đổi."
+  picker_title: "Chọn nguồn tiền vào thường xuyên:"
+  change_button: "Đổi nguồn"
+  back_button: "◀️ Quay lại Profile"
+  changed_message: "✅ Đã đổi nguồn tiền vào thường xuyên sang: {source}."
+  invalid: "Nguồn tiền vào không hợp lệ."

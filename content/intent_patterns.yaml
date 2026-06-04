@@ -281,6 +281,24 @@ action_quick_transaction:
     # "nhận lương 20tr vào tiền mặt"
     - pattern: '^(?:nhan|duoc|thuong|luong)\s+(?:luong\s+)?[\d.,]+.*(?:vao|tai|o|trong)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9
+    # "được bố cho 500k" / "được thưởng 200k" / "được lì xì 50k trên
+    # momo" / "được mẹ cho 1tr" — the Chi tiêu menu PROMISES these are
+    # recorded as money-in. "được" + an optional giver (bố/mẹ/sếp) + a
+    # giving verb (cho/tặng/biếu/thưởng/lì xì/mừng tuổi/hỗ trợ/hoàn) +
+    # an amount with a money suffix. The message-layer fast-path records
+    # the transaction; this rule keeps the LLM tier from having to. Money
+    # suffix is mandatory so resultative "được" ("mua được áo") and bare
+    # numbers don't match. Kept in sync with ``_GIVING_VERBS`` in
+    # ``backend/intent/income_semantics.py``.
+    - pattern: '\bduoc\s+(?:\w+\s+){0,2}?(?:cho|tang|bieu|thuong|li\s*xi|mung\s*tuoi|mung|ho\s*tro|hoan)\b[^?\n]{0,40}?\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.9
+    # "Found money": "tìm/nhặt/lượm được 200k dưới gối" — cash picked up is
+    # money-in. The amount must come DIRECTLY after "được" (only a sign in
+    # between) and carry a money suffix, so "tìm được thắt lưng 500k" (an
+    # object worth 500k, no purchase yet) does NOT match. Kept in sync with
+    # ``_FOUND_MONEY_RE`` in ``backend/intent/income_semantics.py``.
+    - pattern: '\b(?:tim|nhat|luom)\s+duoc\s+[+\-]?\s*\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|nghin|ngan|m|vnd|vnđ|d)\b'
+      confidence: 0.9
     # "trừ 50k khỏi ví momo" — explicit expense from named asset.
     - pattern: '^(?:tru|bot|giam|chi|tieu|rut)\s+[\d.,]+.*(?:khoi|tu|o|trong|vao)\s+(?:vi|tai\s*khoan|cash|tien\s*mat|momo|zalopay|viettel|vcb|acb|tcb|mb|tpb|techcom)'
       confidence: 0.9
@@ -491,6 +509,31 @@ action_add_goal:
     - pattern: '^(?:muc\s*tieu|goals?)\s+moi\b'
       confidence: 0.92
 
+action_add_income:
+  description: "User wants to add a new income stream (salary, freelance, rental, ...)."
+  # High confidence so it beats query_income when the user is initiating an
+  # add (e.g. "thêm thu nhập"). Opens the income wizard ("+ thêm thu nhập"),
+  # which collects type + schedule + amount. This is NOT a quick income log
+  # — that carries an amount and routes to action_quick_transaction.
+  # "thu nhập" is a product keyword here, mirroring "tài sản" (action_add_asset)
+  # and "mục tiêu" (action_add_goal).
+  # Every pattern carries a trailing-digit negative lookahead `(?!.*\d)` so
+  # amount-bearing phrases ("thêm thu nhập 20tr", "ghi thu nhập 20tr vào ví
+  # momo") fall through to action_quick_transaction (a money-in log) instead
+  # of opening the add-stream wizard. Only amountless "add a source" requests
+  # match here.
+  patterns:
+    # "thêm thu nhập" / "tạo thu nhập mới" / "thêm nguồn thu nhập"
+    - pattern: '^(?:them|tao|nhap|ghi|moi)\s+(?:moi\s+)?(?:nguon\s+)?thu\s*nhap\b(?!.*\d)'
+      confidence: 0.95
+    # "thu nhập mới" / "nguồn thu nhập mới"
+    - pattern: '^(?:nguon\s+)?thu\s*nhap\s+moi\b(?!.*\d)'
+      confidence: 0.92
+    # "thêm lương" — salary is the dominant stream type. The trailing-digit
+    # guard keeps "thêm lương 20tr" routed to a quick log.
+    - pattern: '^(?:them|tao|nhap)\s+(?:moi\s+)?luong\b(?!.*\d)'
+      confidence: 0.9
+
 nav_expense_dashboard:
   description: "User wants to open the Expense Dashboard miniapp."
   patterns:
@@ -556,3 +599,35 @@ query_twin:
       confidence: 0.95
     - pattern: "\b(10 nam toi|nam 2036|tai san tuong lai)\b"
       confidence: 0.86
+
+query_credit_card_debt:
+  description: "User asks to see outstanding balances across their credit cards."
+  # Each pattern is guarded with a negative lookahead that rejects any input
+  # containing a money amount (e.g. "10tr", "500k", "1 tỷ"). This prevents
+  # repayment transactions like "trả nợ thẻ tín dụng 10tr" from being routed
+  # to the read-only debt summary — they must reach action_quick_transaction.
+  patterns:
+    # "dư nợ tín dụng" / "du no tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+tin\s*dung'
+      confidence: 0.96
+    # "dư nợ thẻ tín dụng" / "du no the tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+(?:the\s+)?tin\s*dung'
+      confidence: 0.96
+    # "dư nợ thẻ" — short form when context is clear
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*du\s*no\s+the(?:\s|$)'
+      confidence: 0.9
+    # "nợ tín dụng" / "no tin dung"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b)no\s+tin\s*dung'
+      confidence: 0.9
+    # "nợ thẻ tín dụng"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*no\s+the\s+tin\s*dung'
+      confidence: 0.92
+    # "thẻ tín dụng nợ bao nhiêu"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*the\s+tin\s*dung.*no\s+bao\s*nhieu'
+      confidence: 0.93
+    # "nợ thẻ bao nhiêu"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*no\s+the.*bao\s*nhieu'
+      confidence: 0.88
+    # English fallback: "credit card debt", "credit card balance"
+    - pattern: '^(?!.*\b\d+(?:[.,]\d+)?\s*(?:k|tr|trieu|ty|nghin|ngan|m|vnd|vnđ|d)\b).*credit\s+card\s+(?:debt|balance|owe)'
+      confidence: 0.92

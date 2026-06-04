@@ -49,6 +49,7 @@ READ_INTENTS = frozenset(
         IntentType.QUERY_MARKET,
         IntentType.QUERY_GOALS,
         IntentType.QUERY_GOAL_PROGRESS,
+        IntentType.QUERY_CREDIT_CARD_DEBT,
     }
 )
 
@@ -60,6 +61,7 @@ WRITE_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
     }
 )
 
@@ -72,6 +74,7 @@ _WIZARD_LAUNCHING_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
@@ -92,6 +95,7 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.ACTION_EDIT_ASSET,
         IntentType.ACTION_DELETE_ASSET,
         IntentType.ACTION_ADD_GOAL,
+        IntentType.ACTION_ADD_INCOME,
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
@@ -403,6 +407,12 @@ class IntentDispatcher:
             )
 
             return QueryGoalProgressHandler()
+        if intent == IntentType.QUERY_CREDIT_CARD_DEBT:
+            from backend.intent.handlers.query_credit_card_debt import (
+                QueryCreditCardDebtHandler,
+            )
+
+            return QueryCreditCardDebtHandler()
         if intent == IntentType.ADVISORY:
             from backend.intent.handlers.advisory import AdvisoryHandler
 
@@ -431,6 +441,12 @@ class IntentDispatcher:
             )
 
             return ActionAddGoalHandler()
+        if intent == IntentType.ACTION_ADD_INCOME:
+            from backend.intent.handlers.action_add_income import (
+                ActionAddIncomeHandler,
+            )
+
+            return ActionAddIncomeHandler()
         if intent == IntentType.NAV_EXPENSE_DASHBOARD:
             from backend.intent.handlers.nav_expense_dashboard import (
                 NavExpenseDashboardHandler,

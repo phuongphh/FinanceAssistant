@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import pytest
 
+from backend.config.categories import get_all_categories
 from backend.intent.follow_up import (
     CALLBACK_PREFIX,
     MAX_SUGGESTIONS,
     FollowUp,
+    build_category_picker_keyboard,
     build_inline_keyboard,
     get_follow_ups,
+    is_category_picker_callback,
     parse_callback_data,
 )
 from backend.intent.intents import IntentType
@@ -66,7 +69,7 @@ def test_hnw_sees_advanced_overrides():
         IntentType.QUERY_NET_WORTH, wealth_level=WealthLevel.HIGH_NET_WORTH
     )
     labels = " ".join(fu.label for fu in fus).lower()
-    assert "trend" in labels or "phân bổ" in labels
+    assert "xu hướng" in labels or "phân bổ" in labels
 
 
 def test_callback_round_trips_intent_and_params():
@@ -105,7 +108,7 @@ def test_gold_market_follow_up_routes_portfolio_to_gold_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục vàng"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "gold"}
 
@@ -122,7 +125,7 @@ def test_crypto_market_follow_up_routes_portfolio_to_crypto_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục tiền số"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "crypto"}
 
@@ -134,7 +137,7 @@ def test_stock_market_follow_up_routes_portfolio_to_stock_assets():
         avoid_intent=IntentType.QUERY_MARKET,
     )
 
-    assert fus[0].label == "💼 Portfolio của tôi"
+    assert fus[0].label == "💼 Danh mục cổ phiếu"
     assert fus[0].intent == IntentType.QUERY_PORTFOLIO
     assert fus[0].parameters == {"asset_type": "stock"}
 
@@ -191,3 +194,383 @@ def test_assets_follow_up_has_ytd_button_for_all_wealth_levels(level):
     ytd_button = next(f for f in fus if "YTD - Tài sản từ đầu năm đến nay" in f.label)
     assert ytd_button.intent == IntentType.QUERY_NET_WORTH
     assert ytd_button.parameters == {"time_range": "ytd"}
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_assets_follow_up_never_offers_plain_total_net_worth(level):
+    """The "Tổng net worth" / "Net worth tổng" plain shortcut was removed —
+    it duplicated the asset-list headline and confused users with a delta
+    computed on a rolling-30-day baseline. The two delta-aware buttons
+    (YTD and So với tháng trước) replace it across every wealth level."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(IntentType.QUERY_ASSETS, **kwargs)
+    for fu in fus:
+        # No bare net-worth headline button (i.e. QUERY_NET_WORTH with no
+        # time_range parameter) should appear in the assets follow-ups.
+        if fu.intent == IntentType.QUERY_NET_WORTH:
+            assert fu.parameters and "time_range" in fu.parameters
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_month_vs_previous_view_shows_only_goals_cta(level):
+    """The ⚖️ comparison surface keeps a single, focused next-step:
+    "🎯 Mục tiêu của tôi". Trend / Portfolio buttons are suppressed so
+    the user isn't pulled back into another net-worth view right after
+    seeing the delta."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(
+        IntentType.QUERY_NET_WORTH,
+        parameters={"time_range": "month_vs_previous"},
+        avoid_intent=IntentType.QUERY_NET_WORTH,
+        **kwargs,
+    )
+    assert len(fus) == 1
+    assert fus[0].intent == IntentType.QUERY_GOALS
+    assert "Mục tiêu" in fus[0].label
+    # No Portfolio button — explicit per UX requirement.
+    assert all(f.intent != IntentType.QUERY_PORTFOLIO for f in fus)
+
+
+def test_net_worth_follow_ups_unaffected_when_no_time_range():
+    """Sanity: the override only kicks in for month_vs_previous —
+    the default net-worth view still gets its rich pool."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH)
+    assert len(fus) > 1
+
+
+@pytest.mark.parametrize("level", [
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_net_worth_view_no_longer_offers_portfolio_analytics_label(level):
+    """The "💼 Portfolio analytics" shortcut was removed across HNW/VIP.
+    It routed to the same QUERY_PORTFOLIO surface as the base
+    "💼 Portfolio của tôi" button, so it duplicated the entry-point."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH, wealth_level=level)
+    for fu in fus:
+        assert "Portfolio analytics" not in fu.label
+
+
+# ---------------------------------------------------------------------------
+# Category picker (Story: "Theo loại" → choose category → filtered report)
+# ---------------------------------------------------------------------------
+
+
+def test_category_picker_keyboard_has_all_13_categories():
+    kb = build_category_picker_keyboard()
+    assert "inline_keyboard" in kb
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    cats = get_all_categories()
+    assert len(flat) == len(cats)
+    # Every category label (emoji + name) appears once.
+    labels = {btn["text"] for btn in flat}
+    for cat in cats:
+        assert f"{cat.emoji} {cat.name_vi}" in labels
+
+
+def test_category_picker_uses_two_column_layout():
+    kb = build_category_picker_keyboard()
+    rows = kb["inline_keyboard"]
+    # All but possibly the last row carry two buttons.
+    for row in rows[:-1]:
+        assert len(row) == 2
+    assert 1 <= len(rows[-1]) <= 2
+
+
+def test_category_picker_preserves_time_range():
+    kb = build_category_picker_keyboard(time_range="this_week")
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        assert parsed is not None
+        assert parsed.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+        assert parsed.parameters is not None
+        assert parsed.parameters.get("time_range") == "this_week"
+        assert "category" in parsed.parameters
+
+
+def test_category_picker_omits_time_range_when_none():
+    kb = build_category_picker_keyboard()
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        assert parsed is not None
+        params = parsed.parameters or {}
+        assert "time_range" not in params
+        assert "category" in params
+
+
+@pytest.mark.parametrize("time_range", [None, "this_week", "this_month", "last_month"])
+def test_category_picker_button_callback_under_64_bytes(time_range):
+    """Every picker button payload must fit Telegram's 64-byte cap for the
+    time_range values an expense report actually uses."""
+    kb = build_category_picker_keyboard(time_range=time_range)
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        assert len(btn["callback_data"].encode()) <= 64
+
+
+def test_is_category_picker_callback_true_when_no_category():
+    parsed = FollowUp(label="", intent=IntentType.QUERY_EXPENSES_BY_CATEGORY)
+    assert is_category_picker_callback(parsed) is True
+
+
+def test_is_category_picker_callback_true_when_only_time_range():
+    parsed = FollowUp(
+        label="",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"time_range": "this_week"},
+    )
+    assert is_category_picker_callback(parsed) is True
+
+
+def test_is_category_picker_callback_false_when_category_set():
+    parsed = FollowUp(
+        label="",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"category": "transport"},
+    )
+    assert is_category_picker_callback(parsed) is False
+
+
+def test_is_category_picker_callback_false_for_other_intents():
+    parsed = FollowUp(label="", intent=IntentType.QUERY_EXPENSES)
+    assert is_category_picker_callback(parsed) is False
+    assert is_category_picker_callback(None) is False
+
+
+def test_query_expenses_follow_up_has_theo_loai_button():
+    fus = get_follow_ups(IntentType.QUERY_EXPENSES)
+    labels = [fu.label for fu in fus]
+    assert any("Theo loại" in label for label in labels)
+
+
+def test_query_expenses_follow_up_propagates_time_range_to_picker():
+    """When the parent report is "tuần này", the picker button must carry
+    that time_range so the wizard preserves the period."""
+    fus = get_follow_ups(
+        IntentType.QUERY_EXPENSES, parameters={"time_range": "this_week"}
+    )
+    picker = next(f for f in fus if "Theo loại" in f.label)
+    assert picker.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert picker.parameters == {"time_range": "this_week"}
+    # And the picker button itself stays in picker mode (no category).
+    assert is_category_picker_callback(picker) is True
+
+
+def test_query_expenses_picker_has_no_params_when_no_time_range():
+    fus = get_follow_ups(IntentType.QUERY_EXPENSES)
+    picker = next(f for f in fus if "Theo loại" in f.label)
+    assert picker.parameters is None
+
+
+def test_query_expenses_by_category_injects_loai_khac_with_time_range():
+    fus = get_follow_ups(
+        IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"time_range": "this_week", "category": "food"},
+    )
+    loai_khac = next(f for f in fus if "Loại khác" in f.label)
+    assert loai_khac.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert loai_khac.parameters == {"time_range": "this_week"}
+    # "Loại khác" is itself a picker (no category) so tapping it re-shows
+    # the picker keyboard for the same period.
+    assert is_category_picker_callback(loai_khac) is True
+
+
+@pytest.mark.parametrize(
+    "category_code",
+    [c.code for c in get_all_categories()],
+)
+def test_category_picker_button_round_trip_for_every_category(category_code):
+    """Every category button decodes back to the exact same category +
+    time_range — guards against subtle base64/JSON drift."""
+    kb = build_category_picker_keyboard(time_range="this_month")
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    # Find the button matching this category.
+    match = None
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        if parsed and (parsed.parameters or {}).get("category") == category_code:
+            match = parsed
+            break
+    assert match is not None, f"Category {category_code} missing from picker"
+    assert match.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert match.parameters == {"category": category_code, "time_range": "this_month"}
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_month_vs_previous_view_excludes_portfolio_analytics(level):
+    """The month_vs_previous comparison surface must not surface any
+    portfolio button (analytics label or otherwise). It's a focused,
+    single-CTA view that hands off to goals."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(
+        IntentType.QUERY_NET_WORTH,
+        parameters={"time_range": "month_vs_previous"},
+        avoid_intent=IntentType.QUERY_NET_WORTH,
+        **kwargs,
+    )
+    for fu in fus:
+        assert fu.intent != IntentType.QUERY_PORTFOLIO
+        assert "Portfolio" not in fu.label
+
+
+# ---------------------------------------------------------------------------
+# Vietnamese-only label guard
+# ---------------------------------------------------------------------------
+
+# Read-intents whose follow-up pools are surfaced to the user. We iterate
+# every wealth level (plus the unset case) and every dynamic market
+# category to exhaust the label surface.
+_READ_INTENTS_FOR_VI_AUDIT = [
+    IntentType.QUERY_ASSETS,
+    IntentType.QUERY_NET_WORTH,
+    IntentType.QUERY_PORTFOLIO,
+    IntentType.QUERY_EXPENSES,
+    IntentType.QUERY_EXPENSES_BY_CATEGORY,
+    IntentType.QUERY_INCOME,
+    IntentType.QUERY_CASHFLOW,
+    IntentType.QUERY_MARKET,
+    IntentType.QUERY_GOALS,
+    IntentType.QUERY_GOAL_PROGRESS,
+]
+
+_WEALTH_LEVELS_FOR_VI_AUDIT = [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.YOUNG_PROFESSIONAL,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+]
+
+# Words that must never appear in user-visible button labels — they are
+# English/finance jargon that the product copy explicitly forbids.
+_FORBIDDEN_LABEL_SUBSTRINGS = (
+    "Net worth",
+    "net worth",
+    "Portfolio",
+    "portfolio",
+    "Cashflow",
+    "cashflow",
+    "Trend",
+    "trend",
+)
+
+
+def _iter_all_follow_up_labels():
+    for intent in _READ_INTENTS_FOR_VI_AUDIT:
+        for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+            kwargs = {} if level is None else {"wealth_level": level}
+            for fu in get_follow_ups(intent, **kwargs):
+                yield (intent, level, fu.label)
+
+    # Dynamic market category branch — produces context-aware labels.
+    for category in ("stock", "stocks", "crypto", "gold"):
+        for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+            kwargs = {} if level is None else {"wealth_level": level}
+            for fu in get_follow_ups(
+                IntentType.QUERY_MARKET,
+                parameters={"category": category},
+                **kwargs,
+            ):
+                yield (IntentType.QUERY_MARKET, level, fu.label)
+
+    # The focused month_vs_previous comparison surface.
+    for level in _WEALTH_LEVELS_FOR_VI_AUDIT:
+        kwargs = {} if level is None else {"wealth_level": level}
+        for fu in get_follow_ups(
+            IntentType.QUERY_NET_WORTH,
+            parameters={"time_range": "month_vs_previous"},
+            avoid_intent=IntentType.QUERY_NET_WORTH,
+            **kwargs,
+        ):
+            yield (IntentType.QUERY_NET_WORTH, level, fu.label)
+
+
+def test_all_follow_up_labels_are_vietnamese():
+    """Every user-visible follow-up label must be Vietnamese.
+
+    Guard against regressions where English finance jargon ("Net worth",
+    "Portfolio", "Cashflow", "Trend") leaks back into button copy. The
+    product rule is that Bé Tiền speaks Vietnamese to the user — these
+    English terms have canonical Vietnamese equivalents and the labels
+    must use them.
+    """
+    violations: list[tuple[IntentType, object, str, str]] = []
+    for intent, level, label in _iter_all_follow_up_labels():
+        for banned in _FORBIDDEN_LABEL_SUBSTRINGS:
+            if banned in label:
+                violations.append((intent, level, label, banned))
+    assert not violations, (
+        "Found non-Vietnamese tokens in follow-up labels:\n"
+        + "\n".join(
+            f"  - intent={i.value} level={lv} label={lbl!r} banned={b!r}"
+            for i, lv, lbl, b in violations
+        )
+    )
+
+
+def test_net_worth_view_uses_tong_tai_san_label():
+    """`Net worth` must surface as `Tổng tài sản` across the read-intent
+    pools that link back to the headline net-worth view."""
+    seen_labels: set[str] = set()
+    for intent in (
+        IntentType.QUERY_PORTFOLIO,
+        IntentType.QUERY_MARKET,
+        IntentType.QUERY_GOALS,
+    ):
+        for fu in get_follow_ups(intent):
+            if fu.intent == IntentType.QUERY_NET_WORTH and not fu.parameters:
+                seen_labels.add(fu.label)
+    assert seen_labels, "Expected at least one net-worth follow-up entry"
+    for label in seen_labels:
+        assert "Tổng tài sản" in label, label
+
+
+def test_portfolio_entry_uses_danh_muc_co_phieu_label():
+    """`Portfolio của tôi` must surface as `Danh mục cổ phiếu` on the
+    net-worth view (where there's no asset_type context)."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH)
+    portfolio_buttons = [f for f in fus if f.intent == IntentType.QUERY_PORTFOLIO]
+    assert portfolio_buttons, "Expected a portfolio follow-up on net-worth view"
+    for fu in portfolio_buttons:
+        assert "Danh mục cổ phiếu" in fu.label, fu.label
+
+
+@pytest.mark.parametrize(
+    "category,expected_label",
+    [
+        ("stocks", "💼 Danh mục cổ phiếu"),
+        ("stock", "💼 Danh mục cổ phiếu"),
+        ("crypto", "💼 Danh mục tiền số"),
+        ("gold", "💼 Danh mục vàng"),
+    ],
+)
+def test_market_portfolio_label_is_category_specific(category, expected_label):
+    """The dynamic market-portfolio button names the actual asset class
+    rather than the generic English `Portfolio`."""
+    fus = get_follow_ups(
+        IntentType.QUERY_MARKET,
+        parameters={"category": category},
+        avoid_intent=IntentType.QUERY_MARKET,
+    )
+    assert fus[0].label == expected_label

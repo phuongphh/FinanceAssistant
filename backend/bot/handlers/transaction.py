@@ -53,19 +53,25 @@ async def send_transaction_confirmation(
     if not user or not user.telegram_id:
         return
 
-    is_expense = expense.transaction_type == "expense"
+    # Both expense and money-in get the rich card: source label + 4 edit
+    # buttons + edit hint. Daily budget context stays expense-only.
+    tx_type = expense.transaction_type or "expense"
+    is_card_type = tx_type in ("expense", "money_in")
+    is_expense = tx_type == "expense"
     source_label = (
-        await resolve_source_label_for_expense(db, expense) if is_expense else None
+        await resolve_source_label_for_expense(db, expense) if is_card_type else None
     )
     text = format_transaction_confirmation(
         merchant=expense.merchant or expense.note or "Giao dịch",
         amount=float(expense.amount),
         category_code=_normalize_category(expense.category),
         time=expense.created_at,
-        daily_spent=daily_spent,
-        daily_budget=daily_budget,
+        daily_spent=daily_spent if is_expense else None,
+        daily_budget=daily_budget if is_expense else None,
         source_label=source_label,
-        show_edit_hint=is_expense,
+        show_edit_hint=is_card_type,
+        transaction_type=tx_type,
+        expense_date=expense.expense_date,
     )
     reply_markup = transaction_actions_keyboard(str(expense.id))
     await send_message(
@@ -120,6 +126,12 @@ async def send_transaction_batch_confirmation(
         if len(unique) == 1 and len(labels) == len(expenses):
             source_label = next(iter(unique))
 
+    # Batch items can technically be on different days (rare — usually a
+    # single ``ngày dd/mm`` covers the whole message); only surface the
+    # date row when every item agrees AND it isn't today.
+    batch_dates = {expense.expense_date for expense in expenses}
+    batch_date = batch_dates.pop() if len(batch_dates) == 1 else None
+
     text = format_transaction_batch_confirmation(
         items=[
             (
@@ -132,6 +144,7 @@ async def send_transaction_batch_confirmation(
         time=max((expense.created_at for expense in expenses), default=None),
         source_label=source_label,
         show_edit_hint=all_expense,
+        expense_date=batch_date,
     )
     reply_markup = (
         None if all_expense else transaction_batch_actions_keyboard(batch_id)

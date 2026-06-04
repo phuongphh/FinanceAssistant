@@ -26,6 +26,7 @@ import logging
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from dataclasses import dataclass
 
+from backend.config.categories import get_all_categories
 from backend.intent.intents import IntentType
 from backend.wealth.ladder import WealthLevel
 
@@ -57,6 +58,19 @@ _INTENT_TO_CODE: dict[IntentType, str] = {
 _CODE_TO_INTENT: dict[str, IntentType] = {v: k for k, v in _INTENT_TO_CODE.items()}
 
 
+# Parameter-key abbreviations for the callback wire format. Telegram caps
+# callback_data at 64 bytes; long JSON keys like ``"time_range"`` together
+# with a category code blow past that cap once base64-encoded. We shorten
+# only on the wire — handlers see the full key names after parsing.
+_PARAM_KEY_TO_CODE: dict[str, str] = {
+    "category": "c",
+    "time_range": "t",
+    "asset_type": "a",
+    "trend_days": "d",
+}
+_CODE_TO_PARAM_KEY: dict[str, str] = {v: k for k, v in _PARAM_KEY_TO_CODE.items()}
+
+
 @dataclass(frozen=True)
 class FollowUp:
     """One follow-up suggestion — label + the intent it triggers."""
@@ -77,9 +91,12 @@ class FollowUp:
         code = _INTENT_TO_CODE.get(self.intent, self.intent.value[:8])
         if not self.parameters:
             return f"{CALLBACK_PREFIX}{code}"
+        wire_params = {
+            _PARAM_KEY_TO_CODE.get(k, k): v for k, v in self.parameters.items()
+        }
         encoded = (
             urlsafe_b64encode(
-                json.dumps(self.parameters, separators=(",", ":")).encode()
+                json.dumps(wire_params, separators=(",", ":")).encode()
             )
             .decode()
             .rstrip("=")
@@ -96,22 +113,22 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH, {"time_range": "month_vs_previous"}),
         FollowUp("🏠 Chỉ BĐS", IntentType.QUERY_ASSETS, {"asset_type": "real_estate"}),
-        FollowUp("💎 Tổng net worth", IntentType.QUERY_NET_WORTH),
         FollowUp("📈 Cổ phiếu", IntentType.QUERY_PORTFOLIO),
     ),
     IntentType.QUERY_NET_WORTH: (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio của tôi", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
+        FollowUp("💼 Danh mục cổ phiếu", IntentType.QUERY_PORTFOLIO),
         FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS),
     ),
     IntentType.QUERY_PORTFOLIO: (
-        FollowUp("💼 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("💼 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("📊 Xem mã khác", IntentType.QUERY_MARKET),
         FollowUp("📊 Tài sản chi tiết", IntentType.QUERY_ASSETS),
     ),
     IntentType.QUERY_EXPENSES: (
         FollowUp("📅 Tuần này", IntentType.QUERY_EXPENSES, {"time_range": "this_week"}),
-        FollowUp("🍕 Theo loại", IntentType.QUERY_EXPENSES_BY_CATEGORY),
+        # "🍕 Theo loại" is injected dynamically in ``get_follow_ups`` so it
+        # carries the parent report's ``time_range``.
         FollowUp(
             "📊 So sánh tháng trước",
             IntentType.QUERY_EXPENSES,
@@ -123,10 +140,11 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
             "📅 Tháng trước", IntentType.QUERY_EXPENSES, {"time_range": "last_month"}
         ),
         FollowUp("📊 Tổng chi tiêu", IntentType.QUERY_EXPENSES),
-        FollowUp("🍕 Loại khác", IntentType.QUERY_EXPENSES_BY_CATEGORY),
+        # "🍕 Loại khác" is injected dynamically in ``get_follow_ups`` so it
+        # preserves the current ``time_range`` into the picker.
     ),
     IntentType.QUERY_INCOME: (
-        FollowUp("💸 Cashflow tháng này", IntentType.QUERY_CASHFLOW),
+        FollowUp("💸 Dòng tiền tháng này", IntentType.QUERY_CASHFLOW),
         FollowUp("📊 Chi tiêu tháng này", IntentType.QUERY_EXPENSES),
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
@@ -136,19 +154,19 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("🎯 Mục tiêu", IntentType.QUERY_GOALS),
     ),
     IntentType.QUERY_MARKET: (
-        FollowUp("💼 Portfolio của tôi", IntentType.QUERY_PORTFOLIO),
-        FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("💼 Danh mục cổ phiếu", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("💎 Tài sản chi tiết", IntentType.QUERY_ASSETS),
     ),
     IntentType.QUERY_GOALS: (
-        FollowUp("📊 Net worth", IntentType.QUERY_NET_WORTH),
+        FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
         FollowUp("💼 Thu nhập", IntentType.QUERY_INCOME),
         FollowUp("💸 Chi tiêu tháng", IntentType.QUERY_EXPENSES),
     ),
     IntentType.QUERY_GOAL_PROGRESS: (
         FollowUp("📋 Tất cả mục tiêu", IntentType.QUERY_GOALS),
         FollowUp("💼 Thu nhập", IntentType.QUERY_INCOME),
-        FollowUp("💸 Cashflow tháng", IntentType.QUERY_CASHFLOW),
+        FollowUp("💸 Dòng tiền tháng", IntentType.QUERY_CASHFLOW),
     ),
 }
 
@@ -159,7 +177,7 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     (IntentType.QUERY_ASSETS, WealthLevel.STARTER): (
         FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
-        FollowUp("💎 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH, {"time_range": "month_vs_previous"}),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.STARTER): (
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
@@ -169,15 +187,17 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     # already leads with the YTD button, then "So với tháng trước" and a
     # BĐS filter — the right analytics-first surface for these levels.
     # (The "Portfolio detail" button + flow was removed by request.)
+    # HNW / VIP previously surfaced a dedicated "💼 Portfolio analytics"
+    # button on the net-worth view. It was removed by product request — the
+    # analytics shortcut routed to the same QUERY_PORTFOLIO surface as the
+    # base "💼 Danh mục cổ phiếu" button, so it added a second portfolio
+    # entry-point without adding information. Trend remains as the
+    # HNW-flavored override; portfolio + goals come from the base pool.
     (IntentType.QUERY_NET_WORTH, WealthLevel.HIGH_NET_WORTH): (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
     ),
-    # Đỉnh Cao (VIP) gets the same analytics-first surface as HNW —
-    # the persona/copy difference lives in prompts, not in follow-ups.
     (IntentType.QUERY_NET_WORTH, WealthLevel.VIP): (
-        FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
+        FollowUp("📈 Xu hướng 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
     ),
 }
 
@@ -198,18 +218,66 @@ def get_follow_ups(
     intents such as market queries keep follow-ups context-aware without
     adding another DB roundtrip.
     """
+    params = parameters or {}
+
+    # The "📈 So với tháng trước" comparison view is a focused, single-
+    # purpose surface: the user has just compared this-month vs last-month
+    # net worth. Generic net-worth follow-ups ("Trend 6 tháng",
+    # "Portfolio của tôi", "Portfolio analytics") would either repeat the
+    # same number or dilute the next-step CTA. By design we surface only
+    # the goal-progress hand-off — the natural next question after a
+    # delta is "am I still on track for my goals?".
+    if (
+        intent == IntentType.QUERY_NET_WORTH
+        and params.get("time_range") == "month_vs_previous"
+    ):
+        return [FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS)]
+
     pool: list[FollowUp] = []
-    category = str((parameters or {}).get("category") or "").lower()
+    # Inject the "🍕 Theo loại" picker dynamically so it carries the parent
+    # report's ``time_range``. Without this the picker would default back to
+    # "tháng này" even when the user is currently viewing e.g. "tuần này".
+    # "🍕 Loại khác" plays the same role on the category-filtered surface.
+    if intent == IntentType.QUERY_EXPENSES:
+        picker_params: dict | None = None
+        parent_tr = params.get("time_range")
+        if parent_tr:
+            picker_params = {"time_range": parent_tr}
+        pool.append(
+            FollowUp(
+                "🍕 Theo loại",
+                IntentType.QUERY_EXPENSES_BY_CATEGORY,
+                picker_params,
+            )
+        )
+    elif intent == IntentType.QUERY_EXPENSES_BY_CATEGORY:
+        picker_params = None
+        parent_tr = params.get("time_range")
+        if parent_tr:
+            picker_params = {"time_range": parent_tr}
+        pool.append(
+            FollowUp(
+                "🍕 Loại khác",
+                IntentType.QUERY_EXPENSES_BY_CATEGORY,
+                picker_params,
+            )
+        )
+    category = str(params.get("category") or "").lower()
     if intent == IntentType.QUERY_MARKET and category in {"stock", "stocks", "crypto", "gold"}:
         asset_type = "stock" if category in {"stock", "stocks"} else category
+        portfolio_label = {
+            "stock": "💼 Danh mục cổ phiếu",
+            "crypto": "💼 Danh mục tiền số",
+            "gold": "💼 Danh mục vàng",
+        }[asset_type]
         pool.extend(
             (
                 FollowUp(
-                    "💼 Portfolio của tôi",
+                    portfolio_label,
                     IntentType.QUERY_PORTFOLIO,
                     {"asset_type": asset_type},
                 ),
-                FollowUp("📊 Net worth tổng", IntentType.QUERY_NET_WORTH),
+                FollowUp("📊 Tổng tài sản", IntentType.QUERY_NET_WORTH),
                 FollowUp(
                     "💎 Tài sản chi tiết",
                     IntentType.QUERY_ASSETS,
@@ -287,6 +355,10 @@ def parse_callback_data(callback_data: str) -> FollowUp | None:
             params = json.loads(raw)
             if not isinstance(params, dict):
                 params = None
+            else:
+                params = {
+                    _CODE_TO_PARAM_KEY.get(k, k): v for k, v in params.items()
+                }
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
             logger.debug("Bad follow-up params: %r", callback_data)
             return None
@@ -294,11 +366,55 @@ def parse_callback_data(callback_data: str) -> FollowUp | None:
     return FollowUp(label="", intent=intent, parameters=params or None)
 
 
+def build_category_picker_keyboard(time_range: str | None = None) -> dict:
+    """Inline keyboard listing every spending category as a follow-up.
+
+    Tapped when the user selects "🍕 Theo loại" on a spending report — each
+    button re-dispatches ``QUERY_EXPENSES_BY_CATEGORY`` with the chosen
+    ``category`` (and the preserved ``time_range`` so the filter applies to
+    the same period as the original report).
+
+    Two columns to keep the keyboard compact on mobile.
+    """
+    buttons: list[list[dict]] = []
+    row: list[dict] = []
+    for cat in get_all_categories():
+        params: dict = {"category": cat.code}
+        if time_range:
+            params["time_range"] = time_range
+        fu = FollowUp(
+            label=f"{cat.emoji} {cat.name_vi}",
+            intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+            parameters=params,
+        )
+        row.append({"text": fu.label, "callback_data": fu.to_callback_data()})
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    return {"inline_keyboard": buttons}
+
+
+def is_category_picker_callback(parsed: FollowUp | None) -> bool:
+    """True when a parsed follow-up callback should trigger the category
+    picker rather than dispatching the handler — i.e. the user tapped
+    "🍕 Theo loại" without choosing a category yet."""
+    if parsed is None:
+        return False
+    if parsed.intent != IntentType.QUERY_EXPENSES_BY_CATEGORY:
+        return False
+    params = parsed.parameters or {}
+    return not params.get("category")
+
+
 __all__ = [
     "CALLBACK_PREFIX",
     "FollowUp",
     "MAX_SUGGESTIONS",
+    "build_category_picker_keyboard",
     "build_inline_keyboard",
     "get_follow_ups",
+    "is_category_picker_callback",
     "parse_callback_data",
 ]

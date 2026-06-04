@@ -275,6 +275,14 @@ class TestFormatSubmenu:
         assert "💎 Tỷ lệ tiết kiệm" not in labels
         assert "menu:cashflow:saving_rate" not in callbacks
 
+    def test_expenses_submenu_removes_money_in_button(self):
+        _, kb = format_submenu(_user("Phương"), "expenses")
+        labels = [row[0]["text"] for row in kb["inline_keyboard"]]
+        callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
+
+        assert "💚 Tiền vào" not in labels
+        assert callbacks.count("menu:expenses:manage") == 1
+
     def test_expenses_submenu_has_credit_card_button(self):
         _, kb = format_submenu(_user("Phương"), "expenses")
         callbacks = [row[0]["callback_data"] for row in kb["inline_keyboard"]]
@@ -1363,8 +1371,8 @@ class TestNetWorthFastPath:
         assert "Tổng tài sản của An" in sent["text"]
         assert "500,000,000" in sent["text"]
         assert (
-            "Tài sản của bạn đã được Bé Tiền cập nhật dựa trên giá trị mới nhất "
-            "của thị trường chứng khoán, vàng và tiền số"
+            "Bé Tiền đã cập nhật tài sản của bạn theo giá mới nhất mình có "
+            "từ chứng khoán, vàng và tiền số rồi nhé"
         ) in sent["text"]
         assert "Đây là ảnh" not in sent["text"]
         assert "tháng trước" not in sent["text"]

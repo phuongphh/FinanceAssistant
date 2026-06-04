@@ -9,7 +9,7 @@ message as typing "So sánh tài sản của tôi so với tháng trước".
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,11 +47,15 @@ class QueryNetWorthHandler(IntentHandler):
         level = detect_level(breakdown.total)
         style = style_for_level(level, breakdown.total)
 
-        change = await net_worth_calculator.calculate_change_from_current(
+        # Anchor the baseline to the end of the previous calendar month so
+        # the standalone "so với tháng trước" delta matches the ⚖️ comparison
+        # view the asset-list follow-up renders. Using a rolling 30-day
+        # window here would drift across month boundaries and produce a
+        # different number than the comparison the user sees one tap later.
+        change = await net_worth_calculator.calculate_change_vs_last_month_end_from_current(
             db,
             user.id,
             breakdown.total,
-            period=net_worth_calculator.PERIOD_MONTH,
         )
 
         name = user.display_name or "bạn"
@@ -131,12 +135,12 @@ class QueryNetWorthHandler(IntentHandler):
             )
             label_a = "Hiện tại"
         else:  # month_vs_previous
-            last_month_end = date.today().replace(day=1) - timedelta(days=1)
-            previous = await net_worth_calculator.calculate_historical(
-                db, user.id, last_month_end
+            change = await net_worth_calculator.calculate_change_vs_last_month_end_from_current(
+                db, user.id, current
             )
-            diff = current - previous
-            diff_pct = float(diff / previous * 100) if previous > 0 else 0.0
+            previous = change.previous
+            diff = change.change_absolute
+            diff_pct = change.change_percentage
             label_a = "Tháng này"
             label_b = "Tháng trước"
 

@@ -13,8 +13,10 @@ from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.report import MonthlyReport
 from backend.models.user import User
+from backend.config.categories import get_category
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.llm_service import call_llm
+from backend.wealth import income_types as _income_types
 from backend.wealth.asset_types import get_label
 from backend.wealth.ladder import WealthLevel, detect_level
 from backend.wealth.models.income_stream import IncomeStream
@@ -164,51 +166,55 @@ _LEVEL_LABEL_VI = {
 # budget-control framing — strategic CFO frame only.
 _LEVEL_GUIDANCE = {
     WealthLevel.STARTER: (
-        "Tone: ấm áp, khuyến khích, giáo dục, không jargon.\n"
-        "Focus: xây thói quen tiết kiệm, tránh comment khắc nghiệt về chi tiêu.\n"
-        "Tránh: dùng tỷ lệ % tài sản (chưa có ý nghĩa), advice phức tạp.\n"
-        "Closing: 1 hành động đơn giản tuần tới (vd: đặt mục tiêu nhỏ)."
+        "Tone: ấm áp, khuyến khích, giáo dục, không thuật ngữ chuyên ngành.\n"
+        "Trọng tâm: xây thói quen tiết kiệm, tránh phán xét khắc nghiệt về chi tiêu.\n"
+        "Tránh: dùng tỷ lệ % tài sản (chưa có ý nghĩa), gợi ý phức tạp.\n"
+        "Kết bài: 1 hành động đơn giản cho tuần tới (vd: đặt mục tiêu nhỏ)."
     ),
     WealthLevel.YOUNG_PROFESSIONAL: (
         "Tone: thân thiện, định hướng tăng trưởng.\n"
-        "Focus: saving rate, bắt đầu đầu tư, cân bằng chi tiêu vs đầu tư.\n"
-        "Tránh: portfolio analytics nặng (chưa đủ tài sản để có ý nghĩa).\n"
-        "Closing: 1 gợi ý growth-oriented (tăng tỷ lệ đầu tư, mở thêm income)."
+        "Trọng tâm: tỷ lệ tiết kiệm, bắt đầu đầu tư, cân bằng chi tiêu và đầu tư.\n"
+        "Tránh: phân tích danh mục nặng (chưa đủ tài sản để có ý nghĩa).\n"
+        "Kết bài: 1 gợi ý hướng đến tăng trưởng (tăng tỷ lệ đầu tư, mở thêm nguồn thu)."
     ),
     WealthLevel.MASS_AFFLUENT: (
-        "Tone: CFO-style, có data, ít cảm xúc.\n"
-        "Focus: allocation, diversification, cashflow optimization, "
-        "saving rate trong context net worth.\n"
-        "Frame chi tiêu theo % net worth (vd: 5tr ăn uống = 0.5% NW), "
-        "KHÔNG comment tuyệt đối '5tr là nhiều/ít'.\n"
-        "Closing: 1 action item mang tính chiến lược (rebalance, tăng "
-        "passive income, fill data gap)."
+        "Tone: Trợ lý Tài sản, có dữ liệu, ít cảm xúc.\n"
+        "Trọng tâm: phân bổ, đa dạng hoá, tối ưu dòng tiền, "
+        "tỷ lệ tiết kiệm trong bối cảnh tổng tài sản.\n"
+        "Khung chi tiêu theo % tổng tài sản (vd: 5tr ăn uống = 0.5% tổng tài sản), "
+        "KHÔNG nhận xét tuyệt đối '5tr là nhiều/ít'.\n"
+        "Kết bài: 1 hành động mang tính chiến lược (tái cân bằng, tăng "
+        "thu nhập thụ động, bổ sung dữ liệu còn thiếu)."
+        "\nNgôn ngữ: 100% tiếng Việt, không dùng thuật ngữ tiếng Anh."
     ),
     WealthLevel.HIGH_NET_WORTH: (
-        "Tone: Trợ lý Tài sản advisor, strategic, không 'nhắc nhở'.\n"
-        "Focus: portfolio allocation %, passive income coverage, "
-        "tỷ lệ chi tiêu / net worth, gaps trong data (passive income, "
-        "cổ tức, lãi BĐS chưa được ghi nhận).\n"
-        "TUYỆT ĐỐI tránh: comment tuyệt đối ('20tr là rất lớn'), "
+        "Tone: Trợ lý Tài sản chiến lược, không 'nhắc nhở' sinh viên.\n"
+        "Trọng tâm: tỷ trọng phân bổ danh mục %, mức bao phủ của thu nhập "
+        "thụ động, tỷ lệ chi tiêu / tổng tài sản, dữ liệu còn thiếu "
+        "(thu nhập thụ động, cổ tức, lãi cho thuê BĐS chưa được ghi nhận).\n"
+        "TUYỆT ĐỐI tránh: nhận xét tuyệt đối ('20tr là rất lớn'), "
         "câu nhắc cuối tháng kiểu 'để biết lời/lỗ', tone nhắc nhở "
         "sinh viên.\n"
-        "Frame mọi con số theo % tổng tài sản. Mục tiêu nhỏ (vd: "
-        "50tr mua xe) phải acknowledge là trivial vs net worth và "
-        "hỏi user có muốn allocate từ tài sản hiện có không.\n"
-        "Closing: action-oriented CFO prompt (review allocation, "
-        "log passive income, rebalance), KHÔNG 'để mình nhắc cuối tháng'."
+        "Khung mọi con số theo % tổng tài sản. Mục tiêu nhỏ (vd: "
+        "50tr mua xe) phải ghi nhận là không đáng kể so với tổng tài sản và "
+        "hỏi user có muốn phân bổ từ tài sản hiện có không.\n"
+        "Kết bài: 1 đề xuất hành động kiểu Trợ lý Tài sản (rà soát phân "
+        "bổ, ghi nhận thu nhập thụ động, tái cân bằng), KHÔNG 'để mình "
+        "nhắc cuối tháng'."
+        "\nNgôn ngữ: 100% tiếng Việt, không dùng thuật ngữ tiếng Anh."
     ),
     WealthLevel.VIP: (
-        "Tone: Trợ lý Tài sản cấp cao, strategic, ngắn gọn.\n"
-        "Focus: bảo toàn tài sản đa thế hệ, estate planning, "
-        "alternative investments, tax/legal structure, family-office "
-        "mindset, horizon 10+ năm.\n"
-        "TUYỆT ĐỐI tránh: cashflow/budget framing, comment tuyệt đối "
-        "về chi tiêu, tone nhắc nhở. Mục tiêu cá nhân nhỏ (xe, du "
-        "lịch) phải acknowledge là noise — không xếp vào weekly review.\n"
-        "Frame mọi con số theo % portfolio và risk to legacy.\n"
-        "Closing: 1 strategic prompt (rebalance, review trustee/family "
-        "structure, audit alternative allocations)."
+        "Tone: Trợ lý Tài sản cấp cao, chiến lược, ngắn gọn.\n"
+        "Trọng tâm: bảo toàn tài sản đa thế hệ, hoạch định thừa kế, "
+        "các kênh đầu tư thay thế, cấu trúc thuế/pháp lý, tư duy "
+        "văn phòng quản lý tài sản gia đình, tầm nhìn 10+ năm.\n"
+        "TUYỆT ĐỐI tránh: khung dòng tiền/ngân sách, nhận xét tuyệt "
+        "đối về chi tiêu, tone nhắc nhở. Mục tiêu cá nhân nhỏ (xe, du "
+        "lịch) phải ghi nhận là nhiễu — không xếp vào review hàng tuần.\n"
+        "Khung mọi con số theo % danh mục và rủi ro với tài sản kế thừa.\n"
+        "Kết bài: 1 đề xuất chiến lược (tái cân bằng, rà soát cấu trúc "
+        "người được uỷ thác / gia đình, kiểm tra phân bổ kênh thay thế)."
+        "\nNgôn ngữ: 100% tiếng Việt, không dùng thuật ngữ tiếng Anh."
     ),
 }
 
@@ -253,7 +259,7 @@ async def _build_wealth_context(
     income_total = sum((s.monthly_equivalent for s in streams), Decimal(0))
     if streams:
         income_lines = [
-            f"  • {s.name} ({s.stream_type}): "
+            f"  • {s.name} ({_income_types.get_label(s.stream_type)}): "
             f"{format_money_short(s.monthly_equivalent)}/tháng"
             for s in streams
         ]
@@ -262,7 +268,7 @@ async def _build_wealth_context(
             f"{len(streams)} nguồn:\n" + "\n".join(income_lines)
         )
     else:
-        income_str = "  (chưa khai báo income streams — gap đáng chú ý)"
+        income_str = "  (chưa khai báo nguồn thu nhập — dữ liệu còn thiếu đáng chú ý)"
 
     # Expense vs net worth ratio — only meaningful for Mass Affluent+.
     expense_pct_of_nw = None
@@ -299,37 +305,45 @@ def _build_report_prompt(report_context: str, wealth_ctx: dict) -> str:
     )
 
     return (
-        "Bạn là Trợ lý Tài sản — không phải finance app cho người mới đi làm.\n"
-        "Viết báo cáo tài chính tháng cho user Telegram dưới đây.\n\n"
-        "=== HỒ SƠ USER ===\n"
-        f"Wealth level: {wealth_ctx['level_label_vi']}\n"
+        "Bạn là Trợ lý Tài sản — không phải ứng dụng quản lý chi tiêu "
+        "cho người mới đi làm.\n"
+        "Viết báo cáo tài chính tháng cho người dùng Telegram dưới đây.\n\n"
+        "=== HỒ SƠ NGƯỜI DÙNG ===\n"
+        f"Phân khúc tài sản: {wealth_ctx['level_label_vi']}\n"
         f"Tổng tài sản: {wealth_ctx['net_worth_str']}\n"
         f"Số tài sản đang theo dõi: {wealth_ctx['asset_count']}\n"
         f"Phân bổ tài sản:\n{wealth_ctx['breakdown_str']}\n"
-        f"Income streams:\n{wealth_ctx['income_str']}\n"
+        f"Nguồn thu nhập:\n{wealth_ctx['income_str']}\n"
         f"Chi tiêu tháng / tổng tài sản: {expense_pct_str}\n\n"
-        "=== DATA THÁNG ===\n"
+        "=== DỮ LIỆU THÁNG ===\n"
         f"{report_context}\n\n"
-        "=== HƯỚNG DẪN VIẾT THEO LEVEL ===\n"
+        "=== HƯỚNG DẪN VIẾT THEO PHÂN KHÚC ===\n"
         f"{wealth_ctx['guidance']}\n\n"
         "=== YÊU CẦU OUTPUT ===\n"
-        "1. Dùng emoji phù hợp, format Telegram-friendly; viết đầy đủ ý, "
-        "không cắt câu giữa chừng.\n"
-        "2. Có 2 section: '✅ Điểm chính' (3-4 bullet) + "
-        "'💡 Lời khuyên' (2-3 bullet, action-oriented).\n"
+        "1. Dùng emoji phù hợp, định dạng thân thiện Telegram; viết đầy "
+        "đủ ý, không cắt câu giữa chừng.\n"
+        "2. Có 2 phần: '✅ Điểm chính' (3-4 gạch đầu dòng) + "
+        "'💡 Lời khuyên' (2-3 gạch đầu dòng, hướng tới hành động).\n"
         "2b. Độ dài mục tiêu: khoảng 180-260 từ để đủ ngữ cảnh, không "
         "quá ngắn.\n"
-        "3. Mọi nhận xét về số tiền PHẢI frame theo level: với Mass "
-        "Affluent / HNW, dùng % net worth thay vì comment tuyệt đối. "
-        "Với Starter / Young Prof, có thể comment tuyệt đối nhưng tone "
-        "khuyến khích.\n"
-        "4. Nếu data thiếu (income, passive income, asset chưa khai), "
-        "acknowledge với tone phù hợp level — KHÔNG generic 'chưa "
-        "khai báo'.\n"
-        "5. Closing: 1 câu CTA phù hợp level (xem hướng dẫn). KHÔNG "
-        "kết bằng 'để mình nhắc cuối tháng' với HNW user.\n"
-        "6. Nếu user có goal active, frame target amount vs net worth "
-        "(với HNW, 50tr là 0.04% NW → trivial, có thể allocate ngay)."
+        "3. Mọi nhận xét về số tiền PHẢI khung theo phân khúc: với "
+        "Khá giả / Giàu, dùng % tổng tài sản thay vì nhận xét tuyệt đối. "
+        "Với Khởi đầu / Trẻ đi làm, có thể nhận xét tuyệt đối nhưng "
+        "giọng văn khuyến khích.\n"
+        "4. Nếu dữ liệu còn thiếu (thu nhập, thu nhập thụ động, tài sản "
+        "chưa khai), ghi nhận với giọng văn phù hợp phân khúc — KHÔNG "
+        "dùng câu chung chung 'chưa khai báo'.\n"
+        "5. Kết bài: 1 câu kêu gọi hành động phù hợp phân khúc (xem "
+        "hướng dẫn). KHÔNG kết bằng 'để mình nhắc cuối tháng' với người "
+        "dùng phân khúc Giàu trở lên.\n"
+        "6. Nếu người dùng có mục tiêu đang theo dõi, khung số tiền mục "
+        "tiêu theo % tổng tài sản (với phân khúc Giàu, 50tr là 0.04% "
+        "tổng tài sản → không đáng kể, có thể trích từ tài sản hiện có).\n"
+        "\n=== NGÔN NGỮ ===\n"
+        "Toàn bộ báo cáo PHẢI 100% bằng tiếng Việt. Không dùng thuật "
+        "ngữ tiếng Anh (net worth → tổng tài sản, passive income → "
+        "thu nhập thụ động, cashflow → dòng tiền, allocate → phân bổ, "
+        "rebalance → tái cân bằng, saving rate → tỷ lệ tiết kiệm)."
     )
 
 
@@ -418,7 +432,7 @@ Thu nhập: {f'{monthly_income:,.0f} VND' if monthly_income else 'Chưa khai bá
 Tiết kiệm: {f'{savings_amount:,.0f} VND ({savings_rate}%)' if savings_amount is not None else 'N/A'}
 
 Chi tiết theo danh mục:
-{chr(10).join(f'  • {cat}: {amt:,.0f} VND' for cat, amt in sorted(breakdown.items(), key=lambda x: -x[1]))}
+{chr(10).join(f'  • {get_category(cat).name_vi}: {amt:,.0f} VND' for cat, amt in sorted(breakdown.items(), key=lambda x: -x[1]))}
 
 {f'So với tháng trước ({prev_key}): tổng {prev_total:,.0f} VND, thay đổi {vs_previous["total_diff_pct"]:+.1f}%' if vs_previous else 'Không có dữ liệu tháng trước'}
 

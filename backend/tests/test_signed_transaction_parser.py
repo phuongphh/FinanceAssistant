@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.bot.handlers.message import _parse_signed_transaction
+from backend.bot.handlers.message import (
+    _parse_duoc_money_in,
+    _parse_signed_transaction,
+)
 from backend.intent.handlers.action_quick_transaction import (
     _has_leading_plus_sign,
     _looks_like_income,
@@ -69,3 +72,113 @@ def test_plus_sign_routes_through_income_guard() -> None:
     assert _looks_like_income("+200k") is True
     assert _looks_like_income("-200k") is False
     assert _looks_like_income("200k cà phê") is False
+
+
+@pytest.mark.parametrize(
+    "text,expected_amount,expected_merchant",
+    [
+        ("được bố cho 500k", 500_000, "bố cho"),
+        ("được thưởng 200k", 200_000, "thưởng"),
+        ("được lì xì 50k trên momo", 50_000, "lì xì trên momo"),
+        ("được mẹ cho 1tr", 1_000_000, "mẹ cho"),
+        ("được mừng tuổi 100k", 100_000, "mừng tuổi"),
+        # Refund inflow: the "mua" reference to the original purchase must
+        # not block the money-in parse.
+        ("được hoàn 200k tiền mua vé", 200_000, "hoàn tiền mua vé"),
+        # Found money: cash picked up records as money-in.
+        ("tìm được 200k dưới gối", 200_000, "tìm được dưới gối"),
+    ],
+)
+def test_parse_duoc_money_in_accepts(
+    text: str, expected_amount: float, expected_merchant: str
+) -> None:
+    """'được <giver> cho/tặng/lì xì/thưởng <amount>' must parse as money-in
+    so the Chi tiêu menu promise ('được bố cho 500k' → tiền vào) holds."""
+    parsed = _parse_duoc_money_in(text)
+    assert parsed is not None, f"expected a money-in parse for {text!r}"
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == expected_amount
+    assert parsed["merchant"] == expected_merchant
+    assert parsed["note"] == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "mua được áo 200k",  # resultative được → expense, not income
+        "tìm được quán ngon 150k",
+        "tìm được thắt lưng 500k",  # found an OBJECT worth 500k, not cash
+        "được thưởng bao nhiêu?",  # question
+        "được thưởng 5tr rồi tiêu hết",  # spend verb wins
+        "được nghỉ hôm nay",  # no amount, no giving verb
+        "50k cà phê",  # plain expense
+        "",
+    ],
+)
+def test_parse_duoc_money_in_rejects(text: str) -> None:
+    assert _parse_duoc_money_in(text) is None
+
+
+# ---------------------------------------------------------------------------
+# Date extraction wiring — the Tier-1 fast-paths must surface the
+# ``ngày dd/mm[/yyyy]`` hint in the parsed dict as ISO string so the
+# wizard draft stays JSONB-safe, and the date phrase must NOT bleed into
+# the merchant slot.
+# ---------------------------------------------------------------------------
+
+
+def test_signed_expense_extracts_date_with_year() -> None:
+    parsed = _parse_signed_transaction("-1tr ăn tối ngày 16/05/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 1_000_000
+    assert parsed["expense_date"] == "2026-05-16"
+    # Date phrase stripped from merchant.
+    assert "ngày" not in parsed["merchant"]
+    assert "16/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "ăn tối"
+
+
+def test_signed_expense_extracts_year_less_date() -> None:
+    parsed = _parse_signed_transaction("-50k cà phê ngày 02/06")
+    assert parsed is not None
+    assert parsed["expense_date"] is not None
+    # Defaults to current year — exact value depends on test run date,
+    # but format and month/day must be right.
+    assert parsed["expense_date"].endswith("-06-02")
+    assert parsed["merchant"] == "cà phê"
+
+
+def test_signed_money_in_extracts_date() -> None:
+    parsed = _parse_signed_transaction("+5tr thưởng tết ngày 15/01/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 5_000_000
+    assert parsed["expense_date"] == "2026-01-15"
+    assert parsed["merchant"] == "thưởng tết"
+
+
+def test_signed_expense_without_date_omits_expense_date() -> None:
+    parsed = _parse_signed_transaction("-50k cà phê")
+    assert parsed is not None
+    # No date in input → key must be absent so the handler defaults to today.
+    assert "expense_date" not in parsed
+
+
+def test_duoc_money_in_extracts_date() -> None:
+    parsed = _parse_duoc_money_in("được bố cho 500k ngày 15/05/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 500_000
+    assert parsed["expense_date"] == "2026-05-15"
+    assert "ngày" not in parsed["merchant"]
+    assert parsed["merchant"] == "bố cho"
+
+
+def test_duoc_money_in_invalid_date_falls_back_silently() -> None:
+    """``ngày 31/02`` is invalid — parser must drop the date hint but still
+    record the money-in (don't refuse a good transaction over a bad date)."""
+    parsed = _parse_duoc_money_in("được bố cho 500k ngày 31/02")
+    assert parsed is not None
+    assert parsed["amount"] == 500_000
+    assert "expense_date" not in parsed

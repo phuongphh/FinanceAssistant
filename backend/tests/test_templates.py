@@ -1,6 +1,6 @@
 """Tests for message templates (Issue #27)."""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from backend.bot.formatters.templates import (
@@ -81,8 +81,53 @@ class TestTransactionConfirmation:
         )
         assert "Chi từ: Thẻ tín dụng [Vietcombank]" in result
         assert "chi tiêu đã được ghi lại" in result
+        assert "Nếu thông tin chưa chính xác" in result
+        assert "click vào các nhãn ở dưới để sửa lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
+
+    def test_edit_done_uses_short_hint(self):
+        result = format_transaction_confirmation(
+            merchant="ăn tối",
+            amount=2_000_000,
+            category_code="food",
+            source_label="Tài khoản thanh toán [Techcombank]",
+            show_edit_hint=True,
+            edit_done=True,
+        )
+        assert "Chi tiêu đã được ghi lại" in result
+        # The long edit prompt must be gone
+        assert "click vào các nhãn" not in result
+        assert "Nếu thông tin chưa chính xác" not in result
+        # Merchant/amount/source still rendered
+        assert "ăn tối" in result
+        assert "2,000,000đ" in result
+        assert "Techcombank" in result
+
+    def test_edit_done_money_in_uses_money_in_short_hint(self):
+        result = format_transaction_confirmation(
+            merchant="Lương tháng 6",
+            amount=15_000_000,
+            category_code="other",
+            source_label="Tiền mặt",
+            show_edit_hint=True,
+            transaction_type="money_in",
+            edit_done=True,
+        )
+        assert "Khoản tiền vào đã được ghi lại" in result
+        assert "Chi tiêu đã được ghi lại" not in result
+        assert "click vào các nhãn" not in result
+
+    def test_edit_done_without_show_edit_hint_omits_hint(self):
+        result = format_transaction_confirmation(
+            merchant="Phở",
+            amount=45_000,
+            category_code="food",
+            show_edit_hint=False,
+            edit_done=True,
+        )
+        assert "Chi tiêu đã được ghi lại" not in result
+        assert "💡" not in result
 
     def test_unknown_category_falls_back_to_other(self):
         result = format_transaction_confirmation(
@@ -91,6 +136,33 @@ class TestTransactionConfirmation:
             category_code="not_a_real_category",
         )
         assert "📌" in result  # 'other' emoji
+
+    def test_back_dated_expense_renders_date_line(self):
+        result = format_transaction_confirmation(
+            merchant="ăn tối",
+            amount=1_000_000,
+            category_code="food",
+            expense_date=date(2026, 5, 16),
+        )
+        assert "📅 Ngày giao dịch: 16/05/2026" in result
+
+    def test_today_expense_omits_date_line(self):
+        result = format_transaction_confirmation(
+            merchant="cà phê",
+            amount=50_000,
+            category_code="food",
+            expense_date=date.today(),
+        )
+        assert "Ngày giao dịch" not in result
+
+    def test_none_expense_date_omits_date_line(self):
+        result = format_transaction_confirmation(
+            merchant="cà phê",
+            amount=50_000,
+            category_code="food",
+            expense_date=None,
+        )
+        assert "Ngày giao dịch" not in result
 
 
 class TestTransactionBatchConfirmation:
@@ -113,8 +185,33 @@ class TestTransactionBatchConfirmation:
         )
         assert "Chi từ: Tiền mặt" in result
         assert "chi tiêu đã được ghi lại" in result
+        assert "Nếu thông tin chưa chính xác" in result
+        assert "click vào các nhãn ở dưới để sửa lại" in result
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
+
+    def test_batch_back_dated_renders_date_line(self):
+        yesterday = date.today() - timedelta(days=1)
+        result = format_transaction_batch_confirmation(
+            items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
+            expense_date=yesterday,
+        )
+        assert "Ngày giao dịch" in result
+        assert yesterday.strftime("%d/%m/%Y") in result
+
+    def test_batch_today_omits_date_line(self):
+        result = format_transaction_batch_confirmation(
+            items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
+            expense_date=date.today(),
+        )
+        assert "Ngày giao dịch" not in result
+
+    def test_batch_none_expense_date_omits_date_line(self):
+        result = format_transaction_batch_confirmation(
+            items=[("tiền xăng", 50_000, "transport"), ("ăn trưa", 50_000, "food")],
+            expense_date=None,
+        )
+        assert "Ngày giao dịch" not in result
 
 
 class TestDailySummary:

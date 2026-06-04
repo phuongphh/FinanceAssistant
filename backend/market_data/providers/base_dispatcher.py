@@ -13,6 +13,7 @@ from backend.market_data.cache.cache_keys import (
     health_open_until_key,
 )
 from backend.market_data.exceptions import (
+    MarketDataError,
     ParserError,
     ProviderUnavailable,
     RateLimitError,
@@ -92,14 +93,23 @@ class Dispatcher:
         ``fetch_quote`` sequentially would multiply provider latency and keep
         hitting an already-open backup circuit. Use provider-native batch calls
         instead and apply the same circuit checks as single-quote fetches.
+
+        Unlike single-quote fetches, a provider batch can *succeed* (no
+        exception) yet return fewer symbols than requested — e.g. a 200 OK with
+        an empty or shape-drifted body. Treat any symbol the primary did not
+        return as missing and ask the secondary provider for it, so a healthy
+        backup (SSI) still serves quotes when the primary (VNDIRECT) answers
+        emptily. Without this guard the empty primary result would be returned
+        as-is and the secondary would never be consulted.
         """
         clean_symbols = [symbol for symbol in symbols if symbol.strip()]
         if not clean_symbols:
             return []
 
+        quotes: list[PriceQuote] = []
         if not await self._is_circuit_open(self.primary):
             try:
-                return await self._call_provider_batch(self.primary, clean_symbols)
+                quotes = await self._call_provider_batch(self.primary, clean_symbols)
             except _RETRYABLE_ERRORS as exc:
                 await self._record_failure(self.primary)
                 logger.warning(
@@ -114,7 +124,36 @@ class Dispatcher:
                 len(clean_symbols),
             )
 
-        return await self._call_secondary_batch(clean_symbols)
+        missing = self._missing_symbols(clean_symbols, quotes)
+        if not missing:
+            return quotes
+
+        if quotes:
+            logger.info(
+                "Primary %s returned %d/%d symbols; asking secondary for the remaining %d",
+                self._provider_name(self.primary),
+                len(quotes),
+                len(clean_symbols),
+                len(missing),
+            )
+        try:
+            secondary_quotes = await self._call_secondary_batch(missing)
+        except MarketDataError:
+            # Keep whatever the primary already gave us; only surface the error
+            # when we have nothing at all (preserves the single-quote raise
+            # contract). This also covers non-retryable errors such as
+            # SymbolNotFound for one missing ticker, which must not discard the
+            # valid quotes the primary returned for the rest of the batch.
+            if quotes:
+                return quotes
+            raise
+        return quotes + secondary_quotes
+
+    @staticmethod
+    def _missing_symbols(requested: list[str], quotes: list[PriceQuote]) -> list[str]:
+        """Return requested symbols not present in ``quotes`` (case-insensitive)."""
+        have = {quote.symbol.upper() for quote in quotes}
+        return [symbol for symbol in requested if symbol.upper().strip() not in have]
 
     async def _call_secondary(self, symbol: str) -> PriceQuote:
         if await self._is_circuit_open(self.secondary):
@@ -155,7 +194,13 @@ class Dispatcher:
         quotes = await asyncio.wait_for(
             provider.fetch_batch(symbols), timeout=self.timeout
         )
-        await self._record_success(provider)
+        if quotes:
+            await self._record_success(provider)
+        elif symbols:
+            # 200-but-empty for a non-empty request mirrors the single-quote
+            # ParserError-on-empty path: count it as a failure so the circuit
+            # can open instead of silently resetting on a dead-but-OK provider.
+            await self._record_failure(provider)
         return quotes
 
     async def _is_circuit_open(self, provider: BaseProvider) -> bool:

@@ -18,7 +18,7 @@ and edit the triggering message in place.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +43,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     transaction_actions_with_done_keyboard,
     transaction_source_keyboard,
 )
-from backend.config.categories import get_all_categories
+from backend.config.categories import get_all_categories, get_all_income_categories
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
 from backend.services import expense_service, wizard_service
@@ -62,6 +62,9 @@ logger = logging.getLogger(__name__)
 
 UNDO_WINDOW_SECONDS = 5
 _VALID_EXPENSE_CATEGORY_CODES = frozenset(cat.code for cat in get_all_categories())
+_VALID_INCOME_CATEGORY_CODES = frozenset(
+    cat.code for cat in get_all_income_categories()
+)
 
 
 async def _handle_source_selection_callback(
@@ -159,6 +162,22 @@ async def _handle_source_selection_callback(
         if chosen != "skip":
             source_type = chosen
 
+    # Wizard JSONB can't store ``date`` natively, so the Tier-1 fast-path
+    # stashes the parsed transaction date as an ISO string. Pull it back
+    # here so a user who walked through the source picker keeps the
+    # ``ngày dd/mm/yyyy`` they typed instead of silently falling back to
+    # today.
+    expense_date_iso = draft.get("expense_date")
+    expense_date_value = date.today()
+    if expense_date_iso:
+        try:
+            expense_date_value = date.fromisoformat(expense_date_iso)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid expense_date in wizard draft for user %s: %r",
+                user.id,
+                expense_date_iso,
+            )
     expense_data = ExpenseCreate(
         amount=float(draft.get("amount", 0)),
         transaction_type=draft.get("transaction_type", "expense"),
@@ -169,6 +188,7 @@ async def _handle_source_selection_callback(
         e_wallet_provider=wallet_provider,
         source_credit_card_id=source_credit_card_id,
         source_asset_id=source_asset_id,
+        expense_date=expense_date_value,
     )
     expense = await expense_service.create_expense(db, user.id, expense_data)
     from backend.services import wizard_service
@@ -233,9 +253,10 @@ async def _rerender_transaction_message(
     edited: bool = False,
     db: AsyncSession | None = None,
 ) -> None:
-    is_expense = expense.transaction_type == "expense"
+    tx_type = expense.transaction_type or "expense"
+    is_card_type = tx_type in ("expense", "money_in")
     source_label = None
-    if is_expense and db is not None:
+    if is_card_type and db is not None:
         try:
             source_label = await resolve_source_label_for_expense(db, expense)
         except Exception:
@@ -247,7 +268,9 @@ async def _rerender_transaction_message(
         category_code=_normalize_category(expense.category),
         time=expense.created_at,
         source_label=source_label,
-        show_edit_hint=is_expense,
+        show_edit_hint=is_card_type,
+        transaction_type=tx_type,
+        expense_date=expense.expense_date,
     )
     reply_markup = (
         transaction_actions_with_done_keyboard(str(expense.id))
@@ -394,17 +417,25 @@ async def _handle_change_category(*, db, user, args, callback_id, chat_id, messa
         )
         return
 
+    is_money_in = (expense.transaction_type or "expense") == "money_in"
+
     if len(args) == 1:
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=category_picker_keyboard(str(expense.id)),
+            reply_markup=category_picker_keyboard(
+                str(expense.id),
+                transaction_type="money_in" if is_money_in else "expense",
+            ),
         )
         await answer_callback(callback_id)
         return
 
     new_code = str(args[1]).strip().lower()
-    if new_code not in _VALID_EXPENSE_CATEGORY_CODES:
+    valid_codes = (
+        _VALID_INCOME_CATEGORY_CODES if is_money_in else _VALID_EXPENSE_CATEGORY_CODES
+    )
+    if new_code not in valid_codes:
         await answer_callback(
             callback_id,
             text="Danh mục không hợp lệ — bạn chọn lại trong danh sách nhé.",
@@ -709,6 +740,8 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
         )
         return
 
+    is_money_in = (expense.transaction_type or "expense") == "money_in"
+
     if len(args) == 1:
         await wizard_service.start_flow(
             db,
@@ -724,12 +757,23 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=source_picker_keyboard(str(expense.id)),
+            reply_markup=source_picker_keyboard(
+                str(expense.id), allow_credit_card=not is_money_in
+            ),
         )
         await answer_callback(callback_id)
         return
 
     kind = str(args[1]).strip().lower()
+    if kind == "card" and is_money_in:
+        # Defensive: the picker hides this button for money-in, but reject a
+        # stale/forged callback too — money can't arrive into a credit card.
+        await answer_callback(
+            callback_id,
+            text="Tiền nhận vào không thể vào thẻ tín dụng nhé 🌱",
+            show_alert=True,
+        )
+        return
     if kind == "cash":
         updated = await expense_service.update_expense(
             db,
@@ -967,10 +1011,53 @@ async def _handle_edit_amount(*, db, user, args, callback_id, chat_id, message_i
 
 
 async def _handle_done_edit(*, db, user, args, callback_id, chat_id, message_id):
-    """User taps ✅ Đồng ý — strip the keyboard, keep the message text."""
-    await edit_message_reply_markup(
-        chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": []}
-    )
+    """User taps ✅ Đồng ý — collapse the edit hint and strip the keyboard.
+
+    Re-renders the confirmation with the shortened "đã được ghi lại" hint so
+    the user sees a calm, settled state instead of the lengthy edit prompt.
+    Falls back to stripping the keyboard if the expense can't be resolved.
+    """
+    expense = None
+    if args:
+        try:
+            expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
+        except Exception:
+            logger.exception("resolve_transaction_by_callback_id failed in done_edit")
+
+    if expense is not None:
+        tx_type = expense.transaction_type or "expense"
+        is_card_type = tx_type in ("expense", "money_in")
+        source_label = None
+        if is_card_type:
+            try:
+                source_label = await resolve_source_label_for_expense(db, expense)
+            except Exception:
+                logger.exception("resolve_source_label_for_expense failed in done_edit")
+                source_label = None
+        text = format_transaction_confirmation(
+            merchant=expense.merchant or expense.note or "Giao dịch",
+            amount=float(expense.amount),
+            category_code=_normalize_category(expense.category),
+            time=expense.created_at,
+            source_label=source_label,
+            show_edit_hint=is_card_type,
+            transaction_type=tx_type,
+            expense_date=expense.expense_date,
+            edit_done=True,
+        )
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup={"inline_keyboard": []},
+        )
+    else:
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup={"inline_keyboard": []},
+        )
     await answer_callback(callback_id, text="Đã lưu ✅")
 
 

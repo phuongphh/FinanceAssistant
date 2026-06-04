@@ -27,7 +27,7 @@ income_types:
       - "Lương + thưởng KPI"
 
   freelance:
-    label: "Freelance / Công việc thêm"
+    label: "Việc làm thêm"
     icon: "💻"
     is_passive: false
     typical_schedule: "ad_hoc"
