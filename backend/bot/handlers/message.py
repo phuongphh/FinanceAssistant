@@ -575,6 +575,23 @@ async def _handle_followup_callback(
         )
         return True
 
+    if follow_up.is_category_picker_callback(parsed):
+        time_range = (parsed.parameters or {}).get("time_range")
+        keyboard = follow_up.build_category_picker_keyboard(time_range=time_range)
+        await send_message(
+            chat_id,
+            "Bạn muốn xem chi tiêu loại nào? 🌱",
+            reply_markup=keyboard,
+        )
+        from backend import analytics
+
+        analytics.track(
+            "intent_followup_category_picker_shown",
+            user_id=user.id,
+            properties={"time_range": time_range or ""},
+        )
+        return True
+
     synthesised = IntentResult(
         intent=parsed.intent,
         confidence=0.95,

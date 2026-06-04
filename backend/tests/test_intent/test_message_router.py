@@ -172,6 +172,134 @@ async def test_clarify_callback_reroutes_via_classify_and_dispatch():
     assert kwargs["text"] == "tài sản"
 
 
+# ---------------------------------------------------------------------------
+# Follow-up category picker — "🍕 Theo loại" → choose category → filtered
+# ---------------------------------------------------------------------------
+
+
+def _followup_callback(data: str) -> dict:
+    return {
+        "id": "cbq-1",
+        "data": data,
+        "message": {"chat": {"id": 999}},
+        "from": {"id": 12345},
+    }
+
+
+@pytest.mark.asyncio
+async def test_followup_theo_loai_shows_picker_keyboard_and_skips_dispatch():
+    """Tapping "🍕 Theo loại" (no category yet) must show the picker
+    keyboard, NOT dispatch a category-filtered handler."""
+    from backend.intent import follow_up
+
+    user = _user(state=None)
+    db = _fake_db()
+
+    # Picker callback: QUERY_EXPENSES_BY_CATEGORY with no category param.
+    picker_fu = follow_up.FollowUp(
+        label="🍕 Theo loại",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+    )
+    cbq = _followup_callback(picker_fu.to_callback_data())
+
+    dispatcher_mock = MagicMock()
+    dispatcher_mock.dispatch = AsyncMock()
+
+    with patch.object(
+        message, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    ), patch.object(
+        message, "send_message", AsyncMock()
+    ) as mock_send, patch(
+        "backend.bot.handlers.free_form_text._dispatcher", dispatcher_mock
+    ):
+        handled = await message.handle_intent_callback(db, cbq)
+
+    assert handled is True
+    dispatcher_mock.dispatch.assert_not_called()
+    mock_send.assert_awaited_once()
+    # The picker reply carries the inline-keyboard payload.
+    kwargs = mock_send.call_args.kwargs
+    assert "reply_markup" in kwargs
+    assert "inline_keyboard" in kwargs["reply_markup"]
+    rows = kwargs["reply_markup"]["inline_keyboard"]
+    flat = [btn for row in rows for btn in row]
+    # All 13 spending categories rendered.
+    from backend.config.categories import get_all_categories
+
+    assert len(flat) == len(get_all_categories())
+
+
+@pytest.mark.asyncio
+async def test_followup_category_button_dispatches_handler_with_filter():
+    """Tapping a specific category (e.g. Di chuyển) DOES dispatch the
+    intent handler — with the chosen category in the parameters."""
+    from backend.intent import follow_up
+
+    user = _user(state=None)
+    db = _fake_db()
+
+    category_fu = follow_up.FollowUp(
+        label="🚗 Di chuyển",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"category": "transport"},
+    )
+    cbq = _followup_callback(category_fu.to_callback_data())
+
+    dispatcher_mock = MagicMock()
+    dispatcher_mock.dispatch = AsyncMock(return_value=MagicMock(spec=DispatchOutcome))
+
+    with patch.object(
+        message, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    ), patch.object(
+        message, "send_message", AsyncMock()
+    ), patch(
+        "backend.bot.handlers.free_form_text._dispatcher", dispatcher_mock
+    ), patch(
+        "backend.bot.handlers.free_form_text._send_outcome", AsyncMock()
+    ):
+        handled = await message.handle_intent_callback(db, cbq)
+
+    assert handled is True
+    dispatcher_mock.dispatch.assert_awaited_once()
+    synthesised = dispatcher_mock.dispatch.call_args.args[0]
+    assert synthesised.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert synthesised.parameters.get("category") == "transport"
+
+
+@pytest.mark.asyncio
+async def test_followup_theo_loai_preserves_time_range_in_picker_buttons():
+    """The picker shown on tap of "Theo loại" must carry the parent
+    report's time_range into every category button."""
+    from backend.intent import follow_up
+
+    user = _user(state=None)
+    db = _fake_db()
+
+    picker_fu = follow_up.FollowUp(
+        label="🍕 Theo loại",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"time_range": "this_week"},
+    )
+    cbq = _followup_callback(picker_fu.to_callback_data())
+
+    with patch.object(
+        message, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    ), patch.object(
+        message, "send_message", AsyncMock()
+    ) as mock_send:
+        handled = await message.handle_intent_callback(db, cbq)
+
+    assert handled is True
+    kwargs = mock_send.call_args.kwargs
+    rows = kwargs["reply_markup"]["inline_keyboard"]
+    flat = [btn for row in rows for btn in row]
+    for btn in flat:
+        parsed = follow_up.parse_callback_data(btn["callback_data"])
+        assert parsed is not None
+        assert (parsed.parameters or {}).get("time_range") == "this_week"
+        assert "category" in (parsed.parameters or {})
+
+
 @pytest.mark.asyncio
 async def test_pending_action_active_blocks_classification_with_nudge():
     """Free-form text while a confirm is pending should send the

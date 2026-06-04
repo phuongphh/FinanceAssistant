@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import pytest
 
+from backend.config.categories import get_all_categories
 from backend.intent.follow_up import (
     CALLBACK_PREFIX,
     MAX_SUGGESTIONS,
     FollowUp,
+    build_category_picker_keyboard,
     build_inline_keyboard,
     get_follow_ups,
+    is_category_picker_callback,
     parse_callback_data,
 )
 from backend.intent.intents import IntentType
@@ -258,6 +261,153 @@ def test_net_worth_view_no_longer_offers_portfolio_analytics_label(level):
     fus = get_follow_ups(IntentType.QUERY_NET_WORTH, wealth_level=level)
     for fu in fus:
         assert "Portfolio analytics" not in fu.label
+
+
+# ---------------------------------------------------------------------------
+# Category picker (Story: "Theo loại" → choose category → filtered report)
+# ---------------------------------------------------------------------------
+
+
+def test_category_picker_keyboard_has_all_13_categories():
+    kb = build_category_picker_keyboard()
+    assert "inline_keyboard" in kb
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    cats = get_all_categories()
+    assert len(flat) == len(cats)
+    # Every category label (emoji + name) appears once.
+    labels = {btn["text"] for btn in flat}
+    for cat in cats:
+        assert f"{cat.emoji} {cat.name_vi}" in labels
+
+
+def test_category_picker_uses_two_column_layout():
+    kb = build_category_picker_keyboard()
+    rows = kb["inline_keyboard"]
+    # All but possibly the last row carry two buttons.
+    for row in rows[:-1]:
+        assert len(row) == 2
+    assert 1 <= len(rows[-1]) <= 2
+
+
+def test_category_picker_preserves_time_range():
+    kb = build_category_picker_keyboard(time_range="this_week")
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        assert parsed is not None
+        assert parsed.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+        assert parsed.parameters is not None
+        assert parsed.parameters.get("time_range") == "this_week"
+        assert "category" in parsed.parameters
+
+
+def test_category_picker_omits_time_range_when_none():
+    kb = build_category_picker_keyboard()
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        assert parsed is not None
+        params = parsed.parameters or {}
+        assert "time_range" not in params
+        assert "category" in params
+
+
+@pytest.mark.parametrize("time_range", [None, "this_week", "this_month", "last_month"])
+def test_category_picker_button_callback_under_64_bytes(time_range):
+    """Every picker button payload must fit Telegram's 64-byte cap for the
+    time_range values an expense report actually uses."""
+    kb = build_category_picker_keyboard(time_range=time_range)
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    for btn in flat:
+        assert len(btn["callback_data"].encode()) <= 64
+
+
+def test_is_category_picker_callback_true_when_no_category():
+    parsed = FollowUp(label="", intent=IntentType.QUERY_EXPENSES_BY_CATEGORY)
+    assert is_category_picker_callback(parsed) is True
+
+
+def test_is_category_picker_callback_true_when_only_time_range():
+    parsed = FollowUp(
+        label="",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"time_range": "this_week"},
+    )
+    assert is_category_picker_callback(parsed) is True
+
+
+def test_is_category_picker_callback_false_when_category_set():
+    parsed = FollowUp(
+        label="",
+        intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"category": "transport"},
+    )
+    assert is_category_picker_callback(parsed) is False
+
+
+def test_is_category_picker_callback_false_for_other_intents():
+    parsed = FollowUp(label="", intent=IntentType.QUERY_EXPENSES)
+    assert is_category_picker_callback(parsed) is False
+    assert is_category_picker_callback(None) is False
+
+
+def test_query_expenses_follow_up_has_theo_loai_button():
+    fus = get_follow_ups(IntentType.QUERY_EXPENSES)
+    labels = [fu.label for fu in fus]
+    assert any("Theo loại" in label for label in labels)
+
+
+def test_query_expenses_follow_up_propagates_time_range_to_picker():
+    """When the parent report is "tuần này", the picker button must carry
+    that time_range so the wizard preserves the period."""
+    fus = get_follow_ups(
+        IntentType.QUERY_EXPENSES, parameters={"time_range": "this_week"}
+    )
+    picker = next(f for f in fus if "Theo loại" in f.label)
+    assert picker.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert picker.parameters == {"time_range": "this_week"}
+    # And the picker button itself stays in picker mode (no category).
+    assert is_category_picker_callback(picker) is True
+
+
+def test_query_expenses_picker_has_no_params_when_no_time_range():
+    fus = get_follow_ups(IntentType.QUERY_EXPENSES)
+    picker = next(f for f in fus if "Theo loại" in f.label)
+    assert picker.parameters is None
+
+
+def test_query_expenses_by_category_injects_loai_khac_with_time_range():
+    fus = get_follow_ups(
+        IntentType.QUERY_EXPENSES_BY_CATEGORY,
+        parameters={"time_range": "this_week", "category": "food"},
+    )
+    loai_khac = next(f for f in fus if "Loại khác" in f.label)
+    assert loai_khac.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert loai_khac.parameters == {"time_range": "this_week"}
+    # "Loại khác" is itself a picker (no category) so tapping it re-shows
+    # the picker keyboard for the same period.
+    assert is_category_picker_callback(loai_khac) is True
+
+
+@pytest.mark.parametrize(
+    "category_code",
+    [c.code for c in get_all_categories()],
+)
+def test_category_picker_button_round_trip_for_every_category(category_code):
+    """Every category button decodes back to the exact same category +
+    time_range — guards against subtle base64/JSON drift."""
+    kb = build_category_picker_keyboard(time_range="this_month")
+    flat = [btn for row in kb["inline_keyboard"] for btn in row]
+    # Find the button matching this category.
+    match = None
+    for btn in flat:
+        parsed = parse_callback_data(btn["callback_data"])
+        if parsed and (parsed.parameters or {}).get("category") == category_code:
+            match = parsed
+            break
+    assert match is not None, f"Category {category_code} missing from picker"
+    assert match.intent == IntentType.QUERY_EXPENSES_BY_CATEGORY
+    assert match.parameters == {"category": category_code, "time_range": "this_month"}
 
 
 @pytest.mark.parametrize("level", [
