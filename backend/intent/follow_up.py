@@ -96,7 +96,6 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
         FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH, {"time_range": "month_vs_previous"}),
         FollowUp("🏠 Chỉ BĐS", IntentType.QUERY_ASSETS, {"asset_type": "real_estate"}),
-        FollowUp("💎 Tổng net worth", IntentType.QUERY_NET_WORTH),
         FollowUp("📈 Cổ phiếu", IntentType.QUERY_PORTFOLIO),
     ),
     IntentType.QUERY_NET_WORTH: (
@@ -159,7 +158,7 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     (IntentType.QUERY_ASSETS, WealthLevel.STARTER): (
         FollowUp("📈 YTD - Tài sản từ đầu năm đến nay", IntentType.QUERY_NET_WORTH, {"time_range": "ytd"}),
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
-        FollowUp("💎 Net worth tổng", IntentType.QUERY_NET_WORTH),
+        FollowUp("📈 So với tháng trước", IntentType.QUERY_NET_WORTH, {"time_range": "month_vs_previous"}),
     ),
     (IntentType.QUERY_NET_WORTH, WealthLevel.STARTER): (
         FollowUp("➕ Thêm tài sản", IntentType.HELP),
@@ -198,8 +197,23 @@ def get_follow_ups(
     intents such as market queries keep follow-ups context-aware without
     adding another DB roundtrip.
     """
+    params = parameters or {}
+
+    # The "📈 So với tháng trước" comparison view is a focused, single-
+    # purpose surface: the user has just compared this-month vs last-month
+    # net worth. Generic net-worth follow-ups ("Trend 6 tháng",
+    # "Portfolio của tôi", "Portfolio analytics") would either repeat the
+    # same number or dilute the next-step CTA. By design we surface only
+    # the goal-progress hand-off — the natural next question after a
+    # delta is "am I still on track for my goals?".
+    if (
+        intent == IntentType.QUERY_NET_WORTH
+        and params.get("time_range") == "month_vs_previous"
+    ):
+        return [FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS)]
+
     pool: list[FollowUp] = []
-    category = str((parameters or {}).get("category") or "").lower()
+    category = str(params.get("category") or "").lower()
     if intent == IntentType.QUERY_MARKET and category in {"stock", "stocks", "crypto", "gold"}:
         asset_type = "stock" if category in {"stock", "stocks"} else category
         pool.extend(

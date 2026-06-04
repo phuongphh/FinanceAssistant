@@ -255,6 +255,43 @@ async def calculate_change_from_current(
     )
 
 
+async def calculate_change_vs_last_month_end_from_current(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    current: Decimal,
+    *,
+    today: date | None = None,
+) -> NetWorthChange:
+    """Compare current net worth to the snapshot at the **end of last month**.
+
+    Unlike :func:`calculate_change_from_current` with ``period=PERIOD_MONTH``
+    (which uses ``today - 30 days`` — an approximation that drifts across
+    month boundaries), this anchors the baseline to a calendar-aligned
+    point: the last day of the previous calendar month. That matches the
+    semantics users expect when they read "so với tháng trước" and keeps
+    the standalone headline consistent with the ⚖️ comparison view that
+    the asset-list follow-up "📈 So với tháng trước" produces.
+    """
+    today = today or date.today()
+    last_month_end = today.replace(day=1) - timedelta(days=1)
+    current = Decimal(current or 0)
+    previous = await calculate_historical(db, user_id, last_month_end)
+
+    change_absolute = current - previous
+    if previous > 0:
+        change_pct = float(change_absolute / previous * 100)
+    else:
+        change_pct = 0.0
+
+    return NetWorthChange(
+        current=current,
+        previous=previous,
+        change_absolute=change_absolute,
+        change_percentage=change_pct,
+        period_label=_PERIOD_LABELS[PERIOD_MONTH],
+    )
+
+
 async def calculate_ytd_return_from_current(
     db: AsyncSession,
     user_id: uuid.UUID,
