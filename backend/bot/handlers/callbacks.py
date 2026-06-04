@@ -1011,10 +1011,53 @@ async def _handle_edit_amount(*, db, user, args, callback_id, chat_id, message_i
 
 
 async def _handle_done_edit(*, db, user, args, callback_id, chat_id, message_id):
-    """User taps ✅ Đồng ý — strip the keyboard, keep the message text."""
-    await edit_message_reply_markup(
-        chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": []}
-    )
+    """User taps ✅ Đồng ý — collapse the edit hint and strip the keyboard.
+
+    Re-renders the confirmation with the shortened "đã được ghi lại" hint so
+    the user sees a calm, settled state instead of the lengthy edit prompt.
+    Falls back to stripping the keyboard if the expense can't be resolved.
+    """
+    expense = None
+    if args:
+        try:
+            expense = await resolve_transaction_by_callback_id(db, user.id, args[0])
+        except Exception:
+            logger.exception("resolve_transaction_by_callback_id failed in done_edit")
+
+    if expense is not None:
+        tx_type = expense.transaction_type or "expense"
+        is_card_type = tx_type in ("expense", "money_in")
+        source_label = None
+        if is_card_type:
+            try:
+                source_label = await resolve_source_label_for_expense(db, expense)
+            except Exception:
+                logger.exception("resolve_source_label_for_expense failed in done_edit")
+                source_label = None
+        text = format_transaction_confirmation(
+            merchant=expense.merchant or expense.note or "Giao dịch",
+            amount=float(expense.amount),
+            category_code=_normalize_category(expense.category),
+            time=expense.created_at,
+            source_label=source_label,
+            show_edit_hint=is_card_type,
+            transaction_type=tx_type,
+            expense_date=expense.expense_date,
+            edit_done=True,
+        )
+        await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup={"inline_keyboard": []},
+        )
+    else:
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup={"inline_keyboard": []},
+        )
     await answer_callback(callback_id, text="Đã lưu ✅")
 
 

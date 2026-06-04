@@ -86,6 +86,49 @@ class TestTransactionConfirmation:
         assert "<i>" in result and "</i>" in result
         assert "💡" in result
 
+    def test_edit_done_uses_short_hint(self):
+        result = format_transaction_confirmation(
+            merchant="ăn tối",
+            amount=2_000_000,
+            category_code="food",
+            source_label="Tài khoản thanh toán [Techcombank]",
+            show_edit_hint=True,
+            edit_done=True,
+        )
+        assert "Chi tiêu đã được ghi lại" in result
+        # The long edit prompt must be gone
+        assert "click vào các nhãn" not in result
+        assert "Nếu thông tin chưa chính xác" not in result
+        # Merchant/amount/source still rendered
+        assert "ăn tối" in result
+        assert "2,000,000đ" in result
+        assert "Techcombank" in result
+
+    def test_edit_done_money_in_uses_money_in_short_hint(self):
+        result = format_transaction_confirmation(
+            merchant="Lương tháng 6",
+            amount=15_000_000,
+            category_code="other",
+            source_label="Tiền mặt",
+            show_edit_hint=True,
+            transaction_type="money_in",
+            edit_done=True,
+        )
+        assert "Khoản tiền vào đã được ghi lại" in result
+        assert "Chi tiêu đã được ghi lại" not in result
+        assert "click vào các nhãn" not in result
+
+    def test_edit_done_without_show_edit_hint_omits_hint(self):
+        result = format_transaction_confirmation(
+            merchant="Phở",
+            amount=45_000,
+            category_code="food",
+            show_edit_hint=False,
+            edit_done=True,
+        )
+        assert "Chi tiêu đã được ghi lại" not in result
+        assert "💡" not in result
+
     def test_unknown_category_falls_back_to_other(self):
         result = format_transaction_confirmation(
             merchant="?",
