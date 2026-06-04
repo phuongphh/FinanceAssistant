@@ -18,7 +18,7 @@ and edit the triggering message in place.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -162,6 +162,22 @@ async def _handle_source_selection_callback(
         if chosen != "skip":
             source_type = chosen
 
+    # Wizard JSONB can't store ``date`` natively, so the Tier-1 fast-path
+    # stashes the parsed transaction date as an ISO string. Pull it back
+    # here so a user who walked through the source picker keeps the
+    # ``ngày dd/mm/yyyy`` they typed instead of silently falling back to
+    # today.
+    expense_date_iso = draft.get("expense_date")
+    expense_date_value = date.today()
+    if expense_date_iso:
+        try:
+            expense_date_value = date.fromisoformat(expense_date_iso)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid expense_date in wizard draft for user %s: %r",
+                user.id,
+                expense_date_iso,
+            )
     expense_data = ExpenseCreate(
         amount=float(draft.get("amount", 0)),
         transaction_type=draft.get("transaction_type", "expense"),
@@ -172,6 +188,7 @@ async def _handle_source_selection_callback(
         e_wallet_provider=wallet_provider,
         source_credit_card_id=source_credit_card_id,
         source_asset_id=source_asset_id,
+        expense_date=expense_date_value,
     )
     expense = await expense_service.create_expense(db, user.id, expense_data)
     from backend.services import wizard_service
@@ -253,6 +270,7 @@ async def _rerender_transaction_message(
         source_label=source_label,
         show_edit_hint=is_card_type,
         transaction_type=tx_type,
+        expense_date=expense.expense_date,
     )
     reply_markup = (
         transaction_actions_with_done_keyboard(str(expense.id))

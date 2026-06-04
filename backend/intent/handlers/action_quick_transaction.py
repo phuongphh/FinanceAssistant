@@ -30,6 +30,10 @@ from backend.bot.handlers.transaction import (
     send_transaction_batch_confirmation,
     send_transaction_confirmation,
 )
+from backend.bot.utils.transaction_date_extractor import (
+    extract_transaction_date,
+    strip_span,
+)
 from backend.intent.clarifier import build_message_from_key
 from backend.intent.handlers.base import IntentHandler
 # Income vs. expense semantics live in ONE place —
@@ -158,7 +162,21 @@ class ActionQuickTransactionHandler(IntentHandler):
                 "income_detected_in_expense_flow", user
             )
 
-        items = await self._extract_items(text, params, db, user)
+        # Tier-2 must mirror the Tier-1 fast-path: pull any
+        # ``ngày dd/mm[/yyyy]`` hint out before item-parsing so the
+        # date digits don't get re-interpreted as a second amount, and
+        # so the recorded ``expense_date`` matches what the user typed.
+        extracted_date = extract_transaction_date(text)
+        expense_date_value = (
+            extracted_date.value if extracted_date is not None else date.today()
+        )
+        parse_text = (
+            strip_span(text, extracted_date.span)
+            if extracted_date is not None
+            else text
+        )
+
+        items = await self._extract_items(parse_text, params, db, user)
         if not items:
             return _FALLBACK_REPLY
 
@@ -166,11 +184,11 @@ class ActionQuickTransactionHandler(IntentHandler):
             item = items[0]
             expense_data = ExpenseCreate(
                 amount=float(item.amount),
-                merchant=item.merchant or text,
+                merchant=item.merchant or parse_text,
                 category=item.category_hint,
                 note=text,
                 source="manual",
-                expense_date=date.today(),
+                expense_date=expense_date_value,
             )
             expense_data = await apply_default_source(db, user.id, expense_data)
             expense = await expense_service.create_expense(db, user.id, expense_data)
@@ -181,11 +199,11 @@ class ActionQuickTransactionHandler(IntentHandler):
             for index, item in enumerate(items, start=1):
                 expense_data = ExpenseCreate(
                     amount=float(item.amount),
-                    merchant=item.merchant or text,
+                    merchant=item.merchant or parse_text,
                     category=item.category_hint,
                     note=text,
                     source="manual",
-                    expense_date=date.today(),
+                    expense_date=expense_date_value,
                     raw_data={
                         "batch_id": batch_id,
                         "batch_size": len(items),

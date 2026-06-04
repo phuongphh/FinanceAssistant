@@ -71,6 +71,7 @@ async def send_transaction_confirmation(
         source_label=source_label,
         show_edit_hint=is_card_type,
         transaction_type=tx_type,
+        expense_date=expense.expense_date,
     )
     reply_markup = transaction_actions_keyboard(str(expense.id))
     await send_message(
@@ -125,6 +126,12 @@ async def send_transaction_batch_confirmation(
         if len(unique) == 1 and len(labels) == len(expenses):
             source_label = next(iter(unique))
 
+    # Batch items can technically be on different days (rare — usually a
+    # single ``ngày dd/mm`` covers the whole message); only surface the
+    # date row when every item agrees AND it isn't today.
+    batch_dates = {expense.expense_date for expense in expenses}
+    batch_date = batch_dates.pop() if len(batch_dates) == 1 else None
+
     text = format_transaction_batch_confirmation(
         items=[
             (
@@ -137,6 +144,7 @@ async def send_transaction_batch_confirmation(
         time=max((expense.created_at for expense in expenses), default=None),
         source_label=source_label,
         show_edit_hint=all_expense,
+        expense_date=batch_date,
     )
     reply_markup = (
         None if all_expense else transaction_batch_actions_keyboard(batch_id)

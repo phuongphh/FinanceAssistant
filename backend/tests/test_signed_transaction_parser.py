@@ -117,3 +117,68 @@ def test_parse_duoc_money_in_accepts(
 )
 def test_parse_duoc_money_in_rejects(text: str) -> None:
     assert _parse_duoc_money_in(text) is None
+
+
+# ---------------------------------------------------------------------------
+# Date extraction wiring — the Tier-1 fast-paths must surface the
+# ``ngày dd/mm[/yyyy]`` hint in the parsed dict as ISO string so the
+# wizard draft stays JSONB-safe, and the date phrase must NOT bleed into
+# the merchant slot.
+# ---------------------------------------------------------------------------
+
+
+def test_signed_expense_extracts_date_with_year() -> None:
+    parsed = _parse_signed_transaction("-1tr ăn tối ngày 16/05/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 1_000_000
+    assert parsed["expense_date"] == "2026-05-16"
+    # Date phrase stripped from merchant.
+    assert "ngày" not in parsed["merchant"]
+    assert "16/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "ăn tối"
+
+
+def test_signed_expense_extracts_year_less_date() -> None:
+    parsed = _parse_signed_transaction("-50k cà phê ngày 02/06")
+    assert parsed is not None
+    assert parsed["expense_date"] is not None
+    # Defaults to current year — exact value depends on test run date,
+    # but format and month/day must be right.
+    assert parsed["expense_date"].endswith("-06-02")
+    assert parsed["merchant"] == "cà phê"
+
+
+def test_signed_money_in_extracts_date() -> None:
+    parsed = _parse_signed_transaction("+5tr thưởng tết ngày 15/01/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 5_000_000
+    assert parsed["expense_date"] == "2026-01-15"
+    assert parsed["merchant"] == "thưởng tết"
+
+
+def test_signed_expense_without_date_omits_expense_date() -> None:
+    parsed = _parse_signed_transaction("-50k cà phê")
+    assert parsed is not None
+    # No date in input → key must be absent so the handler defaults to today.
+    assert "expense_date" not in parsed
+
+
+def test_duoc_money_in_extracts_date() -> None:
+    parsed = _parse_duoc_money_in("được bố cho 500k ngày 15/05/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 500_000
+    assert parsed["expense_date"] == "2026-05-15"
+    assert "ngày" not in parsed["merchant"]
+    assert parsed["merchant"] == "bố cho"
+
+
+def test_duoc_money_in_invalid_date_falls_back_silently() -> None:
+    """``ngày 31/02`` is invalid — parser must drop the date hint but still
+    record the money-in (don't refuse a good transaction over a bad date)."""
+    parsed = _parse_duoc_money_in("được bố cho 500k ngày 31/02")
+    assert parsed is not None
+    assert parsed["amount"] == 500_000
+    assert "expense_date" not in parsed
