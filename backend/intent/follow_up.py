@@ -168,15 +168,17 @@ _LEVEL_OVERRIDES: dict[tuple[IntentType, WealthLevel], tuple[FollowUp, ...]] = {
     # already leads with the YTD button, then "So với tháng trước" and a
     # BĐS filter — the right analytics-first surface for these levels.
     # (The "Portfolio detail" button + flow was removed by request.)
+    # HNW / VIP previously surfaced a dedicated "💼 Portfolio analytics"
+    # button on the net-worth view. It was removed by product request — the
+    # analytics shortcut routed to the same QUERY_PORTFOLIO surface as the
+    # base "💼 Portfolio của tôi" button, so it added a second portfolio
+    # entry-point without adding information. Trend remains as the
+    # HNW-flavored override; portfolio + goals come from the base pool.
     (IntentType.QUERY_NET_WORTH, WealthLevel.HIGH_NET_WORTH): (
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
     ),
-    # Đỉnh Cao (VIP) gets the same analytics-first surface as HNW —
-    # the persona/copy difference lives in prompts, not in follow-ups.
     (IntentType.QUERY_NET_WORTH, WealthLevel.VIP): (
         FollowUp("📈 Trend 6 tháng", IntentType.QUERY_NET_WORTH, {"trend_days": 180}),
-        FollowUp("💼 Portfolio analytics", IntentType.QUERY_PORTFOLIO),
     ),
 }
 

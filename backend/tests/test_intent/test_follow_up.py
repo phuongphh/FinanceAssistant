@@ -245,3 +245,39 @@ def test_net_worth_follow_ups_unaffected_when_no_time_range():
     the default net-worth view still gets its rich pool."""
     fus = get_follow_ups(IntentType.QUERY_NET_WORTH)
     assert len(fus) > 1
+
+
+@pytest.mark.parametrize("level", [
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_net_worth_view_no_longer_offers_portfolio_analytics_label(level):
+    """The "💼 Portfolio analytics" shortcut was removed across HNW/VIP.
+    It routed to the same QUERY_PORTFOLIO surface as the base
+    "💼 Portfolio của tôi" button, so it duplicated the entry-point."""
+    fus = get_follow_ups(IntentType.QUERY_NET_WORTH, wealth_level=level)
+    for fu in fus:
+        assert "Portfolio analytics" not in fu.label
+
+
+@pytest.mark.parametrize("level", [
+    None,
+    WealthLevel.STARTER,
+    WealthLevel.MASS_AFFLUENT,
+    WealthLevel.HIGH_NET_WORTH,
+    WealthLevel.VIP,
+])
+def test_month_vs_previous_view_excludes_portfolio_analytics(level):
+    """The month_vs_previous comparison surface must not surface any
+    portfolio button (analytics label or otherwise). It's a focused,
+    single-CTA view that hands off to goals."""
+    kwargs = {} if level is None else {"wealth_level": level}
+    fus = get_follow_ups(
+        IntentType.QUERY_NET_WORTH,
+        parameters={"time_range": "month_vs_previous"},
+        avoid_intent=IntentType.QUERY_NET_WORTH,
+        **kwargs,
+    )
+    for fu in fus:
+        assert fu.intent != IntentType.QUERY_PORTFOLIO
+        assert "Portfolio" not in fu.label
