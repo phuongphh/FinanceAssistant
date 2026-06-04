@@ -43,6 +43,7 @@ def format_transaction_confirmation(
     show_edit_hint: bool = False,
     transaction_type: str = "expense",
     expense_date: date | None = None,
+    edit_done: bool = False,
 ) -> str:
     """Tin nhắn xác nhận sau khi ghi giao dịch thành công.
 
@@ -117,7 +118,10 @@ def format_transaction_confirmation(
             )
 
     if show_edit_hint:
-        hint_key = "edit_hint_money_in" if is_money_in else "edit_hint"
+        if edit_done:
+            hint_key = "edit_hint_done_money_in" if is_money_in else "edit_hint_done"
+        else:
+            hint_key = "edit_hint_money_in" if is_money_in else "edit_hint"
         hint = _confirmation_copy(hint_key) or _confirmation_copy("edit_hint")
         if hint:
             lines.append("")
