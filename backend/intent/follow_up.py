@@ -26,6 +26,7 @@ import logging
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from dataclasses import dataclass
 
+from backend.config.categories import get_all_categories
 from backend.intent.intents import IntentType
 from backend.wealth.ladder import WealthLevel
 
@@ -57,6 +58,19 @@ _INTENT_TO_CODE: dict[IntentType, str] = {
 _CODE_TO_INTENT: dict[str, IntentType] = {v: k for k, v in _INTENT_TO_CODE.items()}
 
 
+# Parameter-key abbreviations for the callback wire format. Telegram caps
+# callback_data at 64 bytes; long JSON keys like ``"time_range"`` together
+# with a category code blow past that cap once base64-encoded. We shorten
+# only on the wire — handlers see the full key names after parsing.
+_PARAM_KEY_TO_CODE: dict[str, str] = {
+    "category": "c",
+    "time_range": "t",
+    "asset_type": "a",
+    "trend_days": "d",
+}
+_CODE_TO_PARAM_KEY: dict[str, str] = {v: k for k, v in _PARAM_KEY_TO_CODE.items()}
+
+
 @dataclass(frozen=True)
 class FollowUp:
     """One follow-up suggestion — label + the intent it triggers."""
@@ -77,9 +91,12 @@ class FollowUp:
         code = _INTENT_TO_CODE.get(self.intent, self.intent.value[:8])
         if not self.parameters:
             return f"{CALLBACK_PREFIX}{code}"
+        wire_params = {
+            _PARAM_KEY_TO_CODE.get(k, k): v for k, v in self.parameters.items()
+        }
         encoded = (
             urlsafe_b64encode(
-                json.dumps(self.parameters, separators=(",", ":")).encode()
+                json.dumps(wire_params, separators=(",", ":")).encode()
             )
             .decode()
             .rstrip("=")
@@ -110,7 +127,8 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
     ),
     IntentType.QUERY_EXPENSES: (
         FollowUp("📅 Tuần này", IntentType.QUERY_EXPENSES, {"time_range": "this_week"}),
-        FollowUp("🍕 Theo loại", IntentType.QUERY_EXPENSES_BY_CATEGORY),
+        # "🍕 Theo loại" is injected dynamically in ``get_follow_ups`` so it
+        # carries the parent report's ``time_range``.
         FollowUp(
             "📊 So sánh tháng trước",
             IntentType.QUERY_EXPENSES,
@@ -122,7 +140,8 @@ _BASE_SUGGESTIONS: dict[IntentType, tuple[FollowUp, ...]] = {
             "📅 Tháng trước", IntentType.QUERY_EXPENSES, {"time_range": "last_month"}
         ),
         FollowUp("📊 Tổng chi tiêu", IntentType.QUERY_EXPENSES),
-        FollowUp("🍕 Loại khác", IntentType.QUERY_EXPENSES_BY_CATEGORY),
+        # "🍕 Loại khác" is injected dynamically in ``get_follow_ups`` so it
+        # preserves the current ``time_range`` into the picker.
     ),
     IntentType.QUERY_INCOME: (
         FollowUp("💸 Cashflow tháng này", IntentType.QUERY_CASHFLOW),
@@ -215,6 +234,34 @@ def get_follow_ups(
         return [FollowUp("🎯 Mục tiêu của tôi", IntentType.QUERY_GOALS)]
 
     pool: list[FollowUp] = []
+    # Inject the "🍕 Theo loại" picker dynamically so it carries the parent
+    # report's ``time_range``. Without this the picker would default back to
+    # "tháng này" even when the user is currently viewing e.g. "tuần này".
+    # "🍕 Loại khác" plays the same role on the category-filtered surface.
+    if intent == IntentType.QUERY_EXPENSES:
+        picker_params: dict | None = None
+        parent_tr = params.get("time_range")
+        if parent_tr:
+            picker_params = {"time_range": parent_tr}
+        pool.append(
+            FollowUp(
+                "🍕 Theo loại",
+                IntentType.QUERY_EXPENSES_BY_CATEGORY,
+                picker_params,
+            )
+        )
+    elif intent == IntentType.QUERY_EXPENSES_BY_CATEGORY:
+        picker_params = None
+        parent_tr = params.get("time_range")
+        if parent_tr:
+            picker_params = {"time_range": parent_tr}
+        pool.append(
+            FollowUp(
+                "🍕 Loại khác",
+                IntentType.QUERY_EXPENSES_BY_CATEGORY,
+                picker_params,
+            )
+        )
     category = str(params.get("category") or "").lower()
     if intent == IntentType.QUERY_MARKET and category in {"stock", "stocks", "crypto", "gold"}:
         asset_type = "stock" if category in {"stock", "stocks"} else category
@@ -303,6 +350,10 @@ def parse_callback_data(callback_data: str) -> FollowUp | None:
             params = json.loads(raw)
             if not isinstance(params, dict):
                 params = None
+            else:
+                params = {
+                    _CODE_TO_PARAM_KEY.get(k, k): v for k, v in params.items()
+                }
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
             logger.debug("Bad follow-up params: %r", callback_data)
             return None
@@ -310,11 +361,55 @@ def parse_callback_data(callback_data: str) -> FollowUp | None:
     return FollowUp(label="", intent=intent, parameters=params or None)
 
 
+def build_category_picker_keyboard(time_range: str | None = None) -> dict:
+    """Inline keyboard listing every spending category as a follow-up.
+
+    Tapped when the user selects "🍕 Theo loại" on a spending report — each
+    button re-dispatches ``QUERY_EXPENSES_BY_CATEGORY`` with the chosen
+    ``category`` (and the preserved ``time_range`` so the filter applies to
+    the same period as the original report).
+
+    Two columns to keep the keyboard compact on mobile.
+    """
+    buttons: list[list[dict]] = []
+    row: list[dict] = []
+    for cat in get_all_categories():
+        params: dict = {"category": cat.code}
+        if time_range:
+            params["time_range"] = time_range
+        fu = FollowUp(
+            label=f"{cat.emoji} {cat.name_vi}",
+            intent=IntentType.QUERY_EXPENSES_BY_CATEGORY,
+            parameters=params,
+        )
+        row.append({"text": fu.label, "callback_data": fu.to_callback_data()})
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    return {"inline_keyboard": buttons}
+
+
+def is_category_picker_callback(parsed: FollowUp | None) -> bool:
+    """True when a parsed follow-up callback should trigger the category
+    picker rather than dispatching the handler — i.e. the user tapped
+    "🍕 Theo loại" without choosing a category yet."""
+    if parsed is None:
+        return False
+    if parsed.intent != IntentType.QUERY_EXPENSES_BY_CATEGORY:
+        return False
+    params = parsed.parameters or {}
+    return not params.get("category")
+
+
 __all__ = [
     "CALLBACK_PREFIX",
     "FollowUp",
     "MAX_SUGGESTIONS",
+    "build_category_picker_keyboard",
     "build_inline_keyboard",
     "get_follow_ups",
+    "is_category_picker_callback",
     "parse_callback_data",
 ]
