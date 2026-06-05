@@ -28,6 +28,7 @@ class IntentType(str, Enum):
     QUERY_EXPENSES = "query_expenses"
     QUERY_EXPENSES_BY_CATEGORY = "query_expenses_by_category"
     QUERY_INCOME = "query_income"
+    QUERY_MONEY_IN = "query_money_in"
     QUERY_CASHFLOW = "query_cashflow"
     QUERY_MARKET = "query_market"
     QUERY_GOALS = "query_goals"

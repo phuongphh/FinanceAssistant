@@ -29,6 +29,20 @@ _THIRTY_DAYS = TimeRange(
 )
 
 
+def _fetch_expenses_side_effect(expenses=None, money_in=None):
+    """Return a side_effect for ``_fetch_expenses`` that routes by
+    ``transaction_type`` so tests don't need to know call order."""
+    expenses = expenses or []
+    money_in = money_in or []
+
+    async def _impl(db, user, *, start, end, category=None, transaction_type="expense"):
+        if transaction_type == "money_in":
+            return money_in
+        return expenses
+
+    return _impl
+
+
 def _user(name: str = "An") -> MagicMock:
     user = MagicMock()
     user.id = uuid.uuid4()
@@ -85,7 +99,7 @@ async def test_starter_gets_simple_message_no_jargon():
 
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
-        AsyncMock(return_value=[expense]),
+        new=AsyncMock(side_effect=_fetch_expenses_side_effect(expenses=[expense])),
     ), patch(
         "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
         AsyncMock(return_value=Decimal("0")),
@@ -117,7 +131,7 @@ async def test_mass_affluent_gets_savings_rate_breakdown():
     expenses = [MagicMock(amount=Decimal("20000000"))]
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
-        AsyncMock(return_value=expenses),
+        new=AsyncMock(side_effect=_fetch_expenses_side_effect(expenses=expenses)),
     ), patch(
         "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
         AsyncMock(return_value=Decimal("0")),
@@ -147,7 +161,7 @@ async def test_no_data_message():
 
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
-        AsyncMock(return_value=[]),
+        new=AsyncMock(side_effect=_fetch_expenses_side_effect()),
     ), patch(
         "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
         AsyncMock(return_value=Decimal("0")),
@@ -179,7 +193,7 @@ async def test_cashflow_overview_splits_income_and_expense_cards():
     shopping = MagicMock(amount=Decimal("1000000"), category="shopping")
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
-        AsyncMock(return_value=[food, shopping]),
+        new=AsyncMock(side_effect=_fetch_expenses_side_effect(expenses=[food, shopping])),
     ), patch(
         "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
         AsyncMock(return_value=Decimal("500000")),
@@ -230,7 +244,7 @@ async def test_cashflow_current_month_detail_report():
     )
     with patch(
         "backend.intent.handlers.query_cashflow._fetch_expenses",
-        AsyncMock(return_value=[tx1, tx2]),
+        new=AsyncMock(side_effect=_fetch_expenses_side_effect(expenses=[tx1, tx2])),
     ), patch(
         "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
         AsyncMock(return_value=Decimal("3000000")),
@@ -253,6 +267,92 @@ async def test_cashflow_current_month_detail_report():
     assert "Chi tiêu hiện tại" in response
     assert "Chi phí định kì" in response
     assert "Tiền nhà" in response
+
+
+@pytest.mark.asyncio
+async def test_cashflow_overview_includes_money_in_card_and_correct_net():
+    """Bug fix: money_in must show as a separate card AND be added to net
+    (net = income + money_in - spend_total), not folded into expenses."""
+    user = _user()
+    intent = IntentResult(
+        intent=IntentType.QUERY_CASHFLOW,
+        confidence=1.0,
+        parameters={"time_range": "this_month"},
+        raw_text="[menu:cashflow:overview]",
+    )
+    salary = _stream(Decimal("30000000"))
+    salary.stream_type = "salary"
+    salary.name = "Lương"
+    db = _fake_db_with_streams([salary])
+    style = style_for_level(WealthLevel.MASS_AFFLUENT, Decimal("500000000"))
+
+    expense = MagicMock(amount=Decimal("10000000"), category="food")
+    gift = MagicMock(amount=Decimal("2000000"), category="other", merchant="Bố cho")
+    with patch(
+        "backend.intent.handlers.query_cashflow._fetch_expenses",
+        new=AsyncMock(
+            side_effect=_fetch_expenses_side_effect(
+                expenses=[expense], money_in=[gift]
+            )
+        ),
+    ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("0")),
+    ), patch(
+        "backend.intent.handlers.query_cashflow.resolve_style",
+        AsyncMock(return_value=style),
+    ):
+        response = await QueryCashflowHandler().handle(intent, user, db)
+
+    assert "💰 *Tiền vào tháng*" in response
+    # Net = 30M income + 2M money_in - 10M spend = 22M dư
+    assert "dư 22tr" in response.lower() or "22.000.000" in response
+
+
+@pytest.mark.asyncio
+async def test_cashflow_monthly_detail_shows_money_in_line():
+    user = _user()
+    intent = IntentResult(
+        intent=IntentType.QUERY_CASHFLOW,
+        confidence=1.0,
+        parameters={"focus": "current_month_detail", "time_range": "this_month"},
+        raw_text="[menu:cashflow:monthly_report]",
+    )
+    salary = _stream(Decimal("20000000"))
+    salary.stream_type = "salary"
+    salary.name = "Lương"
+    db = _fake_db_with_streams([salary])
+    style = style_for_level(WealthLevel.MASS_AFFLUENT, Decimal("500000000"))
+
+    expense = MagicMock(
+        amount=Decimal("5000000"),
+        category="food",
+        merchant="Nhà hàng",
+        expense_date=date.today().replace(day=3),
+    )
+    gift = MagicMock(
+        amount=Decimal("1000000"),
+        category="other",
+        merchant="Tìm trong ngăn bàn",
+        expense_date=date.today().replace(day=2),
+    )
+    with patch(
+        "backend.intent.handlers.query_cashflow._fetch_expenses",
+        new=AsyncMock(
+            side_effect=_fetch_expenses_side_effect(
+                expenses=[expense], money_in=[gift]
+            )
+        ),
+    ), patch(
+        "backend.intent.handlers.query_cashflow._recurring_expense_for_period",
+        AsyncMock(return_value=Decimal("0")),
+    ), patch(
+        "backend.intent.handlers.query_cashflow.resolve_style",
+        AsyncMock(return_value=style),
+    ):
+        response = await QueryCashflowHandler().handle(intent, user, db)
+
+    assert "Tiền vào:" in response
 
 
 class TestIncomeForPeriodFromStreams:
