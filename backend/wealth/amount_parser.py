@@ -44,7 +44,14 @@ _AMOUNT_RE = re.compile(
     (?P<int>\d{1,3}(?:[.,]\d{3})+|\d+)            # 1,000,000 or 1000000
     (?:[.,](?P<frac>\d+))?                        # optional .5 or ,5
     \s*
-    (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:(?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)
+       (?!(?!rưỡi|ruoi)[^\W\d_]))?                # a unit must not be the prefix of a
+                                                  # word: the "tr" in "trên", the "k"
+                                                  # in "kem", the "d" in "do" are NOT
+                                                  # units. ``[^\W\d_]`` is "a letter";
+                                                  # the inner ``(?!rưỡi|ruoi)`` still
+                                                  # lets a glued half-word through
+                                                  # ("3trrưỡi" = 3.5 triệu).
     (?:\s*(?P<sub>\d+))?                          # "25tr320" or "1 tỷ 500" sub-amount
     (?:\s*(?P<half>rưỡi|ruoi))?                   # "rưỡi" → +0.5 of unit
     \s*
@@ -174,7 +181,8 @@ _LABELED_AMOUNT_RE = re.compile(
     (?:^|(?<=\s))
     (?P<num>\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)
     \s*
-    (?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)?
+    (?:(?P<unit>tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)
+       (?!(?!rưỡi|ruoi)[^\W\d_]))?                # see _AMOUNT_RE: unit ≠ word prefix
     (?:\s*(?P<sub>\d+))?
     (?:\s*(?P<half>rưỡi|ruoi))?
     """,
