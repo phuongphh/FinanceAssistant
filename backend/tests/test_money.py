@@ -89,3 +89,7 @@ class TestFormatMoneyFull:
 
     def test_user_amount_full_precision(self):
         assert format_money_full(2_350_000) == "2,350,000đ"
+
+    def test_large_decimal_preserves_exact_value(self):
+        # float conversion would lose precision past 2**53; Decimal path keeps it.
+        assert format_money_full(Decimal("9007199254740993")) == "9,007,199,254,740,993đ"

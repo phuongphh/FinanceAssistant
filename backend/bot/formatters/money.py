@@ -8,14 +8,22 @@ mất chính xác ở mức triệu (ví dụ 2,350,000đ → "2tr350", KHÔNG p
 from decimal import ROUND_HALF_UP, Decimal
 
 
-def _round_half_up(value: float, divisor: int) -> int:
+def _to_decimal(amount) -> Decimal:
+    if isinstance(amount, Decimal):
+        return amount
+    if isinstance(amount, int):
+        return Decimal(amount)
+    return Decimal(repr(amount))
+
+
+def _round_half_up(value: Decimal, divisor: int) -> int:
     """Round ``value / divisor`` half-away-from-zero to int.
 
     Python's built-in ``round`` uses banker's rounding (round-half-even), which
     would turn 2,350,500 into 2,350 (then "2tr350") instead of the user-expected
     2,351 ("2tr351"). Use Decimal ROUND_HALF_UP for predictable display.
     """
-    quotient = Decimal(int(value)) / Decimal(divisor) if isinstance(value, int) else Decimal(repr(value)) / Decimal(divisor)
+    quotient = value / Decimal(divisor)
     return int(quotient.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
@@ -48,7 +56,7 @@ def format_money_short(amount) -> str:
         >>> format_money_short(-2_350_000)
         '-2tr350'
     """
-    value = float(amount) if not isinstance(amount, Decimal) else float(amount)
+    value = _to_decimal(amount)
     sign = "-" if value < 0 else ""
     raw = abs(value)
 
@@ -85,4 +93,5 @@ def format_money_full(amount) -> str:
         >>> format_money_full(1500000)
         '1,500,000đ'
     """
-    return f"{int(round(float(amount))):,}đ"
+    rounded = _to_decimal(amount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return f"{int(rounded):,}đ"
