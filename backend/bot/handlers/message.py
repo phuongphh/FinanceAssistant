@@ -149,22 +149,24 @@ async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> t
 def _parse_signed_transaction(text: str) -> dict | None:
     if _QUESTION_HINT_RE.search(text):
         return None
-    signed = _SIGNED_TX_RE.match(text)
+
+    # Pull any transaction-date phrase out of the FULL text first so a
+    # leading bare date like "14/05/2026 -120k cà phê" still reaches the
+    # sign-aware matchers (otherwise the leading "14/05/2026" would
+    # prevent both _SIGNED_TX_RE and _AMOUNT_LED_TX_RE from matching).
+    extracted_date = extract_transaction_date(text)
+    cleaned = strip_span(text, extracted_date.span) if extracted_date else text
+
+    signed = _SIGNED_TX_RE.match(cleaned)
     if signed:
         sign = signed.group("sign")
         body = (signed.group("body") or "").strip()
     else:
-        amount_led = _AMOUNT_LED_TX_RE.match(text)
+        amount_led = _AMOUNT_LED_TX_RE.match(cleaned)
         if not amount_led:
             return None
         sign = None
         body = (amount_led.group("body") or "").strip()
-
-    # Strip any "ngày dd/mm[/yyyy]" phrase BEFORE searching for the
-    # amount so the date digits don't get mistaken for a price.
-    extracted_date = extract_transaction_date(body)
-    if extracted_date is not None:
-        body = strip_span(body, extracted_date.span)
 
     amount_match = _AMOUNT_TOKEN_RE.search(body)
     if not amount_match:

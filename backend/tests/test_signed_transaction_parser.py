@@ -182,3 +182,84 @@ def test_duoc_money_in_invalid_date_falls_back_silently() -> None:
     assert parsed is not None
     assert parsed["amount"] == 500_000
     assert "expense_date" not in parsed
+
+
+# ---------------------------------------------------------------------------
+# Keyword-less date fast-path — the user can lead the message with a bare
+# ``dd/mm/yyyy`` date and the Tier-1 parsers MUST still record the date.
+# This is the bug the screenshot showed: ``14/05/2026 ăn gà kfc 120k`` was
+# logged with today's date because the sign/amount-led matchers fired on
+# the date digits before the date extractor saw them.
+# ---------------------------------------------------------------------------
+
+
+def test_signed_expense_with_leading_year_bearing_date() -> None:
+    parsed = _parse_signed_transaction("14/05/2026 -1tr ăn tối")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 1_000_000
+    assert parsed["expense_date"] == "2026-05-14"
+    assert "14/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "ăn tối"
+
+
+def test_amount_led_expense_with_leading_year_bearing_date() -> None:
+    """The exact screenshot bug: no sign, leading date, then amount+merchant."""
+    parsed = _parse_signed_transaction("14/05/2026 120k cà phê")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 120_000
+    assert parsed["expense_date"] == "2026-05-14"
+    assert "14/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "cà phê"
+
+
+def test_signed_money_in_with_leading_year_bearing_date() -> None:
+    parsed = _parse_signed_transaction("14/05/2026 +5tr thưởng")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 5_000_000
+    assert parsed["expense_date"] == "2026-05-14"
+    assert "14/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "thưởng"
+
+
+def test_signed_expense_with_trailing_year_bearing_date() -> None:
+    parsed = _parse_signed_transaction("-50k cà phê 02/06/2026")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 50_000
+    assert parsed["expense_date"] == "2026-06-02"
+    assert "02/06" not in parsed["merchant"]
+    assert parsed["merchant"] == "cà phê"
+
+
+def test_amount_led_expense_with_leading_bare_dd_mm() -> None:
+    """Leading ``dd/mm`` (no year) with day>12 is unambiguously a date."""
+    parsed = _parse_signed_transaction("14/05 120k cà phê")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "expense"
+    assert parsed["amount"] == 120_000
+    assert parsed["expense_date"] is not None
+    assert parsed["expense_date"].endswith("-05-14")
+    assert parsed["merchant"] == "cà phê"
+
+
+def test_duoc_money_in_with_leading_year_bearing_date() -> None:
+    parsed = _parse_duoc_money_in("14/05/2026 được bố cho 500k")
+    assert parsed is not None
+    assert parsed["transaction_type"] == "money_in"
+    assert parsed["amount"] == 500_000
+    assert parsed["expense_date"] == "2026-05-14"
+    assert "14/05" not in parsed["merchant"]
+    assert parsed["merchant"] == "bố cho"
+
+
+def test_ratio_shape_not_parsed_as_transaction() -> None:
+    """``1/2 ổ bánh mì 50k`` must NOT be parsed as a 1-Feb expense — the
+    Mode 2 guard (day>12 OR month>12) keeps ratios untouched."""
+    parsed = _parse_signed_transaction("1/2 ổ bánh mì 50k")
+    # Even if the parser does record this as an expense, the expense_date
+    # MUST NOT be set from the leading "1/2".
+    if parsed is not None:
+        assert "expense_date" not in parsed
