@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -334,6 +334,22 @@ async def health_check():
 
 _ADMIN_STATIC = Path(__file__).parent / "static" / "admin"
 if _ADMIN_STATIC.exists():
+    # Canonical admin URL is /admin/ (matches Cloudflare ingress + deploy
+    # script success message). Starlette's Mount("/admin", ...) only
+    # matches /admin/* — bare /admin still 404s without an explicit
+    # redirect, so add one before mounting.
+    @app.get("/admin", include_in_schema=False)
+    async def _admin_trailing_slash():
+        return RedirectResponse(url="/admin/", status_code=308)
+
+    # /admin mount must come BEFORE / so the more-specific prefix wins
+    # for /admin/login, /admin/assets/*, etc.
+    app.mount(
+        "/admin",
+        SPAStaticFiles(directory=str(_ADMIN_STATIC), html=True),
+        name="admin-spa-prefix",
+    )
+    # Root mount kept for backward-compat: pre-fix users had / bookmarked.
     app.mount(
         "/", SPAStaticFiles(directory=str(_ADMIN_STATIC), html=True), name="admin-spa"
     )
