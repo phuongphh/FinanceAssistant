@@ -637,8 +637,8 @@ class TestConfirmationKeyboard:
         )
         assert "Nhà hàng" in body
         assert "2 giao dịch" in body
-        # Total = 2,300,000 → "2.3tr"
-        assert "2.3tr" in body
+        # Total = 2,300,000 → "2tr300" (round to nearest 1,000đ only).
+        assert "2tr300" in body
 
     def test_format_pending_confirmation_html_escapes_merchant(self):
         body = h.format_pending_confirmation(

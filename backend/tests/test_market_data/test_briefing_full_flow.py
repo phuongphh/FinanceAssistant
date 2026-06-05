@@ -145,7 +145,7 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
     assert "stock" in result.text
     assert "crypto" in result.text
     assert "gold" in result.text
-    assert "155.5tr" in result.sections["net_worth"]
+    assert "155tr500" in result.sections["net_worth"]
     assert await redis.get("market_data:stock:VNM") is not None
     assert await redis.get("market_data:crypto:BTC") is not None
     assert result.is_stale is False
