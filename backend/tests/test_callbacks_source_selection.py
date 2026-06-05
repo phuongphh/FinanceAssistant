@@ -654,3 +654,87 @@ async def test_handle_transaction_callback_routes_txsrc_wallet_prefix():
 
     assert handled is True
     source_handler.assert_awaited_once_with(db, cb)
+
+
+@pytest.mark.asyncio
+async def test_create_expense_failure_alerts_user_and_clears_wizard():
+    """Issue #948 safety net: when ``create_expense`` raises (e.g. DB
+    check-constraint violation on the e_wallet flow), the user must NOT
+    be left staring at a stuck spinner.
+
+    Contract:
+      - ``answer_callback`` fires with ``show_alert=True`` and a friendly
+        Vietnamese message (Bé Tiền tone — no harsh wording).
+      - A chat fallback ``send_message`` follows so the message survives
+        the alert dismiss.
+      - The wizard state is cleared so the user can retry from scratch.
+      - The handler returns ``True`` so the dispatcher stops processing.
+    """
+    user = _user()
+    db = MagicMock()
+    wallet_id = uuid.uuid4()
+
+    answer = AsyncMock()
+    send = AsyncMock()
+    edit_text = AsyncMock()
+    boom = AsyncMock(side_effect=RuntimeError("simulated IntegrityError"))
+    with (
+        patch.object(
+            callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(callbacks.expense_service, "create_expense", boom),
+        patch.object(callbacks, "edit_message_text", edit_text),
+        patch.object(callbacks, "send_message", send),
+        patch.object(callbacks, "answer_callback", answer),
+        patch("backend.services.wizard_service.clear", AsyncMock()) as wizard_clear,
+    ):
+        handled = await callbacks._handle_source_selection_callback(
+            db, _callback(f"txsrc_wallet:{wallet_id}")
+        )
+
+    assert handled is True
+    # The picker message is NOT edited on failure — the user gets a fresh
+    # chat message + alert instead.
+    edit_text.assert_not_awaited()
+    answer.assert_awaited_once()
+    assert answer.await_args.kwargs.get("show_alert") is True
+    alert_text = (answer.await_args.kwargs.get("text") or "").lower()
+    # Friendly Bé Tiền tone — never harsh.
+    assert "chưa ghi" in alert_text or "không ghi" in alert_text
+    send.assert_awaited_once()
+    sent_text = send.await_args.args[1].lower()
+    assert "chưa ghi" in sent_text or "không ghi" in sent_text
+    wizard_clear.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_expense_failure_does_not_crash_without_chat_id():
+    """If Telegram somehow delivers a callback without a chat (rare —
+    shouldn't happen for inline keyboards but is defensively guarded),
+    the safety net must still alert the user via ``answer_callback``
+    without raising on the missing ``chat_id``."""
+    user = _user()
+    db = MagicMock()
+    wallet_id = uuid.uuid4()
+
+    cb = _callback(f"txsrc_wallet:{wallet_id}")
+    cb["message"] = {}  # no chat key — chat_id resolves to None
+
+    answer = AsyncMock()
+    send = AsyncMock()
+    boom = AsyncMock(side_effect=RuntimeError("boom"))
+    with (
+        patch.object(
+            callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(callbacks.expense_service, "create_expense", boom),
+        patch.object(callbacks, "send_message", send),
+        patch.object(callbacks, "answer_callback", answer),
+        patch("backend.services.wizard_service.clear", AsyncMock()),
+    ):
+        handled = await callbacks._handle_source_selection_callback(db, cb)
+
+    assert handled is True
+    answer.assert_awaited_once()
+    # No chat to send a fallback into — skip silently rather than crash.
+    send.assert_not_awaited()
