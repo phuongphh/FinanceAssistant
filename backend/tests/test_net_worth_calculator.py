@@ -203,6 +203,60 @@ class TestCalculateHistorical:
         total = await nwc.calculate_historical(db, uuid.uuid4(), date(2026, 4, 1))
         assert total == Decimal(0)
 
+    async def test_query_joins_assets_and_filters_ghost_states(self):
+        """Regression: phantom -19.5% on morning briefing.
+
+        Soft-deleted, placeholder, and unconfirmed assets must be excluded
+        from the historical sum so it matches ``get_user_assets`` semantics.
+        We assert the SQL text itself (rather than mocking row-level
+        behaviour) because the filter belongs to the query plan — that's
+        what guarantees DB-side consistency under any data shape.
+        """
+        result = MagicMock()
+        result.scalar.return_value = Decimal(0)
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        await nwc.calculate_historical(db, uuid.uuid4(), date(2026, 6, 4))
+
+        executed_stmt = db.execute.await_args.args[0]
+        sql = str(executed_stmt).lower()
+        assert "join assets" in sql
+        assert "a.is_active = true" in sql
+        assert "a.is_placeholder_asset = false" in sql
+        assert "a.is_confirmed = true" in sql
+        # The join must be wired through the asset_id FK, not a cross-join.
+        assert "a.id = s.asset_id" in sql
+
+    async def test_change_excludes_sold_asset_snapshot_regression(
+        self, monkeypatch
+    ):
+        """End-to-end shape of the bug shown in the screenshot.
+
+        User holds 2.5 tỷ today. Yesterday a ~592.8tr stock was sold (cash
+        proceeds NOT yet re-added). Pre-fix: historical summed both the
+        live cash + the sold stock snapshot ⇒ previous ≈ 3.09 tỷ ⇒
+        -19.5%. Post-fix: the JOIN drops the sold asset, so previous
+        matches current and the briefing reports a flat change.
+        """
+        monkeypatch.setattr(
+            "backend.wealth.services.asset_service.get_user_assets",
+            AsyncMock(return_value=[_asset("cash", "VCB", 2_500_000_000)]),
+        )
+        # The post-fix query returns only the still-held assets'
+        # snapshots, so previous == current.
+        result = MagicMock()
+        result.scalar.return_value = Decimal("2_500_000_000")
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        change = await nwc.calculate_change(db, uuid.uuid4(), period="day")
+
+        assert change.current == Decimal("2_500_000_000")
+        assert change.previous == Decimal("2_500_000_000")
+        assert change.change_absolute == Decimal(0)
+        assert change.change_percentage == 0.0
+
 
 @pytest.mark.asyncio
 class TestCalculateChange:

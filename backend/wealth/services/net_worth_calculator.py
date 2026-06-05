@@ -192,15 +192,28 @@ async def calculate_historical(
     Uses Postgres ``DISTINCT ON (asset_id)`` to pick the latest snapshot
     on or before the target date — one row per asset, single scan.
     Returns 0 if no snapshots exist on/before that date.
+
+    The JOIN on ``assets`` with ``is_active / is_placeholder_asset /
+    is_confirmed`` mirrors ``asset_service.get_user_assets`` so the
+    historical figure is computed over the exact same asset set as
+    :func:`calculate`. Without this guard, snapshots belonging to
+    soft-deleted, placeholder, or unconfirmed assets would inflate
+    "hôm qua" while being excluded from "hôm nay", producing phantom
+    declines on the morning briefing. Index ``idx_assets_real`` covers
+    the predicate.
     """
     stmt = text(
         """
         SELECT COALESCE(SUM(value), 0) AS total FROM (
-            SELECT DISTINCT ON (asset_id) value
-            FROM asset_snapshots
-            WHERE user_id = :user_id
-              AND snapshot_date <= :target_date
-            ORDER BY asset_id, snapshot_date DESC
+            SELECT DISTINCT ON (s.asset_id) s.value
+            FROM asset_snapshots s
+            JOIN assets a ON a.id = s.asset_id
+            WHERE s.user_id = :user_id
+              AND s.snapshot_date <= :target_date
+              AND a.is_active = TRUE
+              AND a.is_placeholder_asset = FALSE
+              AND a.is_confirmed = TRUE
+            ORDER BY s.asset_id, s.snapshot_date DESC
         ) latest
         """
     ).bindparams(
