@@ -276,12 +276,27 @@ async function fetchJSON(url, options = {}) {
     return res.json();
 }
 
+// Round only to nearest 1,000đ — same rule as DashboardCommon.formatMoneyShort.
 function fmtMoney(v) {
     if (isNaN(v)) return "—";
-    if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)} tỷ`;
-    if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)} tr`;
-    if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(0)}k`;
-    return v.toFixed(0) + " đ";
+    const value = Number(v) || 0;
+    const sign = value < 0 ? '-' : '';
+    const raw = Math.abs(value);
+    if (raw < 1) return '0đ';
+    if (raw < 1_000) return sign + Math.round(raw) + 'đ';
+    const thousandsTotal = Math.round(raw / 1_000);
+    if (thousandsTotal < 1_000) return sign + thousandsTotal + 'k';
+    if (thousandsTotal < 1_000_000) {
+        const millions = Math.floor(thousandsTotal / 1_000);
+        const thousands = thousandsTotal % 1_000;
+        if (thousands === 0) return sign + millions + 'tr';
+        return sign + millions + 'tr' + String(thousands).padStart(3, '0');
+    }
+    const trTotal = Math.round(raw / 1_000_000);
+    const billions = Math.floor(trTotal / 1_000);
+    const millions = trTotal % 1_000;
+    if (millions === 0) return sign + billions + ' tỷ';
+    return sign + billions + 'tỷ' + String(millions).padStart(3, '0');
 }
 
 function escHtml(s) {

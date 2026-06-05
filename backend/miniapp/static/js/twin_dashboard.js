@@ -496,15 +496,31 @@
         if (theme.button_text_color) root.style.setProperty('--primary-text', theme.button_text_color);
     }
 
-    function formatMoneyShort(value) {
-        if (value >= 1_000_000_000) return `${trim(value / 1_000_000_000)} tỷ`;
-        if (value >= 1_000_000) return `${trim(value / 1_000_000)}tr`;
-        if (value >= 1_000) return `${trim(value / 1_000)}k`;
-        return `${Math.round(value).toLocaleString('en-US')}đ`;
+    // Mirror dashboard_common.js formatMoneyShort exactly — Twin dashboard
+    // keeps a local copy because it's loaded before dashboard_common in
+    // some legacy entry points. Round only to nearest 1,000đ.
+    function formatMoneyShort(amount) {
+        const value = Number(amount) || 0;
+        const sign = value < 0 ? '-' : '';
+        const raw = Math.abs(value);
+        if (raw < 1) return '0đ';
+        if (raw < 1_000) return sign + Math.round(raw) + 'đ';
+        const thousandsTotal = Math.round(raw / 1_000);
+        if (thousandsTotal < 1_000) return sign + thousandsTotal + 'k';
+        if (thousandsTotal < 1_000_000) {
+            const millions = Math.floor(thousandsTotal / 1_000);
+            const thousands = thousandsTotal % 1_000;
+            if (thousands === 0) return sign + millions + 'tr';
+            return sign + millions + 'tr' + String(thousands).padStart(3, '0');
+        }
+        const trTotal = Math.round(raw / 1_000_000);
+        const billions = Math.floor(trTotal / 1_000);
+        const millions = trTotal % 1_000;
+        if (millions === 0) return sign + billions + ' tỷ';
+        return sign + billions + 'tỷ' + String(millions).padStart(3, '0');
     }
 
     function formatMoneyFull(value) { return `${Math.round(value).toLocaleString('en-US')}đ`; }
-    function trim(value) { return value.toFixed(value >= 10 ? 0 : 1).replace('.0', ''); }
 
     const DATE_FORMAT_BY_LANGUAGE = {
         vi: { locale: 'vi-VN', options: { day: '2-digit', month: '2-digit', year: 'numeric' } },
