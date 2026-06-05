@@ -220,9 +220,32 @@ async def _handle_source_selection_callback(
         source_asset_id=source_asset_id,
         expense_date=expense_date_value,
     )
-    expense = await expense_service.create_expense(db, user.id, expense_data)
-    from backend.services import wizard_service
-
+    # Issue #948 safety net: if the write fails (e.g. DB check-constraint
+    # violation on the e_wallet flow), the user must still get feedback —
+    # otherwise the tapped button spins forever while the worker silently
+    # marks the update as failed.
+    try:
+        expense = await expense_service.create_expense(db, user.id, expense_data)
+    except Exception:
+        logger.exception(
+            "create_expense failed in source-selection flow for user %s (data=%s)",
+            user.id,
+            data,
+        )
+        await wizard_service.clear(db, user.id)
+        await answer_callback(
+            callback_id,
+            text="Mình chưa ghi được giao dịch này 🌱 Bạn gõ lại giúp mình nhé.",
+            show_alert=True,
+        )
+        if chat_id is not None:
+            await send_message(
+                chat_id,
+                "Mình chưa ghi được giao dịch vừa rồi 🌱 Bạn gõ lại giúp "
+                "mình nhé — nếu lặp lại, thử chọn nguồn khác xem sao.",
+                parse_mode=None,
+            )
+        return True
     await wizard_service.clear(db, user.id)
     tx_sign = "+" if expense.transaction_type == "money_in" else "-"
     # Render the source label through the canonical resolver so that asset-
@@ -1025,7 +1048,33 @@ async def _handle_change_source_subpicker(
         await answer_callback(callback_id)
         return True
 
-    updated = await expense_service.update_expense(db, user.id, expense.id, update)
+    # Issue #948 safety net: a failed update (e.g. DB check-constraint
+    # violation on the e_wallet flow) must not leave the user with a
+    # stuck spinner on the source-change picker.
+    try:
+        updated = await expense_service.update_expense(
+            db, user.id, expense.id, update
+        )
+    except Exception:
+        logger.exception(
+            "update_expense failed in change-source flow for user %s (data=%s)",
+            user.id,
+            data,
+        )
+        await wizard_service.clear(db, user.id)
+        await answer_callback(
+            callback_id,
+            text="Mình chưa đổi được nguồn tiền 🌱 Bạn thử lại giúp mình nhé.",
+            show_alert=True,
+        )
+        if chat_id is not None:
+            await send_message(
+                chat_id,
+                "Mình chưa đổi được nguồn tiền 🌱 Bạn thử lại giúp mình "
+                "nhé — nếu lặp lại, chọn nguồn khác xem sao.",
+                parse_mode=None,
+            )
+        return True
     await wizard_service.clear(db, user.id)
     if updated is None:
         await answer_callback(

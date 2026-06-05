@@ -277,4 +277,67 @@ async def test_change_source_subpicker_rejects_when_not_in_flow(monkeypatch):
     )
     assert handled is True
     answer.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_change_source_subpicker_update_failure_alerts_user(monkeypatch):
+    """Issue #948 safety net for the change-source flow: when
+    ``update_expense`` raises (e.g. DB check-constraint violation on
+    the e_wallet flow), the picker must surface a friendly alert and a
+    chat fallback rather than leaving the user staring at a stuck spinner.
+
+    Contract mirrors the create_expense safety net:
+      - ``answer_callback`` fires with ``show_alert=True`` and a Bé Tiền-
+        tone Vietnamese message.
+      - A chat ``send_message`` fallback follows.
+      - The wizard state is cleared.
+      - The re-render is skipped (no successful update to render).
+    """
+    expense = SimpleNamespace(id="tx-1", transaction_type="expense")
+    user = SimpleNamespace(
+        id=42,
+        wizard_state={
+            "flow": "transaction_source_edit",
+            "step": "pick_kind",
+            "draft": {"expense_id": "tx-1", "chat_id": 10, "message_id": 20},
+        },
+    )
+
+    monkeypatch.setattr(
+        callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    )
+    monkeypatch.setattr(
+        callbacks,
+        "resolve_transaction_by_callback_id",
+        AsyncMock(return_value=expense),
+    )
+    boom = AsyncMock(side_effect=RuntimeError("simulated IntegrityError"))
+    monkeypatch.setattr(callbacks.expense_service, "update_expense", boom)
+    clear = AsyncMock()
+    monkeypatch.setattr(callbacks.wizard_service, "clear", clear)
+    rerender = AsyncMock()
+    monkeypatch.setattr(callbacks, "_rerender_transaction_message", rerender)
+    answer = AsyncMock()
+    monkeypatch.setattr(callbacks, "answer_callback", answer)
+    send = AsyncMock()
+    monkeypatch.setattr(callbacks, "send_message", send)
+
+    callback_query = {
+        "id": "cb1",
+        "data": "chsrc_wl:22222222-2222-2222-2222-222222222222",
+        "from": {"id": 7},
+        "message": {"chat": {"id": 10}, "message_id": 20},
+    }
+    handled = await callbacks._handle_change_source_subpicker(
+        SimpleNamespace(), callback_query
+    )
+
+    assert handled is True
+    rerender.assert_not_awaited()
+    answer.assert_awaited_once()
+    assert answer.await_args.kwargs.get("show_alert") is True
+    alert_text = (answer.await_args.kwargs.get("text") or "").lower()
+    assert "chưa đổi" in alert_text or "không đổi" in alert_text
+    send.assert_awaited_once()
+    clear.assert_awaited_once()
     assert answer.await_args.kwargs.get("show_alert") is True
