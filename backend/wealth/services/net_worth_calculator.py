@@ -193,14 +193,18 @@ async def calculate_historical(
     on or before the target date — one row per asset, single scan.
     Returns 0 if no snapshots exist on/before that date.
 
-    The JOIN on ``assets`` with ``is_active / is_placeholder_asset /
-    is_confirmed`` mirrors ``asset_service.get_user_assets`` so the
-    historical figure is computed over the exact same asset set as
-    :func:`calculate`. Without this guard, snapshots belonging to
-    soft-deleted, placeholder, or unconfirmed assets would inflate
-    "hôm qua" while being excluded from "hôm nay", producing phantom
-    declines on the morning briefing. Index ``idx_assets_real`` covers
-    the predicate.
+    The JOIN on ``assets`` mirrors ``asset_service.get_user_assets`` for
+    placeholder / unconfirmed gating (those are work-in-progress rows
+    that never represented real holdings, so their snapshots must not
+    anchor any historical comparison). For ``is_active`` we time-gate
+    instead of dropping every inactive asset: an asset sold *after*
+    ``target_date`` was still owned on that date, and its snapshot must
+    count toward past net worth — otherwise "how much did I have on
+    Apr 30" silently drops everything sold since, and the asset model's
+    contract ("snapshots remain so net-worth-at-date stays
+    reproducible") breaks. Index ``idx_assets_real`` covers the
+    placeholder/confirmed predicates; ``sold_at`` is low-cardinality
+    and the JOIN is selective.
     """
     stmt = text(
         """
@@ -210,9 +214,9 @@ async def calculate_historical(
             JOIN assets a ON a.id = s.asset_id
             WHERE s.user_id = :user_id
               AND s.snapshot_date <= :target_date
-              AND a.is_active = TRUE
               AND a.is_placeholder_asset = FALSE
               AND a.is_confirmed = TRUE
+              AND (a.is_active = TRUE OR a.sold_at > :target_date)
             ORDER BY s.asset_id, s.snapshot_date DESC
         ) latest
         """

@@ -222,11 +222,35 @@ class TestCalculateHistorical:
         executed_stmt = db.execute.await_args.args[0]
         sql = str(executed_stmt).lower()
         assert "join assets" in sql
-        assert "a.is_active = true" in sql
         assert "a.is_placeholder_asset = false" in sql
         assert "a.is_confirmed = true" in sql
+        # is_active is TIME-GATED, not absolute: an asset sold after the
+        # target date was still owned on that date. Dropping it would
+        # silently erase reproducible past net worth.
+        assert "a.is_active = true or a.sold_at > :target_date" in sql
         # The join must be wired through the asset_id FK, not a cross-join.
         assert "a.id = s.asset_id" in sql
+
+    async def test_query_preserves_assets_sold_after_target_date(self):
+        """Codex review #940: ``calculate_historical(target_date)`` must
+        include assets that were *still owned* on ``target_date`` even
+        if the user has sold them since. Anything else breaks the
+        "snapshots remain → past net worth stays reproducible" contract
+        the model docstring promises, and silently zeros out callers
+        like ``compute_net_worth_growth`` after every sale.
+        """
+        result = MagicMock()
+        result.scalar.return_value = Decimal(0)
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        await nwc.calculate_historical(db, uuid.uuid4(), date(2026, 4, 30))
+
+        sql = str(db.execute.await_args.args[0]).lower()
+        # The disjunction is the entire point of the fix — assert it
+        # exactly so a future "simplification" back to ``is_active = TRUE``
+        # would trip the test.
+        assert "is_active = true or a.sold_at > :target_date" in sql
 
     async def test_change_excludes_sold_asset_snapshot_regression(
         self, monkeypatch
