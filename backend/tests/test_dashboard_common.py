@@ -116,9 +116,11 @@ def test_dashboard_common_exposes_expected_helpers() -> None:
 
 
 def test_format_money_short_canonical_precision() -> None:
-    """Canonical 2-decimal precision for billions, 1-decimal for millions,
-    rounded thousands, rounded raw đồng. Mirrors the rule the expense and
-    wealth dashboards depended on before extraction.
+    """Rounding rule: only ever round to the nearest 1,000đ in the triệu
+    range — so 2,350,000đ renders as "2tr350" (NOT the legacy "2.4tr").
+    Tỷ range rounds to the nearest 1tr to keep the badge short on mobile.
+    Mirrors backend/bot/formatters/money.py — keep both implementations
+    in sync so server-rendered summaries and dashboard widgets agree.
     """
     cases = _evaluate("""
         return {
@@ -126,19 +128,36 @@ def test_format_money_short_canonical_precision() -> None:
             '500': DC.formatMoneyShort(500),
             '1500': DC.formatMoneyShort(1500),
             '12345': DC.formatMoneyShort(12345),
+            '45500': DC.formatMoneyShort(45500),
+            '2350000': DC.formatMoneyShort(2350000),
+            '2350400': DC.formatMoneyShort(2350400),
+            '2350500': DC.formatMoneyShort(2350500),
+            '1050000': DC.formatMoneyShort(1050000),
             '1500000': DC.formatMoneyShort(1500000),
+            '25000000': DC.formatMoneyShort(25000000),
+            '1200000000': DC.formatMoneyShort(1200000000),
             '1234567890': DC.formatMoneyShort(1234567890),
             '2000000000': DC.formatMoneyShort(2000000000),
+            'neg2350000': DC.formatMoneyShort(-2350000),
             'neg45000': DC.formatMoneyShort(-45000),
         };
     """)
     assert cases["0"] == "0đ"
     assert cases["500"] == "500đ"
-    assert cases["1500"] == "2k"  # round
+    assert cases["1500"] == "2k"
     assert cases["12345"] == "12k"
-    assert cases["1500000"] == "1.5tr"
-    assert cases["1234567890"] == "1.23 tỷ"
-    assert cases["2000000000"] == "2 tỷ"  # trailing zeros stripped
+    assert cases["45500"] == "46k"
+    # User-reported bug: badge showed "2.4tr" for a 2,350,000đ money-in entry.
+    assert cases["2350000"] == "2tr350"
+    assert cases["2350400"] == "2tr350"
+    assert cases["2350500"] == "2tr351"
+    assert cases["1050000"] == "1tr050"
+    assert cases["1500000"] == "1tr500"
+    assert cases["25000000"] == "25tr"
+    assert cases["1200000000"] == "1tỷ200"
+    assert cases["1234567890"] == "1tỷ235"
+    assert cases["2000000000"] == "2 tỷ"
+    assert cases["neg2350000"] == "-2tr350"
     assert cases["neg45000"] == "-45k"
 
 

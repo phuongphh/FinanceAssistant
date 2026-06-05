@@ -68,19 +68,28 @@
         }
     }
 
-    // Canonical 2-decimal precision for billions ("1.23 tỷ"). The legacy
-    // dashboard.js used 1-decimal; aligning to this is a precision boost,
-    // not a regression — same rounding rule across all dashboards.
+    // Numbers are rounded only to the nearest 1,000đ so a 2,350,000đ
+    // money-in transaction renders as "2tr350" (not "2.4tr"). Tỷ range
+    // rounds to the nearest 1tr to keep the badge short on mobile.
     function formatMoneyShort(amount) {
-        const abs = Math.abs(amount);
-        if (abs >= 1_000_000_000) {
-            return (amount / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
+        const value = Number(amount) || 0;
+        const sign = value < 0 ? '-' : '';
+        const raw = Math.abs(value);
+        if (raw < 1) return '0đ';
+        if (raw < 1_000) return sign + Math.round(raw) + 'đ';
+        const thousandsTotal = Math.round(raw / 1_000);
+        if (thousandsTotal < 1_000) return sign + thousandsTotal + 'k';
+        if (thousandsTotal < 1_000_000) {
+            const millions = Math.floor(thousandsTotal / 1_000);
+            const thousands = thousandsTotal % 1_000;
+            if (thousands === 0) return sign + millions + 'tr';
+            return sign + millions + 'tr' + String(thousands).padStart(3, '0');
         }
-        if (abs >= 1_000_000) {
-            return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-        }
-        if (abs >= 1_000) return Math.round(amount / 1_000) + 'k';
-        return Math.round(amount) + 'đ';
+        const trTotal = Math.round(raw / 1_000_000);
+        const billions = Math.floor(trTotal / 1_000);
+        const millions = trTotal % 1_000;
+        if (millions === 0) return sign + billions + ' tỷ';
+        return sign + billions + 'tỷ' + String(millions).padStart(3, '0');
     }
 
     function formatMoneyFull(amount) {

@@ -42,7 +42,15 @@ SOURCE_AUTO_DAILY = "auto_daily"
 
 
 async def _fetch_active_assets(db: AsyncSession) -> list[Asset]:
-    stmt = select(Asset).where(Asset.is_active.is_(True))
+    # Mirror ``asset_service.get_user_assets`` defaults: snapshot only the
+    # asset set that counts toward "real" net worth. Placeholder and
+    # unconfirmed rows are work-in-progress (e.g. mid-onboarding capture)
+    # and must not anchor "vs hôm qua" comparisons.
+    stmt = select(Asset).where(
+        Asset.is_active.is_(True),
+        Asset.is_placeholder_asset.is_(False),
+        Asset.is_confirmed.is_(True),
+    )
     return list((await db.execute(stmt)).scalars())
 
 

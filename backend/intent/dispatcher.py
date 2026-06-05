@@ -383,6 +383,12 @@ class IntentDispatcher:
             )
 
             return QueryIncomeHandler()
+        if intent == IntentType.QUERY_MONEY_IN:
+            from backend.intent.handlers.query_expenses import (
+                QueryMoneyInHandler,
+            )
+
+            return QueryMoneyInHandler()
         if intent == IntentType.QUERY_CASHFLOW:
             from backend.intent.handlers.query_cashflow import (
                 QueryCashflowHandler,
