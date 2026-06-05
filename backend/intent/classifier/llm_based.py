@@ -66,6 +66,7 @@ INTENTS:
 - query_expenses_by_category: Hỏi chi tiêu theo loại (ăn uống, sức khỏe...)
 - query_income: Hỏi thu nhập / lương
 - query_cashflow: Hỏi dòng tiền / dư cuối tháng
+- query_money_in: Hỏi các khoản tiền vào (quà, được cho, hoàn tiền) — KHÔNG phải lương/thu nhập định kỳ
 - query_market: Hỏi giá thị trường (cổ phiếu VNM, crypto BTC, vàng SJC, VN-Index). Bao gồm cả câu hỏi tổng quát kiểu "giá vàng", "giá crypto", "giá cổ phiếu".
 - query_goals: Hỏi mục tiêu của user
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể

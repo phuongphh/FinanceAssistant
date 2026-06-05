@@ -61,8 +61,10 @@ class CashflowPeriod:
     spend_current: Decimal
     spend_recurring: Decimal
     spend_total: Decimal
+    money_in: Decimal
     net: Decimal
     expenses: list[Expense]
+    money_in_txs: list[Expense]
 
 
 class QueryCashflowHandler(IntentHandler):
@@ -100,13 +102,17 @@ class QueryCashflowHandler(IntentHandler):
     ) -> str:
         name = user.display_name or "bạn"
         label_vi = _cashflow_period_label(time_range)
-        if current.income <= 0 and current.spend_total <= 0:
+        if (
+            current.income <= 0
+            and current.spend_total <= 0
+            and current.money_in <= 0
+        ):
             return (
                 f"{name} chưa có dữ liệu thu / chi {label_vi} 🌱\n"
                 "Mình cần ít nhất một nguồn thu và vài giao dịch để tính dòng tiền."
             )
 
-        saving_rate = _safe_rate(current.net, current.income)
+        saving_rate = _safe_rate(current.net, current.income + current.money_in)
         arrow = "💚" if current.net >= 0 else "🟥"
         sign = "+" if current.net >= 0 else "−"
         net_word = "dư" if current.net >= 0 else "vượt thu"
@@ -116,6 +122,8 @@ class QueryCashflowHandler(IntentHandler):
             self._income_card(current, previous, streams, time_range),
             "",
             self._expense_card(current, previous),
+            "",
+            self._money_in_card(current, previous),
             "",
             "💎 *Tỷ lệ tiết kiệm*",
             f"{_format_percent(saving_rate) if saving_rate is not None else '—'}",
@@ -152,6 +160,17 @@ class QueryCashflowHandler(IntentHandler):
         ]
         return "\n".join(lines)
 
+    def _money_in_card(
+        self, current: CashflowPeriod, previous: CashflowPeriod
+    ) -> str:
+        money_in_delta = _delta_text(current.money_in, previous.money_in)
+        lines = [
+            "💰 *Tiền vào tháng*",
+            f"Tổng: *{format_money_full(current.money_in)}* "
+            f"({money_in_delta} vs tháng trước)",
+        ]
+        return "\n".join(lines)
+
     def _format_monthly_detail(
         self,
         user: User,
@@ -168,6 +187,7 @@ class QueryCashflowHandler(IntentHandler):
             f"Chi: *{format_money_full(period.spend_total)}*",
             f"• Chi tiêu hiện tại: {format_money_full(period.spend_current)}",
             f"• Chi phí định kì: {format_money_full(period.spend_recurring)}",
+            f"Tiền vào: *{format_money_full(period.money_in)}*",
             f"Dư / thiếu: *{sign}{format_money_full(abs(period.net))}*",
             "",
             "💼 *Top nguồn thu*",
@@ -232,17 +252,29 @@ async def _build_period(
     expenses = await _fetch_expenses(
         db, user, start=time_range.start, end=time_range.end
     )
+    money_in_txs = await _fetch_expenses(
+        db,
+        user,
+        start=time_range.start,
+        end=time_range.end,
+        transaction_type="money_in",
+    )
     spend_current = sum(Decimal(tx.amount or 0) for tx in expenses)
     spend_recurring = await _recurring_expense_for_period(db, user, time_range)
     spend_total = spend_current + spend_recurring
-    net = income - spend_total
+    money_in = sum(
+        (Decimal(tx.amount or 0) for tx in money_in_txs), Decimal(0)
+    )
+    net = income + money_in - spend_total
     return CashflowPeriod(
         income=income,
         spend_current=spend_current,
         spend_recurring=spend_recurring,
         spend_total=spend_total,
+        money_in=money_in,
         net=net,
         expenses=expenses,
+        money_in_txs=money_in_txs,
     )
 
 

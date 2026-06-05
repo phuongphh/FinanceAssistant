@@ -80,6 +80,7 @@ async def _fetch_expenses(
     start: date,
     end: date,
     category: str | None = None,
+    transaction_type: str | None = "expense",
 ) -> list[Expense]:
     stmt = select(Expense).where(
         Expense.user_id == user.id,
@@ -87,6 +88,8 @@ async def _fetch_expenses(
         Expense.expense_date >= start,
         Expense.expense_date <= end,
     )
+    if transaction_type is not None:
+        stmt = stmt.where(Expense.transaction_type == transaction_type)
     if category:
         stmt = stmt.where(Expense.category == category)
     stmt = stmt.order_by(Expense.amount.desc())
@@ -158,6 +161,55 @@ class QueryExpensesHandler(IntentHandler):
         return _format_listing(
             expenses, time_range=time_range, user=user
         )
+
+
+def _format_money_in_listing(
+    rows: list[Expense],
+    *,
+    time_range: TimeRange,
+    user: User,
+) -> str:
+    total = sum(Decimal(tx.amount or 0) for tx in rows)
+    count = len(rows)
+    label_vi = _TIME_LABELS_VI.get(time_range.label, time_range.label)
+    lines = [
+        f"💰 Tiền vào {label_vi}:",
+        f"Tổng: *{format_money_full(total)}* ({count} giao dịch)",
+        "",
+    ]
+    top = sorted(rows, key=lambda x: Decimal(x.amount or 0), reverse=True)[
+        :_TOP_N_TRANSACTIONS
+    ]
+    for tx in top:
+        merchant = tx.merchant or tx.note or "Tiền vào"
+        lines.append(f"💰 {merchant} — {format_money_short(tx.amount)}")
+    if count > _TOP_N_TRANSACTIONS:
+        lines.append("")
+        lines.append(f"_...và {count - _TOP_N_TRANSACTIONS} giao dịch nhỏ hơn_")
+    return "\n".join(lines)
+
+
+def _empty_money_in_message(*, time_range: TimeRange, user: User) -> str:
+    name = user.display_name or "bạn"
+    label_vi = _TIME_LABELS_VI.get(time_range.label, time_range.label)
+    return f"{name} chưa có khoản tiền vào nào {label_vi} 🌱"
+
+
+class QueryMoneyInHandler(IntentHandler):
+    async def handle(
+        self, intent: IntentResult, user: User, db: AsyncSession
+    ) -> str:
+        time_range = _resolve_time_range(intent)
+        rows = await _fetch_expenses(
+            db,
+            user,
+            start=time_range.start,
+            end=time_range.end,
+            transaction_type="money_in",
+        )
+        if not rows:
+            return _empty_money_in_message(time_range=time_range, user=user)
+        return _format_money_in_listing(rows, time_range=time_range, user=user)
 
 
 class QueryExpensesByCategoryHandler(IntentHandler):

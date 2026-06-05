@@ -165,6 +165,21 @@ query_income:
     - pattern: 'tong\s+thu\s*nhap\s+(?:thang|nam)'
       confidence: 0.9
 
+query_money_in:
+  description: "User asks about money-in transactions (gifts, refunds, found cash) for a period."
+  patterns:
+    - pattern: 'tien\s+vao.*(?:thang|tuan|nam|hom)'
+      confidence: 0.95
+    - pattern: '^(?:liet\s*ke|list|xem)\s+tien\s+vao'
+      confidence: 0.9
+    - pattern: 'tien\s+vao\s+(?:cua\s+)?(?:toi|minh)?'
+      confidence: 0.85
+    - pattern: 'khoan\s+thu\s+khac.*(?:thang|tuan)'
+      confidence: 0.85
+  parameter_extractors:
+    time_range:
+      use_extractor: time_range
+
 query_cashflow:
   description: "User asks net cashflow / savings for a period."
   patterns:
