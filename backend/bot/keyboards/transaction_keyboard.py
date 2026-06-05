@@ -269,20 +269,20 @@ def credit_card_source_keyboard(cards: list) -> InlineKeyboardMarkup:
     return {"inline_keyboard": rows}
 
 
-def e_wallet_provider_keyboard() -> InlineKeyboardMarkup:
-    return {
-        "inline_keyboard": [
+def e_wallet_picker_keyboard(wallets: list) -> InlineKeyboardMarkup:
+    rows: list[list[dict]] = []
+    for w in wallets:
+        rows.append(
             [
-                {"text": "Momo", "callback_data": "txsrc_wallet:momo"},
-                {"text": "VNPay", "callback_data": "txsrc_wallet:vnpay"},
-            ],
-            [
-                {"text": "ZaloPay", "callback_data": "txsrc_wallet:zalopay"},
-                {"text": "ViettelPay", "callback_data": "txsrc_wallet:viettelpay"},
-            ],
-            [{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}],
-        ]
-    }
+                {
+                    "text": f"👛 Ví điện tử - {w.name}",
+                    "callback_data": f"txsrc_wallet:{w.id}",
+                }
+            ]
+        )
+    rows.append([{"text": "↩️ Quay lại chọn nguồn", "callback_data": "txsrc:back"}])
+    rows.append([{"text": "↪️ Bỏ qua nguồn", "callback_data": "txsrc:skip"}])
+    return {"inline_keyboard": rows}
 
 
 def source_asset_keyboard(assets: list) -> InlineKeyboardMarkup:
