@@ -141,6 +141,43 @@ async def test_insert_exception_marks_run_failed_and_rolls_back():
 
 
 @pytest.mark.asyncio
+async def test_fetch_active_assets_excludes_placeholder_and_unconfirmed():
+    """The snapshot job must use the same filter as ``get_user_assets``.
+
+    Without this, placeholder / unconfirmed rows would write snapshots
+    that ``calculate()`` never sees, producing phantom day-over-day
+    declines on the morning briefing.
+    """
+    from sqlalchemy.dialects import postgresql
+
+    captured: dict = {}
+
+    class _ExecResult:
+        def scalars(self):
+            return []
+
+    db = MagicMock()
+
+    async def _execute(stmt):
+        captured["stmt"] = stmt
+        return _ExecResult()
+
+    db.execute = _execute
+
+    await job._fetch_active_assets(db)
+
+    compiled = str(
+        captured["stmt"].compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    ).lower()
+    assert "is_active" in compiled and "true" in compiled
+    assert "is_placeholder_asset" in compiled and "false" in compiled
+    assert "is_confirmed" in compiled
+
+
+@pytest.mark.asyncio
 async def test_fetch_failure_returns_zero_counters():
     """If we can't even read the asset list, no counters are written."""
     factory, _ = _patch_factory()
