@@ -245,7 +245,12 @@ async def resolve_source_asset_for_payload(
         provider = data.e_wallet_provider
         if source_type == "e_wallet":
             provider = provider or inferred_provider
-            if provider not in EWALLET_PROVIDERS:
+            # When source_asset_id pins an explicit wallet, the asset row IS the
+            # source of truth — provider is denormalized decoration. Generic
+            # `subtype="e_wallet"` assets (created via the cash wizard) carry no
+            # provider hint, and that's fine: resolve_source_label_for_expense
+            # falls back to asset.name to render "Ví điện tử [<name>]".
+            if provider is not None and provider not in EWALLET_PROVIDERS:
                 raise ValueError("e_wallet_provider is not supported")
         else:
             provider = None
@@ -284,20 +289,33 @@ async def resolve_source_asset_for_payload(
     )
 
 
-
-
 def _source_label(source_type: str | None) -> str:
-    return {"cash": "Tiền mặt", "bank_account": "Tài khoản", "e_wallet": "Ví điện tử"}.get(source_type or "", "Nguồn khác")
+    return {
+        "cash": "Tiền mặt",
+        "bank_account": "Tài khoản",
+        "e_wallet": "Ví điện tử",
+    }.get(source_type or "", "Nguồn khác")
 
 
-async def _create_transaction_record(db: AsyncSession, user_id: uuid.UUID, expense: Expense, *, status: str = "active", original_transaction_id: uuid.UUID | None = None, edited_at: datetime | None = None, reversed_at: datetime | None = None) -> Transaction:
+async def _create_transaction_record(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    expense: Expense,
+    *,
+    status: str = "active",
+    original_transaction_id: uuid.UUID | None = None,
+    edited_at: datetime | None = None,
+    reversed_at: datetime | None = None,
+) -> Transaction:
     tx = Transaction(
         user_id=user_id,
         source_asset_id=expense.source_asset_id,
         source_type=expense.source_type or "expense_category",
         source_label=_source_label(expense.source_type),
         amount=Decimal(str(expense.amount or 0)),
-        direction="inflow" if expense.transaction_type == TRANSACTION_TYPE_MONEY_IN else "outflow",
+        direction="inflow"
+        if expense.transaction_type == TRANSACTION_TYPE_MONEY_IN
+        else "outflow",
         note=expense.note or expense.merchant,
         category=expense.category,
         status=status,
@@ -544,7 +562,9 @@ async def update_expense(
                 db, user_id, merged
             )
             update_data["source_asset_id"] = source_resolution.source_asset_id
-            update_data["source_credit_card_id"] = source_resolution.source_credit_card_id
+            update_data["source_credit_card_id"] = (
+                source_resolution.source_credit_card_id
+            )
             update_data["source_type"] = source_resolution.source_type
             update_data["e_wallet_provider"] = source_resolution.e_wallet_provider
             raw_data = dict(update_data.get("raw_data", expense.raw_data) or {})
@@ -564,7 +584,13 @@ async def update_expense(
     if existing_tx and existing_tx.status == "active":
         existing_tx.status = "edited"
         existing_tx.edited_at = datetime.utcnow()
-    await _create_transaction_record(db, user_id, expense, original_transaction_id=(existing_tx.id if existing_tx else None), edited_at=datetime.utcnow())
+    await _create_transaction_record(
+        db,
+        user_id,
+        expense,
+        original_transaction_id=(existing_tx.id if existing_tx else None),
+        edited_at=datetime.utcnow(),
+    )
 
     await db.refresh(expense)
     return expense
