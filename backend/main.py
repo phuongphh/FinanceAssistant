@@ -337,8 +337,9 @@ if _ADMIN_STATIC.exists():
     # Canonical admin URL is /admin/ (matches Cloudflare ingress + deploy
     # script success message). Starlette's Mount("/admin", ...) only
     # matches /admin/* — bare /admin still 404s without an explicit
-    # redirect, so add one before mounting.
-    @app.get("/admin", include_in_schema=False)
+    # redirect. Register GET + HEAD so `curl -I` and uptime probes also
+    # see the 308 instead of falling through to the static mount.
+    @app.api_route("/admin", methods=["GET", "HEAD"], include_in_schema=False)
     async def _admin_trailing_slash():
         return RedirectResponse(url="/admin/", status_code=308)
 

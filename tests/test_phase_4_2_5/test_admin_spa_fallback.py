@@ -130,7 +130,7 @@ def dual_mount_app(tmp_path: Path) -> TestClient:
     async def ping():
         return {"ok": True}
 
-    @app.get("/admin", include_in_schema=False)
+    @app.api_route("/admin", methods=["GET", "HEAD"], include_in_schema=False)
     async def admin_redirect():
         return RedirectResponse(url="/admin/", status_code=308)
 
@@ -155,6 +155,14 @@ def test_admin_trailing_slash_serves_spa(dual_mount_app: TestClient):
 
 def test_admin_bare_redirects_to_trailing_slash(dual_mount_app: TestClient):
     resp = dual_mount_app.get("/admin")
+    assert resp.status_code == 308
+    assert resp.headers["location"] == "/admin/"
+
+
+def test_admin_bare_head_also_redirects(dual_mount_app: TestClient):
+    # `curl -I` and uptime probes use HEAD — must see the redirect, not fall
+    # through to the static mount and 404.
+    resp = dual_mount_app.head("/admin")
     assert resp.status_code == 308
     assert resp.headers["location"] == "/admin/"
 
