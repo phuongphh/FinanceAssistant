@@ -107,8 +107,12 @@ Quy tắc:
 Chỉ trả về JSON, không giải thích."""
 
 
+# The lookahead after the unit stops "tr"/"k" from matching the prefix of a
+# word ("tr" in "trên", "k" in "kem") and inflating the amount ×1,000,000.
+# ``[^\W\d_]`` is "a letter"; the inner ``(?!rưỡi|ruoi)`` lets a glued
+# half-word through, matching backend.wealth.amount_parser.
 _AMOUNT_RE = re.compile(
-    r"(?<!\w)(\d+(?:[.,]\d+)?)(?:\s*(k|K|ngàn|nghìn|ngan|nghin|tr|triệu|trieu))?",
+    r"(?<!\w)(\d+(?:[.,]\d+)?)(?:\s*(k|K|ngàn|nghìn|ngan|nghin|tr|triệu|trieu)(?!(?!rưỡi|ruoi)[^\W\d_]))?",
     re.IGNORECASE,
 )
 _SPLIT_RE = re.compile(r"\s*(?:,|\+|\n|\s+và\s+)\s*", re.IGNORECASE)

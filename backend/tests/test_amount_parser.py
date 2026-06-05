@@ -107,6 +107,33 @@ class TestParseAmount:
     def test_sub_amount_after_unit(self, raw, expected):
         assert parse_amount(raw) == expected
 
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            # Regression: a unit abbreviation must NOT match the prefix of
+            # an ordinary word. "199999 trên momo" was read as "199999 tr"
+            # (= 199,999 triệu = 199,999,000,000đ) because "tr" greedily
+            # ate the start of "trên". The number has no real unit, so it
+            # parses as the bare amount.
+            ("199999 trên momo", Decimal("199999")),
+            ("100 trên bàn", Decimal("100")),  # "tr" in "trên"
+            ("199999 trong ví", Decimal("199999")),  # "tr" in "trong"
+            ("50 kem", Decimal("50")),  # "k" in "kem"
+            ("5 ký gạo", Decimal("5")),  # "k" in "ký"
+            ("3 ngày", Decimal("3")),  # "ngà" in "ngày" not "ngàn"
+            ("10 do dự", Decimal("10")),  # "d" in "do"
+            # The fix must not break a real unit glued to a number, a unit
+            # followed by a digit, or the half-word "rưỡi" right after.
+            ("100tr", Decimal("100000000")),
+            ("20tr5", Decimal("20500000")),
+            ("3trrưỡi", Decimal("3500000")),
+            ("500k", Decimal("500000")),
+            ("2tỷ", Decimal("2000000000")),
+        ],
+    )
+    def test_unit_must_not_be_word_prefix(self, raw, expected):
+        assert parse_amount(raw) == expected
+
 
 class TestParseLabelAndAmount:
     @pytest.mark.parametrize(
@@ -185,6 +212,25 @@ class TestParseLabelAndAmount:
         ],
     )
     def test_ruoi_in_labeled_amount(
+        self, raw, expected_label, expected_amount
+    ):
+        result = parse_label_and_amount(raw)
+        assert result is not None, f"parser returned None for {raw!r}"
+        label, amount = result
+        assert label == expected_label
+        assert amount == expected_amount
+
+    @pytest.mark.parametrize(
+        "raw,expected_label,expected_amount",
+        [
+            # Regression: the trailing word after a bare amount must not be
+            # swallowed as a unit. "199999 trên momo" → 199,999đ, not
+            # 199,999,000,000đ.
+            ("199999 trên momo", "", Decimal("199999")),
+            ("Quỹ 50 kem", "Quỹ", Decimal("50")),
+        ],
+    )
+    def test_trailing_word_not_read_as_unit(
         self, raw, expected_label, expected_amount
     ):
         result = parse_label_and_amount(raw)

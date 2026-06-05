@@ -75,7 +75,9 @@ _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 # pipeline.
 _AMOUNT_TOKEN_PATTERN = (
     r"\d{1,3}(?:[.,]\d{3})+"
-    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?"
+    # The lookahead keeps a unit letter from gluing onto a word ("tr" in
+    # "trên", "k" in "kem") — see _DUOC_AMOUNT_RE below.
+    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_])(?:\s*\d+)?)?"
 )
 
 _SIGNED_TX_RE = re.compile(
@@ -100,9 +102,15 @@ _AMOUNT_TOKEN_RE = re.compile(
 # intent pipeline. This mirrors the Tier-1 YAML rule, which also demands
 # a money suffix for this shape. Keep the unit list in sync with
 # ``_AMOUNT_TOKEN_PATTERN`` above.
+# The ``(?!(?!rưỡi|ruoi)[^\W\d_])`` after each unit alternation stops a unit
+# letter from matching the prefix of an ordinary word — without it the "tr" in
+# "199999 trên momo" was read as triệu and booked 199,999 as 199,999,000,000đ.
+# ``[^\W\d_]`` is "a (unicode) letter"; digits/space/end still let the unit
+# stand ("100tr", "20tr5", "500k"), and the inner ``(?!rưỡi|ruoi)`` keeps a
+# glued half-word working ("3trrưỡi" = 3.5 triệu).
 _DUOC_AMOUNT_RE = re.compile(
-    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd))?"
-    r"|\d+(?:[.,]\d+)?\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)",
+    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_]))?"
+    r"|\d+(?:[.,]\d+)?\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_])(?:\s*\d+)?)",
     re.IGNORECASE,
 )
 
