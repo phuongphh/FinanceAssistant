@@ -672,6 +672,7 @@ async def test_create_expense_failure_alerts_user_and_clears_wizard():
     """
     user = _user()
     db = MagicMock()
+    db.rollback = AsyncMock()
     wallet_id = uuid.uuid4()
 
     answer = AsyncMock()
@@ -704,6 +705,9 @@ async def test_create_expense_failure_alerts_user_and_clears_wizard():
     send.assert_awaited_once()
     sent_text = send.await_args.args[1].lower()
     assert "chưa ghi" in sent_text or "không ghi" in sent_text
+    # PR #948 fix: rollback must precede wizard cleanup so the latter
+    # doesn't crash on PendingRollbackError after an aborted insert.
+    db.rollback.assert_awaited_once()
     wizard_clear.assert_awaited_once()
 
 
@@ -715,6 +719,7 @@ async def test_create_expense_failure_does_not_crash_without_chat_id():
     without raising on the missing ``chat_id``."""
     user = _user()
     db = MagicMock()
+    db.rollback = AsyncMock()
     wallet_id = uuid.uuid4()
 
     cb = _callback(f"txsrc_wallet:{wallet_id}")
@@ -738,3 +743,47 @@ async def test_create_expense_failure_does_not_crash_without_chat_id():
     answer.assert_awaited_once()
     # No chat to send a fallback into — skip silently rather than crash.
     send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_txsrc_wallet_accepts_legacy_provider_name():
+    """Pre-#948 clients shipped ``txsrc_wallet:momo`` (provider name)
+    rather than an asset UUID. Older Telegram message bubbles still
+    carry those callbacks, so the parser must continue routing the
+    provider name onto ``payload.e_wallet_provider`` instead of
+    treating it as a (bogus) asset id."""
+    user = _user()
+    db = MagicMock()
+    expense = _expense()
+
+    with (
+        patch.object(
+            callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)
+        ),
+        patch.object(
+            callbacks.expense_service,
+            "create_expense",
+            AsyncMock(return_value=expense),
+        ) as create,
+        patch.object(
+            callbacks,
+            "resolve_source_label_for_expense",
+            AsyncMock(return_value="Ví điện tử [MoMo]"),
+        ),
+        patch.object(
+            callbacks, "edit_message_text", AsyncMock(return_value={"ok": True})
+        ),
+        patch.object(callbacks, "send_message", AsyncMock()),
+        patch.object(callbacks, "answer_callback", AsyncMock()),
+        patch("backend.services.wizard_service.clear", AsyncMock()),
+    ):
+        handled = await callbacks._handle_source_selection_callback(
+            db, _callback("txsrc_wallet:momo")
+        )
+
+    assert handled is True
+    create.assert_awaited_once()
+    payload = create.await_args.args[2]
+    assert payload.source_type == "e_wallet"
+    assert payload.e_wallet_provider == "momo"
+    assert payload.source_asset_id is None

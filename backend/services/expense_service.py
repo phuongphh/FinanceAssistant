@@ -244,6 +244,14 @@ async def resolve_source_asset_for_payload(
         source_type = data.source_type or inferred_type
         provider = data.e_wallet_provider
         if source_type == "e_wallet":
+            # Guard against a caller pinning an arbitrary asset (e.g. a bank
+            # account) to source_type=e_wallet. Without this check we'd
+            # happily write an expense whose asset/source_type mismatch,
+            # leaving the dashboard rendering the wrong label and the
+            # source-resolver picking up bogus subtypes downstream.
+            subtype = (asset.subtype or "").lower()
+            if subtype not in EWALLET_PROVIDERS and subtype != "e_wallet":
+                raise ValueError("source_asset_id không phải ví điện tử")
             provider = provider or inferred_provider
             # When source_asset_id pins an explicit wallet, the asset row IS the
             # source of truth — provider is denormalized decoration. Generic
