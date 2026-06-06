@@ -36,7 +36,7 @@ from backend.bot.keyboards.transaction_keyboard import (
     category_picker_keyboard,
     confirm_delete_keyboard,
     credit_card_source_keyboard,
-    e_wallet_provider_keyboard,
+    e_wallet_picker_keyboard,
     source_asset_keyboard,
     source_picker_keyboard,
     transaction_actions_keyboard,
@@ -96,18 +96,44 @@ async def _handle_source_selection_callback(
     wallet_provider = None
     if data == "txsrc:bank_pick":
         assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
-        bank_assets = [a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")]
+        bank_assets = [
+            a
+            for a in assets
+            if (a.subtype or "").lower() in ("bank_checking", "bank_account")
+        ]
         if not bank_assets:
-            await answer_callback(callback_id, text="Bạn chưa có tài khoản thanh toán nào 🌱", show_alert=True)
+            await answer_callback(
+                callback_id,
+                text="Bạn chưa có tài khoản thanh toán nào 🌱",
+                show_alert=True,
+            )
             return True
-        await edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=source_asset_keyboard(bank_assets))
-        await answer_callback(callback_id)
-        return True
-    if data == "txsrc:e_wallet":
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=e_wallet_provider_keyboard(),
+            reply_markup=source_asset_keyboard(bank_assets),
+        )
+        await answer_callback(callback_id)
+        return True
+    if data == "txsrc:e_wallet":
+        assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
+        wallet_assets = [
+            a
+            for a in assets
+            if (a.subtype or "").lower()
+            in ("e_wallet", "momo", "vnpay", "zalopay", "viettelpay")
+        ]
+        if not wallet_assets:
+            await answer_callback(
+                callback_id,
+                text="Bạn chưa có ví điện tử nào 🌱",
+                show_alert=True,
+            )
+            return True
+        await edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=e_wallet_picker_keyboard(wallet_assets),
         )
         await answer_callback(callback_id)
         return True
@@ -115,14 +141,18 @@ async def _handle_source_selection_callback(
         await edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=transaction_source_keyboard(draft.get("transaction_type", "expense")),
+            reply_markup=transaction_source_keyboard(
+                draft.get("transaction_type", "expense")
+            ),
         )
         await answer_callback(callback_id)
         return True
     if data == "txsrc:credit_card":
         cards = await list_credit_cards(db, user.id)
         if not cards:
-            await answer_callback(callback_id, text="Bạn chưa có thẻ tín dụng nào 🌱", show_alert=True)
+            await answer_callback(
+                callback_id, text="Bạn chưa có thẻ tín dụng nào 🌱", show_alert=True
+            )
             return True
         await edit_message_reply_markup(
             chat_id=chat_id,
@@ -136,7 +166,14 @@ async def _handle_source_selection_callback(
     selected_card_bank_name = None
     if data.startswith("txsrc_wallet:"):
         source_type = "e_wallet"
-        wallet_provider = data.split(":", 1)[1]
+        suffix = data.split(":", 1)[1]
+        # Backward-compat: pre-#948 clients sent provider names ("momo") instead
+        # of asset UUIDs. Keep accepting them so in-flight callbacks from
+        # older message bubbles don't dead-end. New flow uses asset UUIDs.
+        if suffix in expense_service.EWALLET_PROVIDERS:
+            wallet_provider = suffix
+        else:
+            source_asset_id = suffix
     elif data.startswith("txsrc_card:"):
         source_type = "credit_card"
         requested_card_id = data.split(":", 1)[1]
@@ -190,24 +227,65 @@ async def _handle_source_selection_callback(
         source_asset_id=source_asset_id,
         expense_date=expense_date_value,
     )
-    expense = await expense_service.create_expense(db, user.id, expense_data)
-    from backend.services import wizard_service
-
+    # Issue #948 safety net: if the write fails (e.g. DB check-constraint
+    # violation on the e_wallet flow), the user must still get feedback —
+    # otherwise the tapped button spins forever while the worker silently
+    # marks the update as failed.
+    try:
+        expense = await expense_service.create_expense(db, user.id, expense_data)
+    except Exception:
+        logger.exception(
+            "create_expense failed in source-selection flow for user %s (data=%s)",
+            user.id,
+            data,
+        )
+        # An aborted SQLAlchemy transaction leaves the session in a
+        # ``PendingRollbackError`` state — wizard_service.clear would then
+        # crash and the user gets no feedback. Rollback first so the
+        # subsequent wizard write succeeds.
+        await db.rollback()
+        await wizard_service.clear(db, user.id)
+        await answer_callback(
+            callback_id,
+            text="Mình chưa ghi được giao dịch này 🌱 Bạn gõ lại giúp mình nhé.",
+            show_alert=True,
+        )
+        if chat_id is not None:
+            await send_message(
+                chat_id,
+                "Mình chưa ghi được giao dịch vừa rồi 🌱 Bạn gõ lại giúp "
+                "mình nhé — nếu lặp lại, thử chọn nguồn khác xem sao.",
+                parse_mode=None,
+            )
+        return True
     await wizard_service.clear(db, user.id)
     tx_sign = "+" if expense.transaction_type == "money_in" else "-"
-    source_label = {
-        "cash": "Tiền mặt",
-        "bank_account": "Tài khoản",
-        "momo": "Ví Momo",
-        "vnpay": "Ví VNPay",
-        "zalopay": "Ví ZaloPay",
-        "viettelpay": "Ví ViettelPay",
-        "credit_card": (
-            f"Thẻ tín dụng {selected_card_bank_name}"
-            if selected_card_bank_name
-            else "Thẻ tín dụng"
-        ),
-    }.get(wallet_provider or source_type, "không liên kết nguồn")
+    # Render the source label through the canonical resolver so that asset-
+    # backed flows (bank account / e-wallet) print "Tài khoản [<bank>]" or
+    # "Ví điện tử [<name>]" instead of generic words. Credit-card and bare
+    # "no source" cases fall back to the previous behaviour.
+    source_label: str | None = None
+    if source_type:
+        try:
+            source_label = await resolve_source_label_for_expense(db, expense)
+        except Exception:
+            logger.exception("resolve_source_label_for_expense failed (quick tx)")
+            source_label = None
+    if not source_label:
+        if source_type == "credit_card":
+            source_label = (
+                f"Thẻ tín dụng {selected_card_bank_name}"
+                if selected_card_bank_name
+                else "Thẻ tín dụng"
+            )
+        elif source_type == "cash":
+            source_label = "Tiền mặt"
+        elif source_type == "bank_account":
+            source_label = "Tài khoản"
+        elif source_type == "e_wallet":
+            source_label = "Ví điện tử"
+        else:
+            source_label = "không liên kết nguồn"
     confirmation_text = (
         f"Đã ghi nhận {tx_sign}{float(expense.amount):,.0f}đ · {source_label}"
     )
@@ -484,9 +562,7 @@ async def _handle_delete_transaction(
     await answer_callback(callback_id)
 
 
-async def _handle_receipt_category(
-    *, db, user, args, callback_id, chat_id, message_id
-):
+async def _handle_receipt_category(*, db, user, args, callback_id, chat_id, message_id):
     """User picked a category on a pending OCR receipt (before confirming).
 
     Updates the in-memory pending payload and re-renders the confirmation
@@ -801,7 +877,9 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
     if kind == "bank":
         assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
         bank_assets = [
-            a for a in assets if (a.subtype or "").lower() in ("bank_checking", "bank_account")
+            a
+            for a in assets
+            if (a.subtype or "").lower() in ("bank_checking", "bank_account")
         ]
         if not bank_assets:
             await answer_callback(
@@ -828,30 +906,49 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
             ]
         )
         await edit_message_reply_markup(
-            chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": rows}
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup={"inline_keyboard": rows},
         )
         await answer_callback(callback_id)
         return
 
     if kind == "wallet":
-        rows = [
+        assets = await list_assets(db, user.id, asset_type="cash", limit=500, offset=0)
+        wallet_assets = [
+            a
+            for a in assets
+            if (a.subtype or "").lower()
+            in ("e_wallet", "momo", "vnpay", "zalopay", "viettelpay")
+        ]
+        if not wallet_assets:
+            await answer_callback(
+                callback_id,
+                text="Bạn chưa có ví điện tử nào 🌱",
+                show_alert=True,
+            )
+            return
+        rows: list[list[dict]] = [
             [
-                {"text": "Momo", "callback_data": "chsrc_wl:momo"},
-                {"text": "VNPay", "callback_data": "chsrc_wl:vnpay"},
-            ],
-            [
-                {"text": "ZaloPay", "callback_data": "chsrc_wl:zalopay"},
-                {"text": "ViettelPay", "callback_data": "chsrc_wl:viettelpay"},
-            ],
+                {
+                    "text": f"👛 Ví điện tử - {a.name}",
+                    "callback_data": f"chsrc_wl:{a.id}",
+                }
+            ]
+            for a in wallet_assets
+        ]
+        rows.append(
             [
                 {
                     "text": "↩️ Quay lại",
                     "callback_data": f"{CallbackPrefix.CHANGE_SOURCE}:{expense.id}",
                 }
-            ],
-        ]
+            ]
+        )
         await edit_message_reply_markup(
-            chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": rows}
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup={"inline_keyboard": rows},
         )
         await answer_callback(callback_id)
         return
@@ -883,7 +980,9 @@ async def _handle_change_source(*, db, user, args, callback_id, chat_id, message
             ]
         )
         await edit_message_reply_markup(
-            chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": rows}
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup={"inline_keyboard": rows},
         )
         await answer_callback(callback_id)
         return
@@ -919,7 +1018,9 @@ async def _handle_change_source_subpicker(
     draft = dict(state.get("draft") or {})
     expense_id_str = draft.get("expense_id")
     if not expense_id_str:
-        await answer_callback(callback_id, text="Yêu cầu này đã hết hạn rồi 🌱", show_alert=True)
+        await answer_callback(
+            callback_id, text="Yêu cầu này đã hết hạn rồi 🌱", show_alert=True
+        )
         return True
 
     expense = await resolve_transaction_by_callback_id(db, user.id, expense_id_str)
@@ -940,13 +1041,24 @@ async def _handle_change_source_subpicker(
             e_wallet_provider=None,
         )
     elif data.startswith("chsrc_wl:"):
-        provider = data.split(":", 1)[1]
-        update = ExpenseUpdate(
-            source_type="e_wallet",
-            e_wallet_provider=provider,
-            source_asset_id=None,
-            source_credit_card_id=None,
-        )
+        suffix = data.split(":", 1)[1]
+        # Backward-compat: pre-#948 callbacks used provider names ("momo")
+        # rather than asset UUIDs. Accept both so older message bubbles
+        # don't dead-end after a deploy.
+        if suffix in expense_service.EWALLET_PROVIDERS:
+            update = ExpenseUpdate(
+                source_type="e_wallet",
+                source_asset_id=None,
+                source_credit_card_id=None,
+                e_wallet_provider=suffix,
+            )
+        else:
+            update = ExpenseUpdate(
+                source_type="e_wallet",
+                source_asset_id=suffix,
+                source_credit_card_id=None,
+                e_wallet_provider=None,
+            )
     elif data.startswith("chsrc_cc:"):
         card_id = data.split(":", 1)[1]
         update = ExpenseUpdate(
@@ -959,7 +1071,35 @@ async def _handle_change_source_subpicker(
         await answer_callback(callback_id)
         return True
 
-    updated = await expense_service.update_expense(db, user.id, expense.id, update)
+    # Issue #948 safety net: a failed update (e.g. DB check-constraint
+    # violation on the e_wallet flow) must not leave the user with a
+    # stuck spinner on the source-change picker.
+    try:
+        updated = await expense_service.update_expense(db, user.id, expense.id, update)
+    except Exception:
+        logger.exception(
+            "update_expense failed in change-source flow for user %s (data=%s)",
+            user.id,
+            data,
+        )
+        # Mirror the create_expense path: an aborted SQLAlchemy transaction
+        # leaves the session in a ``PendingRollbackError`` state — rollback
+        # first so the wizard cleanup write succeeds.
+        await db.rollback()
+        await wizard_service.clear(db, user.id)
+        await answer_callback(
+            callback_id,
+            text="Mình chưa đổi được nguồn tiền 🌱 Bạn thử lại giúp mình nhé.",
+            show_alert=True,
+        )
+        if chat_id is not None:
+            await send_message(
+                chat_id,
+                "Mình chưa đổi được nguồn tiền 🌱 Bạn thử lại giúp mình "
+                "nhé — nếu lặp lại, chọn nguồn khác xem sao.",
+                parse_mode=None,
+            )
+        return True
     await wizard_service.clear(db, user.id)
     if updated is None:
         await answer_callback(

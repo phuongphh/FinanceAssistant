@@ -3,6 +3,7 @@
 Covers the new source-resolution / warning logic and transaction-type
 filtering introduced by issue #562 without requiring a real database.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -86,6 +87,66 @@ async def test_resolve_source_asset_inferrs_wallet_provider_and_warns_for_expens
     assert result.source_type == "e_wallet"
     assert result.e_wallet_provider == "momo"
     assert result.warning == {"insufficient_balance": True, "balance": 50000.0}
+
+
+@pytest.mark.asyncio
+async def test_resolve_source_asset_rejects_non_wallet_subtype_for_e_wallet_source():
+    """PR #948 P2 fix: if the caller pins ``source_type=e_wallet`` to an
+    asset whose ``subtype`` is anything other than a wallet provider (or
+    the generic ``e_wallet`` subtype), the resolver MUST reject it.
+    Otherwise we'd silently persist a mismatched source — the dashboard
+    would render the wrong label and the source resolver would pick up
+    a bogus subtype downstream."""
+    user_id = uuid.uuid4()
+    bank_asset = _asset(
+        user_id=user_id,
+        current_value="500000",
+        subtype="bank_checking",
+    )
+    db = _db(get_result=bank_asset)
+
+    with pytest.raises(ValueError):
+        await expense_service.resolve_source_asset_for_payload(
+            db,
+            user_id,
+            ExpenseCreate(
+                amount=100_000,
+                source_asset_id=bank_asset.id,
+                source_type="e_wallet",
+                transaction_type="expense",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_resolve_source_asset_accepts_generic_e_wallet_subtype():
+    """Wallet assets created by the cash wizard carry the generic
+    ``subtype='e_wallet'`` (no provider hint). These are valid e_wallet
+    sources — the resolver must let them through without inferring a
+    bogus provider."""
+    user_id = uuid.uuid4()
+    wallet = _asset(
+        user_id=user_id,
+        current_value="200000",
+        subtype="e_wallet",
+    )
+    db = _db(get_result=wallet)
+
+    result = await expense_service.resolve_source_asset_for_payload(
+        db,
+        user_id,
+        ExpenseCreate(
+            amount=100_000,
+            source_asset_id=wallet.id,
+            source_type="e_wallet",
+            transaction_type="expense",
+        ),
+    )
+
+    assert result.source_asset_id == wallet.id
+    assert result.source_type == "e_wallet"
+    # Generic-subtype wallet has no provider hint — must not fabricate one.
+    assert result.e_wallet_provider is None
 
 
 @pytest.mark.asyncio

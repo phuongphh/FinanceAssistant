@@ -11,6 +11,50 @@ from types import SimpleNamespace
 import pytest
 
 from backend.bot.handlers import message as message_handler
+from backend.bot.handlers.message import _parse_duoc_money_in
+
+
+class TestDuocMoneyInAmountScaling:
+    """Regression for the ×1,000,000 money-in scaling bug.
+
+    "Vừa được cho 199999 trên momo" was booked as 199,999,000,000đ because
+    the amount regex matched "199999 tr" — the "tr" of "trên" — and read it
+    as the triệu unit. A unit abbreviation must never glue onto the prefix
+    of an ordinary word.
+    """
+
+    def test_word_starting_with_unit_does_not_inflate_amount(self):
+        # The exact message from the bug report. "199999" carries no real
+        # unit, so the strict được-fast-path declines (returns None) and the
+        # message falls through to the intent pipeline — crucially it is NOT
+        # booked as 199,999,000,000đ.
+        assert _parse_duoc_money_in("Vừa được cho 199999 trên momo") is None
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "được bố cho 100 trên bàn",  # "tr" in "trên"
+            "được mẹ cho 50 kem",  # "k" in "kem"
+        ],
+    )
+    def test_unit_prefixed_words_never_booked(self, text):
+        assert _parse_duoc_money_in(text) is None
+
+    @pytest.mark.parametrize(
+        "text,expected_amount",
+        [
+            # Real units must still parse — the fix is surgical.
+            ("được bố cho 500k", 500_000.0),
+            ("được lì xì 50 ngàn", 50_000.0),
+            ("được thưởng 2tr", 2_000_000.0),
+            ("được bố cho 1.000.000", 1_000_000.0),
+        ],
+    )
+    def test_real_units_still_record(self, text, expected_amount):
+        parsed = _parse_duoc_money_in(text)
+        assert parsed is not None, f"fast-path declined a real money-in: {text!r}"
+        assert parsed["amount"] == expected_amount
+        assert parsed["transaction_type"] == "money_in"
 
 
 @pytest.mark.asyncio

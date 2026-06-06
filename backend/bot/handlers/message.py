@@ -75,7 +75,9 @@ _NOT_REGISTERED = "Bạn chưa đăng ký. Gửi /start để bắt đầu."
 # pipeline.
 _AMOUNT_TOKEN_PATTERN = (
     r"\d{1,3}(?:[.,]\d{3})+"
-    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)?"
+    # The lookahead keeps a unit letter from gluing onto a word ("tr" in
+    # "trên", "k" in "kem") — see _DUOC_AMOUNT_RE below.
+    r"|\d+(?:[.,]\d+)?(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_])(?:\s*\d+)?)?"
 )
 
 _SIGNED_TX_RE = re.compile(
@@ -100,9 +102,15 @@ _AMOUNT_TOKEN_RE = re.compile(
 # intent pipeline. This mirrors the Tier-1 YAML rule, which also demands
 # a money suffix for this shape. Keep the unit list in sync with
 # ``_AMOUNT_TOKEN_PATTERN`` above.
+# The ``(?!(?!rưỡi|ruoi)[^\W\d_])`` after each unit alternation stops a unit
+# letter from matching the prefix of an ordinary word — without it the "tr" in
+# "199999 trên momo" was read as triệu and booked 199,999 as 199,999,000,000đ.
+# ``[^\W\d_]`` is "a (unicode) letter"; digits/space/end still let the unit
+# stand ("100tr", "20tr5", "500k"), and the inner ``(?!rưỡi|ruoi)`` keeps a
+# glued half-word working ("3trrưỡi" = 3.5 triệu).
 _DUOC_AMOUNT_RE = re.compile(
-    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd))?"
-    r"|\d+(?:[.,]\d+)?\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?:\s*\d+)?)",
+    r"(?P<amt>\d{1,3}(?:[.,]\d{3})+(?:\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_]))?"
+    r"|\d+(?:[.,]\d+)?\s*(?:tỷ|ty|tỉ|triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|đ|d|vnđ|vnd)(?!(?!rưỡi|ruoi)[^\W\d_])(?:\s*\d+)?)",
     re.IGNORECASE,
 )
 
@@ -141,22 +149,24 @@ async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> t
 def _parse_signed_transaction(text: str) -> dict | None:
     if _QUESTION_HINT_RE.search(text):
         return None
-    signed = _SIGNED_TX_RE.match(text)
+
+    # Pull any transaction-date phrase out of the FULL text first so a
+    # leading bare date like "14/05/2026 -120k cà phê" still reaches the
+    # sign-aware matchers (otherwise the leading "14/05/2026" would
+    # prevent both _SIGNED_TX_RE and _AMOUNT_LED_TX_RE from matching).
+    extracted_date = extract_transaction_date(text)
+    cleaned = strip_span(text, extracted_date.span) if extracted_date else text
+
+    signed = _SIGNED_TX_RE.match(cleaned)
     if signed:
         sign = signed.group("sign")
         body = (signed.group("body") or "").strip()
     else:
-        amount_led = _AMOUNT_LED_TX_RE.match(text)
+        amount_led = _AMOUNT_LED_TX_RE.match(cleaned)
         if not amount_led:
             return None
         sign = None
         body = (amount_led.group("body") or "").strip()
-
-    # Strip any "ngày dd/mm[/yyyy]" phrase BEFORE searching for the
-    # amount so the date digits don't get mistaken for a price.
-    extracted_date = extract_transaction_date(body)
-    if extracted_date is not None:
-        body = strip_span(body, extracted_date.span)
 
     amount_match = _AMOUNT_TOKEN_RE.search(body)
     if not amount_match:
