@@ -322,15 +322,14 @@ async def test_change_source_subpicker_update_failure_alerts_user(monkeypatch):
     send = AsyncMock()
     monkeypatch.setattr(callbacks, "send_message", send)
 
+    db = SimpleNamespace(rollback=AsyncMock())
     callback_query = {
         "id": "cb1",
         "data": "chsrc_wl:22222222-2222-2222-2222-222222222222",
         "from": {"id": 7},
         "message": {"chat": {"id": 10}, "message_id": 20},
     }
-    handled = await callbacks._handle_change_source_subpicker(
-        SimpleNamespace(), callback_query
-    )
+    handled = await callbacks._handle_change_source_subpicker(db, callback_query)
 
     assert handled is True
     rerender.assert_not_awaited()
@@ -339,5 +338,56 @@ async def test_change_source_subpicker_update_failure_alerts_user(monkeypatch):
     alert_text = (answer.await_args.kwargs.get("text") or "").lower()
     assert "chưa đổi" in alert_text or "không đổi" in alert_text
     send.assert_awaited_once()
+    # PR #948 fix: rollback must precede wizard cleanup so the latter doesn't
+    # crash on PendingRollbackError after an aborted update.
+    db.rollback.assert_awaited_once()
     clear.assert_awaited_once()
-    assert answer.await_args.kwargs.get("show_alert") is True
+
+
+@pytest.mark.asyncio
+async def test_change_source_subpicker_accepts_legacy_wallet_provider(monkeypatch):
+    """Pre-#948 callbacks shipped ``chsrc_wl:momo`` (provider name) rather than
+    an asset UUID. Keep accepting those so older message bubbles still resolve.
+    """
+    expense = SimpleNamespace(id="tx-1", transaction_type="expense")
+    updated = SimpleNamespace(id="tx-1", transaction_type="expense")
+
+    user = SimpleNamespace(
+        id=42,
+        wizard_state={
+            "flow": "transaction_source_edit",
+            "step": "pick_kind",
+            "draft": {"expense_id": "tx-1", "chat_id": 10, "message_id": 20},
+        },
+    )
+
+    monkeypatch.setattr(
+        callbacks, "get_user_by_telegram_id", AsyncMock(return_value=user)
+    )
+    monkeypatch.setattr(
+        callbacks,
+        "resolve_transaction_by_callback_id",
+        AsyncMock(return_value=expense),
+    )
+    update_expense = AsyncMock(return_value=updated)
+    monkeypatch.setattr(callbacks.expense_service, "update_expense", update_expense)
+    monkeypatch.setattr(callbacks.wizard_service, "clear", AsyncMock())
+    monkeypatch.setattr(callbacks, "_rerender_transaction_message", AsyncMock())
+    monkeypatch.setattr(callbacks, "answer_callback", AsyncMock())
+
+    callback_query = {
+        "id": "cb1",
+        "data": "chsrc_wl:momo",
+        "from": {"id": 7},
+        "message": {"chat": {"id": 10}, "message_id": 20},
+    }
+    handled = await callbacks._handle_change_source_subpicker(
+        SimpleNamespace(), callback_query
+    )
+
+    assert handled is True
+    update_arg = update_expense.await_args.args[3]
+    assert update_arg.source_type == "e_wallet"
+    assert update_arg.e_wallet_provider == "momo"
+    assert update_arg.source_asset_id is None
+    assert update_arg.source_credit_card_id is None

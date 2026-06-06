@@ -166,7 +166,14 @@ async def _handle_source_selection_callback(
     selected_card_bank_name = None
     if data.startswith("txsrc_wallet:"):
         source_type = "e_wallet"
-        source_asset_id = data.split(":", 1)[1]
+        suffix = data.split(":", 1)[1]
+        # Backward-compat: pre-#948 clients sent provider names ("momo") instead
+        # of asset UUIDs. Keep accepting them so in-flight callbacks from
+        # older message bubbles don't dead-end. New flow uses asset UUIDs.
+        if suffix in expense_service.EWALLET_PROVIDERS:
+            wallet_provider = suffix
+        else:
+            source_asset_id = suffix
     elif data.startswith("txsrc_card:"):
         source_type = "credit_card"
         requested_card_id = data.split(":", 1)[1]
@@ -232,6 +239,11 @@ async def _handle_source_selection_callback(
             user.id,
             data,
         )
+        # An aborted SQLAlchemy transaction leaves the session in a
+        # ``PendingRollbackError`` state — wizard_service.clear would then
+        # crash and the user gets no feedback. Rollback first so the
+        # subsequent wizard write succeeds.
+        await db.rollback()
         await wizard_service.clear(db, user.id)
         await answer_callback(
             callback_id,
@@ -1029,13 +1041,24 @@ async def _handle_change_source_subpicker(
             e_wallet_provider=None,
         )
     elif data.startswith("chsrc_wl:"):
-        asset_id = data.split(":", 1)[1]
-        update = ExpenseUpdate(
-            source_type="e_wallet",
-            source_asset_id=asset_id,
-            source_credit_card_id=None,
-            e_wallet_provider=None,
-        )
+        suffix = data.split(":", 1)[1]
+        # Backward-compat: pre-#948 callbacks used provider names ("momo")
+        # rather than asset UUIDs. Accept both so older message bubbles
+        # don't dead-end after a deploy.
+        if suffix in expense_service.EWALLET_PROVIDERS:
+            update = ExpenseUpdate(
+                source_type="e_wallet",
+                source_asset_id=None,
+                source_credit_card_id=None,
+                e_wallet_provider=suffix,
+            )
+        else:
+            update = ExpenseUpdate(
+                source_type="e_wallet",
+                source_asset_id=suffix,
+                source_credit_card_id=None,
+                e_wallet_provider=None,
+            )
     elif data.startswith("chsrc_cc:"):
         card_id = data.split(":", 1)[1]
         update = ExpenseUpdate(
@@ -1052,15 +1075,17 @@ async def _handle_change_source_subpicker(
     # violation on the e_wallet flow) must not leave the user with a
     # stuck spinner on the source-change picker.
     try:
-        updated = await expense_service.update_expense(
-            db, user.id, expense.id, update
-        )
+        updated = await expense_service.update_expense(db, user.id, expense.id, update)
     except Exception:
         logger.exception(
             "update_expense failed in change-source flow for user %s (data=%s)",
             user.id,
             data,
         )
+        # Mirror the create_expense path: an aborted SQLAlchemy transaction
+        # leaves the session in a ``PendingRollbackError`` state — rollback
+        # first so the wizard cleanup write succeeds.
+        await db.rollback()
         await wizard_service.clear(db, user.id)
         await answer_callback(
             callback_id,

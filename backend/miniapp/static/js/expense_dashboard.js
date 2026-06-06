@@ -728,12 +728,19 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
     }
 
 
-    function applySourceOptions(txType, selectedValue = '', existingCardId = null) {
+    function applySourceOptions(txType, selectedValue = '', existingCardId = null, existingWalletAssetId = null) {
         const key = txType === 'money_in' ? 'money_in' : 'expense';
         const sourceOptions = (lastOverview && lastOverview.source_options && lastOverview.source_options[key]) || FALLBACK_SOURCE_OPTIONS[key];
         const opts = [...sourceOptions];
         if (selectedValue === 'credit_card' && existingCardId) {
             opts.push({ value: `credit_card:${existingCardId}`, label: 'Thẻ tín dụng (đã chọn)' });
+        }
+        // Providerless wallet assets (subtype="e_wallet" with no provider hint)
+        // aren't in the server-built option list, which is keyed by provider.
+        // Surface a "preserve current" entry so editing such an expense doesn't
+        // silently rewrite the source to a fabricated Momo asset on save.
+        if (typeof selectedValue === 'string' && selectedValue.startsWith('e_wallet_asset:') && existingWalletAssetId) {
+            opts.push({ value: selectedValue, label: 'Ví điện tử (đã chọn)' });
         }
         els.modalSource.innerHTML = opts
             .map((it) => `<option value="${escapeHtml(it.value)}">${escapeHtml(it.label)}</option>`)
@@ -748,7 +755,12 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         els.modalTitle.textContent = editingExpenseId ? (txType === 'money_in' ? 'Sửa tiền vào' : 'Sửa chi tiêu') : (txType === 'money_in' ? 'Thêm tiền vào' : 'Thêm chi tiêu');
         els.modalType.value = txType;
         applyCategoryOptions(txType);
-        applySourceOptions(txType, sourceValue(item), item?.source_credit_card_id || null);
+        applySourceOptions(
+            txType,
+            sourceValue(item),
+            item?.source_credit_card_id || null,
+            item?.source_type === 'e_wallet' ? (item?.source_asset_id || null) : null,
+        );
         els.modalAmount.value = item ? formatMoneyInput(Math.round(item.amount || 0)) : '';
         els.modalCategory.value = item?.category || (txType === 'money_in' ? 'other_income' : 'other');
         els.modalDate.value = item?.expense_date || new Date().toISOString().slice(0, 10);
@@ -771,14 +783,27 @@ const SOURCE = new URLSearchParams(window.location.search).get('source');
         if (!item || !item.source_type) return '';
         if (item.source_credit_card_id) return `credit_card:${item.source_credit_card_id}`;
         if (item.source_asset_id && item.source_type === 'bank_account') return `bank_account:${item.source_asset_id}`;
-        if (item.source_type === 'e_wallet') return `e_wallet:${item.e_wallet_provider || 'momo'}`;
+        if (item.source_type === 'e_wallet') {
+            // A provider-less wallet asset (subtype="e_wallet" from the cash
+            // wizard) round-trips by asset id, not by provider — otherwise we'd
+            // fabricate a Momo provider on edit and silently rewrite the source.
+            if (item.source_asset_id && !item.e_wallet_provider) {
+                return `e_wallet_asset:${item.source_asset_id}`;
+            }
+            if (item.e_wallet_provider) return `e_wallet:${item.e_wallet_provider}`;
+            return 'e_wallet';
+        }
         return item.source_type;
     }
 
     function parseSourceValue(value, editingItem = null) {
         if (!value) return { source_type: null, e_wallet_provider: null, source_credit_card_id: null, source_asset_id: null };
+        if (value.startsWith('e_wallet_asset:')) {
+            return { source_type: 'e_wallet', e_wallet_provider: null, source_credit_card_id: null, source_asset_id: value.split(':')[1] || null };
+        }
         if (value.startsWith('e_wallet:')) {
-            return { source_type: 'e_wallet', e_wallet_provider: value.split(':')[1] || 'momo', source_credit_card_id: null, source_asset_id: null };
+            const provider = value.split(':')[1] || null;
+            return { source_type: 'e_wallet', e_wallet_provider: provider, source_credit_card_id: null, source_asset_id: null };
         }
         if (value.startsWith('credit_card:')) return { source_type: 'credit_card', e_wallet_provider: null, source_credit_card_id: value.split(':')[1] || null, source_asset_id: null };
         if (value.startsWith('bank_account:')) return { source_type: 'bank_account', e_wallet_provider: null, source_credit_card_id: null, source_asset_id: value.split(':')[1] || null };
