@@ -907,7 +907,12 @@ async def _expense_source_options(user_id: Any, db: AsyncSession) -> list[tuple[
 
     cards = (
         await db.execute(
-            select(CreditCard).where(CreditCard.user_id == user_id).order_by(CreditCard.created_at.asc())
+            select(CreditCard)
+            .where(
+                CreditCard.user_id == user_id,
+                CreditCard.deleted_at.is_(None),
+            )
+            .order_by(CreditCard.created_at.asc())
         )
     ).scalars().all()
     for card in cards:

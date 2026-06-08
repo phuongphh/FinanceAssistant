@@ -94,3 +94,49 @@ async def test_get_credit_card_not_found():
     db = FakeDB([None])
     got = await credit_card_service.get_credit_card(db, uuid.uuid4(), uuid.uuid4())
     assert got is None
+
+
+@pytest.mark.asyncio
+async def test_delete_credit_card_sets_deleted_at_instead_of_hard_delete():
+    """Soft delete: mutate the row and flush — never call ``db.delete``."""
+    card = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        bank_name="MSB",
+        deleted_at=None,
+    )
+    db = FakeDB([card])
+
+    got = await credit_card_service.delete_credit_card(db, card.user_id, card.id)
+
+    assert got is card
+    assert got.deleted_at is not None
+    assert db.flushed is True
+
+
+@pytest.mark.asyncio
+async def test_delete_credit_card_returns_none_when_missing():
+    db = FakeDB([None])
+    got = await credit_card_service.delete_credit_card(db, uuid.uuid4(), uuid.uuid4())
+    assert got is None
+
+
+@pytest.mark.asyncio
+async def test_create_credit_card_allows_reusing_bank_name_after_soft_delete():
+    """Soft-deleted rows must NOT block re-adding the same bank."""
+    # ``None`` here means the uniqueness query found no live (non-deleted)
+    # match — even if a soft-deleted row exists, the service's WHERE clause
+    # filters it out, so the create proceeds.
+    db = FakeDB([None])
+    user_id = uuid.uuid4()
+    data = CreditCardCreate(
+        bank_name="MSB",
+        credit_limit=5_000_000,
+        closing_date=15,
+        debt_balance=0,
+    )
+
+    got = await credit_card_service.create_credit_card(db, user_id, data)
+
+    assert got.bank_name == "MSB"
+    assert db.flushed is True

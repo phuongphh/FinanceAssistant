@@ -7,11 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.bot.formatters.money import format_money_full
 from backend.schemas.credit_card import CreditCardCreate
 from backend.services import wizard_service
-from backend.services.credit_card_service import create_credit_card, delete_credit_card, list_credit_cards
+from backend.services.credit_card_service import (
+    create_credit_card,
+    delete_credit_card,
+    get_credit_card,
+    list_credit_cards,
+)
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import send_message
 
 FLOW_CREDIT_CARD_ADD = "credit_card_add"
+
+CB_CREDIT_ADD = "expense:credit:add"
+CB_CREDIT_DELETE_PICKER = "expense:credit:del"
+CB_CREDIT_DELETE_PICK_PREFIX = "expense:credit:del:pick:"
+CB_CREDIT_DELETE_CONFIRM_PREFIX = "expense:credit:del:confirm:"
 
 
 def _credit_card_footer_keyboard(card_id: str) -> dict:
@@ -41,16 +51,22 @@ async def show_credit_cards_list(db: AsyncSession, chat_id: int, user) -> None:
             )
         text = "\n".join(lines)
 
+    keyboard_rows = [
+        [{"text": "➕ Thêm thẻ tín dụng", "callback_data": CB_CREDIT_ADD}],
+    ]
+    if cards:
+        # Only surface delete when there's actually something to remove
+        # — keeps the empty-state focused on the primary "Thêm" action.
+        keyboard_rows.append(
+            [{"text": "🗑️ Xóa thẻ tín dụng", "callback_data": CB_CREDIT_DELETE_PICKER}]
+        )
+    keyboard_rows.append([{"text": "Quay về", "callback_data": "menu:expenses"}])
+
     await send_message(
         chat_id=chat_id,
         text=text,
         parse_mode="Markdown",
-        reply_markup={
-            "inline_keyboard": [
-                [{"text": "➕ Thêm thẻ tín dụng", "callback_data": "expense:credit:add"}],
-                [{"text": "Quay về", "callback_data": "menu:expenses"}],
-            ]
-        },
+        reply_markup={"inline_keyboard": keyboard_rows},
     )
 
 
@@ -150,6 +166,120 @@ async def handle_credit_card_text_input(db: AsyncSession, message: dict) -> bool
         return True
 
     return False
+
+
+async def show_credit_card_delete_picker(
+    db: AsyncSession, chat_id: int, user
+) -> None:
+    """List live cards as buttons so the user can pick which to remove.
+
+    Falls back to a friendly message when nothing remains — the entry
+    point is suppressed in the list view, but a stale callback (e.g.
+    user tapped "Xóa" then deleted from another device) shouldn't
+    crash.
+    """
+    cards = await list_credit_cards(db, user.id)
+    if not cards:
+        await send_message(
+            chat_id=chat_id,
+            text="Bạn chưa có thẻ tín dụng nào để xóa.",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "◀️ Quay lại", "callback_data": "menu:expenses:credit_cards"}],
+                ]
+            },
+        )
+        return
+
+    rows = [
+        [{
+            "text": f"💳 {card.bank_name}",
+            "callback_data": f"{CB_CREDIT_DELETE_PICK_PREFIX}{card.id}",
+        }]
+        for card in cards
+    ]
+    rows.append([{"text": "◀️ Quay lại", "callback_data": "menu:expenses:credit_cards"}])
+    await send_message(
+        chat_id=chat_id,
+        text="🗑️ <b>Chọn thẻ tín dụng muốn xóa:</b>",
+        parse_mode="HTML",
+        reply_markup={"inline_keyboard": rows},
+    )
+
+
+async def show_credit_card_delete_confirm(
+    db: AsyncSession, chat_id: int, user, card_id: str
+) -> None:
+    """Two-tap guard before the irreversible (to the user) soft-delete."""
+    from uuid import UUID
+
+    try:
+        parsed_id = UUID(card_id)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy thẻ này.")
+        return
+    card = await get_credit_card(db, user.id, parsed_id)
+    if card is None:
+        await send_message(
+            chat_id=chat_id,
+            text="Thẻ này không còn trong danh sách. Bạn quay lại chọn thẻ khác nhé.",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "◀️ Quay lại", "callback_data": CB_CREDIT_DELETE_PICKER}],
+                ]
+            },
+        )
+        return
+
+    await send_message(
+        chat_id=chat_id,
+        text=(
+            f"🗑️ <b>Xác nhận xóa thẻ {card.bank_name}?</b>\n\n"
+            "Thẻ sẽ được gỡ khỏi danh sách và không hiển thị khi ghi chi tiêu mới.\n"
+            "Lịch sử chi tiêu đã ghi nhận trên thẻ này vẫn được giữ nguyên."
+        ),
+        parse_mode="HTML",
+        reply_markup={
+            "inline_keyboard": [
+                [{
+                    "text": "🗑️ Xóa thật",
+                    "callback_data": f"{CB_CREDIT_DELETE_CONFIRM_PREFIX}{card.id}",
+                }],
+                [{
+                    "text": "❌ Không, giữ lại",
+                    "callback_data": CB_CREDIT_DELETE_PICKER,
+                }],
+            ]
+        },
+    )
+
+
+async def confirm_credit_card_delete(
+    db: AsyncSession, chat_id: int, user, card_id: str
+) -> None:
+    """Perform the soft-delete and bounce back to the (now-updated) list."""
+    from uuid import UUID
+
+    try:
+        parsed_id = UUID(card_id)
+    except ValueError:
+        await send_message(chat_id=chat_id, text="Không tìm thấy thẻ này.")
+        return
+    card = await delete_credit_card(db, user.id, parsed_id)
+    if card is None:
+        await send_message(
+            chat_id=chat_id,
+            text="Thẻ này đã được xóa trước đó rồi 🤔",
+        )
+    else:
+        await send_message(
+            chat_id=chat_id,
+            text=f"✅ Đã xóa thẻ <b>{card.bank_name}</b> khỏi danh sách.",
+            parse_mode="HTML",
+        )
+    # Refresh the list so the user sees the updated state immediately
+    # — saves one extra tap and confirms the action visually.
+    await show_credit_cards_list(db, chat_id, user)
 
 
 async def undo_credit_card_create(db: AsyncSession, chat_id: int, user, card_id: str) -> None:
