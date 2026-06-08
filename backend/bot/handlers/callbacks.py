@@ -409,6 +409,37 @@ async def handle_transaction_callback(
         await undo_credit_card_create(db, chat_id, user, data.split(":")[-1])
         await answer_callback(callback_query["id"])
         return True
+    if (
+        data == "expense:credit:del"
+        or data.startswith("expense:credit:del:pick:")
+        or data.startswith("expense:credit:del:confirm:")
+    ):
+        from backend.bot.handlers.credit_card_entry import (
+            confirm_credit_card_delete,
+            show_credit_card_delete_confirm,
+            show_credit_card_delete_picker,
+        )
+
+        from_user = callback_query.get("from") or {}
+        telegram_id = from_user.get("id")
+        message = callback_query.get("message") or {}
+        chat_id = message.get("chat", {}).get("id")
+        user = await get_user_by_telegram_id(db, telegram_id) if telegram_id else None
+        if not user or chat_id is None:
+            await answer_callback(callback_query["id"])
+            return True
+        if data == "expense:credit:del":
+            await show_credit_card_delete_picker(db, chat_id, user)
+        elif data.startswith("expense:credit:del:pick:"):
+            await show_credit_card_delete_confirm(
+                db, chat_id, user, data[len("expense:credit:del:pick:"):]
+            )
+        else:
+            await confirm_credit_card_delete(
+                db, chat_id, user, data[len("expense:credit:del:confirm:"):]
+            )
+        await answer_callback(callback_query["id"])
+        return True
 
     if (
         data.startswith("chsrc_bk:")
