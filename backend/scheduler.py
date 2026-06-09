@@ -14,6 +14,7 @@ import signal
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from backend.jobs.admin_cache_warmer import run_admin_cache_warmer
 from backend.jobs.cashflow_detection_job import run_cashflow_detection
 from backend.jobs.cashflow_forecast_job import run_cashflow_forecast_job
 from backend.jobs.daily_kpi_digest_job import run_daily_kpi_digest_job
@@ -226,6 +227,18 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         hour=1, minute=0,
         timezone="Asia/Ho_Chi_Minh",
         id="cashflow_forecast",
+    )
+
+    # Phase 4.3 — Admin Twin metrics cache warmer. Every 10 minutes
+    # re-populate the 4 Twin sections with default params so the next
+    # operator request after the 15-min TTL never hits a cold build.
+    # 10 < 15 means there is always a warm entry by the time the
+    # previous one expires; the DB load per pass is one read per tenant
+    # per section.
+    scheduler.add_job(
+        run_admin_cache_warmer, "interval",
+        minutes=10, timezone="Asia/Ho_Chi_Minh",
+        id="admin_twin_cache_warmer",
     )
 
 

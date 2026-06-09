@@ -72,3 +72,15 @@ export function getTwinDeltaDistribution(params = {}) {
 export function getTwinDeltaCsvUrl(params = {}) {
   return buildAdminDashboardPath('/twin-metrics/delta-distribution.csv', params);
 }
+
+export function invalidateTwinCache(sections = []) {
+  const query = new URLSearchParams();
+  (sections || []).forEach((section) => {
+    if (section) query.append('sections', section);
+  });
+  const suffix = query.toString();
+  const path = suffix
+    ? `/twin-metrics/cache/invalidate?${suffix}`
+    : '/twin-metrics/cache/invalidate';
+  return apiFetch(path, { method: 'POST' });
+}

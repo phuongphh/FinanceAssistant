@@ -28,6 +28,7 @@ import {
   getTwinEngagementFunnel,
   getTwinEngagementUsers,
   getTwinLoopHealth,
+  invalidateTwinCache,
 } from '../../api/adminDashboard';
 import { buildAdminDashboardPath, formatNumber, formatValue, pieColors, toDatedChartData } from '../../utils/adminDashboardUtils';
 
@@ -48,6 +49,9 @@ export default function TwinDashboard({ period, days, refreshNonce }) {
   const [payload, setPayload] = useState({ funnel: null, loop: null, comprehension: null, delta: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [localRefresh, setLocalRefresh] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState('');
   const params = useMemo(() => ({
     period: twinPeriod,
     segment,
@@ -79,7 +83,26 @@ export default function TwinDashboard({ period, days, refreshNonce }) {
     return () => {
       alive = false;
     };
-  }, [params, refreshNonce]);
+  }, [params, refreshNonce, localRefresh]);
+
+  const generatedAt = payload.funnel?.generated_at || payload.loop?.generated_at
+    || payload.comprehension?.generated_at || payload.delta?.generated_at || null;
+  const freshnessLabel = useMemo(() => formatFreshness(generatedAt), [generatedAt]);
+
+  async function handleForceRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshNote('');
+    try {
+      const result = await invalidateTwinCache();
+      setRefreshNote(`Đã xoá ${result?.keys_removed ?? 0} cache key. Đang tải lại…`);
+      setLocalRefresh((prev) => prev + 1);
+    } catch (err) {
+      setRefreshNote(err.message || 'Không refresh được cache.');
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   return (
     <section className="space-y-6" id="twin-admin-dashboard">
@@ -115,9 +138,25 @@ export default function TwinDashboard({ period, days, refreshNonce }) {
               className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm text-white"
               aria-label="Signup cohort week"
             />
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/70"><RefreshCw className="h-3.5 w-3.5" /> Cache 15m · {days}d</span>
+            <span
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/70"
+              title={generatedAt ? new Date(generatedAt).toLocaleString('vi-VN') : 'Chưa có dữ liệu'}
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> {freshnessLabel} · {days}d
+            </span>
+            <button
+              type="button"
+              onClick={handleForceRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/20 px-3 py-2 text-xs font-semibold text-white hover:bg-gold/30 disabled:opacity-60"
+              aria-label="Force refresh Twin admin cache"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Đang refresh…' : 'Refresh ngay'}
+            </button>
           </div>
         </div>
+        {refreshNote ? <p className="mt-3 text-xs text-white/70">{refreshNote}</p> : null}
       </div>
       {error ? <TwinError message={error} /> : null}
       <div className="grid gap-6 xl:grid-cols-2">
@@ -256,6 +295,7 @@ function DeltaDistribution({ loading, data, params }) {
   const histogram = data?.histogram || [];
   const p50 = toDatedChartData(data?.p50_distribution || []);
   const calibration = data?.calibration || [];
+  const calibrationMeta = data?.calibration_meta || null;
   async function exportCsv() {
     const token = getStoredToken();
     const response = await fetch(buildAdminDashboardPath(`${getApiBase()}${getTwinDeltaCsvUrl(params)}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
@@ -275,6 +315,12 @@ function DeltaDistribution({ loading, data, params }) {
           <Download className="h-3.5 w-3.5" /> Export CSV
         </button>
       </div>
+      {calibrationMeta?.truncated ? (
+        <p className="mb-3 flex items-start gap-2 rounded-2xl border border-orange/30 bg-orange/10 p-3 text-xs leading-5 text-orange">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none" />
+          Đang hiển thị {formatNumber(calibrationMeta.rows_returned)} / {formatNumber(calibrationMeta.rows_total)} điểm calibration (giới hạn {formatNumber(calibrationMeta.cap)}). Export CSV để xem trọn bộ.
+        </p>
+      ) : null}
       <div className="grid gap-4">
         <ChartBox loading={loading} empty={!histogram.length} compact>
           <ResponsiveContainer width="100%" height="100%">
@@ -352,6 +398,20 @@ function AlertList({ alerts }) {
       ))}
     </div>
   );
+}
+
+function formatFreshness(generatedAt) {
+  if (!generatedAt) return 'Chưa có dữ liệu';
+  const ts = new Date(generatedAt).getTime();
+  if (Number.isNaN(ts)) return 'Chưa có dữ liệu';
+  const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (diffSec < 60) return 'Cập nhật vừa xong';
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `Cập nhật ${mins} phút trước`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Cập nhật ${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  return `Cập nhật ${days} ngày trước`;
 }
 
 function TwinError({ message }) {
