@@ -71,15 +71,33 @@ async def _warm_tenant(db: AsyncSession, tenant_id: int) -> int:
             segment=None, admin=synthetic_admin, db=db,
         )),
     )
-    for section, call in builders:
-        try:
-            await call()
-            warmed += 1
-        except Exception:
-            logger.warning(
-                "admin_cache_warmer section=%s tenant=%s failed",
-                section, tenant_id, exc_info=True,
-            )
+    # Force a rebuild + SETEX even if the previous entry is still alive.
+    # Otherwise a 10-min warmer pass against a 15-min TTL just hits cache
+    # without extending it, leaving a cold window between minute 15 and the
+    # next warmer at minute 20.
+    token = twin_metrics._force_rebuild.set(True)
+    try:
+        for section, call in builders:
+            try:
+                await call()
+                warmed += 1
+            except Exception:
+                logger.warning(
+                    "admin_cache_warmer section=%s tenant=%s failed",
+                    section, tenant_id, exc_info=True,
+                )
+                # A failed query leaves the AsyncSession's transaction in
+                # an aborted state — every subsequent query on the same
+                # session would also fail until we roll back.
+                try:
+                    await db.rollback()
+                except Exception:
+                    logger.warning(
+                        "admin_cache_warmer rollback after section=%s tenant=%s failed",
+                        section, tenant_id, exc_info=True,
+                    )
+    finally:
+        twin_metrics._force_rebuild.reset(token)
     return warmed
 
 

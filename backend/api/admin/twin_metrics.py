@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import uuid
 from collections import Counter, defaultdict
@@ -120,10 +121,21 @@ def _anonymize_user_id(user_id: uuid.UUID) -> str:
     return f"usr_{digest[:10]}"
 
 
+# Set by the cache warmer (backend/jobs/admin_cache_warmer.py) so a warming
+# pass rebuilds and re-SETEXes the entry even when the previous one is still
+# alive. Without this the 10-min warmer at minute 10 just reads the minute-0
+# entry, the TTL still expires at minute 15, and the dashboard sees a cold
+# window until minute 20. With force=True the TTL resets every warmer pass.
+_force_rebuild: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_admin_cache_force_rebuild", default=False
+)
+
+
 async def _cached(key: str, builder):
-    cached = await cache_get(key)
-    if cached is not None:
-        return cached
+    if not _force_rebuild.get():
+        cached = await cache_get(key)
+        if cached is not None:
+            return cached
     payload = await builder()
     await cache_set(key, payload, CACHE_TTL_SECONDS)
     return payload

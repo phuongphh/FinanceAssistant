@@ -346,9 +346,17 @@ async def test_admin_cache_warmer_warms_every_active_tenant(monkeypatch):
 async def test_admin_cache_warmer_continues_when_one_section_fails(monkeypatch):
     from backend.jobs import admin_cache_warmer
 
+    rollback_calls: list[int] = []
+
+    class _Session:
+        async def rollback(self):
+            rollback_calls.append(1)
+
+    session = _Session()
+
     class _Factory:
         async def __aenter__(self):
-            return SimpleNamespace()
+            return session
         async def __aexit__(self, exc_type, exc, tb):
             return False
     factory_instance = _Factory()
@@ -373,3 +381,91 @@ async def test_admin_cache_warmer_continues_when_one_section_fails(monkeypatch):
     # poison the run.
     assert summary["tenants"] == [1]
     assert summary["sections_warmed"] == 3
+    # The failed section must trigger a rollback so the AsyncSession's
+    # aborted transaction doesn't poison the next section/tenant.
+    assert rollback_calls == [1]
+
+
+# ---------- force-rebuild contract -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cached_force_rebuild_bypasses_read_and_resets_ttl(monkeypatch):
+    # Without force the cached value short-circuits the builder.
+    reads: list[str] = []
+    sets: list[tuple[str, dict, int]] = []
+    build_calls = {"n": 0}
+
+    async def fake_get(key):
+        reads.append(key)
+        return {"cached": True}
+
+    async def fake_set(key, value, ttl):
+        sets.append((key, value, ttl))
+
+    async def builder():
+        build_calls["n"] += 1
+        return {"fresh": True}
+
+    monkeypatch.setattr(twin_metrics, "cache_get", fake_get)
+    monkeypatch.setattr(twin_metrics, "cache_set", fake_set)
+
+    # Default path: returns the cached value, never builds, never re-SETEXes.
+    result = await twin_metrics._cached("k", builder)
+    assert result == {"cached": True}
+    assert build_calls["n"] == 0
+    assert sets == []
+
+    # Force path: bypasses the read, rebuilds, and SETEXes (TTL reset).
+    token = twin_metrics._force_rebuild.set(True)
+    try:
+        result = await twin_metrics._cached("k", builder)
+    finally:
+        twin_metrics._force_rebuild.reset(token)
+    assert result == {"fresh": True}
+    assert build_calls["n"] == 1
+    assert sets and sets[0][0] == "k"
+    assert sets[0][2] == twin_metrics.CACHE_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_admin_cache_warmer_forces_rebuild(monkeypatch):
+    """The warmer must set ``_force_rebuild`` so a still-warm entry's TTL
+    actually resets — otherwise a 10-min warmer against 15-min TTL leaves a
+    cold window between minute 15 and the next warmer pass."""
+    from backend.jobs import admin_cache_warmer
+
+    observed: list[bool] = []
+
+    class _Session:
+        async def rollback(self):
+            pass
+
+    session = _Session()
+
+    class _Factory:
+        async def __aenter__(self):
+            return session
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+    factory_instance = _Factory()
+    monkeypatch.setattr(admin_cache_warmer, "get_session_factory", lambda: (lambda: factory_instance))
+
+    async def fake_active(db):
+        return [1]
+    monkeypatch.setattr(admin_cache_warmer, "_active_tenant_ids", fake_active)
+
+    async def record(**kw):
+        observed.append(twin_metrics._force_rebuild.get())
+        return {"ok": True}
+
+    monkeypatch.setattr(twin_metrics, "engagement_funnel", record)
+    monkeypatch.setattr(twin_metrics, "loop_health", record)
+    monkeypatch.setattr(twin_metrics, "comprehension", record)
+    monkeypatch.setattr(twin_metrics, "delta_distribution", record)
+
+    await admin_cache_warmer.run_admin_cache_warmer()
+
+    assert observed == [True, True, True, True]
+    # Context var must be restored to its default outside the warming pass.
+    assert twin_metrics._force_rebuild.get() is False
