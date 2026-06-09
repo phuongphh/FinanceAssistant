@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,10 +23,17 @@ from backend.models.twin_habit_loop import TwinDeltaThresholdConfig, TwinRecompu
 from backend.models.twin_projection import TwinProjection
 from backend.models.twin_view_event import TwinViewEvent
 from backend.models.user import User
-from backend.services.admin_cache import cache_get, cache_set
+from backend.services.admin_audit import log_action
+from backend.services.admin_cache import cache_get, cache_invalidate_pattern, cache_set
 
 router = APIRouter(prefix="/twin-metrics", tags=["admin-twin-metrics"])
 CACHE_TTL_SECONDS = 15 * 60
+# Calibration / CSV row caps. The previous 500/5000 limits were silently
+# truncating the dataset operators rely on. The new caps are generous and
+# we expose a ``truncated`` flag so the UI can show "showing first N rows".
+CALIBRATION_ROW_CAP = 5000
+CSV_ROW_CAP = 50_000
+TWIN_SECTIONS = ("funnel", "loop", "comprehension", "delta")
 _RANGE_RE = r"^(7d|14d|30d|90d|custom)$"
 _SEGMENTS = {"starter", "young_pro", "mass_affluent", "hnw"}
 _ACTION_EVENT_KEYS = {
@@ -95,7 +102,12 @@ def _wealth_subquery():
 def _user_filters(tenant_id: int, cohort_week: date | None, segment: str | None, wealth_sq):
     filters = [User.deleted_at.is_(None), User.tenant_id == tenant_id]
     if cohort_week:
-        start = datetime.combine(cohort_week, time.min, tzinfo=timezone.utc)
+        # ``cohort_week`` is a calendar date the operator picks in the
+        # Vietnam-time UI. Anchor the 7-day window to VN_TZ midnight,
+        # converted to UTC for storage comparison — otherwise we
+        # silently drift by 7 hours and the cohort filter loses users
+        # who signed up between 17:00-23:59 ICT on the boundary days.
+        start = datetime.combine(cohort_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
         filters.append(User.created_at >= start)
         filters.append(User.created_at < start + timedelta(days=7))
     if segment in _SEGMENTS:
@@ -368,8 +380,9 @@ async def comprehension(
     async def build() -> dict:
         filters = [User.deleted_at.is_(None), User.tenant_id == tenant_id]
         if cohort_week:
-            filters.append(User.created_at >= datetime.combine(cohort_week, time.min, tzinfo=timezone.utc))
-            filters.append(User.created_at < datetime.combine(cohort_week, time.min, tzinfo=timezone.utc) + timedelta(days=7))
+            cohort_start = datetime.combine(cohort_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+            filters.append(User.created_at >= cohort_start)
+            filters.append(User.created_at < cohort_start + timedelta(days=7))
         reaction_rows = (await db.execute(
             select(Event.event_type, func.count(Event.id))
             .join(User, User.id == Event.user_id)
@@ -471,15 +484,40 @@ async def delta_distribution(
             .order_by(func.date(TwinProjection.computed_at))
         )).all()
         p50_distribution = [{"date": day, "p50_vnd": round(_safe_float(avg), 2), "count": int(count or 0)} for day, avg, count in projection_rows]
+        calibration_total = int((await db.execute(
+            select(func.count(TwinCalibrationSnapshot.id))
+            .join(User, User.id == TwinCalibrationSnapshot.user_id)
+            .where(
+                TwinCalibrationSnapshot.predicted_at >= start - timedelta(days=90),
+                TwinCalibrationSnapshot.predicted_at < end,
+                TwinCalibrationSnapshot.actual_vnd.is_not(None),
+                User.tenant_id == tenant_id,
+                User.deleted_at.is_(None),
+            )
+        )).scalar() or 0)
         calibration_rows = (await db.execute(
             select(TwinCalibrationSnapshot.p50_vnd, TwinCalibrationSnapshot.actual_vnd, TwinCalibrationSnapshot.within_band)
             .join(User, User.id == TwinCalibrationSnapshot.user_id)
             .where(TwinCalibrationSnapshot.predicted_at >= start - timedelta(days=90), TwinCalibrationSnapshot.predicted_at < end, TwinCalibrationSnapshot.actual_vnd.is_not(None), User.tenant_id == tenant_id, User.deleted_at.is_(None))
-            .limit(500)
+            .order_by(desc(TwinCalibrationSnapshot.predicted_at))
+            .limit(CALIBRATION_ROW_CAP)
         )).all()
         calibration = [{"predicted_vnd": _safe_float(predicted), "actual_vnd": _safe_float(actual), "within_band": bool(within)} for predicted, actual, within in calibration_rows]
         alerts = evaluate_delta_bias_alert((positive / total) if total else 0)
-        return {"generated_at": _now(), "refresh_seconds": CACHE_TTL_SECONDS, "histogram": histogram, "p50_distribution": p50_distribution, "calibration": calibration, "alerts": alerts}
+        return {
+            "generated_at": _now(),
+            "refresh_seconds": CACHE_TTL_SECONDS,
+            "histogram": histogram,
+            "p50_distribution": p50_distribution,
+            "calibration": calibration,
+            "calibration_meta": {
+                "rows_total": calibration_total,
+                "rows_returned": len(calibration),
+                "truncated": calibration_total > len(calibration),
+                "cap": CALIBRATION_ROW_CAP,
+            },
+            "alerts": alerts,
+        }
 
     return await _cached(cache_key, build)
 
@@ -492,14 +530,62 @@ async def delta_distribution_csv(
 ) -> Response:
     tenant_id = _admin_tenant_id(admin)
     start, end, _ = _parse_window(period, None, None)
+    total = int((await db.execute(
+        select(func.count(TwinRecomputeLog.id))
+        .join(User, User.id == TwinRecomputeLog.user_id)
+        .where(User.tenant_id == tenant_id, User.deleted_at.is_(None), TwinRecomputeLog.created_at >= start, TwinRecomputeLog.created_at < end)
+    )).scalar() or 0)
     rows = (await db.execute(
         select(TwinRecomputeLog.created_at, TwinRecomputeLog.user_id, TwinRecomputeLog.delta_pct, TwinRecomputeLog.delta_absolute_vnd, TwinRecomputeLog.event_type)
         .join(User, User.id == TwinRecomputeLog.user_id)
         .where(User.tenant_id == tenant_id, User.deleted_at.is_(None), TwinRecomputeLog.created_at >= start, TwinRecomputeLog.created_at < end)
         .order_by(desc(TwinRecomputeLog.created_at))
-        .limit(5000)
+        .limit(CSV_ROW_CAP)
     )).all()
     lines = ["created_at,anon_user_id,delta_pct,delta_absolute_vnd,event_type"]
     for created_at, user_id, delta_pct, delta_abs, event_type in rows:
         lines.append(f"{created_at.isoformat()},{_anonymize_user_id(user_id)},{_safe_float(delta_pct)},{_safe_float(delta_abs)},{event_type}")
-    return Response("\n".join(lines) + "\n", media_type="text/csv", headers={"Content-Disposition": "attachment; filename=twin-delta-distribution.csv"})
+    truncated = total > len(rows)
+    headers = {
+        "Content-Disposition": "attachment; filename=twin-delta-distribution.csv",
+        "X-Rows-Returned": str(len(rows)),
+        "X-Rows-Total": str(total),
+        "X-Truncated": "true" if truncated else "false",
+    }
+    return Response("\n".join(lines) + "\n", media_type="text/csv", headers=headers)
+
+
+@router.post("/cache/invalidate")
+async def invalidate_twin_cache(
+    sections: list[str] | None = Query(default=None),
+    request: Request = None,  # type: ignore[assignment]
+    admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Force-invalidate Twin admin cache for the caller's tenant.
+
+    Operator-driven freshness: the 15-minute TTL is a soft ceiling — when
+    the operator needs current numbers (e.g. immediately after a fix),
+    they hit this endpoint and the next read paints fresh data. Scope is
+    pinned to ``admin.tenant_id`` so an operator cannot ever evict
+    another tenant's cache.
+    """
+    tenant_id = _admin_tenant_id(admin)
+    targets = [s for s in (sections or list(TWIN_SECTIONS)) if s in TWIN_SECTIONS]
+    if not targets:
+        targets = list(TWIN_SECTIONS)
+    removed = 0
+    for section in targets:
+        pattern = f"admin:tenant:{tenant_id}:twin:{section}:*"
+        removed += await cache_invalidate_pattern(pattern)
+    await log_action(
+        db,
+        admin.id,
+        "twin_cache_invalidate",
+        target_type="twin_metrics_cache",
+        target_id=str(tenant_id),
+        payload={"sections": targets, "keys_removed": removed},
+        request=request,
+        commit=True,
+    )
+    return {"tenant_id": tenant_id, "sections": targets, "keys_removed": removed}
