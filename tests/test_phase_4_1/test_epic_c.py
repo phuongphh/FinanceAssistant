@@ -453,6 +453,226 @@ async def test_mark_invite_redeemed_preserves_prior_acquisition_source():
 
 
 # ====================================================================
+# Token-free founding — record_source (src_<source> deep-link path)
+# ====================================================================
+
+
+def test_founding_sources_is_canonical_for_script():
+    """The script re-exports the service tuple — they must be identical so
+    the onboarding handler validates ``src_<source>`` against the same set
+    the distribution script round-robins over."""
+    from backend.services.founding.founding_member_service import FOUNDING_SOURCES
+    from scripts.soft_launch_acquisition import SOURCES
+
+    assert SOURCES is FOUNDING_SOURCES
+    assert FOUNDING_SOURCES == (
+        "friends",
+        "personal_fb",
+        "vn_finance_community",
+        "direct_msg",
+        "tg_finance_groups",
+    )
+
+
+@pytest.mark.asyncio
+async def test_record_source_sets_known_source():
+    from backend.services.founding import founding_member_service
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    await founding_member_service.record_source(db, user, "tg_finance_groups")
+
+    assert user.acquisition_source == "tg_finance_groups"
+    assert db.flush_count == 1
+
+
+@pytest.mark.asyncio
+async def test_record_source_ignores_unknown_source():
+    """A bogus ``src_<x>`` payload (typo / tampering) must not write a
+    junk source — only the 5 known channels are accepted."""
+    from backend.services.founding import founding_member_service
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    await founding_member_service.record_source(db, user, "spam_channel")
+
+    assert user.acquisition_source is None
+    assert db.flush_count == 0
+
+
+@pytest.mark.asyncio
+async def test_record_source_ignores_none():
+    """Bare /start (no payload) carries no source — nothing to record."""
+    from backend.services.founding import founding_member_service
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    await founding_member_service.record_source(db, user, None)
+
+    assert user.acquisition_source is None
+    assert db.flush_count == 0
+
+
+@pytest.mark.asyncio
+async def test_record_source_preserves_prior_source():
+    """First touch wins — a later src_ link must not overwrite the
+    channel that originally converted the user."""
+    from backend.services.founding import founding_member_service
+
+    user = _make_user(seq=None, founding=False)
+    user.acquisition_source = "friends"
+    db = _FakeFoundingDB(max_sequence=None)
+
+    await founding_member_service.record_source(db, user, "personal_fb")
+
+    assert user.acquisition_source == "friends"
+    assert db.flush_count == 0
+
+
+# ====================================================================
+# _claim_founding — token-free orchestration in onboarding_v2 handler
+# ====================================================================
+
+
+def _patch_claim_deps(monkeypatch, *, assignment=None, cap=False):
+    """Patch the handler collaborators so _claim_founding runs in isolation.
+
+    Returns a list that records analytics.track calls.
+    """
+    from backend.bot.handlers import onboarding_v2
+    from backend.services.founding import founding_member_service
+
+    monkeypatch.setattr(
+        onboarding_v2.onboarding_service,
+        "load_copy",
+        lambda: {
+            "source_variants": {
+                "friends": {"prefix": "PREFIX_FRIENDS"},
+            }
+        },
+    )
+    monkeypatch.setattr(
+        onboarding_v2, "_load_founding_copy", lambda: {"banner": "BANNER #{sequence}"}
+    )
+
+    async def _fake_assign(db, user):  # noqa: ANN001
+        if cap:
+            from backend.services.founding.founding_member_service import (
+                FoundingCapReachedError,
+            )
+
+            raise FoundingCapReachedError()
+        user.is_founding_member = True
+        user.founding_member_sequence = assignment.sequence
+        return assignment
+
+    monkeypatch.setattr(founding_member_service, "assign_sequence", _fake_assign)
+
+    tracked: list[dict] = []
+    monkeypatch.setattr(
+        onboarding_v2.analytics,
+        "track",
+        lambda event, **kw: tracked.append({"event": event, **kw}),
+    )
+    return tracked
+
+
+@pytest.mark.asyncio
+async def test_claim_founding_grants_seat_with_source_prefix(monkeypatch):
+    from types import SimpleNamespace
+
+    from backend.bot.handlers import onboarding_v2
+
+    assignment = SimpleNamespace(sequence=3)
+    tracked = _patch_claim_deps(monkeypatch, assignment=assignment)
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    text = await onboarding_v2._claim_founding(db, user, "friends")
+
+    assert user.acquisition_source == "friends"
+    assert "PREFIX_FRIENDS" in text
+    assert "BANNER #3" in text
+    assert tracked and tracked[0]["event"] == "founding_member_activated"
+    assert tracked[0]["properties"]["source"] == "friends"
+
+
+@pytest.mark.asyncio
+async def test_claim_founding_bare_start_grants_seat_without_prefix(monkeypatch):
+    """No payload → no source prefix, but still a founding seat + banner."""
+    from types import SimpleNamespace
+
+    from backend.bot.handlers import onboarding_v2
+
+    assignment = SimpleNamespace(sequence=1)
+    tracked = _patch_claim_deps(monkeypatch, assignment=assignment)
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    text = await onboarding_v2._claim_founding(db, user, None)
+
+    assert user.acquisition_source is None
+    assert text == "BANNER #1"
+    assert tracked[0]["properties"]["source"] is None
+
+
+@pytest.mark.asyncio
+async def test_claim_founding_cap_reached_shows_prefix_only_no_banner(monkeypatch):
+    from backend.bot.handlers import onboarding_v2
+
+    tracked = _patch_claim_deps(monkeypatch, cap=True)
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    text = await onboarding_v2._claim_founding(db, user, "friends")
+
+    # Source still attributed; banner suppressed (organic user past cap).
+    assert user.acquisition_source == "friends"
+    assert text == "PREFIX_FRIENDS"
+    assert tracked == []
+
+
+@pytest.mark.asyncio
+async def test_claim_founding_cap_reached_bare_start_returns_none(monkeypatch):
+    from backend.bot.handlers import onboarding_v2
+
+    _patch_claim_deps(monkeypatch, cap=True)
+
+    user = _make_user(seq=None, founding=False)
+    db = _FakeFoundingDB(max_sequence=None)
+
+    text = await onboarding_v2._claim_founding(db, user, None)
+
+    assert text is None
+
+
+@pytest.mark.asyncio
+async def test_claim_founding_returning_member_no_duplicate_banner(monkeypatch):
+    """A user who already holds a sequence re-running /start must not get a
+    second banner or a duplicate analytics event."""
+    from types import SimpleNamespace
+
+    from backend.bot.handlers import onboarding_v2
+
+    assignment = SimpleNamespace(sequence=5)
+    tracked = _patch_claim_deps(monkeypatch, assignment=assignment)
+
+    user = _make_user(seq=5)  # already founding
+    db = _FakeFoundingDB(max_sequence=None)
+
+    text = await onboarding_v2._claim_founding(db, user, "friends")
+
+    assert text == "PREFIX_FRIENDS"  # prefix only, no banner
+    assert tracked == []
+
+
+# ====================================================================
 # D.1 — Zalo channel feature flag
 # ====================================================================
 

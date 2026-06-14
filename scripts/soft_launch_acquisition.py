@@ -47,19 +47,16 @@ from sqlalchemy import select
 
 from backend.database import get_session_factory
 from backend.models.invite_code import InviteCode
+from backend.services.founding.founding_member_service import FOUNDING_SOURCES
 
 logger = logging.getLogger(__name__)
 
 
-# 5 sources from Phase 4.1 spec (Story C.1). Order is significant: the
-# distribution loop assigns sources round-robin from this list.
-SOURCES: tuple[str, ...] = (
-    "friends",
-    "personal_fb",
-    "vn_finance_community",
-    "direct_msg",
-    "tg_finance_groups",
-)
+# 5 sources from Phase 4.1 spec (Story C.1). Canonical list lives in
+# ``founding_member_service`` so the onboarding handler validates the
+# token-free ``src_<source>`` deep-link against the same tuple. Order is
+# significant: the distribution loop assigns sources round-robin.
+SOURCES: tuple[str, ...] = FOUNDING_SOURCES
 
 DEFAULT_BOT_USERNAME = "BeTienBot"
 DEFAULT_COUNT = 50
