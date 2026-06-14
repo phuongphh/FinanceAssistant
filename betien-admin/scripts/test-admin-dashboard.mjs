@@ -2,17 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAdminDashboardPath,
+  buildFeedbackQueryParams,
   buildStatusChangeBody,
   buildUsersQueryParams,
+  categoryClasses,
+  feedbackStatusClasses,
+  formatConfidence,
   formatTier,
   formatValue,
   getFeatureBarWidthPct,
   getRetentionCellPresentation,
+  isUuid,
   latestDauWindow,
+  optionLabel,
+  priorityClasses,
+  sentimentClasses,
   statusClasses,
   statusLabel,
   toDatedChartData,
 } from '../src/utils/adminDashboardUtils.js';
+
+const SAMPLE_UUID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 
 test('API client path builder encodes params and drops empty filters', () => {
   assert.equal(
@@ -78,4 +88,94 @@ test('KPI formatter supports empty state, percent, USD, and vi-VN numbers', () =
   assert.equal(formatValue(42.42, 'percent'), '42.4%');
   assert.equal(formatValue(1.234, 'usd'), '$1.23');
   assert.equal(formatValue(1234567, 'number'), '1.234.567');
+});
+
+test('feedback query builder maps UI state onto the backend snake_case contract', () => {
+  assert.deepEqual(
+    buildFeedbackQueryParams({
+      period: '30d',
+      category: 'bug',
+      sentiment: 'negative',
+      priority: 'high',
+      status: 'new',
+      userId: SAMPLE_UUID,
+      search: 'app crash',
+      sort: 'oldest',
+      limit: 50,
+      offset: 100,
+    }),
+    {
+      period: '30d',
+      start_date: undefined,
+      end_date: undefined,
+      category: 'bug',
+      sentiment: 'negative',
+      priority: 'high',
+      status: 'new',
+      user_id: SAMPLE_UUID,
+      search: 'app crash',
+      sort: 'oldest',
+      limit: 50,
+      offset: 100,
+    },
+  );
+});
+
+test('feedback query builder applies defaults for period, sort, limit, and offset', () => {
+  const params = buildFeedbackQueryParams();
+  assert.equal(params.period, 'all');
+  assert.equal(params.sort, 'newest');
+  assert.equal(params.limit, 50);
+  assert.equal(params.offset, 0);
+});
+
+test('feedback query builder only forwards custom dates when the custom period is active', () => {
+  const ranged = buildFeedbackQueryParams({ period: '7d', startDate: '2026-01-01', endDate: '2026-01-31' });
+  assert.equal(ranged.start_date, undefined);
+  assert.equal(ranged.end_date, undefined);
+
+  const custom = buildFeedbackQueryParams({ period: 'custom', startDate: '2026-01-01', endDate: '2026-01-31' });
+  assert.equal(custom.start_date, '2026-01-01');
+  assert.equal(custom.end_date, '2026-01-31');
+});
+
+test('feedback path builder drops empty filters so unused params never hit the wire', () => {
+  assert.equal(
+    buildAdminDashboardPath('/feedback', buildFeedbackQueryParams({ category: 'praise', userId: SAMPLE_UUID })),
+    `/feedback?period=all&category=praise&user_id=${SAMPLE_UUID}&sort=newest&limit=50&offset=0`,
+  );
+});
+
+test('isUuid accepts full UUIDs (trimmed) and rejects partial or malformed ids', () => {
+  assert.equal(isUuid(SAMPLE_UUID), true);
+  assert.equal(isUuid(`  ${SAMPLE_UUID}  `), true);
+  assert.equal(isUuid('not-a-uuid'), false);
+  assert.equal(isUuid('a1b2c3d4'), false);
+  assert.equal(isUuid(''), false);
+  assert.equal(isUuid(null), false);
+});
+
+test('optionLabel resolves labels, falls back to raw value, and renders an em dash when empty', () => {
+  const options = [{ value: 'bug', label: 'Bug' }, { value: 'praise', label: 'Praise' }];
+  assert.equal(optionLabel(options, 'bug'), 'Bug');
+  assert.equal(optionLabel(options, 'unmapped'), 'unmapped');
+  assert.equal(optionLabel(options, ''), '—');
+  assert.equal(optionLabel(options, null), '—');
+});
+
+test('formatConfidence renders an em dash for null and rounds ratios to whole percent', () => {
+  assert.equal(formatConfidence(null), '—');
+  assert.equal(formatConfidence(undefined), '—');
+  assert.equal(formatConfidence(0.873), '87%');
+  assert.equal(formatConfidence(1), '100%');
+  assert.equal(formatConfidence(0), '0%');
+});
+
+test('feedback badge color maps cover every backend enum value', () => {
+  assert.match(categoryClasses.bug, /burgundy/);
+  assert.match(sentimentClasses.negative, /burgundy/);
+  assert.match(sentimentClasses.positive, /sage/);
+  assert.match(priorityClasses.high, /burgundy/);
+  assert.match(feedbackStatusClasses.new, /gold/);
+  assert.match(feedbackStatusClasses.actioned, /sage/);
 });
