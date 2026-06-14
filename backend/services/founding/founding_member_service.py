@@ -54,6 +54,20 @@ class FoundingCapReachedError(RuntimeError):
 FOUNDING_COHORT_CAP = 50
 
 
+# Canonical list of soft-launch acquisition sources (Phase 4.1, Story C.1).
+# Lives here so the onboarding handler can validate a ``src_<source>``
+# deep-link payload against it and the distribution script can re-export
+# it as ``SOURCES``. Order is significant for the script's round-robin
+# distribution.
+FOUNDING_SOURCES: tuple[str, ...] = (
+    "friends",
+    "personal_fb",
+    "vn_finance_community",
+    "direct_msg",
+    "tg_finance_groups",
+)
+
+
 async def assign_sequence(db: AsyncSession, user: User) -> FoundingAssignment:
     """Atomically grant the next founding sequence to ``user``.
 
@@ -130,6 +144,21 @@ async def mark_invite_redeemed(
     if user.acquisition_source is None:
         user.acquisition_source = invite.source
     await db.flush()
+
+
+async def record_source(db: AsyncSession, user: User, source: str | None) -> None:
+    """Attribute ``user`` to an acquisition ``source`` (idempotent).
+
+    Used by the token-free ``src_<source>`` deep-link path: a single
+    shared link carries the channel that converted the user without
+    burning a one-time invite. Unknown/empty sources are ignored, and
+    we never clobber a source already set (first touch wins).
+    """
+    if not source or source not in FOUNDING_SOURCES:
+        return
+    if user.acquisition_source is None:
+        user.acquisition_source = source
+        await db.flush()
 
 
 async def list_founding_members(db: AsyncSession) -> list[User]:

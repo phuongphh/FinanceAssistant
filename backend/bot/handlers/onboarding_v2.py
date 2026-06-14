@@ -175,14 +175,26 @@ async def handle_start(
     """Route a /start command into the v2 onboarding flow.
 
     ``payload`` is whatever followed ``/start `` (Telegram deep-link
-    payload). We support ``invite_<token>`` to redeem invite codes.
+    payload). Two payload shapes carry founding-member acquisition:
+
+      * ``invite_<token>`` — legacy single-use invite codes (kept for the
+        links already distributed via the CSV batch).
+      * ``src_<source>`` — token-free shared link. One link can be posted
+        in a group; it only attributes the channel (``src_friends`` …) and
+        does NOT gate access. Founding seats are granted to the first 50
+        users who onboard, regardless of payload.
     """
-    # Redeem invite (if any) BEFORE creating the session so the welcome
-    # banner reflects founding-member status.
+    # Resolve founding membership (if any) BEFORE creating the session so
+    # the welcome banner reflects founding-member status.
     founding_banner_text: str | None = None
     if payload and payload.startswith("invite_"):
         token = payload[len("invite_") :]
         founding_banner_text = await _redeem_invite(db, user, token)
+    else:
+        # Token-free path: ``src_<source>`` attributes the channel; a bare
+        # /start (no payload) still claims a founding seat if one is left.
+        source = payload[len("src_") :] if payload and payload.startswith("src_") else None
+        founding_banner_text = await _claim_founding(db, user, source)
 
     # Resume / start the session.
     session = await onboarding_service.start_or_resume(db, user.id)
@@ -249,6 +261,56 @@ async def _redeem_invite(db: AsyncSession, user: User, token: str) -> str | None
         "founding_member_activated",
         user_id=user.id,
         properties={"sequence": assignment.sequence, "source": invite.source},
+    )
+    return f"{source_prefix}\n\n{banner}" if source_prefix else banner
+
+
+async def _claim_founding(
+    db: AsyncSession, user: User, source: str | None
+) -> str | None:
+    """Token-free founding claim for the ``src_<source>`` / bare-/start path.
+
+    Attributes the channel (if ``source`` is one of the known
+    acquisition sources) and grants the next founding seat to the first
+    50 onboarders. Returns banner text to render, or None when there is
+    no special copy (e.g. cohort full and no source prefix).
+    """
+    await founding_member_service.record_source(db, user, source)
+
+    copy = onboarding_service.load_copy()
+    source_variants = copy.get("source_variants") or {}
+    source_prefix: str | None = None
+    variant = source_variants.get(user.acquisition_source)
+    if variant:
+        source_prefix = variant.get("prefix")
+
+    from backend.services.founding.founding_member_service import (
+        FoundingCapReachedError,
+    )
+
+    # Newly founding only if the user had no sequence before this call.
+    was_founding = user.founding_member_sequence is not None
+    try:
+        assignment = await founding_member_service.assign_sequence(db, user)
+    except FoundingCapReachedError:
+        # Cohort full — no founding banner for organic onboarders, but we
+        # still greet them with the source-aware prefix when present.
+        return source_prefix
+
+    if was_founding:
+        # Returning founding member re-running /start — banner already
+        # shown on their first visit; just the source prefix (if any).
+        return source_prefix
+
+    founding_copy = _load_founding_copy()
+    banner = founding_copy["banner"].format(sequence=assignment.sequence)
+    analytics.track(
+        "founding_member_activated",
+        user_id=user.id,
+        properties={
+            "sequence": assignment.sequence,
+            "source": user.acquisition_source,
+        },
     )
     return f"{source_prefix}\n\n{banner}" if source_prefix else banner
 

@@ -46,3 +46,25 @@ async def cache_set(key: str, value: Any, ttl_seconds: int) -> None:
         await _client().setex(key, ttl_seconds, json.dumps(value, default=_json_default))
     except Exception:
         logger.debug("admin cache set failed for %s", key, exc_info=True)
+
+
+async def cache_invalidate_pattern(pattern: str) -> int:
+    """Delete every key matching the glob pattern via SCAN + DEL.
+
+    Returns the number of keys removed. SCAN avoids the production-killing
+    KEYS *. Pattern MUST be tenant-scoped (e.g. ``admin:tenant:1:twin:*``)
+    so an admin of tenant A can never wipe tenant B's cache.
+    """
+    if not pattern or "*" not in pattern and "?" not in pattern and "[" not in pattern:
+        # Require a glob to prevent accidental key-equals deletes via this
+        # path; callers should use a tenant-scoped pattern.
+        raise ValueError("cache_invalidate_pattern requires a glob pattern")
+    removed = 0
+    try:
+        client = _client()
+        async for key in client.scan_iter(match=pattern, count=200):
+            await client.delete(key)
+            removed += 1
+    except Exception:
+        logger.warning("admin cache invalidate failed for %s", pattern, exc_info=True)
+    return removed

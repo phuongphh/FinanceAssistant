@@ -1,5 +1,10 @@
 import { apiFetch } from './client';
-import { buildAdminDashboardPath, buildStatusChangeBody, buildUsersQueryParams } from '../utils/adminDashboardUtils';
+import {
+  buildAdminDashboardPath,
+  buildFeedbackQueryParams,
+  buildStatusChangeBody,
+  buildUsersQueryParams,
+} from '../utils/adminDashboardUtils';
 
 export function getOverview(period) {
   return apiFetch(buildAdminDashboardPath('/stats/overview', { period }));
@@ -71,4 +76,24 @@ export function getTwinDeltaDistribution(params = {}) {
 
 export function getTwinDeltaCsvUrl(params = {}) {
   return buildAdminDashboardPath('/twin-metrics/delta-distribution.csv', params);
+}
+
+export function getFeedbackList(params = {}) {
+  return apiFetch(buildAdminDashboardPath('/feedback', buildFeedbackQueryParams(params)));
+}
+
+export function getFeedbackCsvUrl(params = {}) {
+  return buildAdminDashboardPath('/feedback/export.csv', buildFeedbackQueryParams(params));
+}
+
+export function invalidateTwinCache(sections = []) {
+  const query = new URLSearchParams();
+  (sections || []).forEach((section) => {
+    if (section) query.append('sections', section);
+  });
+  const suffix = query.toString();
+  const path = suffix
+    ? `/twin-metrics/cache/invalidate?${suffix}`
+    : '/twin-metrics/cache/invalidate';
+  return apiFetch(path, { method: 'POST' });
 }

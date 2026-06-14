@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Index, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import DateTime, Index, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,8 +26,22 @@ class CreditCard(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
-        UniqueConstraint("user_id", "bank_name", name="uq_credit_cards_user_bank_name"),
+        Index(
+            "uq_credit_cards_user_bank_name_active",
+            "user_id",
+            "bank_name",
+            unique=True,
+            postgresql_where=("deleted_at IS NULL"),
+        ),
         Index("idx_credit_cards_user_created", "user_id", "created_at"),
+        Index(
+            "idx_credit_cards_user_active",
+            "user_id",
+            postgresql_where=("deleted_at IS NULL"),
+        ),
     )

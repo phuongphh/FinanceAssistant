@@ -138,6 +138,7 @@ async def _extract_credit_card_source(db: AsyncSession, user_id, text: str) -> t
         select(CreditCard).where(
             CreditCard.user_id == user_id,
             func.lower(CreditCard.bank_name) == bank.lower(),
+            CreditCard.deleted_at.is_(None),
         )
     )
     card = row.scalar_one_or_none()

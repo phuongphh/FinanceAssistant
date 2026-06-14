@@ -18,6 +18,7 @@ from backend.api.admin import (
     analytics as admin_analytics,
     audit as admin_audit,
     auth as admin_auth,
+    feedback as admin_feedback,
     licenses as admin_licenses,
     twin_metrics as admin_twin_metrics,
     users as admin_users,
@@ -324,6 +325,7 @@ app.include_router(admin_audit.router, prefix="/api/admin")
 app.include_router(admin_users.router, prefix="/api/admin")
 app.include_router(admin_licenses.router, prefix="/api/admin")
 app.include_router(admin_twin_metrics.router, prefix="/api/admin")
+app.include_router(admin_feedback.router, prefix="/api/admin")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 
