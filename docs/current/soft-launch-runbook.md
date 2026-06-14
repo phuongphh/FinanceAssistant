@@ -75,19 +75,29 @@
 
 ---
 
-## 4. Founding member — sinh 50 invite (T-3 → T-1)
+## 4. Founding member — model mới: token-free, source-tracked (T-3 → T-1)
 
-- [ ] Chạy `scripts/soft_launch_acquisition.py --batch soft-launch-2026-06`
-- [ ] Verify đúng **50 row**, **10/source × 5 source**, tất cả `grants_founding_status=TRUE`:
-      ```sql
-      SELECT COUNT(*), source FROM invite_codes
-      WHERE batch_name='soft-launch-2026-06' GROUP BY source;
-      ```
-- [ ] Test redeem 1 invite (account sạch) → banner Founding Member `#1` + 50% trọn đời;
-      DB set `redeemed_by_user_id`, `redeemed_at`
-- [ ] **Race test:** redeem 5 invite song song → sequence 1–5 distinct, không trùng/nhảy số
-- [ ] CSV invite chuyển sang folder private, **KHÔNG commit vào git**;
-      operator mở 3 row random ở trình duyệt ẩn danh để kiểm
+> **Đổi từ "token một lần" → "first 50 onboard = Founding".** Không cần sinh
+> 50 token nữa. Chỉ cần **5 link cố định** `t.me/BeTienBot?start=src_<source>`
+> (1 link/kênh, dùng lại thoải mái). 50 suất được trao tự động cho 50 người
+> onboard đầu tiên (advisory-lock race-safe, cap 50). `src_<source>` chỉ ghi
+> attribution kênh vào `users.acquisition_source` cho `/cohort_stats`.
+
+- [ ] Soạn sẵn 5 link kênh và dán vào đúng message ở mục 6.3:
+      `src_friends`, `src_personal_fb`, `src_vn_finance_community`,
+      `src_direct_msg`, `src_tg_finance_groups`
+- [ ] Test onboard 1 account sạch qua `src_friends` → banner Founding Member
+      `#1` + 50% trọn đời; DB set `users.founding_member_sequence`,
+      `acquisition_source='friends'`
+- [ ] **Race test:** onboard 5 account song song → sequence 1–5 distinct,
+      không trùng/nhảy số (advisory lock `pg_advisory_xact_lock`)
+- [ ] Verify cap: onboard người thứ 51 → vẫn vào được, KHÔNG nhận banner
+      Founding (cohort đầy), vẫn lưu `acquisition_source` cho cohort tracking
+
+> **Backward-compat (tuỳ chọn):** nếu cần phát link token một lần cho một đợt
+> riêng, `scripts/soft_launch_acquisition.py --batch <name>` vẫn sinh
+> `invite_codes` + CSV; link `invite_<token>` vẫn redeem được. CSV token là
+> **nhạy cảm**, chuyển sang folder private, **KHÔNG commit vào git**.
 
 ---
 
@@ -124,13 +134,25 @@ trong `founding-promise.md`. (Chi tiết & corner case: xem `founding-promise.md
 | `direct_msg` | 10 | DM người đã quan tâm trước đó | Cá nhân, follow-up |
 | `tg_finance_groups` | 10 | Group Telegram tài chính | Ngắn, đúng trọng tâm |
 
-**Cadence (tránh dồn 50 người vào cùng lúc, để kịp triage):**
-- Ngày 1 sáng: 15 invite · Ngày 1 chiều: 15 · Ngày 2 sáng: 10 · Ngày 2 chiều: 10
+**Cadence (tránh dồn 50 người vào cùng lúc, để kịp triage):** vì link
+`src_<source>` dùng lại được, điều tiết bằng **thời điểm đăng/nhắn từng kênh**
+(stagger), không phải bằng số token phát ra. Gợi ý rải theo nhịp ~15 / 15 / 10 /
+10 người qua 2 ngày — group post (kênh C, E) đăng sau cùng vì khó kiểm soát lượt.
 
 ### 6.3 Seeding messages (operator copy-paste — KHÔNG phải in-app string)
 
-> Tất cả đều warm, không hype, không "CFO". Mỗi link kèm đúng source:
-> `t.me/BeTienBot?start=invite_<token>`
+> Tất cả đều warm, không hype, không "CFO". Mỗi kênh dùng **một link cố
+> định kèm đúng source** (không phải token một lần):
+> `t.me/BeTienBot?start=src_<source>` —
+> ví dụ `src_friends`, `src_personal_fb`, `src_vn_finance_community`,
+> `src_direct_msg`, `src_tg_finance_groups`.
+>
+> Link `src_<source>` **không giới hạn lượt dùng**: dán nguyên một link vào
+> group cũng được, nhiều người cùng bấm vẫn nhận đúng attribution kênh để
+> `/cohort_stats` đo sạch. **50 suất Founding Member được trao tự động cho 50
+> người onboard đầu tiên** (race-safe, đếm theo thứ tự hoàn tất `/start`),
+> không phụ thuộc token. Link `invite_<token>` cũ vẫn redeem được (backward
+> compatible) cho các link đã phát trước đó.
 
 **A. `friends` — nhắn tay bạn bè thân**
 ```
@@ -185,7 +207,7 @@ Ai muốn thử & góp ý: 👉 [invite link]
 
 ### 6.4 Checklist trước khi gửi mỗi đợt seeding
 
-- [ ] Link đúng `source` tương ứng (để `/cohort_stats` đo sạch theo kênh)
+- [ ] Dán đúng link `src_<source>` của kênh (để `/cohort_stats` đo sạch theo kênh)
 - [ ] Người Việt đọc lại 1 lượt — nghe tự nhiên, không sượng, không "CFO"
 - [ ] Founder đọc cuối cùng trước khi post
 - [ ] Không hứa gì ngoài cam kết ở 6.1
