@@ -220,13 +220,43 @@ phases:
     completed_date: ""
     icon: "🪞"
 
-  - id: "5.0"
-    name: "Encryption End-to-End"
+  - id: "4.5"
+    name: "Decision Engine Foundation"
     status: next
+    duration: "~3 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel/Google Sheets, tone dial, one-time re-engagement cho cohort dormant. Bắt đầu cuối tháng 7/2026."
+    completed_date: ""
+    icon: "🧭"
+
+  - id: "4.6"
+    name: "Onboarding Reset"
+    status: planned
+    duration: "~2 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Onboarding cho segment mới (22-35, Level 0→1): decision-first entry (trả lời 1 câu hỏi thật trước khi nhập liệu), độ nét thay forced data entry, salutation + tone phù hợp người trẻ. Tháng 8/2026."
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "4.7"
+    name: "Guardian Layer"
+    status: planned
     duration: "~2-3 tuần"
     detail_doc: ""
     issues_doc: ""
-    description: "Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature."
+    description: "Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). Tháng 9/2026, gate G1 đo giữa tháng 9."
+    completed_date: ""
+    icon: "🔮"
+
+  - id: "5.0"
+    name: "Encryption End-to-End"
+    status: planned
+    duration: "~2-3 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. Dời sang tháng 10/2026 (sau Guardian Layer) per Strategy V4."
     completed_date: ""
     icon: "🔮"
 
@@ -236,7 +266,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows"
+    description: "Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027 khi GTM TikTok/KOL có data."
     completed_date: ""
     icon: "🔮"
 
@@ -246,7 +276,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints"
+    description: "Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027."
     completed_date: ""
     icon: "🔮"
 
@@ -256,7 +286,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK"
+    description: "Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027."
     completed_date: ""
     icon: "🔮"
 
@@ -266,7 +296,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard"
+    description: "Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard. PARKED per Strategy V4."
     completed_date: ""
     icon: "🔮"
 
@@ -276,7 +306,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data"
+    description: "Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data. PARKED per Strategy V4 (một phần nudge logic được hấp thụ vào 4.7 Guardian Layer)."
     completed_date: ""
     icon: "🔮"
 
@@ -286,7 +316,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Multi-user household: shared assets, joint goals, privacy boundaries (mỗi thành viên có view riêng), couple Twin"
+    description: "Multi-user household: shared assets, joint goals, privacy boundaries (mỗi thành viên có view riêng), couple Twin. PARKED per Strategy V4 — segment mới (22-35) chưa cần household mode."
     completed_date: ""
     icon: "🔮"
 
@@ -296,7 +326,7 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "License management, rate limit + tier enforcement (free/pro/cfo UI), payment integration (VN gateways: VNPay/MoMo/ZaloPay), reconciliation + invoice. Pricing re-validate sau khi infra sẵn sàng."
+    description: "Tháng 11/2026. License management, rate limit + tier enforcement, payment integration (VN gateways: VNPay/MoMo/ZaloPay), reconciliation + invoice. Strategy V4: paywall decisions không paywall tracking — Free tracking forever, Pro 68k unlimited decisions; CFO tier rút khỏi bảng giá chờ conversion data. Gate G3 (Free→Pro ≥3%) đo tháng 12/2026."
     completed_date: ""
     icon: "🔮"
 
@@ -306,6 +336,6 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Public launch tháng 2/2027 (Tết) — Zalo là primary channel, Telegram secondary. Marketing campaign, multi-region, public pricing live."
+    description: "Public launch tháng 2/2027 (Tết) — GATED per Strategy V4: marketing spend chỉ commit nếu gate G2 (D28 ≥25%, n≥20, cuối tháng 10) pass. Telegram là primary channel; GTM TikTok/KOL trẻ. Zalo re-evaluate sau Tết."
     completed_date: ""
     icon: "🔮"
