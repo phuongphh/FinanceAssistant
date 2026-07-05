@@ -39,7 +39,7 @@ Không compete với Money Lover, MISA, Spendee. Không compete với Finhay, Ti
 > reveal. Cách kéo người mới tới Twin nay dựa vào việc **giảm ma sát + chuyển cảnh
 > liền mạch**, không phải thêm một màn đoán. WOW #0 (xưng hô) và WOW #3 (nhắn chủ
 > động) vẫn giữ. Chi tiết: banner DECISION trong
-> [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
+> [`phase-4.4/phase-4.4-detailed.md`](../current/phase-4.4/phase-4.4-detailed.md).
 
 **Bé Tiền của bạn năm 2030 sẽ thế nào?**
 
@@ -302,7 +302,7 @@ Epic 1 The Reading đã gỡ — xem dưới):
 - **WOW #3 — Proactive companion:** thêm trigger vào `empathy_engine` đã chạy hourly — Bé Tiền nhắn trước một cách ấm.
 - **Twin positioning:** Twin vẫn là payoff (phút 4); đường tới Twin nay dựa vào giảm ma sát + chuyển cảnh mượt, không phải màn đoán phút-1.
 - **Roadmap impact:** Phase 5.0 (Encryption) lùi thêm ~1-1.5 tuần; soft launch tháng 6/2026 vẫn an toàn.
-Detail: [`phase-4.4/phase-4.4-detailed.md`](phase-4.4/phase-4.4-detailed.md).
+Detail: [`phase-4.4/phase-4.4-detailed.md`](../current/phase-4.4/phase-4.4-detailed.md).
 
 **🎉 Tháng 6 SOFT LAUNCH** với foundation complete:
 - 50 founding member (50% lifetime discount khi Pro ra mắt — commitment honored)

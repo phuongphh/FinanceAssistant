@@ -1,4 +1,4 @@
-# CLAUDE.md — Personal CFO Assistant
+# CLAUDE.md — Bé Tiền (Decision Engine)
 
 Source of truth for Claude Code working on this codebase.
 Read this before any code changes. For implementation details, open the corresponding phase doc linked below.
@@ -73,12 +73,14 @@ For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-stat
 - Test by reading aloud — if cringy or robotic, rewrite
 - "Bé Tiền" persona: warm, supportive, NEVER harsh on overspending or past-due
 - **Customer-facing positioning:** Bé Tiền is a *người đồng hành quản lý tài sản*
-  (companion that helps manage assets). Internal docs may use "Personal CFO"
-  as shorthand for product positioning, but it MUST NEVER appear in
+  (companion that helps manage assets). Internal docs use "Decision Engine"
+  as shorthand for product positioning (Strategy V4 — "Personal CFO" is
+  retired even internally; see `docs/current/strategy.md`). Neither
+  "Decision Engine", "GPS tài chính", nor "CFO" may EVER appear in
   user-facing text (welcome bubbles, chart watermarks, briefings, share
-  images, public-facing announcement copy). "CFO" reads cold and corporate
-  to a Vietnamese mass-affluent user — use *người đồng hành* / *quản lý
-  tài sản* instead.
+  images, public-facing announcement copy) — use *người đồng hành* /
+  *quản lý tài sản* instead. Target user per V4: 22-35 tuổi, Level 0→1
+  ("thế hệ đang xây"), NOT mass affluent.
 
 ### Soft delete pattern
 - Never hard-delete user data
