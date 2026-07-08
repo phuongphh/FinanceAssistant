@@ -251,42 +251,42 @@ phases:
     icon: "🔮"
 
   - id: "5.0"
+    name: "Zalo Channel Launch"
+    status: planned
+    duration: "~2 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Tháng 10/2026. Zalo OA đã sẵn sàng (founder decision 08/07/2026 — đôn lên từ deferred): webhook + adapter (nền Zalo adapter foundation Phase 4B), validate 300-char limit + no-Markdown constraints với real flows, core flows (capture, báo cáo, Twin cơ bản) chạy trên Zalo."
+    completed_date: ""
+    icon: "💬"
+
+  - id: "5.1"
+    name: "Zalo Core Product Parity"
+    status: planned
+    duration: "~2-3 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Tháng 10-11/2026. Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, decision queries — content layer adapted cho Zalo constraints."
+    completed_date: ""
+    icon: "💬"
+
+  - id: "5.2"
+    name: "Zalo Mini App"
+    status: planned
+    duration: "~2-3 tuần"
+    detail_doc: ""
+    issues_doc: ""
+    description: "Tháng 11-12/2026. Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK."
+    completed_date: ""
+    icon: "💬"
+
+  - id: "5.3"
     name: "Encryption End-to-End"
     status: planned
     duration: "~2-3 tuần"
     detail_doc: ""
     issues_doc: ""
-    description: "Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. Dời sang tháng 10/2026 (sau Guardian Layer) per Strategy V4."
-    completed_date: ""
-    icon: "🔮"
-
-  - id: "5.1"
-    name: "Zalo Spike & OA Verification"
-    status: planned
-    duration: "TBD"
-    detail_doc: ""
-    issues_doc: ""
-    description: "Zalo OA verified business account, webhook + adapter spike, validate 300-char limit + no-Markdown constraints with real flows. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027 khi GTM TikTok/KOL có data."
-    completed_date: ""
-    icon: "🔮"
-
-  - id: "5.2"
-    name: "Zalo Core Product Parity"
-    status: planned
-    duration: "TBD"
-    detail_doc: ""
-    issues_doc: ""
-    description: "Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory — content layer adapted for Zalo constraints. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027."
-    completed_date: ""
-    icon: "🔮"
-
-  - id: "5.3"
-    name: "Zalo Mini App"
-    status: planned
-    duration: "TBD"
-    detail_doc: ""
-    issues_doc: ""
-    description: "Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK. DEFERRED per Strategy V4 — re-evaluate sau Tết 2027."
+    description: "Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. Dời sau Zalo 5.0-5.2 (founder decision 08/07/2026) → tháng 12/2026 - 01/2027, vẫn phải xong TRƯỚC khi chi tiền growth Tết."
     completed_date: ""
     icon: "🔮"
 
@@ -336,6 +336,6 @@ phases:
     duration: "TBD"
     detail_doc: ""
     issues_doc: ""
-    description: "Public launch tháng 2/2027 (Tết) — GATED per Strategy V4: marketing spend chỉ commit nếu gate G2 (D28 ≥25%, n≥20, cuối tháng 10) pass. Telegram là primary channel; GTM TikTok/KOL trẻ. Zalo re-evaluate sau Tết."
+    description: "Public launch tháng 2/2027 (Tết) — GATED per Strategy V4: marketing spend chỉ commit nếu gate G2 (D28 ≥25%, n≥20, cuối tháng 10) pass. Launch đa kênh Telegram + Zalo (Zalo live từ 5.0-5.2); GTM TikTok/KOL trẻ."
     completed_date: ""
     icon: "🔮"

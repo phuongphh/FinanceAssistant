@@ -120,13 +120,13 @@ Bài học V3: onboard nhanh → data mỏng → forecast không thuyết phục
 - ✅ **Chuyển sang nơi segment 22-35 thật sự ở:** TikTok tài chính cá nhân, KOL/KOC trẻ, group sinh viên–mới đi làm, build-in-public của founder.
 - **Trình tự bắt buộc:** organic + seed nhóm nhỏ (nhóm sinh viên trong feedback là hạt giống có sẵn) → đo D28 cohort mới → chỉ chi tiền/KOL khi D28 ≥ 25%. **Không mua growth trước khi qua gate.**
 - Tết 2027 giữ làm marketing moment ("năm mới, quyết định tài chính đầu tiên của năm") — nhưng là **gated bet**: chỉ bùng nổ nếu Gate G2 (dưới) qua.
-- Zalo rollout (V3 phases 5.1-5.3): **re-evaluate post-Tết** — Telegram không phải bottleneck với segment mới; TikTok mới là kênh acquisition, Telegram là kênh sử dụng.
+- Zalo rollout: **đôn lên Phase 5.0-5.2** (amendment 08/07/2026 — OA đã sẵn sàng). Zalo là messaging app phổ thông nhất của segment 22-35 tại VN → mở thêm bề mặt sử dụng organic **trước Tết**. Phân vai kênh giữ nguyên: TikTok là kênh acquisition, Telegram + Zalo là kênh sử dụng. Lưu ý: đây là engineering effort, không phải marketing spend — không vi phạm nguyên tắc "gates trước tiền".
 
 ---
 
 ## 📋 Roadmap V4 (07/2026 → Tết 2027)
 
-> Nguyên tắc sequencing: (1) ship decision moments trên engine có sẵn trước, (2) sửa activation cho segment mới, (3) hardening + monetization, (4) Tết là gated bet. Encryption (5.0) giữ nhưng lùi sau Decision Engine foundation.
+> Nguyên tắc sequencing: (1) ship decision moments trên engine có sẵn trước, (2) sửa activation cho segment mới, (3) mở kênh Zalo (OA sẵn sàng) + hardening + monetization, (4) Tết là gated bet. Zalo đôn lên 5.0-5.2 (amendment 08/07/2026); Encryption dời thành 5.3 — vẫn phải xong trước khi chi tiền growth.
 
 #### Phase 4.5 — Decision Engine Foundation *(~3 tuần, target ship: late July 2026)*
 - **Conversational shock sim + liquidation advice** — mở Life Event Simulator (Phase 4B) qua chat tự nhiên; thêm lớp so sánh phương án rút tiền + vẽ lại danh mục (ask của chị Nhung, end-to-end).
@@ -145,8 +145,20 @@ Bài học V3: onboard nhanh → data mỏng → forecast không thuyết phục
 - **Drift/overspend warnings** gắn hậu quả Twin (proactive, qua empathy engine có sẵn).
 - **Scam check v1** — red-flags library + self-verification guide. Feature flag + kill switch ngay từ ngày đầu. Legal wording review trước ship.
 
-#### Phase 5.0 — Encryption End-to-End *(~2-3 tuần, October 2026 — giữ, lùi lịch)*
-- Như kế hoạch V3 (at-rest + in-transit hardening, không expose user-facing). Lùi sau 4.5-4.7 vì decision-engine validation là đường sống; encryption là nghĩa vụ hạ tầng trước khi scale — phải xong **trước** khi chi tiền growth.
+#### Phase 5.0 — Zalo Channel Launch *(~2 tuần, October 2026 — amendment 08/07/2026)*
+- Zalo OA **đã sẵn sàng** → không cần spike verification dài; đi thẳng vào webhook + adapter (dựng trên Zalo adapter foundation Phase 4B).
+- Validate constraints thực tế: 300-char limit, no-Markdown — content layer phải adapt, không copy nguyên Telegram format.
+- Core flows chạy được trên Zalo: capture thu chi, báo cáo, Twin view cơ bản.
+
+#### Phase 5.1 — Zalo Core Product Parity *(~2-3 tuần, October–November 2026)*
+- Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, **decision queries** (hook chính của V4 phải có mặt trên kênh mới từ đầu).
+- Metric Zalo đo chung khung với Telegram: decision interactions/user/tuần + D28 theo cohort, tách theo channel trên admin dashboard.
+
+#### Phase 5.2 — Zalo Mini App *(~2-3 tuần, November–December 2026)*
+- Zalo Mini App tương đương Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK.
+
+#### Phase 5.3 — Encryption End-to-End *(~2-3 tuần, December 2026 – January 2027 — dời sau Zalo)*
+- Như kế hoạch V3 (at-rest + in-transit hardening, không expose user-facing). Dời sau Zalo 5.0-5.2 (amendment 08/07/2026) vì OA sẵn sàng là cơ hội mở kênh trước Tết; encryption vẫn là nghĩa vụ hạ tầng trước khi scale — **phải xong trước khi chi tiền growth Tết**.
 
 #### Phase 5.7 — Monetization *(~3 tuần, November 2026)*
 - License management activate; Free/Pro gate theo **decision queries** (không gate tracking).
@@ -157,7 +169,7 @@ Bài học V3: onboard nhanh → data mỏng → forecast không thuyết phục
 - Tết features (lì xì tracker, year-end review, share images) build ~3 tuần December **chỉ khi Gate G2 qua**.
 - Nếu gate không qua: Tết là đợt học tiếp theo với cohort nhỏ, không phải "bùng nổ" — không đốt marketing vào positioning chưa chứng minh.
 
-**Parked / Deferred (không phải kill):** Zalo 5.1-5.3 (re-evaluate post-Tết) · Household mode (segment cũ) · Achievement/Badges 5.4 (sau khi habit thật tồn tại) · Behavioral engine 5.5 (fold dần vào drift warnings) · CFO tier 168k (re-validate bằng data conversion) · B2B2C cobranding (exploratory — chỉ mở khi D28 cohort mới qua gate).
+**Parked / Deferred (không phải kill):** Household mode (segment cũ) · Achievement/Badges 5.4 (sau khi habit thật tồn tại) · Behavioral engine 5.5 (fold dần vào drift warnings) · CFO tier 168k (re-validate bằng data conversion) · B2B2C cobranding (exploratory — chỉ mở khi D28 cohort mới qua gate). *(Zalo đã rút khỏi danh sách này — đôn lên 5.0-5.2 per amendment 08/07/2026.)*
 
 ---
 
@@ -210,6 +222,11 @@ Giữ nguyên: §2 cost (an toàn xa), §3 bug rate, §4 persona violation, §6 
 11. Founding 50 commitment giữ nguyên; ~27 slots còn lại dành cho cohort segment mới.
 12. Kill criteria recalibrate: §1′ (lần trip thứ 2 = expense-first hoặc kill, không pivot thứ 3), thêm §8 scam-check one-strike.
 
+### Amendment — 08/07/2026 (founder decision)
+
+13. **Zalo đôn lên Phase 5.0-5.2** (October–December 2026), thay vì deferred post-Tết — OA đã sẵn sàng; Zalo là messaging app phổ thông nhất của segment 22-35 tại VN, mở bề mặt sử dụng organic trước Tết. *Sửa một phần decision #8 và #10 ở trên (phần Zalo).*
+14. **Encryption End-to-End dời thành Phase 5.3** (December 2026 – January 2027) — sau Zalo, nhưng vẫn giữ ràng buộc gốc: phải xong **trước** khi chi tiền growth Tết.
+
 ---
 
 ## 📝 Changelog
@@ -219,6 +236,7 @@ Giữ nguyên: §2 cost (an toàn xa), §3 bug rate, §4 persona violation, §6 
 - Twin: Future Vision → Decision Engine (4 decision moments trên engine sẵn có)
 - Độ nét meter, paywall decisions, affiliate deferred, GTM young channels, gates + kill criteria mới
 - Pivot rationale: [MIGRATION_NOTES_V3_TO_V4.md](../archive/MIGRATION_NOTES_V3_TO_V4.md)
+- *Amendment 08/07/2026:* Zalo đôn lên 5.0-5.2 (OA sẵn sàng), Encryption dời thành 5.3 (vẫn trước growth spend Tết)
 
 **V3:** [archived](../archive/strategy-v3.md) — Financial Twin differentiator, pricing 68/168 volume play, Tết 2027 roadmap. Superseded vì soft-launch data phủ nhận segment + passive-prediction hook.
 

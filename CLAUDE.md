@@ -154,7 +154,7 @@ This file is a **table of contents**, not an encyclopedia. When you need detail,
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
 - **Recently completed phase:** [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md) — Twin enhancement (weather metaphor + story-first), habit loop, Twin admin dashboard
-- **Next phase:** Phase 5.0 — Encryption End-to-End (after June 2026 soft launch)
+- **Next phase:** Phase 4.5 — Decision Engine Foundation (Strategy V4); sau đó 4.6 Onboarding Reset → 4.7 Guardian → 5.0-5.2 Zalo → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -193,7 +193,7 @@ Quick reference:
 
 ### Next phase
 
-Phase 5.0 — Encryption End-to-End (sau soft launch June 2026).
+Phase 4.5 — Decision Engine Foundation (Strategy V4, sau soft launch June 2026). Tiếp theo: 4.6 Onboarding Reset → 4.7 Guardian Layer → 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End.
 
 Detail: [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md)
 
