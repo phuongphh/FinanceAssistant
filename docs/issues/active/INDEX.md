@@ -31,5 +31,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #975 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [issue-975.md](issue-975.md) |
 | #976 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [issue-976.md](issue-976.md) |
 | #977 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [issue-977.md](issue-977.md) |
+| #978 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [issue-978.md](issue-978.md) |
 
-**Total active:** 27
+**Total active:** 28
