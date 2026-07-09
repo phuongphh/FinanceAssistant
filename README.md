@@ -32,10 +32,13 @@
 - ✅ Phase 4.2.5: Admin Observability
 - ✅ Phase 4.3: Twin Enhancement + Habit Loop + Admin Dashboard
 - 🚀 Phase 4.4: First-5-Minutes WOW ← **current**
-- 📋 Phase 5.0: Encryption End-to-End
-- 🔮 Phase 5.1: Zalo Spike & OA Verification
-- 🔮 Phase 5.2: Zalo Core Product Parity
-- 🔮 Phase 5.3: Zalo Mini App
+- 📋 Phase 4.5: Decision Engine Foundation
+- 🔮 Phase 4.6: Onboarding Reset
+- 🔮 Phase 4.7: Guardian Layer
+- 🔮 Phase 5.0: Zalo Channel Launch
+- 🔮 Phase 5.1: Zalo Core Product Parity
+- 🔮 Phase 5.2: Zalo Mini App
+- 🔮 Phase 5.3: Encryption End-to-End
 - 🔮 Phase 5.4: Achievement & Badges
 - 🔮 Phase 5.5: Behavioral Engine
 - 🔮 Phase 5.6: Household Mode
