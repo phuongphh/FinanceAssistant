@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "4.4"
+current_phase: "4.5"
 
 phases:
   - id: "1"
@@ -212,21 +212,21 @@ phases:
 
   - id: "4.4"
     name: "First-5-Minutes WOW"
-    status: current
+    status: done
     duration: "~7-10 ngày"
     detail_doc: "docs/current/phase-4.4/phase-4.4-detailed.md"
     issues_doc: "docs/current/phase-4.4/phase-4.4-issues.md"
     description: "WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues."
-    completed_date: ""
-    icon: "🪞"
+    completed_date: "2026-05-30"
+    icon: "✅"
 
   - id: "4.5"
     name: "Decision Engine Foundation"
-    status: next
+    status: current
     duration: "~3 tuần"
-    detail_doc: ""
-    issues_doc: ""
-    description: "Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel/Google Sheets, tone dial, one-time re-engagement cho cohort dormant. Bắt đầu cuối tháng 7/2026."
+    detail_doc: "docs/current/phase-4.5/phase-4.5-detailed.md"
+    issues_doc: "docs/current/phase-4.5/phase-4.5-issues.md"
+    description: "Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel (.xlsx), tone dial, one-time re-engagement cho cohort dormant. Kickoff 09/07/2026, target ship late July 2026. 5 Epics / 17 issues."
     completed_date: ""
     icon: "🧭"
 
