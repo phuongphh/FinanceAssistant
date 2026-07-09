@@ -16,5 +16,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #960 | [Epic 2 / Phase 4.5] Plan-to-Goal Feasibility Q&A | [issue-960.md](issue-960.md) |
 | #961 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [issue-961.md](issue-961.md) |
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
+| #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
 
-**Total active:** 12
+**Total active:** 13
