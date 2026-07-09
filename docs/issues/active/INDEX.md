@@ -26,5 +26,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #970 | [Phase 4.5 / E2] 2.3 — Copy feasibility + persona QA | [issue-970.md](issue-970.md) |
 | #971 | [Phase 4.5 / E1] 1.1 — shock_simulation_service.simulate_shock() | [issue-971.md](issue-971.md) |
 | #972 | [Phase 4.5 / E1] 1.2 — liquidation_advisor.rank_options() | [issue-972.md](issue-972.md) |
+| #973 | [Phase 4.5 / E1] 1.3 — Intent decision_shock + handler + flag | [issue-973.md](issue-973.md) |
 
-**Total active:** 22
+**Total active:** 23
