@@ -28,5 +28,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #972 | [Phase 4.5 / E1] 1.2 — liquidation_advisor.rank_options() | [issue-972.md](issue-972.md) |
 | #973 | [Phase 4.5 / E1] 1.3 — Intent decision_shock + handler + flag | [issue-973.md](issue-973.md) |
 | #974 | [Phase 4.5 / E1] 1.4 — Portfolio redraw sau shock | [issue-974.md](issue-974.md) |
+| #975 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [issue-975.md](issue-975.md) |
 
-**Total active:** 24
+**Total active:** 25
