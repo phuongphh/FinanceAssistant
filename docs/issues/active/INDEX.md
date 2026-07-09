@@ -23,5 +23,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #967 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [issue-967.md](issue-967.md) |
 | #968 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [issue-968.md](issue-968.md) |
 | #969 | [Phase 4.5 / E2] 2.2 — Intent decision_feasibility + handler | [issue-969.md](issue-969.md) |
+| #970 | [Phase 4.5 / E2] 2.3 — Copy feasibility + persona QA | [issue-970.md](issue-970.md) |
 
-**Total active:** 19
+**Total active:** 20
