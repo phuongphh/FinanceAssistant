@@ -30,5 +30,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #974 | [Phase 4.5 / E1] 1.4 — Portfolio redraw sau shock | [issue-974.md](issue-974.md) |
 | #975 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [issue-975.md](issue-975.md) |
 | #976 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [issue-976.md](issue-976.md) |
+| #977 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [issue-977.md](issue-977.md) |
 
-**Total active:** 26
+**Total active:** 27
