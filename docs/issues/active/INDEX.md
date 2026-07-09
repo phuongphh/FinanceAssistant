@@ -20,5 +20,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #964 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [issue-964.md](issue-964.md) |
 | #965 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [issue-965.md](issue-965.md) |
 | #966 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [issue-966.md](issue-966.md) |
+| #967 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [issue-967.md](issue-967.md) |
 
-**Total active:** 16
+**Total active:** 17
