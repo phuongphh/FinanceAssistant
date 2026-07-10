@@ -28,6 +28,7 @@ from pathlib import Path
 import yaml
 
 from backend.bot.formatters.money import format_money_short
+from backend.bot.formatters.tone import render_tone_variant
 from backend.schemas.goal import FeasibilityBand
 from backend.services.decision.plan_feasibility_service import PlanFeasibility
 
@@ -57,8 +58,17 @@ def render_feasibility(
     *,
     target: Decimal,
     horizon_years: Decimal,
+    tone: str | None = None,
+    salutation: str = "bạn",
 ) -> str:
-    """Render the feasibility verdict as a short, warm multi-line reply."""
+    """Render the feasibility verdict as a short, warm multi-line reply.
+
+    ``tone`` threads the tone dial (E4 #4.3). ``None`` (dial dark) keeps the
+    legacy ``decision_copy.yaml`` wording untouched; a live ``"gentle"`` /
+    ``"strict"`` swaps only the emotionally-loaded NEEDS_REVISION verdict for
+    its tone variant — the reachable-target pivot still follows in either tone,
+    so we never end on a flat "no".
+    """
     copy = _feasibility_copy()
     years = _format_years(horizon_years)
     actual = format_money_short(result.actual_monthly_savings)
@@ -85,7 +95,12 @@ def render_feasibility(
         return _join(intro, body, pivot)
 
     # NEEDS_REVISION — never end on a flat "no"; pivot to the reachable target.
-    body = copy.get("needs_revision", "").format(actual=actual)
+    body = render_tone_variant(
+        "decision.feasibility_needs_revision",
+        tone,
+        salutation=salutation,
+        actual=actual,
+    ) or copy.get("needs_revision", "").format(actual=actual)
     return _join(intro, body, _pivot(copy, result, years))
 
 

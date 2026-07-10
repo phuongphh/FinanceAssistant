@@ -28,12 +28,17 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.feasibility import render_clarify, render_feasibility
+from backend.bot.formatters.tone import resolve_tone
 from backend.intent.handlers.base import IntentHandler
-from backend.intent.handlers.decision_flags import is_plan_feasibility_qa_enabled
+from backend.intent.handlers.decision_flags import (
+    is_plan_feasibility_qa_enabled,
+    is_tone_dial_enabled,
+)
 from backend.intent.intents import IntentResult
 from backend.models.user import User
 from backend.services.decision import plan_feasibility_service
 from backend.services.goal_projection import get_avg_monthly_savings
+from backend.services.onboarding.onboarding_service import salutation_of
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +68,16 @@ class DecisionFeasibilityHandler(IntentHandler):
         # The single DB touch in the whole flow.
         avg_savings = await get_avg_monthly_savings(db, user.id)
         result = plan_feasibility_service.assess(start, target, horizon, avg_savings)
-        return render_feasibility(result, target=target, horizon_years=horizon)
+        # Tone dial read at the edge (layer contract); dark → tone=None → the
+        # formatter keeps its legacy copy.
+        tone = resolve_tone(user.tone_preference) if is_tone_dial_enabled() else None
+        return render_feasibility(
+            result,
+            target=target,
+            horizon_years=horizon,
+            tone=tone,
+            salutation=salutation_of(user),
+        )
 
 
 def _coerce_amount(value) -> Decimal | None:

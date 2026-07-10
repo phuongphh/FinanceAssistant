@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.analytics import EventType
 from backend.bot.formatters.money import format_money_full
+from backend.bot.formatters.tone import render_tone_variant
 from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.twin_view_event import TwinViewEvent
@@ -451,8 +452,29 @@ async def count_empathy_fired_today(
 
 # ---------- Rendering ----------------------------------------------
 
-def render_message(trigger: EmpathyTrigger, user: User) -> str:
-    """Pick a random variation from YAML and substitute placeholders."""
+def render_message(
+    trigger: EmpathyTrigger, user: User, *, tone: str | None = None
+) -> str:
+    """Pick a random variation from YAML and substitute placeholders.
+
+    ``tone`` threads the tone dial (E4 #4.3). ``None`` (dial dark) renders the
+    legacy ``empathy_messages.yaml`` copy exactly as before; a live
+    ``"gentle"`` / ``"strict"`` consults ``tone_variants.yaml`` first and only
+    falls back to the legacy copy when that trigger has no tone block yet. The
+    ``TONE_DIAL_ENABLED`` flag is read by the hourly job, never here — the
+    engine stays env-free.
+    """
+    salutation = salutation_of(user)
+    variant = render_tone_variant(
+        f"empathy.{trigger.name}",
+        tone,
+        salutation=salutation,
+        name=user.get_greeting_name(),
+        **trigger.context,
+    )
+    if variant is not None:
+        return variant
+
     spec = _load_messages().get(trigger.name) or {}
     templates = spec.get("messages") or []
     if not templates:
@@ -462,7 +484,7 @@ def render_message(trigger: EmpathyTrigger, user: User) -> str:
     template = random.choice(templates)
     context = {
         "name": user.get_greeting_name(),
-        "salutation": salutation_of(user),
+        "salutation": salutation,
         **trigger.context,
     }
     try:
