@@ -1,0 +1,27 @@
+# Decision Engine copy — Phase 4.5 (clarity meter, feasibility, shock).
+#
+# Bé Tiền persona: ấm áp, đồng hành, KHÔNG bao giờ phán xét. Đọc thành tiếng —
+# nếu nghe máy móc hay khô khan thì viết lại.
+#
+# CẤM tuyệt đối trong text hiển thị cho user: "Decision Engine", "GPS tài chính",
+# "CFO". Dùng "người đồng hành" / "quản lý tài sản" thay thế.
+
+clarity:
+  # {score} = số nguyên 0..100. Một dòng gọn đứng đầu mọi câu trả lời decision.
+  line: "🔍 Ảnh tương lai đang nét khoảng {score}%"
+
+  # Dưới ngưỡng khiêm tốn: thành thật rằng bức tranh còn mờ, rồi chỉ ra đúng
+  # một thứ đáng bổ sung nhất (không dồn dập, không làm user thấy thiếu sót).
+  humble_intro: "Mình mới thấy được một phần bức tranh nên câu trả lời còn hơi mờ nha."
+  humble_suggest: "Thêm {component} là mình nhìn rõ hơn hẳn đó."
+
+  # Trên ngưỡng: vẫn nhẹ nhàng gợi một việc để nét hơn nữa (trọng số cao nhất).
+  sharpen_suggest: "Muốn nét hơn nữa thì thêm {component} nhé."
+
+  # Tên thành phần được đưa vào các câu gợi ý ở trên.
+  components:
+    assets: "thông tin tài sản"
+    asset_freshness: "giá trị tài sản mới nhất"
+    income: "nguồn thu nhập"
+    expenses: "lịch sử chi tiêu"
+    goals: "mục tiêu tài chính"
