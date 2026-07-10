@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **First-5-Minutes WOW** (current) — [detail](docs/current/phase-4.4/phase-4.4-detailed.md)
+🚀 **Decision Engine Foundation** (current) — [detail](docs/current/phase-4.5/phase-4.5-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -153,8 +153,8 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md) — Twin enhancement (weather metaphor + story-first), habit loop, Twin admin dashboard
-- **Next phase:** Phase 4.5 — Decision Engine Foundation (Strategy V4); sau đó 4.6 Onboarding Reset → 4.7 Guardian → 5.0-5.2 Zalo → 5.3 Encryption
+- **Recently completed phase:** [`docs/current/phase-4.4/phase-4.4-detailed.md`](docs/current/phase-4.4/phase-4.4-detailed.md) — First-5-Minutes WOW: salutation foundation, screenshot onboarding, proactive companion (The Reading gỡ bỏ 29/05/2026)
+- **Current phase:** [`docs/current/phase-4.5/phase-4.5-detailed.md`](docs/current/phase-4.5/phase-4.5-detailed.md) — Decision Engine Foundation (Strategy V4); sau đó 4.6 Onboarding Reset → 4.7 Guardian → 5.0-5.2 Zalo → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -180,26 +180,26 @@ Quick reference:
 
 ---
 
-## Phase 4.3 — Status: DONE ✅
+## Phase 4.4 — Status: DONE ✅
 
-**Status:** ✅ Implementation complete. Phase 4.3 turned the Financial Twin from a hard-to-grasp feature into a habit-forming experience, and added a Twin admin dashboard. 4 Epics / 15 stories.
+**Status:** ✅ Implementation complete (30/05/2026). Phase 4.4 làm 5 phút đầu tiên của user mới thành trải nghiệm WOW. 3 Epics còn hiệu lực / ~12 issues.
 
-### Shipped in Phase 4.3
+### Shipped in Phase 4.4
 
-- **Weather metaphor** thay P10/P50/P90 — 🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan — để người dùng hiểu probability cone mà không cần đọc số percentile.
-- **Life-outcome translation** + **story-first narrative** (4-5 màn swipe) + **mascot personification** giúp Twin kể chuyện thay vì bày số liệu.
-- **Habit loop**: on-demand recompute (<5s) + causality ("vì sao thay đổi") + action prompt + negative delta handling + delta threshold + return tease để kéo người dùng quay lại.
-- **Twin admin dashboard** 4 sections: engagement funnel, loop health, comprehension, delta distribution.
+- **Salutation foundation** — `users.salutation` (anh/chị/bạn), hỏi trong onboarding, thread vào mọi surface có giọng nói; user cũ fallback "bạn".
+- **Screenshot onboarding** — chụp màn hình app ngân hàng → OCR → số dư → net worth ~30s, luôn có fallback gõ tay.
+- **Proactive companion** — trigger empathy mới "im lặng sau onboarding", chạy qua job hourly với cooldown + quiet hours.
+- **The Reading GỠ BỎ (29/05/2026)** — Reading v0+v1 phản tác dụng; đã xoá code + flag, onboarding đi thẳng goal → asset → Twin.
 
-### Next phase
+### Current phase
 
-Phase 4.5 — Decision Engine Foundation (Strategy V4, sau soft launch June 2026). Tiếp theo: 4.6 Onboarding Reset → 4.7 Guardian Layer → 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End.
+Phase 4.5 — Decision Engine Foundation (Strategy V4): shock simulation + liquidation advice, plan-to-goal feasibility Q&A, độ nét meter v1, Excel export + tone dial, decision query log + re-engagement một lần. Tiếp theo: 4.6 Onboarding Reset → 4.7 Guardian Layer → 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End.
 
-Detail: [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md)
+Detail: [`docs/current/phase-4.4/phase-4.4-detailed.md`](docs/current/phase-4.4/phase-4.4-detailed.md) · [`docs/current/phase-4.5/phase-4.5-detailed.md`](docs/current/phase-4.5/phase-4.5-detailed.md)
 
 ## Active Breaking Changes
 
-(None currently — Phase 4.3 is additive over 4.2.5)
+(None currently — Phase 4.5 planning is additive over 4.4)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 
