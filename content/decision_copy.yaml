@@ -105,3 +105,19 @@ shock:
   # Cửa xác nhận khi khoản rút quá lớn (>50% tài sản ròng). Hỏi lại trước khi vẽ
   # kịch bản nặng, để user không giật mình. {amount} đã format sẵn.
   confirm_large: "Khoản {amount} này khá lớn so với tài sản của mình đó nha — mình vẫn muốn xem thử kịch bản nếu phải rút chứ?"
+
+# ---------------------------------------------------------------------------
+# Re-engagement broadcast — Phase 4.5 / E5 #5.2 (gửi MỘT LẦN).
+#
+# Nhắn cho nhóm user đã lâu không ghé (dormant) rằng Bé Tiền giờ đã trả lời
+# được những câu hỏi "nếu... thì sao". Ấm áp, không trách móc chuyện vắng mặt,
+# không hối thúc. Chỉ chạy thật sau khi E1-E3 đã live (xem runbook trong script).
+# ---------------------------------------------------------------------------
+reengagement:
+  body: |-
+    Bé Tiền giờ trả lời được câu này rồi nè:
+
+    "Nếu tháng sau mình phải chi 200tr thì tài sản ra sao, nên rút từ đâu?"
+    "Muốn có 1 tỷ sau 5 năm — với mình thì khả thi không?"
+
+    Mình luôn ở đây, hỏi mình thử một câu xem sao nha 🌿
