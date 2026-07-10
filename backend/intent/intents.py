@@ -38,6 +38,7 @@ class IntentType(str, Enum):
 
     # ----- Decision Engine reads (Phase 4.5) -----
     DECISION_FEASIBILITY = "decision_feasibility"
+    DECISION_SHOCK = "decision_shock"
 
     # ----- Action intents (write) -----
     ACTION_RECORD_SAVING = "action_record_saving"

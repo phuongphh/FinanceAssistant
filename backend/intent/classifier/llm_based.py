@@ -71,6 +71,7 @@ INTENTS:
 - query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
 - query_credit_card_debt: Hỏi dư nợ thẻ tín dụng
 - decision_feasibility: Hỏi một mục tiêu tài chính giả định CÓ KHẢ THI không trong một khoảng thời gian. Ví dụ: "muốn có 1 tỷ sau 5 năm được không", "10 năm nữa mua nhà 3 tỷ khả thi không", "để dành 500tr trong 2 năm có được không"
+- decision_shock: Hỏi giả định NẾU PHẢI CHI / RÚT một khoản tiền lớn ngay bây giờ thì ảnh hưởng tài sản thế nào, hoặc NÊN RÚT TỪ ĐÂU. Ví dụ: "nếu phải chi 200tr thì sao", "rút 500tr ra thì ảnh hưởng gì", "cần gấp 1 tỷ thì nên rút từ đâu", "lỡ mất 300tr thì tài sản mình ra sao"
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Ghi giao dịch nhanh (tiền ra/vào). "được cho/thưởng/lì xì/tìm/nhặt X" là tiền vào.
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"
@@ -99,6 +100,7 @@ PARAMETERS (extract nếu có, không có thì bỏ qua):
 - target_amount (cho decision_feasibility): số tiền mục tiêu muốn đạt, số nguyên VND. Ví dụ "1 tỷ" → 1000000000
 - horizon_years (cho decision_feasibility): số năm muốn đạt mục tiêu, số (có thể lẻ). Ví dụ "5 năm" → 5, "18 tháng" → 1.5
 - start_amount (cho decision_feasibility): số tiền đang có sẵn để bắt đầu, số nguyên VND (bỏ qua nếu user không nêu)
+- shock_amount (cho decision_shock): số tiền phải chi / rút ra, số nguyên VND. Ví dụ "200tr" → 200000000, "1 tỷ" → 1000000000
 
 OUTPUT JSON ONLY (không thêm text khác):
 {{"intent": "<intent_name>", "confidence": <0.0-1.0>, "parameters": {{}}}}

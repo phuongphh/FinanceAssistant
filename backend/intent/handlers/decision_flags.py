@@ -36,3 +36,13 @@ def is_plan_feasibility_qa_enabled() -> bool:
     "có khả thi không?" question falls back to the generic advisory handler,
     so the surface behaves exactly as it did before Phase 4.5."""
     return _enabled(PLAN_FEASIBILITY_QA_ENABLED_ENV, default=False)
+
+
+SHOCK_SIMULATION_ENABLED_ENV = "SHOCK_SIMULATION_ENABLED"
+
+
+def is_shock_simulation_enabled() -> bool:
+    """Shock simulation + liquidation advice (E1). OFF by default — when dark, a
+    "nếu phải chi X thì sao?" question falls back to the generic advisory
+    handler, so the surface behaves exactly as it did before Phase 4.5."""
+    return _enabled(SHOCK_SIMULATION_ENABLED_ENV, default=False)

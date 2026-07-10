@@ -665,3 +665,21 @@ decision_feasibility:
     # "... trong/sau N năm (nữa) có được/kịp không"
     - pattern: '\b(?:trong|sau)\s+\d+\s*(?:nam|thang).*(?:duoc\s+khong|kip\s+khong|co\s+kip)'
       confidence: 0.78
+
+decision_shock:
+  description: >
+    User asks a stress hypothetical: "if I had to spend/withdraw a large sum
+    right now, what happens to my portfolio?" or "where should I pull it from?".
+    Like feasibility, patterns sit BELOW the 0.85 rule→LLM short-circuit so the
+    LLM extracts ``shock_amount``, while the rule hit still guarantees a graceful
+    clarify fallback (ask the amount) if the LLM is unavailable.
+  patterns:
+    # "nếu phải chi/rút/mất ..." — canonical shock shape.
+    - pattern: 'neu\s+(?:phai\s+)?(?:chi|rut|mat|tieu|bo\s+ra)\b'
+      confidence: 0.78
+    # "rút từ đâu" / "nên rút chỗ nào" — the liquidation-ordering ask.
+    - pattern: 'rut\s+(?:tu\s+dau|o\s+dau|cho\s+nao|khoan\s+nao)'
+      confidence: 0.8
+    # "cần gấp X" — an urgent lump-sum need.
+    - pattern: 'can\s+gap\b.*\d'
+      confidence: 0.76

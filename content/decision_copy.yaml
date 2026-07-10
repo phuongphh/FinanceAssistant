@@ -63,3 +63,45 @@ feasibility:
   # Hỏi lại đúng một câu khi thiếu tham số. Ưu tiên hỏi target trước, rồi mốc thời gian.
   clarify_target: "Mình muốn tính giúp nè — mình đang nhắm tới con số bao nhiêu vậy? (vd: 1 tỷ)"
   clarify_horizon: "Ok, mình muốn đạt {target} trong bao lâu vậy? (vd: 5 năm)"
+
+# ---------------------------------------------------------------------------
+# Shock simulation + liquidation advice — Phase 4.5 / E1.
+#
+# User hỏi một giả định căng: "Nếu phải chi {amount} thì sao? Rút từ đâu?"
+# Bé Tiền dùng ẩn dụ THỜI TIẾT thay cho số phần trăm khô khan — user cảm được
+# mức độ mà không bị ngợp con số. KHÔNG bao giờ đọc ra p10/p50/p90.
+#
+# legal-guardrail: TUYỆT ĐỐI không gợi ý mua/bán sản phẩm bên ngoài, không nêu
+# tên quỹ/mã/ngân hàng. Chỉ sắp xếp thứ tự rút từ chính tài sản user đang có.
+# ---------------------------------------------------------------------------
+shock:
+  # Dòng mở đầu, nhắc lại giả định. {amount} đã format sẵn.
+  intro: "Mình thử hình dung giúp: nếu phải rút {amount} ra ngay bây giờ nha."
+
+  # Ẩn dụ thời tiết theo mức độ (severity). KHÔNG có số phần trăm.
+  weather:
+    light: "☀️ Cũng chỉ như một cơn mưa rào thôi — hành trình dài của mình gần như không xê dịch mấy."
+    moderate: "🌦️ Trời có râm mát hơn thật, nhưng mình vẫn đi tiếp ngon lành, không có gì đáng ngại."
+    heavy: "🌧️ Đây là một cơn mưa to đó nha — có hơi thấm, nhưng mình che chắn khéo là vượt được."
+    severe: "⛈️ Thành thật nha, đây là một cơn giông thật sự — nó lay hành trình của mình kha khá, mình cần cân nhắc kỹ."
+
+  # Kết luận trấn an: quỹ đạo dài hạn có hồi lại không. {years} đã format sẵn.
+  recovers: "Tin vui là nhìn dài hơi ~{years} tới, guồng của mình vẫn hồi lại được trên mức hôm nay — mình không bị lùi lại đâu."
+  no_recovers: "Chỗ này mình nói thẳng: nhìn dài hơi ~{years} tới, guồng tài sản khó về lại mức hôm nay nếu rút khoản này. Cân nhắc kỹ giúp mình nha."
+
+  # Dẫn vào phần "rút từ đâu ít hại nhất". Danh sách redraw do formatter riêng dựng.
+  redraw_intro: "Nếu buộc phải xoay khoản này, mình gợi ý thứ tự rút để ít ảnh hưởng đường dài nhất:"
+
+  # Không đủ thanh khoản để phủ hết khoản cần rút. {shortfall} đã format sẵn.
+  # legal-guardrail: chỉ nói thật là chưa đủ, KHÔNG gợi ý vay/sản phẩm bên ngoài.
+  insufficient: "Gom hết các khoản có thể xoay thì vẫn còn thiếu khoảng {shortfall} nha. Mình chưa dám khuyên rút thêm chỗ nào khác — chỗ này mình muốn tính kỹ cùng nhau."
+
+  # Portfolio trống — chưa có tài sản nào để mô phỏng.
+  empty_portfolio: "Mình chưa nắm được tài sản của mình nên chưa mô phỏng được cú này. Thêm vài khoản mình đang có là mình tính giúp ngay nha."
+
+  # Thiếu số tiền — hỏi lại đúng một câu.
+  clarify_amount: "Mình tính giúp nè — mình đang tính phải chi khoảng bao nhiêu vậy? (vd: 200tr)"
+
+  # Cửa xác nhận khi khoản rút quá lớn (>50% tài sản ròng). Hỏi lại trước khi vẽ
+  # kịch bản nặng, để user không giật mình. {amount} đã format sẵn.
+  confirm_large: "Khoản {amount} này khá lớn so với tài sản của mình đó nha — mình vẫn muốn xem thử kịch bản nếu phải rút chứ?"
