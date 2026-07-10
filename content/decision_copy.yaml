@@ -25,3 +25,41 @@ clarity:
     income: "nguồn thu nhập"
     expenses: "lịch sử chi tiêu"
     goals: "mục tiêu tài chính"
+
+# ---------------------------------------------------------------------------
+# Plan-to-goal feasibility Q&A — Phase 4.5 / E2.
+#
+# User hỏi một giả định: "Mình muốn có {target} sau {years} năm, khả thi không?"
+# Bé Tiền trả lời trung thực nhưng KHÔNG bao giờ phán xét. Ba tông giọng chính:
+#   khả thi (EASY/FEASIBLE) — cần cố (STRETCH/AMBITIOUS) — bất khả thi hiện tại
+#   (NEEDS_REVISION). Khi ngoài tầm với, luôn xoay sang "mức mình với tới được"
+#   thay vì chốt một câu "không".
+# ---------------------------------------------------------------------------
+feasibility:
+  # Dòng mở đầu, nhắc lại chính câu hỏi để user thấy mình được lắng nghe.
+  # {target} + {years} đã format sẵn.
+  intro: "Mình thử tính giúp: để có {target} trong {years} nha."
+
+  # khả thi — EASY / FEASIBLE. {actual} = mức để dành/tháng hiện tại.
+  feasible: "Tin vui nè — với mức để dành khoảng {actual}/tháng, mục tiêu này hoàn toàn trong tầm tay mình luôn 🎯"
+
+  # cần cố — STRETCH / AMBITIOUS. {required} = mức cần/tháng, {actual} = hiện tại.
+  stretch: "Được đó, nhưng phải hơi cố chút: cần để dành khoảng {required}/tháng (giờ mình đang ~{actual}/tháng). Nhích thêm một nhịp, hoặc nới thời gian ra xíu là ổn nha."
+
+  # bất khả thi ở nhịp hiện tại — NEEDS_REVISION. Không phán xét, xoay sang pivot.
+  needs_revision: "Thành thật nha: ở nhịp để dành hiện tại (~{actual}/tháng) thì con số này hơi quá sức trong khoảng thời gian đó."
+
+  # Câu xoay hướng trung thực khi ngoài tầm với. {reachable} = mốc với tới được,
+  # {years} = cùng khoảng thời gian. Luôn đi kèm needs_revision (và có thể cả
+  # ambitious nếu muốn nhẹ nhàng hơn).
+  reachable_pivot: "Nhưng đừng lo — cũng trong {years} đó, mình hoàn toàn với tới được khoảng {reachable}. Mình bắt đầu từ mốc này rồi tăng tốc sau cũng được mà 💪"
+
+  # Đã đạt/đã vượt mục tiêu ngay từ đầu.
+  already_reached: "Ơ mình có sẵn hơn con số đó rồi mà! Mục tiêu này coi như trong túi 🎉 Đặt một đích cao hơn thử nha?"
+
+  # Chưa đủ dữ liệu dòng tiền (chưa biết mức để dành) — UNKNOWN.
+  unknown: "Mình chưa biết mỗi tháng mình để dành được bao nhiêu nên chưa dám chốt khả thi hay không. Thêm nguồn thu nhập + vài khoản chi gần đây là mình tính được ngay nha."
+
+  # Hỏi lại đúng một câu khi thiếu tham số. Ưu tiên hỏi target trước, rồi mốc thời gian.
+  clarify_target: "Mình muốn tính giúp nè — mình đang nhắm tới con số bao nhiêu vậy? (vd: 1 tỷ)"
+  clarify_horizon: "Ok, mình muốn đạt {target} trong bao lâu vậy? (vd: 5 năm)"

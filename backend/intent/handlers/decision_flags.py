@@ -26,3 +26,13 @@ def is_clarity_meter_enabled() -> bool:
     """Độ Nét meter (E3). OFF by default — when dark, every surface renders
     exactly as it did before Phase 4.5."""
     return _enabled(CLARITY_METER_ENABLED_ENV, default=False)
+
+
+PLAN_FEASIBILITY_QA_ENABLED_ENV = "PLAN_FEASIBILITY_QA_ENABLED"
+
+
+def is_plan_feasibility_qa_enabled() -> bool:
+    """Plan-to-goal feasibility Q&A (E2). OFF by default — when dark, a
+    "có khả thi không?" question falls back to the generic advisory handler,
+    so the surface behaves exactly as it did before Phase 4.5."""
+    return _enabled(PLAN_FEASIBILITY_QA_ENABLED_ENV, default=False)

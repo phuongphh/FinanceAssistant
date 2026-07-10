@@ -29,8 +29,6 @@ import logging
 import time
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from backend.agent.limits import estimate_cost_usd
 from backend.config import get_settings
 from backend.intent.intents import (
@@ -72,6 +70,7 @@ INTENTS:
 - query_goal_progress: Hỏi tiến độ mục tiêu cụ thể
 - query_twin: Hỏi Bé Tiền tương lai / dự phóng tài sản / mô phỏng Financial Twin
 - query_credit_card_debt: Hỏi dư nợ thẻ tín dụng
+- decision_feasibility: Hỏi một mục tiêu tài chính giả định CÓ KHẢ THI không trong một khoảng thời gian. Ví dụ: "muốn có 1 tỷ sau 5 năm được không", "10 năm nữa mua nhà 3 tỷ khả thi không", "để dành 500tr trong 2 năm có được không"
 - action_record_saving: Muốn ghi tiết kiệm
 - action_quick_transaction: Ghi giao dịch nhanh (tiền ra/vào). "được cho/thưởng/lì xì/tìm/nhặt X" là tiền vào.
 - action_add_asset: Muốn thêm tài sản mới (BĐS, cổ phiếu, crypto, vàng, tiền mặt). Ví dụ: "thêm bất động sản", "thêm cổ phiếu FPT", "nhập crypto"
@@ -97,6 +96,9 @@ PARAMETERS (extract nếu có, không có thì bỏ qua):
 - ticker (cho query_market khi user hỏi 1 mã cụ thể): viết hoa, ví dụ "VNM", "BTC", "VNINDEX"
 - amount: số nguyên VND
 - goal_name: tên mục tiêu
+- target_amount (cho decision_feasibility): số tiền mục tiêu muốn đạt, số nguyên VND. Ví dụ "1 tỷ" → 1000000000
+- horizon_years (cho decision_feasibility): số năm muốn đạt mục tiêu, số (có thể lẻ). Ví dụ "5 năm" → 5, "18 tháng" → 1.5
+- start_amount (cho decision_feasibility): số tiền đang có sẵn để bắt đầu, số nguyên VND (bỏ qua nếu user không nêu)
 
 OUTPUT JSON ONLY (không thêm text khác):
 {{"intent": "<intent_name>", "confidence": <0.0-1.0>, "parameters": {{}}}}
