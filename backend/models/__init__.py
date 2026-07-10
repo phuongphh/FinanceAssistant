@@ -88,6 +88,12 @@ from backend.models.positioning_survey import (
     VALID_POSITIONING_RESPONSES,
     PositioningSurveyResponse,
 )
+from backend.models.decision_query_log import (
+    QUERY_TYPE_FEASIBILITY,
+    QUERY_TYPE_SHOCK,
+    VALID_QUERY_TYPES,
+    DecisionQueryLog,
+)
 
 __all__ = [
     "User",
@@ -175,4 +181,8 @@ __all__ = [
     "VALID_POSITIONING_RESPONSES",
     "ALIGNED_POSITIONING_RESPONSES",
     "MISALIGNED_POSITIONING_RESPONSES",
+    "DecisionQueryLog",
+    "QUERY_TYPE_SHOCK",
+    "QUERY_TYPE_FEASIBILITY",
+    "VALID_QUERY_TYPES",
 ]

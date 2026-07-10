@@ -30,6 +30,7 @@ from backend.intent.handlers.decision_feasibility import (
     _coerce_years,
 )
 from backend.intent.intents import IntentResult, IntentType
+from tests.test_phase_4_5.conftest import FakeSession
 
 FLAG = "PLAN_FEASIBILITY_QA_ENABLED"
 
@@ -76,7 +77,7 @@ async def test_flag_off_delegates_to_advisory(monkeypatch):
 async def test_flag_on_missing_target_clarifies(monkeypatch):
     monkeypatch.setenv(FLAG, "true")
     out = await DecisionFeasibilityHandler().handle(
-        _intent(horizon_years=5), _user(), None
+        _intent(horizon_years=5), _user(), FakeSession()
     )
     assert "con số" in out  # clarify_target copy
 
@@ -85,7 +86,7 @@ async def test_flag_on_missing_target_clarifies(monkeypatch):
 async def test_flag_on_missing_horizon_clarifies_and_echoes_target(monkeypatch):
     monkeypatch.setenv(FLAG, "true")
     out = await DecisionFeasibilityHandler().handle(
-        _intent(target_amount=1_000_000_000), _user(), None
+        _intent(target_amount=1_000_000_000), _user(), FakeSession()
     )
     assert "bao lâu" in out  # clarify_horizon copy
     assert "tỷ" in out or "tỉ" in out  # echoes the known target
@@ -101,7 +102,7 @@ async def test_flag_on_full_params_renders_verdict(monkeypatch):
     monkeypatch.setattr(dfh, "get_avg_monthly_savings", fake_savings)
 
     out = await DecisionFeasibilityHandler().handle(
-        _intent(target_amount=60_000_000, horizon_years=5), _user(), object()
+        _intent(target_amount=60_000_000, horizon_years=5), _user(), FakeSession()
     )
     # 5tr/month easily clears a 60tr / 5yr goal → encouraging verdict.
     assert "trong tầm tay" in out
@@ -119,7 +120,7 @@ async def test_start_amount_is_optional(monkeypatch):
 
     # No start_amount → starts fresh (0); still produces a verdict, not a crash.
     out = await DecisionFeasibilityHandler().handle(
-        _intent(target_amount=1_000_000_000, horizon_years=10), _user(), object()
+        _intent(target_amount=1_000_000_000, horizon_years=10), _user(), FakeSession()
     )
     assert out
     for banned in ("Decision Engine", "CFO", "GPS"):

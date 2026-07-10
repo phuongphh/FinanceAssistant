@@ -35,8 +35,9 @@ from backend.intent.handlers.decision_flags import (
     is_tone_dial_enabled,
 )
 from backend.intent.intents import IntentResult
+from backend.models.decision_query_log import QUERY_TYPE_FEASIBILITY
 from backend.models.user import User
-from backend.services.decision import plan_feasibility_service
+from backend.services.decision import decision_query_log_service, plan_feasibility_service
 from backend.services.goal_projection import get_avg_monthly_savings
 from backend.services.onboarding.onboarding_service import salutation_of
 
@@ -48,12 +49,32 @@ _MAX_HORIZON_YEARS = Decimal(60)
 
 class DecisionFeasibilityHandler(IntentHandler):
     async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
-        # Flag gate at the edge — dark by default falls back to advisory.
+        # Flag gate at the edge — dark by default falls back to advisory. No log
+        # here: the surface is not live, so there is no decision query to count.
         if not is_plan_feasibility_qa_enabled():
             from backend.intent.handlers.advisory import AdvisoryHandler
 
             return await AdvisoryHandler().handle(intent, user, db)
 
+        answer, success = await self._answer(intent, user, db)
+        # E5 #5.1 — one append-only row per handled query, including the
+        # clarify turns that never reach a verdict (success=False).
+        await decision_query_log_service.log_query(
+            db,
+            user_id=user.id,
+            query_type=QUERY_TYPE_FEASIBILITY,
+            success=success,
+        )
+        return answer
+
+    async def _answer(
+        self, intent: IntentResult, user: User, db: AsyncSession
+    ) -> tuple[str, bool]:
+        """Build the reply and report ``(text, success)``.
+
+        ``success`` is ``True`` only for a full feasibility verdict; the two
+        clarify turns return ``False``.
+        """
         params = intent.parameters or {}
         target = _coerce_amount(params.get("target_amount"))
         horizon = _coerce_years(params.get("horizon_years"))
@@ -61,9 +82,9 @@ class DecisionFeasibilityHandler(IntentHandler):
         start = _coerce_amount(params.get("start_amount")) or Decimal(0)
 
         if target is None:
-            return render_clarify("target")
+            return render_clarify("target"), False
         if horizon is None:
-            return render_clarify("horizon", target=target)
+            return render_clarify("horizon", target=target), False
 
         # The single DB touch in the whole flow.
         avg_savings = await get_avg_monthly_savings(db, user.id)
@@ -71,12 +92,15 @@ class DecisionFeasibilityHandler(IntentHandler):
         # Tone dial read at the edge (layer contract); dark → tone=None → the
         # formatter keeps its legacy copy.
         tone = resolve_tone(user.tone_preference) if is_tone_dial_enabled() else None
-        return render_feasibility(
-            result,
-            target=target,
-            horizon_years=horizon,
-            tone=tone,
-            salutation=salutation_of(user),
+        return (
+            render_feasibility(
+                result,
+                target=target,
+                horizon_years=horizon,
+                tone=tone,
+                salutation=salutation_of(user),
+            ),
+            True,
         )
 
 

@@ -32,6 +32,7 @@ from backend.intent.handlers.decision_shock import (
 )
 from backend.intent.intents import IntentResult, IntentType
 from backend.twin.services.twin_projection_service import PortfolioSnapshot
+from tests.test_phase_4_5.conftest import FakeSession
 
 FLAG = "SHOCK_SIMULATION_ENABLED"
 CLARITY_FLAG = "CLARITY_METER_ENABLED"
@@ -101,7 +102,7 @@ async def test_flag_off_delegates_to_advisory(monkeypatch):
 @pytest.mark.asyncio
 async def test_flag_on_missing_amount_clarifies(monkeypatch):
     monkeypatch.setenv(FLAG, "true")
-    out = await DecisionShockHandler().handle(_intent(), _user(), None)
+    out = await DecisionShockHandler().handle(_intent(), _user(), FakeSession())
     assert "bao nhiêu" in out
 
 
@@ -118,7 +119,7 @@ async def test_flag_on_empty_portfolio(monkeypatch):
         ),
     )
     out = await DecisionShockHandler().handle(
-        _intent(shock_amount=200_000_000), _user(), object()
+        _intent(shock_amount=200_000_000), _user(), FakeSession()
     )
     assert "chưa" in out
     for banned in _BANNED:
@@ -143,7 +144,7 @@ async def test_large_shock_asks_confirm_first(monkeypatch):
     monkeypatch.setattr(dsh, "simulate_shock", _boom)
 
     out = await DecisionShockHandler().handle(
-        _intent(shock_amount=700_000_000), _user(), object()
+        _intent(shock_amount=700_000_000), _user(), FakeSession()
     )
     assert "khá lớn" in out
 
@@ -155,7 +156,7 @@ async def test_large_shock_proceeds_when_confirmed(monkeypatch):
     _patch_snapshot(monkeypatch, _snapshot())
 
     out = await DecisionShockHandler().handle(
-        _intent(shock_amount=700_000_000, shock_confirmed=True), _user(), object()
+        _intent(shock_amount=700_000_000, shock_confirmed=True), _user(), FakeSession()
     )
     # Full scenario rendered — weather + redraw, not the confirm question.
     assert "khá lớn" not in out
@@ -176,7 +177,7 @@ async def test_full_render_without_clarity(monkeypatch):
     _patch_snapshot(monkeypatch, _snapshot())
 
     out = await DecisionShockHandler().handle(
-        _intent(shock_amount=200_000_000), _user(), object()
+        _intent(shock_amount=200_000_000), _user(), FakeSession()
     )
     assert out
     # Redraw list names owned classes.
@@ -202,7 +203,7 @@ async def test_full_render_appends_clarity_block(monkeypatch):
     monkeypatch.setattr(dsh.clarity_service, "compute_clarity", fake_clarity)
 
     out = await DecisionShockHandler().handle(
-        _intent(shock_amount=200_000_000), _user(), object()
+        _intent(shock_amount=200_000_000), _user(), FakeSession()
     )
     assert "62%" in out  # clarity headline appended
 

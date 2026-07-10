@@ -47,8 +47,9 @@ from backend.intent.handlers.decision_flags import (
     is_shock_simulation_enabled,
 )
 from backend.intent.intents import IntentResult
+from backend.models.decision_query_log import QUERY_TYPE_SHOCK
 from backend.models.user import User
-from backend.services.decision import clarity_service
+from backend.services.decision import clarity_service, decision_query_log_service
 from backend.services.decision.liquidation_advisor import rank_options
 from backend.services.decision.shock_simulation_service import simulate_shock
 from backend.twin.services.twin_projection_service import load_portfolio_snapshot
@@ -64,21 +65,43 @@ _CONFIRM_VALUES = frozenset({"1", "true", "yes", "on", "co", "có", "ok", "uh"})
 
 class DecisionShockHandler(IntentHandler):
     async def handle(self, intent: IntentResult, user: User, db: AsyncSession) -> str:
-        # Flag gate at the edge — dark by default falls back to advisory.
+        # Flag gate at the edge — dark by default falls back to advisory. No log
+        # here: the surface is not live, so there is no decision query to count.
         if not is_shock_simulation_enabled():
             from backend.intent.handlers.advisory import AdvisoryHandler
 
             return await AdvisoryHandler().handle(intent, user, db)
 
+        answer, success, clarity_score = await self._answer(intent, user, db)
+        # E5 #5.1 — one append-only row per handled query, including the
+        # clarify/empty/confirm turns that never reach a verdict (success=False).
+        await decision_query_log_service.log_query(
+            db,
+            user_id=user.id,
+            query_type=QUERY_TYPE_SHOCK,
+            success=success,
+            clarity_score=clarity_score,
+        )
+        return answer
+
+    async def _answer(
+        self, intent: IntentResult, user: User, db: AsyncSession
+    ) -> tuple[str, bool, int | None]:
+        """Build the reply and report ``(text, success, clarity_score)``.
+
+        ``success`` is ``True`` only for a full shock verdict; the
+        clarify/empty/confirm turns return ``False``. ``clarity_score`` is the
+        độ nét surfaced with the verdict when the meter is on, else ``None``.
+        """
         params = intent.parameters or {}
         shock_amount = _coerce_amount(params.get("shock_amount"))
         if shock_amount is None:
-            return render_clarify_amount()
+            return render_clarify_amount(), False, None
 
         # The single DB touch in the whole flow.
         snapshot = await load_portfolio_snapshot(db, user.id)
         if not snapshot.allocation_amounts or snapshot.base_net_worth <= 0:
-            return render_empty_portfolio()
+            return render_empty_portfolio(), False, None
 
         # Confirm gate: a shock > 50% of net worth is alarming — ask once before
         # drawing the heavy scenario, unless the user already confirmed.
@@ -86,17 +109,19 @@ class DecisionShockHandler(IntentHandler):
             shock_amount / snapshot.base_net_worth > _CONFIRM_RATIO
             and not _is_confirmed(params)
         ):
-            return render_confirm_large(shock_amount)
+            return render_confirm_large(shock_amount), False, None
 
         result = simulate_shock(snapshot, shock_amount)
         plan = rank_options(snapshot.allocation_amounts, shock_amount)
         answer = render_shock(result, plan)
 
         # Decision answers carry độ nét — surface it exactly like query_twin.
+        clarity_score: int | None = None
         if is_clarity_meter_enabled():
             clarity = await clarity_service.compute_clarity(db, user.id)
+            clarity_score = clarity.score
             answer = answer + "\n\n" + render_clarity_block(clarity)
-        return answer
+        return answer, True, clarity_score
 
 
 def _coerce_amount(value) -> Decimal | None:
