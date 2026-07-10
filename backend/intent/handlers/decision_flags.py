@@ -46,3 +46,24 @@ def is_shock_simulation_enabled() -> bool:
     "nếu phải chi X thì sao?" question falls back to the generic advisory
     handler, so the surface behaves exactly as it did before Phase 4.5."""
     return _enabled(SHOCK_SIMULATION_ENABLED_ENV, default=False)
+
+
+EXPORT_EXCEL_ENABLED_ENV = "EXPORT_EXCEL_ENABLED"
+
+
+def is_export_excel_enabled() -> bool:
+    """Excel export (E4 #4.1). **ON by default** — data portability is a
+    baseline promise, not an experiment. Flip to ``false`` only to kill the
+    ``/export`` command / menu button in an incident (e.g. a Telegram
+    upload outage)."""
+    return _enabled(EXPORT_EXCEL_ENABLED_ENV, default=True)
+
+
+TONE_DIAL_ENABLED_ENV = "TONE_DIAL_ENABLED"
+
+
+def is_tone_dial_enabled() -> bool:
+    """Tone dial — gentle/strict preference (E4 #4.2). OFF by default: when
+    dark the /profile tone control is hidden and every surface renders in the
+    default gentle voice, exactly as before Phase 4.5."""
+    return _enabled(TONE_DIAL_ENABLED_ENV, default=False)

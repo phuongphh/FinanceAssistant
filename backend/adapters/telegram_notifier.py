@@ -55,3 +55,26 @@ class TelegramNotifier:
             caption=caption,
             **call_kwargs,
         )
+
+    async def send_document(
+        self,
+        chat_id: int,
+        document: bytes,
+        filename: str,
+        *,
+        caption: str = "",
+        mime_type: str = "application/octet-stream",
+        reply_markup: dict | None = None,
+        **kwargs: Any,
+    ) -> dict | None:
+        call_kwargs: dict[str, Any] = dict(kwargs)
+        if reply_markup is not None:
+            call_kwargs["reply_markup"] = reply_markup
+        return await telegram_service.send_document(
+            chat_id,
+            document,
+            filename,
+            caption=caption,
+            mime_type=mime_type,
+            **call_kwargs,
+        )
