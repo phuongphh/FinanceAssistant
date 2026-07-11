@@ -491,9 +491,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #973 | Phase 4 | [Phase 4.5 / E1] 1.3 — Intent decision_shock + handler + flag | [phase-4/issue-973.md](by-phase/phase-4/issue-973.md) |
 | #974 | Phase 4 | [Phase 4.5 / E1] 1.4 — Portfolio redraw sau shock | [phase-4/issue-974.md](by-phase/phase-4/issue-974.md) |
 | #975 | Phase 4 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [phase-4/issue-975.md](by-phase/phase-4/issue-975.md) |
+| #976 | Phase 4 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [phase-4/issue-976.md](by-phase/phase-4/issue-976.md) |
 | #977 | Phase 4 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [phase-4/issue-977.md](by-phase/phase-4/issue-977.md) |
 | #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
 | #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
 
-**Total:** 490 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 16 Phase 4, 457 Pre-Phase)
+**Total:** 491 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 17 Phase 4, 457 Pre-Phase)
