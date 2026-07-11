@@ -480,6 +480,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #924 | Pre-Phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [pre-phase/issue-924.md](by-phase/pre-phase/issue-924.md) |
 | #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
 | #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
+| #966 | Phase 4 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [phase-4/issue-966.md](by-phase/phase-4/issue-966.md) |
 | #967 | Phase 4 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [phase-4/issue-967.md](by-phase/phase-4/issue-967.md) |
 | #968 | Phase 4 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [phase-4/issue-968.md](by-phase/phase-4/issue-968.md) |
 | #970 | Phase 4 | [Phase 4.5 / E2] 2.3 — Copy feasibility + persona QA | [phase-4/issue-970.md](by-phase/phase-4/issue-970.md) |
@@ -487,5 +488,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #977 | Phase 4 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [phase-4/issue-977.md](by-phase/phase-4/issue-977.md) |
 | #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
 
-**Total:** 482 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 8 Phase 4, 457 Pre-Phase)
+**Total:** 483 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 9 Phase 4, 457 Pre-Phase)
