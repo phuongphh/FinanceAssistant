@@ -18,7 +18,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
 | #964 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [issue-964.md](issue-964.md) |
-| #965 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [issue-965.md](issue-965.md) |
 | #966 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [issue-966.md](issue-966.md) |
 | #967 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [issue-967.md](issue-967.md) |
 | #968 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [issue-968.md](issue-968.md) |
@@ -35,4 +34,4 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #979 | [Phase 4.5 / E5] 5.1 — decision_query_log model + ghi log | [issue-979.md](issue-979.md) |
 | #980 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [issue-980.md](issue-980.md) |
 
-**Total active:** 30
+**Total active:** 29
