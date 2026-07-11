@@ -482,6 +482,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
 | #967 | Phase 4 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [phase-4/issue-967.md](by-phase/phase-4/issue-967.md) |
 | #968 | Phase 4 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [phase-4/issue-968.md](by-phase/phase-4/issue-968.md) |
+| #971 | Phase 4 | [Phase 4.5 / E1] 1.1 — shock_simulation_service.simulate_shock() | [phase-4/issue-971.md](by-phase/phase-4/issue-971.md) |
 
-**Total:** 478 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 4 Phase 4, 457 Pre-Phase)
+**Total:** 479 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 5 Phase 4, 457 Pre-Phase)
