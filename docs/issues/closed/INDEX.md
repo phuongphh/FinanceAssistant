@@ -486,9 +486,10 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #970 | Phase 4 | [Phase 4.5 / E2] 2.3 — Copy feasibility + persona QA | [phase-4/issue-970.md](by-phase/phase-4/issue-970.md) |
 | #971 | Phase 4 | [Phase 4.5 / E1] 1.1 — shock_simulation_service.simulate_shock() | [phase-4/issue-971.md](by-phase/phase-4/issue-971.md) |
 | #973 | Phase 4 | [Phase 4.5 / E1] 1.3 — Intent decision_shock + handler + flag | [phase-4/issue-973.md](by-phase/phase-4/issue-973.md) |
+| #975 | Phase 4 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [phase-4/issue-975.md](by-phase/phase-4/issue-975.md) |
 | #977 | Phase 4 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [phase-4/issue-977.md](by-phase/phase-4/issue-977.md) |
 | #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
 | #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
 
-**Total:** 485 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 11 Phase 4, 457 Pre-Phase)
+**Total:** 486 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 12 Phase 4, 457 Pre-Phase)
