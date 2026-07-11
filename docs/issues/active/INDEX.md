@@ -18,8 +18,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
 | #969 | [Phase 4.5 / E2] 2.2 — Intent decision_feasibility + handler | [issue-969.md](issue-969.md) |
-| #972 | [Phase 4.5 / E1] 1.2 — liquidation_advisor.rank_options() | [issue-972.md](issue-972.md) |
 | #976 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [issue-976.md](issue-976.md) |
 | #979 | [Phase 4.5 / E5] 5.1 — decision_query_log model + ghi log | [issue-979.md](issue-979.md) |
 
-**Total active:** 17
+**Total active:** 16
