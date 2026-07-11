@@ -479,6 +479,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #922 | Pre-Phase | default_money_in_source: configurable default income source + money-in confirm UX | [pre-phase/issue-922.md](by-phase/pre-phase/issue-922.md) |
 | #924 | Pre-Phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [pre-phase/issue-924.md](by-phase/pre-phase/issue-924.md) |
 | #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
+| #964 | Phase 4 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [phase-4/issue-964.md](by-phase/phase-4/issue-964.md) |
 | #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
 | #966 | Phase 4 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [phase-4/issue-966.md](by-phase/phase-4/issue-966.md) |
 | #967 | Phase 4 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [phase-4/issue-967.md](by-phase/phase-4/issue-967.md) |
@@ -492,5 +493,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
 | #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
 
-**Total:** 487 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 13 Phase 4, 457 Pre-Phase)
+**Total:** 488 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 14 Phase 4, 457 Pre-Phase)
