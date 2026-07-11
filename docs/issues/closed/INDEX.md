@@ -481,6 +481,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
 | #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
 | #967 | Phase 4 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [phase-4/issue-967.md](by-phase/phase-4/issue-967.md) |
+| #968 | Phase 4 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [phase-4/issue-968.md](by-phase/phase-4/issue-968.md) |
 
-**Total:** 477 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 3 Phase 4, 457 Pre-Phase)
+**Total:** 478 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 4 Phase 4, 457 Pre-Phase)
