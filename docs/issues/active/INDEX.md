@@ -25,6 +25,5 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #975 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [issue-975.md](issue-975.md) |
 | #976 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [issue-976.md](issue-976.md) |
 | #979 | [Phase 4.5 / E5] 5.1 — decision_query_log model + ghi log | [issue-979.md](issue-979.md) |
-| #980 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [issue-980.md](issue-980.md) |
 
-**Total active:** 22
+**Total active:** 21
