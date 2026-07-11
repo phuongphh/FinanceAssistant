@@ -29,8 +29,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import analytics
 from backend.analytics import EventType
+from backend.bot.formatters.tone import resolve_tone
 from backend.bot.personality import empathy_engine
 from backend.database import get_session_factory
+from backend.intent.handlers.decision_flags import is_tone_dial_enabled
 from backend.jobs._active_users import get_active_users
 from backend.models.user import User
 from backend.services.telegram_service import send_message
@@ -163,7 +165,10 @@ async def _process_user(user: User, *, now: datetime) -> None:
         if not trigger:
             return
 
-        message = empathy_engine.render_message(trigger, user)
+        # Tone dial read at the job edge (layer contract); dark → tone=None →
+        # render_message keeps the legacy empathy copy.
+        tone = resolve_tone(user.tone_preference) if is_tone_dial_enabled() else None
+        message = empathy_engine.render_message(trigger, user, tone=tone)
         if not message:
             return
         if not user.telegram_id:

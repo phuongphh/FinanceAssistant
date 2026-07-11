@@ -1850,6 +1850,19 @@ async def _action_twin_life_events(
     await cmd_life_events(db, chat_id, user)
 
 
+async def _action_assets_export(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 4.5 E4 #4.1 — export tài sản/thu chi/mục tiêu ra file Excel.
+
+    ``cmd_export`` reads the ``EXPORT_EXCEL_ENABLED`` flag at the edge, so
+    the button is always wired; the flag only changes what it replies.
+    """
+    from backend.bot.handlers.export_handler import cmd_export
+
+    await cmd_export(db, chat_id, user)
+
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
@@ -1862,6 +1875,7 @@ _DIRECT_HANDLERS = {
     ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("assets", "life_insurance"): _action_assets_life_insurance,
+    ("assets", "export"): _action_assets_export,
     ("expenses", "report"): _action_expenses_report,
     ("expenses", "manage"): _action_expenses_manage,
     ("expenses", "ocr_prompt"): _action_expenses_ocr_prompt,

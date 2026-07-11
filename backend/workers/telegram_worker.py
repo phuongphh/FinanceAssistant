@@ -317,6 +317,20 @@ async def _handle_message(
             return user.id if user else None
         return None
 
+    if command == "/export":
+        # Excel export (E4 #4.1). The handler reads the EXPORT_EXCEL_ENABLED
+        # flag at the edge, so the command is always routed here — the flag
+        # only changes what the handler replies.
+        from backend.bot.handlers.export_handler import cmd_export
+
+        resolved_user = (
+            await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            if telegram_id is not None
+            else None
+        )
+        await cmd_export(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
+
     # Resolve the user once up front for the remaining text-message
     # paths — all of them need it (either to detect the onboarding step
     # or to stamp user_id on the queue row).

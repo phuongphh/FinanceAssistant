@@ -69,7 +69,9 @@ class TestTwinApiRoute:
         async def _fake_resolve(auth, db):
             return user
 
-        async def _fake_payload(db, user_id, scenario="current"):
+        async def _fake_payload(
+            db, user_id, scenario="current", exclude_event_ids=None, include_clarity=False
+        ):
             assert scenario == "current"
             assert user_id == user.id
             return _payload()

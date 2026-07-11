@@ -28,6 +28,9 @@ profile_view:
   field_briefing: "• Báo cáo sáng: *{state}* lúc *{time}*"
   field_reminder: "• Nhắc định kỳ: *{state}* lúc *{time}*"
   field_twin_terms: "• Thuật ngữ kỹ thuật Twin (P10/P50/P90): *{state}*"
+  field_tone: "• Giọng đồng hành: *{value}*"
+  tone_gentle: "Nhẹ nhàng"
+  tone_strict: "Thẳng thắn"
   state_on: "Bật"
   state_off: "Tắt"
 
@@ -99,6 +102,7 @@ keyboards:
     toggle_reminder: "⏰ Nhắc định kỳ: {state}"
     time_reminder: "🕘 Giờ nhắc: {time}"
     twin_terms: "🔬 Bật/tắt P10/P50/P90"
+    toggle_tone: "🗣️ Giọng đồng hành: {state}"
     back: "◀️ Quay lại Profile"
   glossary:
     back: "◀️ Quay lại Profile"

@@ -99,6 +99,16 @@ class User(Base):
         Boolean, default=False, nullable=False
     )
 
+    # Phase 4.5 E4 #4.2 — tone dial. NULL → default gentle voice; the
+    # /profile control sets "gentle" / "strict" once the user chooses.
+    tone_preference: Mapped[str | None] = mapped_column(String(10))
+
+    # Phase 4.5 E5 #5.2 — one-time re-engagement broadcast marker. NULL →
+    # never messaged; stamped with the send time so the nudge fires once.
+    reengagement_broadcast_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""

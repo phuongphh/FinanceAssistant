@@ -15,6 +15,7 @@ from backend.models.credit_card import CreditCard
 from backend.profile.handlers.profile_menu import (
     _expense_source_options,
     _resolve_source_label,
+    _tone_label,
     handle_profile_callback,
     handle_profile_view,
     notification_keyboard,
@@ -43,6 +44,67 @@ def _scalars(values):
     result = MagicMock()
     result.scalars.return_value = scalars
     return result
+
+
+def _minimal_stats():
+    """A complete stats dict so render_profile can build every section."""
+    return {
+        "account_age_days": 12,
+        "net_worth": Decimal("300000000"),
+        "wealth_level": WealthLevelMapper().get_level(Decimal("300000000")),
+        "wealth_progress": WealthLevelMapper().get_progress_to_next(
+            Decimal("300000000")
+        ),
+        "asset_types_count": 3,
+        "transaction_count_total": 40,
+        "transaction_count_this_month": 8,
+        "goals_active": 2,
+        "goals_completed": 1,
+        "briefing_read_count": 5,
+        "current_streak": 4,
+        "net_worth_change_pct": 12.5,
+    }
+
+
+def _wire_callback_fakes(monkeypatch, user, profile):
+    """Patch the DB/transport seams handle_profile_callback reaches through so a
+    callback can be exercised without a real session or Telegram."""
+
+    async def fake_get_user(db, telegram_id):
+        return user
+
+    async def fake_get_or_create_profile(db, user_id):
+        return profile
+
+    async def fake_answer_callback(*args, **kwargs):
+        return None
+
+    async def fake_edit_message_text(**kwargs):
+        return None
+
+    async def fake_send_message(**kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu._get_user_by_telegram_id",
+        fake_get_user,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.get_or_create_profile",
+        fake_get_or_create_profile,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.answer_callback",
+        fake_answer_callback,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.edit_message_text",
+        fake_edit_message_text,
+    )
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.send_message",
+        fake_send_message,
+    )
 
 
 def test_wealth_level_starter():
@@ -238,6 +300,160 @@ def test_notification_keyboard_reflects_status_and_times():
     assert "09:30" in buttons[3]
 
 
+# ---------------------------------------------------------------------------
+# Phase 4.5 E4 #4.2 — tone dial (gentle / strict companion voice)
+# ---------------------------------------------------------------------------
+
+
+def test_tone_label_maps_null_and_gentle_to_gentle_and_strict_to_strict():
+    # NULL means "never chosen" → default gentle voice.
+    assert _tone_label(None) == "Nhẹ nhàng"
+    assert _tone_label("gentle") == "Nhẹ nhàng"
+    # Any unrecognised value also falls back to the safe gentle floor.
+    assert _tone_label("wat") == "Nhẹ nhàng"
+    assert _tone_label("strict") == "Thẳng thắn"
+
+
+def test_notification_keyboard_hides_tone_row_when_flag_dark():
+    profile = UserProfile(user_id=uuid.uuid4())
+    profile.briefing_enabled = True
+    profile.briefing_time = time(8, 0)
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 0)
+
+    keyboard = notification_keyboard(profile)  # tone_enabled defaults to False
+    callbacks = [
+        button["callback_data"]
+        for row in keyboard["inline_keyboard"]
+        for button in row
+    ]
+    assert "profile:toggle_tone" not in callbacks
+
+
+def test_notification_keyboard_shows_tone_row_when_enabled():
+    profile = UserProfile(user_id=uuid.uuid4())
+    profile.briefing_enabled = True
+    profile.briefing_time = time(8, 0)
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 0)
+
+    # Default gentle label when preference is NULL.
+    keyboard = notification_keyboard(profile, tone_enabled=True)
+    tone_buttons = [
+        button
+        for row in keyboard["inline_keyboard"]
+        for button in row
+        if button["callback_data"] == "profile:toggle_tone"
+    ]
+    assert len(tone_buttons) == 1
+    assert "Nhẹ nhàng" in tone_buttons[0]["text"]
+
+    # Strict preference is reflected in the button label.
+    keyboard = notification_keyboard(
+        profile, tone_enabled=True, tone_preference="strict"
+    )
+    tone_buttons = [
+        button
+        for row in keyboard["inline_keyboard"]
+        for button in row
+        if button["callback_data"] == "profile:toggle_tone"
+    ]
+    assert "Thẳng thắn" in tone_buttons[0]["text"]
+
+    # The back button stays last regardless of the tone row.
+    assert keyboard["inline_keyboard"][-1][0]["callback_data"] == "profile:view"
+
+
+def test_render_profile_omits_tone_line_when_flag_dark():
+    profile = UserProfile(user_id=uuid.uuid4(), display_name="Phương")
+    user = User()
+    user.id = profile.user_id
+    user.tone_preference = "strict"
+    stats = _minimal_stats()
+
+    text = render_profile(profile, user, stats)  # tone_enabled defaults False
+    assert "Giọng đồng hành" not in text
+
+
+def test_render_profile_shows_tone_line_when_enabled():
+    profile = UserProfile(user_id=uuid.uuid4(), display_name="Phương")
+    user = User()
+    user.id = profile.user_id
+    user.tone_preference = "strict"
+    stats = _minimal_stats()
+
+    text = render_profile(profile, user, stats, tone_enabled=True)
+    assert "Giọng đồng hành" in text
+    assert "Thẳng thắn" in text
+
+
+@pytest.mark.asyncio
+async def test_toggle_tone_flips_preference_and_persists(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    user.tone_preference = None
+    profile = UserProfile(user_id=user.id)
+    profile.briefing_enabled = True
+    profile.briefing_time = time(7, 0)
+    profile.reminder_enabled = True
+    profile.reminder_time = time(9, 0)
+    db = MagicMock()
+    db.flush = AsyncMock()
+
+    _wire_callback_fakes(monkeypatch, user, profile)
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.is_tone_dial_enabled",
+        lambda: True,
+    )
+
+    callback = {
+        "id": "cb-tone",
+        "data": "profile:toggle_tone",
+        "from": {"id": 12345},
+        "message": {"chat": {"id": 42}, "message_id": 99},
+    }
+
+    # NULL → strict on first tap.
+    handled = await handle_profile_callback(db, callback)
+    assert handled is True
+    assert user.tone_preference == "strict"
+    db.flush.assert_awaited_once()
+
+    # strict → gentle on the second tap.
+    await handle_profile_callback(db, callback)
+    assert user.tone_preference == "gentle"
+
+
+@pytest.mark.asyncio
+async def test_toggle_tone_is_noop_when_flag_dark(monkeypatch):
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 12345
+    user.tone_preference = None
+    profile = UserProfile(user_id=user.id)
+    db = MagicMock()
+    db.flush = AsyncMock()
+
+    _wire_callback_fakes(monkeypatch, user, profile)
+    monkeypatch.setattr(
+        "backend.profile.handlers.profile_menu.is_tone_dial_enabled",
+        lambda: False,
+    )
+
+    handled = await handle_profile_callback(
+        db,
+        {
+            "id": "cb-tone",
+            "data": "profile:toggle_tone",
+            "from": {"id": 12345},
+            "message": {"chat": {"id": 42}, "message_id": 99},
+        },
+    )
+
+    assert handled is True
+    assert user.tone_preference is None
+    db.flush.assert_not_awaited()
 
 
 @pytest.mark.asyncio
