@@ -234,8 +234,8 @@ phases:
     name: "Onboarding Reset"
     status: planned
     duration: "~2 tuần"
-    detail_doc: ""
-    issues_doc: ""
+    detail_doc: "docs/current/phase-4.6/phase-4.6-detailed.md"
+    issues_doc: "docs/current/phase-4.6/phase-4.6-issues.md"
     description: "Onboarding cho segment mới (22-35, Level 0→1): decision-first entry (trả lời 1 câu hỏi thật trước khi nhập liệu), độ nét thay forced data entry, salutation + tone phù hợp người trẻ. Tháng 8/2026."
     completed_date: ""
     icon: "🔮"

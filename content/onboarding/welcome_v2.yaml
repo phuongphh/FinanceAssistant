@@ -66,6 +66,12 @@ step_1_goal:
   header: "Bé Tiền hỏi nhanh"
   body: |
     Bạn muốn Bé Tiền giúp gì trước nhất?
+  # Display order for the goal buttons. The handler builds the keyboard from
+  # this list so the goal set is a content concern, not a code branch.
+  order:
+    - understand_wealth
+    - plan_goal
+    - track_spending
   buttons:
     understand_wealth: "🌱 Hiểu rõ tổng tài sản của tôi"
     plan_goal: "🎯 Lên kế hoạch cho mục tiêu lớn"
@@ -78,6 +84,34 @@ step_1_goal:
       Mục tiêu rõ ràng là bước đầu quan trọng nhất — Bé Tiền sẽ đồng hành.
     track_spending: |
       Bé Tiền sẽ giúp bạn thấy tiền đi đâu, không còn mơ hồ.
+
+# Phase 4.6 (Onboarding Reset) — goal question rewritten for the 22-35 /
+# Level 0→1 segment ("thế hệ đang xây"). Rendered instead of ``step_1_goal``
+# when ONBOARDING_RESET_ENABLED is on. The legacy asset-management framing
+# doesn't land for someone still building their first savings, so the options
+# are concrete first-life milestones (quỹ khẩn cấp, mua nhà đầu tiên, cưới).
+# Same callback_prefix + button/goal_acks structure so the handler and
+# analytics stay unchanged; only the copy and goal codes differ.
+step_1_goal_reset:
+  header: "Bé Tiền hỏi nhanh"
+  body: |
+    Điều gì bạn muốn lo cho xong trước nhất về chuyện tiền?
+  order:
+    - emergency_fund
+    - first_home
+    - wedding
+  buttons:
+    emergency_fund: "🛡️ Có quỹ khẩn cấp cho yên tâm"
+    first_home: "🏠 Dành dụm mua nhà đầu tiên"
+    wedding: "💍 Chuẩn bị cho đám cưới"
+  callback_prefix: "onboarding_v2:goal:"
+  goal_acks:
+    emergency_fund: |
+      Quá đúng! Có một khoản phòng thân là bước vững vàng đầu tiên — Bé Tiền đi cùng bạn.
+    first_home: |
+      Mục tiêu lớn và rất đáng! Bé Tiền sẽ giúp bạn thấy con đường tới đó rõ hơn từng tháng.
+    wedding: |
+      Một cột mốc đẹp 💚 Bé Tiền sẽ giúp bạn chuẩn bị mà không áp lực chuyện tiền.
 
 # Step 2 — first asset prompt.
 step_2_asset:

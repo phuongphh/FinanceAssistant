@@ -1,5 +1,11 @@
 # Phase 4.2 Epic 2 — Next Best Action CTA matrix.
-# 3 asset states × 3 onboarding goals. Keep copy short and action-led.
+# 3 asset states × onboarding goals. Keep copy short and action-led.
+#
+# Phase 4.6 (Onboarding Reset) adds the first-life goal codes
+# (emergency_fund / first_home / wedding) alongside the legacy asset-management
+# codes. next_action_service falls back to the understand_wealth cell for any
+# goal missing here, so these rows are additive — never required for safety,
+# but they give the reset cohort copy that matches the goal they picked.
 
 prefix: "💡 Bước tiếp theo dành cho bạn:"
 
@@ -32,6 +38,15 @@ matrix:
     track_spending:
       text: "Thêm tài sản thật để xem chi tiêu match được không."
       button: "add_asset"
+    emergency_fund:
+      text: "Thêm số tiết kiệm thật để Bé Tiền biết bạn đang cách quỹ khẩn cấp bao xa."
+      button: "add_asset"
+    first_home:
+      text: "Thêm tài sản thật để Bé Tiền vẽ đường tới căn nhà đầu tiên."
+      button: "add_asset"
+    wedding:
+      text: "Thêm tài sản thật để Bé Tiền tính giúp bạn chuẩn bị đám cưới."
+      button: "add_asset"
   real_no_income:
     understand_wealth:
       text: "Thêm 1 nguồn thu nhập để dự phóng chính xác hơn."
@@ -42,6 +57,15 @@ matrix:
     track_spending:
       text: "Ghi 1 khoản chi tiêu hôm nay để bắt đầu theo dõi."
       button: "log_expense"
+    emergency_fund:
+      text: "Thêm thu nhập để Bé Tiền biết mỗi tháng bạn dành được bao nhiêu cho quỹ."
+      button: "add_income"
+    first_home:
+      text: "Thêm thu nhập để Bé Tiền tính nhịp tiết kiệm mua nhà khả thi."
+      button: "add_income"
+    wedding:
+      text: "Thêm thu nhập để Bé Tiền tính giúp bạn dành dụm cho đám cưới."
+      button: "add_income"
   real_with_income:
     understand_wealth:
       text: "Đặt 1 mục tiêu lớn như mua nhà, nghỉ hưu, quỹ dự phòng."
@@ -52,3 +76,12 @@ matrix:
     track_spending:
       text: "Ghi 1 khoản chi tiêu để Bé Tiền học pattern của bạn."
       button: "log_expense"
+    emergency_fund:
+      text: "Đặt mục tiêu quỹ khẩn cấp — Bé Tiền sẽ track cùng bạn từng tháng."
+      button: "set_goal"
+    first_home:
+      text: "Đặt mục tiêu mua nhà — Bé Tiền sẽ theo dõi tiến độ cùng bạn."
+      button: "set_goal"
+    wedding:
+      text: "Đặt mục tiêu đám cưới — Bé Tiền sẽ track cùng bạn cho nhẹ đầu."
+      button: "set_goal"
