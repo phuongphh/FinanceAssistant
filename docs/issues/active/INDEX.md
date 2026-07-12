@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #961 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [issue-961.md](issue-961.md) |
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
-| #982 | [Phase 4.6][E1] Onboarding Goal Reset — first-life goals cho segment 22-35 | [issue-982.md](issue-982.md) |
 | #984 | [Phase 4.6][E2] Sửa đường rơi "chưa từng kích hoạt" — first-message tự nổ + đo tỉ lệ kích hoạt | [issue-984.md](issue-984.md) |
 
-**Total active:** 15
+**Total active:** 14

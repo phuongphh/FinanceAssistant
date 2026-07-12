@@ -496,6 +496,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
 | #979 | Phase 4 | [Phase 4.5 / E5] 5.1 — decision_query_log model + ghi log | [phase-4/issue-979.md](by-phase/phase-4/issue-979.md) |
 | #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
+| #982 | Phase 4 | [Phase 4.6][E1] Onboarding Goal Reset — first-life goals cho segment 22-35 | [phase-4/issue-982.md](by-phase/phase-4/issue-982.md) |
 
-**Total:** 492 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 18 Phase 4, 457 Pre-Phase)
+**Total:** 493 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 19 Phase 4, 457 Pre-Phase)
