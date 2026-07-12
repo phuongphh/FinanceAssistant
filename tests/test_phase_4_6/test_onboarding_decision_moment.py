@@ -176,11 +176,15 @@ def test_answer_already_reached_celebrates_without_a_countdown():
     # Start already at/above target → already_reached shape.
     result = assess(cfg.target_vnd, cfg.target_vnd, cfg.horizon_years, Decimal(0))
     assert result.already_reached
+    from backend.bot.formatters.money import format_money_short
+
     text = onboarding_decision.render_answer(result, cfg, _clarity(), salutation="anh")
     assert "anh" in text
     # ``months`` is the horizon fallback here — must NOT be phrased as a
     # remaining countdown ("còn X tháng") for someone who is already there.
     assert f"{result.months} tháng" not in text
+    # But the answer still carries one real number: the milestone just cleared.
+    assert format_money_short(cfg.target_vnd) in text
     assert "{" not in text and "}" not in text
 
 
@@ -205,9 +209,12 @@ def test_answer_building_when_saving_but_short():
 
     text = onboarding_decision.render_answer(result, cfg, _clarity(), salutation="chị")
     assert format_money_short(result.reachable_target) in text
-    # Exactly one goal number: the reachable amount. The real milestone lives in
-    # the question, so it must NOT be repeated here (keeps the one-number promise).
+    # One money number: the reachable amount. The original milestone lives in the
+    # question, so it must NOT be repeated here (keeps the one-number promise).
     assert format_money_short(cfg.target_vnd) not in text
+    # …but the reachable figure is a projection over the horizon, so the {years}
+    # window it's measured against must appear to keep the number unambiguous.
+    assert onboarding_decision._format_years(cfg.horizon_years) in text
 
 
 def test_answer_direction_when_no_saving_signal():

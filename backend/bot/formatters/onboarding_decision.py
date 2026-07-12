@@ -119,10 +119,12 @@ def render_answer(
     if result.already_reached:
         # ``months`` here is the horizon fallback (the finished projection has no
         # ``months_remaining``), so never phrase it as "còn X tháng" — celebrate
-        # instead of inventing a countdown.
+        # instead of inventing a countdown. Keep the milestone {target} the user
+        # just cleared so the answer still carries one real number.
         body = answers.get("already_reached", "").format(
             salutation=salutation,
             goal_label=label,
+            target=target,
         )
     elif result.band in _ACHIEVABLE_BANDS:
         body = answers.get("on_track", "").format(
@@ -131,11 +133,13 @@ def render_answer(
             goal_label=label,
         )
     elif result.actual_monthly_savings > 0 and result.reachable_target is not None:
-        # Exactly one number: the amount the user is trending toward. The real
-        # milestone lives in the question above — repeating it here would turn
-        # the moment into a mini feasibility report.
+        # One money number: the amount the user is trending toward. Pair it with
+        # the {years} horizon that number is projected over — without the window
+        # the "reachable" figure is ambiguous. We still skip the original target
+        # here so the moment stays a nudge, not a mini feasibility report.
         body = answers.get("building", "").format(
             reachable=format_money_short(result.reachable_target),
+            years=_format_years(config.horizon_years),
             salutation=salutation,
             goal_label=label,
         )
@@ -170,6 +174,14 @@ def _render_clarity(clarity: ClarityResult, *, salutation: str) -> str:
     return cl.get("above", "").format(
         salutation=salutation, score=clarity.score, sharpen_tail=tail
     )
+
+
+def _format_years(horizon_years: Decimal) -> str:
+    """Render the horizon as "5 năm" / "5.5 năm", dropping a trailing ``.0``."""
+    years = Decimal(horizon_years)
+    if years == years.to_integral_value():
+        return f"{int(years)} năm"
+    return f"{years.normalize()} năm"
 
 
 def _join(*parts: str) -> str:
