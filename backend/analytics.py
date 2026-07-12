@@ -84,6 +84,14 @@ class EventType:
     # Phase 4A — Financial Twin weekly batch metrics.
     TWIN_WEEKLY_RUN = "twin_weekly_run"
 
+    # Phase 4.6 Epic 2 — activation-nudge funnel ("chưa từng kích hoạt").
+    # ``ACTIVATION_NUDGE_SENT`` is the "first-message-fired" signal (Bé Tiền
+    # reached out first); ``ACTIVATION_FIRST_REPLY`` is the "user-first-reply"
+    # signal (a nudged user sent their first message back). Activation rate =
+    # first_reply / nudge_sent over the new cohort.
+    ACTIVATION_NUDGE_SENT = "activation_nudge_sent"
+    ACTIVATION_FIRST_REPLY = "activation_first_reply"
+
 
 @dataclass
 class Event_:  # noqa: N801 — underscore suffix avoids clash with ORM `Event`

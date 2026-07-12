@@ -46,7 +46,25 @@ DEFAULT_SALUTATION = SALUTATION_BAN
 GOAL_UNDERSTAND_WEALTH = "understand_wealth"
 GOAL_PLAN_GOAL = "plan_goal"
 GOAL_TRACK_SPENDING = "track_spending"
-ALL_GOALS = (GOAL_UNDERSTAND_WEALTH, GOAL_PLAN_GOAL, GOAL_TRACK_SPENDING)
+
+# Phase 4.6 (Onboarding Reset) — first-life goal codes for the 22-35 /
+# Level 0→1 segment. The v2 asset-management framing ("understand my total
+# wealth") does not speak to someone still building their first savings, so
+# the reset flow offers concrete first-life milestones instead. Gated behind
+# ``ONBOARDING_RESET_ENABLED`` (default off); the old codes stay in
+# ``ALL_GOALS`` so already-onboarded users and analytics keep resolving.
+GOAL_EMERGENCY_FUND = "emergency_fund"
+GOAL_FIRST_HOME = "first_home"
+GOAL_WEDDING = "wedding"
+
+# Legacy asset-management goal set (v2, kept for backward compatibility).
+LEGACY_GOALS = (GOAL_UNDERSTAND_WEALTH, GOAL_PLAN_GOAL, GOAL_TRACK_SPENDING)
+# First-life goal set surfaced by the reset onboarding.
+RESET_GOALS = (GOAL_EMERGENCY_FUND, GOAL_FIRST_HOME, GOAL_WEDDING)
+# Union of every goal code that may be persisted on ``goal_choice``. Keep
+# ``understand_wealth`` first: downstream fallbacks (next_action matrix) and
+# ``next(iter(ALL_GOALS))`` in tests rely on it as the default.
+ALL_GOALS = LEGACY_GOALS + RESET_GOALS
 
 # Wealth segments — inferred from first asset value (not self-reported).
 SEGMENT_STARTER = "starter"

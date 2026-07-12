@@ -32,8 +32,12 @@ from backend.analytics import EventType
 from backend.bot.formatters.tone import resolve_tone
 from backend.bot.personality import empathy_engine
 from backend.database import get_session_factory
-from backend.intent.handlers.decision_flags import is_tone_dial_enabled
+from backend.intent.handlers.decision_flags import (
+    is_activation_nudge_enabled,
+    is_tone_dial_enabled,
+)
 from backend.jobs._active_users import get_active_users
+from backend.models.event import Event
 from backend.models.user import User
 from backend.services.telegram_service import send_message
 
@@ -71,6 +75,41 @@ def _proactive_companion_enabled() -> bool:
         "no",
         "off",
     )
+
+
+async def _get_activation_candidates(
+    db: AsyncSession, *, now: datetime
+) -> list[User]:
+    """Users who opened the bot recently but never activated.
+
+    The ``never_activated`` trigger targets the "0 tin nhắn" cohort — users
+    with a ``bot_started`` event who never logged an expense, so they're
+    invisible to ``get_active_users``. We pull anyone who opened the bot
+    inside the trigger's window and hasn't finished onboarding; the engine's
+    own window / activation / cooldown checks decide whether the nudge
+    actually fires.
+
+    Bounded to the trigger's window (``ACTIVATION_NUDGE_MAX_DAYS``) via the
+    ``bot_started`` timestamp so we never scan the whole table.
+    """
+    since = now - timedelta(days=empathy_engine.ACTIVATION_NUDGE_MAX_DAYS)
+    started_user_ids = (
+        select(Event.user_id)
+        .where(
+            Event.event_type == EventType.BOT_STARTED,
+            Event.timestamp >= since,
+            Event.user_id.isnot(None),
+        )
+        .distinct()
+    )
+    stmt = select(User).where(
+        User.id.in_(started_user_ids),
+        User.onboarding_completed_at.is_(None),
+        User.deleted_at.is_(None),
+        User.is_active.is_(True),
+        User.telegram_id.isnot(None),
+    )
+    return list((await db.execute(stmt)).scalars())
 
 
 async def _get_onboarded_candidates(
@@ -118,17 +157,23 @@ async def run_hourly_empathy_check(now: datetime | None = None) -> None:
         return
 
     proactive_on = _proactive_companion_enabled()
+    activation_on = is_activation_nudge_enabled()
 
     session_factory = get_session_factory()
     async with session_factory() as db:
         users = await get_active_users(db, days=ACTIVE_WINDOW_DAYS)
-        # When the proactive companion is on, fold in recently-onboarded
-        # users who have no expense yet — they're invisible to
-        # get_active_users but are the target of onboarding_no_twin_return.
-        if proactive_on:
+        # Fold in users who are invisible to get_active_users (no expense
+        # yet) but are the target of a proactive trigger:
+        #   - proactive companion → recently-onboarded, drifted-after-WOW.
+        #   - activation nudge → opened the bot but never activated.
+        if proactive_on or activation_on:
             by_id = {u.id: u for u in users}
-            for u in await _get_onboarded_candidates(db, now=now_utc):
-                by_id.setdefault(u.id, u)
+            if proactive_on:
+                for u in await _get_onboarded_candidates(db, now=now_utc):
+                    by_id.setdefault(u.id, u)
+            if activation_on:
+                for u in await _get_activation_candidates(db, now=now_utc):
+                    by_id.setdefault(u.id, u)
             users = list(by_id.values())
 
     logger.info("empathy-check: scanning %d candidate users", len(users))
@@ -160,7 +205,11 @@ async def _process_user(user: User, *, now: datetime) -> None:
             return
 
         trigger = await empathy_engine.check_all_triggers(
-            db, user, now=now, include_proactive=_proactive_companion_enabled()
+            db,
+            user,
+            now=now,
+            include_proactive=_proactive_companion_enabled(),
+            include_activation_nudge=is_activation_nudge_enabled(),
         )
         if not trigger:
             return
@@ -192,8 +241,16 @@ async def _process_user(user: User, *, now: datetime) -> None:
         await empathy_engine.record_fired(db, user.id, trigger.name, now=now)
         await db.commit()
 
+        # The activation nudge feeds a dedicated funnel (E2 #2.2:
+        # first-message-fired vs user-first-reply); everything else stays on
+        # the generic EMPATHY_SENT stream so the two don't co-mingle.
+        sent_event = (
+            EventType.ACTIVATION_NUDGE_SENT
+            if trigger.name == "never_activated"
+            else EventType.EMPATHY_SENT
+        )
         analytics.track(
-            EventType.EMPATHY_SENT,
+            sent_event,
             user_id=user.id,
             properties={"trigger": trigger.name},
         )

@@ -294,7 +294,9 @@ async def test_job_passes_include_proactive_into_check_all_triggers(monkeypatch)
     async def fake_count(*_a, **_k):
         return 0
 
-    async def fake_check(db, user, *, now=None, include_proactive=True):
+    async def fake_check(
+        db, user, *, now=None, include_proactive=True, include_activation_nudge=False
+    ):
         captured["include_proactive"] = include_proactive
         return None  # short-circuits the rest of _process_user
 

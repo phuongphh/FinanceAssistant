@@ -162,6 +162,74 @@ def is_trust_card_enabled() -> bool:
     )
 
 
+ONBOARDING_RESET_FLAG_ENV = "ONBOARDING_RESET_ENABLED"
+
+
+def is_onboarding_reset_enabled() -> bool:
+    """Phase 4.6 goal reset for the 22-35 / Level 0→1 segment is OFF by default.
+
+    When on, the goal question renders the first-life goal set
+    (``step_1_goal_reset``: quỹ khẩn cấp / mua nhà đầu tiên / cưới) instead of
+    the legacy asset-management set (``step_1_goal``). It ships dark so the
+    operator can flip it on once the reset copy is validated; existing users
+    mid-onboarding are unaffected because goal codes are stored, not the copy.
+    Read at the handler edge and never inside a service (layer contract),
+    same pattern as ``is_v2_enabled`` / ``is_trust_card_enabled``.
+    """
+    import os
+
+    return os.environ.get(ONBOARDING_RESET_FLAG_ENV, "false").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+# Fallback display order for the goal buttons when the content block omits an
+# explicit ``order`` list (legacy ``step_1_goal`` predates the key).
+_DEFAULT_GOAL_ORDER = ("understand_wealth", "plan_goal", "track_spending")
+
+
+def _goal_step_copy(copy: dict) -> dict:
+    """Return the goal-question copy block for the active onboarding variant.
+
+    Reset flow → ``step_1_goal_reset`` (falls back to ``step_1_goal`` if the
+    reset block is somehow absent so the flag can never strand a user without
+    a goal question). Legacy flow → ``step_1_goal``.
+    """
+    if is_onboarding_reset_enabled() and copy.get("step_1_goal_reset"):
+        return copy["step_1_goal_reset"]
+    return copy["step_1_goal"]
+
+
+# Copy blocks that can hold a goal ack, active variant first. Ack resolution
+# scans these by *content* (which block owns the goal code) rather than by the
+# current flag value.
+_GOAL_COPY_BLOCKS = ("step_1_goal_reset", "step_1_goal")
+
+
+def _goal_ack_for(copy: dict, goal_code: str) -> str:
+    """Resolve the ack copy for ``goal_code`` from the block that owns it.
+
+    The goal code on the callback comes from the keyboard the user was *shown*,
+    which may predate a flag flip. If ``ONBOARDING_RESET_ENABLED`` is toggled
+    while a user sits on an already-sent keyboard, reading the ack from the
+    flag's *current* variant would look in the wrong block (legacy codes are
+    absent from reset ``goal_acks`` and vice versa), yield an empty ack, skip
+    the message edit, and strand the old buttons on screen. Scanning by content
+    keeps the ack correct across the rollout/rollback window.
+    """
+    for block_key in _GOAL_COPY_BLOCKS:
+        block = copy.get(block_key)
+        if not block:
+            continue
+        ack = block.get("goal_acks", {}).get(goal_code)
+        if ack:
+            return ack
+    return ""
+
+
 # ---------- Entry: /start with optional invite token -----------------
 
 
@@ -357,29 +425,19 @@ async def _send_welcome_and_goal(db: AsyncSession, chat_id: int, user: User) -> 
 
 async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> None:
     copy = onboarding_service.load_copy()
-    step = copy["step_1_goal"]
+    step = _goal_step_copy(copy)
     prefix = step["callback_prefix"]
     text = f"<b>{step['header']}</b>\n\n{step['body']}"
+    # Build the keyboard from the content ``order`` list so the goal set is a
+    # content + flag concern rather than a hardcoded branch — one button per
+    # row (matches the salutation keyboard layout).
+    order = step.get("order") or _DEFAULT_GOAL_ORDER
+    buttons = step["buttons"]
     keyboard = {
         "inline_keyboard": [
-            [
-                {
-                    "text": step["buttons"]["understand_wealth"],
-                    "callback_data": f"{prefix}understand_wealth",
-                }
-            ],
-            [
-                {
-                    "text": step["buttons"]["plan_goal"],
-                    "callback_data": f"{prefix}plan_goal",
-                }
-            ],
-            [
-                {
-                    "text": step["buttons"]["track_spending"],
-                    "callback_data": f"{prefix}track_spending",
-                }
-            ],
+            [{"text": buttons[code], "callback_data": f"{prefix}{code}"}]
+            for code in order
+            if code in buttons
         ]
     }
     await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
@@ -507,7 +565,7 @@ async def _on_goal_picked(
     await answer_callback(callback_id)
 
     copy = onboarding_service.load_copy()
-    ack = copy["step_1_goal"]["goal_acks"].get(goal_code, "")
+    ack = _goal_ack_for(copy, goal_code)
     if message_id is not None and ack:
         try:
             await edit_message_text(
