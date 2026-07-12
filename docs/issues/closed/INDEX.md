@@ -500,6 +500,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #984 | Phase 4 | [Phase 4.6][E2] Sửa đường rơi "chưa từng kích hoạt" — first-message tự nổ + đo tỉ lệ kích hoạt | [phase-4/issue-984.md](by-phase/phase-4/issue-984.md) |
 | #985 | Phase 4 | [Phase 4.6][E3] Decision Moment trong onboarding — 1 câu hỏi gắn goal + đúng 1 con số + độ nét thành thật | [phase-4/issue-985.md](by-phase/phase-4/issue-985.md) |
 | #987 | Pre-Phase | Phase 4.6 E3 — decision-moment review follow-ups (already-reached copy, savepoint isolation, demo gate, one-number building) | [pre-phase/issue-987.md](by-phase/pre-phase/issue-987.md) |
+| #989 | Phase 4 | [Phase 4.6][E4] Instrumentation cohort mới → Admin dashboard — cohort tag + chart decision adoption | [phase-4/issue-989.md](by-phase/phase-4/issue-989.md) |
 
-**Total:** 496 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 21 Phase 4, 458 Pre-Phase)
+**Total:** 497 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 22 Phase 4, 458 Pre-Phase)
