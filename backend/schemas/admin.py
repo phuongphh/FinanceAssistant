@@ -167,6 +167,25 @@ class CohortRetentionResponse(BaseModel):
     cohorts: list[CohortRetentionRow]
 
 
+class DecisionAdoptionPoint(BaseModel):
+    week: date
+    interactions: int
+    active_users: int
+    interactions_per_user: float
+    avg_clarity: float | None = None
+
+
+class DecisionAdoptionCohort(BaseModel):
+    cohort: str
+    label: str
+    points: list[DecisionAdoptionPoint]
+
+
+class DecisionAdoptionResponse(BaseModel):
+    weeks: list[date]
+    cohorts: list[DecisionAdoptionCohort]
+
+
 class LicenseSummaryBucket(BaseModel):
     key: str
     count: int

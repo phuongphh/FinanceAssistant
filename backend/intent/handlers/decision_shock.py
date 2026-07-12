@@ -49,7 +49,11 @@ from backend.intent.handlers.decision_flags import (
 from backend.intent.intents import IntentResult
 from backend.models.decision_query_log import QUERY_TYPE_SHOCK
 from backend.models.user import User
-from backend.services.decision import clarity_service, decision_query_log_service
+from backend.services.decision import (
+    clarity_service,
+    cohort_service,
+    decision_query_log_service,
+)
 from backend.services.decision.liquidation_advisor import rank_options
 from backend.services.decision.shock_simulation_service import simulate_shock
 from backend.twin.services.twin_projection_service import load_portfolio_snapshot
@@ -73,6 +77,9 @@ class DecisionShockHandler(IntentHandler):
             return await AdvisoryHandler().handle(intent, user, db)
 
         answer, success, clarity_score = await self._answer(intent, user, db)
+        # Phase 4.6 E4 — tag the row with the onboarding cohort so the admin
+        # chart can split the new first-life segment from the legacy cohort.
+        cohort = await cohort_service.resolve_user_cohort(db, user.id)
         # E5 #5.1 — one append-only row per handled query, including the
         # clarify/empty/confirm turns that never reach a verdict (success=False).
         await decision_query_log_service.log_query(
@@ -81,6 +88,7 @@ class DecisionShockHandler(IntentHandler):
             query_type=QUERY_TYPE_SHOCK,
             success=success,
             clarity_score=clarity_score,
+            cohort=cohort,
         )
         return answer
 

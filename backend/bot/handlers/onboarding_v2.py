@@ -1212,6 +1212,7 @@ async def _send_decision_moment(db: AsyncSession, chat_id: int, user: User) -> N
     """
     from backend.bot.formatters import onboarding_decision
     from backend.models.decision_query_log import QUERY_TYPE_FEASIBILITY
+    from backend.models.onboarding_session import cohort_for_goal
     from backend.services.decision import (
         clarity_service,
         decision_query_log_service,
@@ -1257,13 +1258,16 @@ async def _send_decision_moment(db: AsyncSession, chat_id: int, user: User) -> N
 
             # Append-only funnel row. Onboarding always lands a verdict (there
             # is no clarify turn), so success is always True; clarity_score
-            # threads the độ nét through for the E4 dashboard.
+            # threads the độ nét through for the E4 dashboard, and the cohort
+            # tag (free from the session goal) lets the chart split the new
+            # first-life segment from the legacy cohort.
             await decision_query_log_service.log_query(
                 db,
                 user_id=user.id,
                 query_type=QUERY_TYPE_FEASIBILITY,
                 success=True,
                 clarity_score=clarity.score,
+                cohort=cohort_for_goal(session.goal_choice),
             )
 
         # Pure telemetry — outside the savepoint so a tracking hiccup can never
