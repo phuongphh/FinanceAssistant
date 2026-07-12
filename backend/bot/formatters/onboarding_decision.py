@@ -115,22 +115,33 @@ def render_answer(
     label = config.goal_label
     label_cap = (label[:1].upper() + label[1:]) if label else label
     target = format_money_short(config.target_vnd)
-    years = _format_years(config.horizon_years)
 
-    if result.already_reached or result.band in _ACHIEVABLE_BANDS:
+    if result.already_reached:
+        # ``months`` here is the horizon fallback (the finished projection has no
+        # ``months_remaining``), so never phrase it as "còn X tháng" — celebrate
+        # instead of inventing a countdown. Keep the milestone {target} the user
+        # just cleared so the answer still carries one real number.
+        body = answers.get("already_reached", "").format(
+            salutation=salutation,
+            goal_label=label,
+            target=target,
+        )
+    elif result.band in _ACHIEVABLE_BANDS:
         body = answers.get("on_track", "").format(
             months=result.months,
             salutation=salutation,
             goal_label=label,
         )
     elif result.actual_monthly_savings > 0 and result.reachable_target is not None:
+        # One money number: the amount the user is trending toward. Pair it with
+        # the {years} horizon that number is projected over — without the window
+        # the "reachable" figure is ambiguous. We still skip the original target
+        # here so the moment stays a nudge, not a mini feasibility report.
         body = answers.get("building", "").format(
             reachable=format_money_short(result.reachable_target),
-            years=years,
+            years=_format_years(config.horizon_years),
             salutation=salutation,
             goal_label=label,
-            goal_label_cap=label_cap,
-            target=target,
         )
     else:
         # No saving-rate signal (the common onboarding case) → don't invent a
@@ -166,7 +177,7 @@ def _render_clarity(clarity: ClarityResult, *, salutation: str) -> str:
 
 
 def _format_years(horizon_years: Decimal) -> str:
-    """ "5 năm" / "5.5 năm" — drop the trailing ``.0`` for whole years."""
+    """Render the horizon as "5 năm" / "5.5 năm", dropping a trailing ``.0``."""
     years = Decimal(horizon_years)
     if years == years.to_integral_value():
         return f"{int(years)} năm"

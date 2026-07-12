@@ -61,6 +61,27 @@ def _user(salutation: str = "bạn"):
     )
 
 
+class _FakeSavepoint:
+    """Async-CM stand-in for ``AsyncSession.begin_nested()`` — the handler wraps
+    its best-effort DB work in a SAVEPOINT, so the fake session must yield one.
+    Propagates exceptions (returns False) exactly like the real savepoint."""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+class _FakeSession:
+    """Minimal ``AsyncSession`` duck for the handler tests — the DB reads/writes
+    are all monkeypatched, so the only method the handler calls on it directly is
+    ``begin_nested()``."""
+
+    def begin_nested(self):
+        return _FakeSavepoint()
+
+
 def _clarity(
     *,
     assets: int = 0,
@@ -150,14 +171,21 @@ def test_render_question_threads_salutation(code, salutation):
 # ----- answer: three honest shapes, always one number ----------------------
 
 
-def test_answer_on_track_when_already_reached():
+def test_answer_already_reached_celebrates_without_a_countdown():
     cfg = onboarding_decision.goal_config("emergency_fund")
-    # Start already at/above target → already_reached → on_track shape.
+    # Start already at/above target → already_reached shape.
     result = assess(cfg.target_vnd, cfg.target_vnd, cfg.horizon_years, Decimal(0))
     assert result.already_reached
+    from backend.bot.formatters.money import format_money_short
+
     text = onboarding_decision.render_answer(result, cfg, _clarity(), salutation="anh")
     assert "anh" in text
-    assert str(result.months) in text
+    # ``months`` is the horizon fallback here — must NOT be phrased as a
+    # remaining countdown ("còn X tháng") for someone who is already there.
+    assert f"{result.months} tháng" not in text
+    # But the answer still carries one real number: the milestone just cleared.
+    assert format_money_short(cfg.target_vnd) in text
+    assert "{" not in text and "}" not in text
 
 
 def test_answer_on_track_when_band_achievable():
@@ -181,8 +209,12 @@ def test_answer_building_when_saving_but_short():
 
     text = onboarding_decision.render_answer(result, cfg, _clarity(), salutation="chị")
     assert format_money_short(result.reachable_target) in text
-    # Still references the real milestone so the user keeps the north star.
-    assert format_money_short(cfg.target_vnd) in text
+    # One money number: the reachable amount. The original milestone lives in the
+    # question, so it must NOT be repeated here (keeps the one-number promise).
+    assert format_money_short(cfg.target_vnd) not in text
+    # …but the reachable figure is a projection over the horizon, so the {years}
+    # window it's measured against must appear to keep the number unambiguous.
+    assert onboarding_decision._format_years(cfg.horizon_years) in text
 
 
 def test_answer_direction_when_no_saving_signal():
@@ -314,7 +346,7 @@ async def test_send_decision_moment_sends_question_answer_and_logs(monkeypatch):
     monkeypatch.setattr(onboarding_v2, "send_message", _send)
     monkeypatch.setattr(onboarding_v2.analytics, "track", _track)
 
-    await onboarding_v2._send_decision_moment(object(), chat_id=42, user=user)
+    await onboarding_v2._send_decision_moment(_FakeSession(), chat_id=42, user=user)
 
     # Exactly the question then the answer, both in the user's salutation.
     assert len(sent) == 2
@@ -350,7 +382,7 @@ async def test_send_decision_moment_noop_without_session(monkeypatch):
     monkeypatch.setattr(onboarding_v2, "send_message", _send)
     monkeypatch.setattr(onboarding_v2.analytics, "track", lambda *a, **k: None)
 
-    await onboarding_v2._send_decision_moment(object(), chat_id=42, user=_user())
+    await onboarding_v2._send_decision_moment(_FakeSession(), chat_id=42, user=_user())
     assert sent == []
 
 
@@ -368,5 +400,5 @@ async def test_send_decision_moment_is_best_effort(monkeypatch):
     monkeypatch.setattr(onboarding_v2, "send_message", lambda *a, **k: None)
     monkeypatch.setattr(onboarding_v2.analytics, "track", lambda *a, **k: None)
 
-    # Must not raise.
-    await onboarding_v2._send_decision_moment(object(), chat_id=42, user=_user())
+    # Must not raise — the savepoint rolls back and the wrapper swallows.
+    await onboarding_v2._send_decision_moment(_FakeSession(), chat_id=42, user=_user())

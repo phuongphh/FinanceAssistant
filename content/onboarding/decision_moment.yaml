@@ -34,10 +34,16 @@ decision_moment:
     target_vnd: 100000000
     horizon_years: 3
   answers:
+    # already_reached — số dư đã chạm/vượt mốc: KHÔNG nói "còn X tháng" (số tháng
+    # chỉ là horizon fallback, không phải thời gian thật), nhưng vẫn giữ 1 con số
+    # mục tiêu = mốc {target} vừa chạm, để câu trả lời không mất con số.
+    already_reached: "Ủa xịn ghê — {salutation} đã đủ mốc {target} cho {goal_label} rồi đó! 🎉 Giờ mình cùng nhắm cột mốc kế tiếp thôi nha."
     # on_track — đủ dữ liệu, đang trên đà: 1 con số = số tháng.
     on_track: "Tin vui nè: với nhịp này, khoảng {months} tháng nữa là {salutation} chạm {goal_label} rồi 🎯"
-    # building — có tiết kiệm nhưng còn chặng dài: 1 con số = mức đang trên đà tới.
-    building: "Với nhịp hiện tại, {salutation} đang trên đà tới khoảng {reachable} trong {years}. {goal_label_cap} thường quanh {target} — mình đi từng bước là tới thôi 💪"
+    # building — có tiết kiệm nhưng còn chặng dài: 1 con số tiền = mức đang trên đà
+    # tới, KÈM mốc thời gian {years} để con số đó không mơ hồ (nó là dự phóng cho
+    # cả horizon). Vẫn KHÔNG lặp lại target gốc → không thành báo cáo mini.
+    building: "Với nhịp hiện tại, trong {years} tới {salutation} đang trên đà chạm khoảng {reachable} cho {goal_label} — cứ đi từng bước là tới thôi 💪"
     # direction — dữ liệu còn mỏng (chưa thấy nhịp tiết kiệm): 1 con số = mốc tham chiếu.
     direction: "{goal_label_cap} thường quanh mức {target}. Nhịp tiết kiệm của {salutation} mình chưa nhìn ra, nên đây mới là điểm khởi đầu thôi — mà hướng đi thì đã rõ rồi ✨"
   clarity:
