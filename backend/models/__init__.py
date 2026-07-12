@@ -59,6 +59,8 @@ from backend.models.license import (
 )
 from backend.models.onboarding_session import (
     ALL_GOALS,
+    COHORT_LEGACY,
+    COHORT_RESET,
     GOAL_EMERGENCY_FUND,
     GOAL_FIRST_HOME,
     GOAL_PLAN_GOAL,
@@ -67,6 +69,7 @@ from backend.models.onboarding_session import (
     GOAL_WEDDING,
     LEGACY_GOALS,
     RESET_GOALS,
+    cohort_for_goal,
     SEGMENT_HNW,
     SEGMENT_MASS_AFFLUENT,
     SEGMENT_STARTER,
@@ -174,6 +177,9 @@ __all__ = [
     "LEGACY_GOALS",
     "RESET_GOALS",
     "ALL_GOALS",
+    "COHORT_RESET",
+    "COHORT_LEGACY",
+    "cohort_for_goal",
     "SEGMENT_STARTER",
     "SEGMENT_YOUNG_PRO",
     "SEGMENT_MASS_AFFLUENT",

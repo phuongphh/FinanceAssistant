@@ -14,6 +14,7 @@ from backend.database import get_db
 from backend.models.admin_user import AdminUser
 from backend.models.agent_audit_log import AgentAuditLog
 from backend.models.cost_budget import LLMCostLog
+from backend.models.decision_query_log import DecisionQueryLog
 from backend.models.event import Event
 from backend.models.feature_event import FeatureEvent
 from backend.models.portfolio_asset import PortfolioAsset
@@ -21,6 +22,7 @@ from backend.models.user import User
 from backend.schemas.admin import (
     CohortRetentionResponse,
     DauChartResponse,
+    DecisionAdoptionResponse,
     FeatureClicksResponse,
     IntentBreakdownResponse,
     OverviewStatsResponse,
@@ -46,6 +48,15 @@ INTENT_LABELS = {
     "rule": "Rule-based (zero cost)",
     "llm_classifier": "LLM classified",
     "clarification": "Cần clarify",
+}
+# Onboarding cohort of the decision-adoption chart. ``unattributed`` buckets the
+# NULL-cohort rows (pre-4.6 logs + users who never chose an onboarding goal).
+# Ordered so the new first-life segment reads first, legacy second.
+COHORT_UNATTRIBUTED = "unattributed"
+DECISION_COHORT_LABELS = {
+    "reset": "Segment mới (reset)",
+    "legacy": "Cohort cũ (legacy)",
+    COHORT_UNATTRIBUTED: "Chưa gắn cohort",
 }
 DEFAULT_TENANT_ID = 1
 
@@ -352,4 +363,87 @@ async def cohort_retention(
         out.append({"cohort_week": cohort_week, "cohort_size": size, "retention": retention})
     response = {"cohorts": out}
     await cache_set(key, response, 86400)
+    return response
+
+
+@router.get("/charts/decision-adoption", response_model=DecisionAdoptionResponse)
+async def decision_adoption(
+    weeks: int = Query(default=8, ge=1, le=26),
+    admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Weekly Decision-Engine adoption, split by onboarding cohort.
+
+    Reads the append-only ``decision_query_logs`` (Phase 4.5) tagged with the
+    onboarding cohort in #4.1, and reports per week × cohort: interactions (row
+    count), active users (distinct ``user_id``), interactions/user, and the
+    average độ nét. Feeds gates G1/G2 — does the new first-life ``reset`` segment
+    engage the decision surfaces differently from the ``legacy`` cohort?
+
+    Output is aggregate-only (counts + averages) so no PII ever leaves the
+    query; tenant isolation and JWT auth match the other admin charts.
+    """
+    tenant_id = _admin_tenant_id(admin)
+    key = f"admin:tenant:{tenant_id}:charts:decision-adoption:{weeks}"
+    cached = await cache_get(key)
+    if cached is not None:
+        return cached
+
+    today = datetime.now(VN_TZ).date()
+    current_week = today - timedelta(days=today.weekday())
+    first_week = current_week - timedelta(weeks=weeks - 1)
+    start_dt = datetime.combine(first_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+    week_list = [first_week + timedelta(weeks=offset) for offset in range(weeks)]
+
+    week_col = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", DecisionQueryLog.created_at)), Date)
+    cohort_col = func.coalesce(DecisionQueryLog.cohort, COHORT_UNATTRIBUTED)
+    rows = (
+        await db.execute(
+            select(
+                week_col.label("week"),
+                cohort_col.label("cohort"),
+                func.count().label("interactions"),
+                func.count(func.distinct(DecisionQueryLog.user_id)).label("active_users"),
+                func.avg(DecisionQueryLog.clarity_score).label("avg_clarity"),
+            )
+            .where(_tenant_filter(DecisionQueryLog, tenant_id), DecisionQueryLog.created_at >= start_dt)
+            .group_by(week_col, cohort_col)
+        )
+    ).all()
+
+    # (cohort, week) -> metrics, so we can emit a dense series per cohort.
+    by_cohort: dict[str, dict[date, dict]] = defaultdict(dict)
+    for row in rows:
+        interactions = int(row.interactions)
+        active_users = int(row.active_users)
+        by_cohort[row.cohort][row.week] = {
+            "week": row.week,
+            "interactions": interactions,
+            "active_users": active_users,
+            "interactions_per_user": round(interactions / active_users, 2) if active_users else 0.0,
+            "avg_clarity": round(float(row.avg_clarity), 1) if row.avg_clarity is not None else None,
+        }
+
+    cohorts = []
+    for cohort, label in DECISION_COHORT_LABELS.items():
+        weeks_seen = by_cohort.get(cohort)
+        if not weeks_seen:
+            continue  # skip a cohort with zero interactions in the window
+        points = [
+            weeks_seen.get(
+                week,
+                {
+                    "week": week,
+                    "interactions": 0,
+                    "active_users": 0,
+                    "interactions_per_user": 0.0,
+                    "avg_clarity": None,
+                },
+            )
+            for week in week_list
+        ]
+        cohorts.append({"cohort": cohort, "label": label, "points": points})
+
+    response = {"weeks": week_list, "cohorts": cohorts}
+    await cache_set(key, response, 1800)
     return response

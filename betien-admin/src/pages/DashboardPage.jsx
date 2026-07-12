@@ -26,6 +26,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -41,6 +43,7 @@ import TwinDashboard from './TwinDashboard/TwinDashboard';
 import {
   changeUserStatus,
   getCohortRetention,
+  getDecisionAdoption,
   getDau,
   getFeatureClicks,
   getIntentBreakdown,
@@ -104,6 +107,7 @@ function DashboardContent() {
   const [intentBreakdown, setIntentBreakdown] = useState([]);
   const [userTiers, setUserTiers] = useState([]);
   const [cohorts, setCohorts] = useState([]);
+  const [decisionAdoption, setDecisionAdoption] = useState({ weeks: [], cohorts: [] });
   const [licenseSummary, setLicenseSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -115,7 +119,7 @@ function DashboardContent() {
       setError('');
       try {
         const days = selectedRange.days;
-        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload, licensePayload] = await Promise.all([
+        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload, decisionPayload, licensePayload] = await Promise.all([
           getOverview(range),
           getUserGrowth(days),
           getDau(Math.min(days, 90)),
@@ -123,6 +127,7 @@ function DashboardContent() {
           getIntentBreakdown(days),
           getUserTiers(),
           getCohortRetention(8),
+          getDecisionAdoption(8),
           getLicenseSummary(),
         ]);
         if (!alive) return;
@@ -133,6 +138,7 @@ function DashboardContent() {
         setIntentBreakdown(intentPayload.data || []);
         setUserTiers(tiersPayload.data || []);
         setCohorts(cohortPayload.cohorts || []);
+        setDecisionAdoption({ weeks: decisionPayload.weeks || [], cohorts: decisionPayload.cohorts || [] });
         setLicenseSummary(licensePayload);
       } catch (err) {
         if (alive) setError(err.message || 'Không tải được dashboard.');
@@ -164,6 +170,7 @@ function DashboardContent() {
           <TierDistributionChart loading={loading} data={userTiers} />
         </section>
         <CohortRetentionTable loading={loading} cohorts={cohorts} />
+        <DecisionAdoptionChart loading={loading} weeks={decisionAdoption.weeks} cohorts={decisionAdoption.cohorts} />
         <LicenseFoundationCard loading={loading} summary={licenseSummary} />
         <UserDirectory refreshNonce={refreshNonce} />
       </div>
@@ -448,6 +455,86 @@ function RetentionCell({ value }) {
     <td className={`rounded-xl px-3 py-3 text-center font-mono text-xs font-semibold ${presentation.className}`} style={presentation.style}>
       {presentation.text}
     </td>
+  );
+}
+
+const decisionMetrics = [
+  { key: 'interactions_per_user', label: 'Tương tác / user', format: 'decimal' },
+  { key: 'interactions', label: 'Tổng tương tác', format: 'number' },
+  { key: 'active_users', label: 'Active users', format: 'number' },
+  { key: 'avg_clarity', label: 'Độ nét TB', format: 'decimal' },
+];
+
+function formatWeekLabel(week) {
+  return typeof week === 'string' ? week.slice(5).replace('-', '/') : String(week);
+}
+
+function buildDecisionAdoptionSeries(weeks, cohorts, metric) {
+  return weeks.map((week, index) => {
+    const row = { label: formatWeekLabel(week) };
+    cohorts.forEach((cohort) => {
+      const value = cohort.points?.[index]?.[metric];
+      row[cohort.cohort] = value === undefined ? null : value;
+    });
+    return row;
+  });
+}
+
+function DecisionAdoptionChart({ loading, weeks, cohorts }) {
+  const [metric, setMetric] = useState('interactions_per_user');
+  const data = useMemo(() => buildDecisionAdoptionSeries(weeks, cohorts, metric), [weeks, cohorts, metric]);
+  const empty = cohorts.length === 0;
+  const totals = cohorts.map((cohort) => ({
+    cohort,
+    total: (cohort.points || []).reduce((sum, point) => sum + (point.interactions || 0), 0),
+  }));
+  const busiest = totals.slice().sort((a, b) => b.total - a.total)[0];
+  return (
+    <MetricShell eyebrow="Adoption" title="Decision adoption theo cohort">
+      <div className="-mt-2 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-ink-500">Tương tác quyết định theo tuần, tách segment mới (reset) khỏi cohort cũ (legacy).</p>
+        <div className="flex flex-wrap gap-1.5">
+          {decisionMetrics.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setMetric(option.key)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${metric === option.key ? 'border-gold bg-gold-50 text-gold' : 'border-hairline text-ink-500 hover:border-gold'}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ChartFrame loading={loading} empty={empty || data.length === 0}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 12, left: -20, bottom: 0 }}>
+            <CartesianGrid stroke="#E8E0D3" vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#52677A', fontSize: 11 }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#52677A', fontSize: 11 }} />
+            <Tooltip content={<CustomTooltip />} />
+            {cohorts.map((cohort, index) => (
+              <Line
+                key={cohort.cohort}
+                type="monotone"
+                dataKey={cohort.cohort}
+                name={cohort.label}
+                stroke={pieColors[index % pieColors.length]}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartFrame>
+      <Legend data={cohorts.map((cohort, index) => ({ label: cohort.label, value: `${formatNumber(totals[index].total)} tương tác`, color: pieColors[index % pieColors.length] }))} />
+      <Insight>
+        {busiest && busiest.total > 0
+          ? `${busiest.cohort.label} dẫn đầu về tổng tương tác (${formatNumber(busiest.total)}); theo dõi interactions/user để so sánh mức gắn kết giữa các cohort.`
+          : 'Chưa có decision query nào được ghi log để tách cohort.'}
+      </Insight>
+    </MetricShell>
   );
 }
 

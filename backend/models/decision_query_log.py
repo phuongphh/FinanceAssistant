@@ -45,6 +45,11 @@ class DecisionQueryLog(Base):
     # meter was off or the turn never reached a verdict.
     clarity_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # Onboarding cohort at answer time (Phase 4.6 / E4), derived from the chosen
+    # goal via ``onboarding_session.cohort_for_goal`` — "reset" (first-life
+    # segment) / "legacy" (asset-management). NULL when the goal is unknown or
+    # no session exists, so the admin chart can split the new segment out.
+    cohort: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
@@ -53,6 +58,7 @@ class DecisionQueryLog(Base):
         Index("idx_decision_query_log_user_id", "user_id"),
         Index("idx_decision_query_log_query_type", "query_type"),
         Index("idx_decision_query_log_created_at", "created_at"),
+        Index("idx_decision_query_log_cohort", "cohort"),
     )
 
 

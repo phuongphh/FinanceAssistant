@@ -37,7 +37,11 @@ from backend.intent.handlers.decision_flags import (
 from backend.intent.intents import IntentResult
 from backend.models.decision_query_log import QUERY_TYPE_FEASIBILITY
 from backend.models.user import User
-from backend.services.decision import decision_query_log_service, plan_feasibility_service
+from backend.services.decision import (
+    cohort_service,
+    decision_query_log_service,
+    plan_feasibility_service,
+)
 from backend.services.goal_projection import get_avg_monthly_savings
 from backend.services.onboarding.onboarding_service import salutation_of
 
@@ -57,6 +61,9 @@ class DecisionFeasibilityHandler(IntentHandler):
             return await AdvisoryHandler().handle(intent, user, db)
 
         answer, success = await self._answer(intent, user, db)
+        # Phase 4.6 E4 — tag the row with the onboarding cohort so the admin
+        # chart can split the new first-life segment from the legacy cohort.
+        cohort = await cohort_service.resolve_user_cohort(db, user.id)
         # E5 #5.1 — one append-only row per handled query, including the
         # clarify turns that never reach a verdict (success=False).
         await decision_query_log_service.log_query(
@@ -64,6 +71,7 @@ class DecisionFeasibilityHandler(IntentHandler):
             user_id=user.id,
             query_type=QUERY_TYPE_FEASIBILITY,
             success=success,
+            cohort=cohort,
         )
         return answer
 

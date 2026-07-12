@@ -30,12 +30,17 @@ async def log_query(
     query_type: str,
     success: bool,
     clarity_score: Decimal | int | None = None,
+    cohort: str | None = None,
 ) -> DecisionQueryLog:
     """Append one decision-query row and flush.
 
     ``clarity_score`` is the độ nét at answer time (0..100) when the clarity
     meter is on, else ``None``. An ``int`` score is accepted and coerced to
     ``Decimal`` so callers can pass ``ClarityResult.score`` straight through.
+
+    ``cohort`` is the onboarding cohort tag (Phase 4.6 / E4) — "reset" /
+    "legacy" / ``None`` — already classified by the caller so this service
+    stays a pure writer. ``None`` leaves the row unattributed.
     """
     score = Decimal(clarity_score) if clarity_score is not None else None
     row = DecisionQueryLog(
@@ -43,6 +48,7 @@ async def log_query(
         query_type=query_type,
         success=success,
         clarity_score=score,
+        cohort=cohort,
     )
     db.add(row)
     await db.flush()

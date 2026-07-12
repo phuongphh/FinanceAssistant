@@ -13,12 +13,19 @@ class FakeSession:
     ``session.added`` when it cares about the logging side effect.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, goal_choice: str | None = None) -> None:
         self.added: list = []
         self.flushes = 0
+        # Phase 4.6 E4: the decision handlers resolve the onboarding cohort with
+        # one ``db.scalar`` lookup of ``goal_choice``. Default ``None`` keeps the
+        # pre-4.6 tests untagged; a test can pass a goal to exercise tagging.
+        self.goal_choice = goal_choice
 
     def add(self, obj) -> None:
         self.added.append(obj)
 
     async def flush(self) -> None:
         self.flushes += 1
+
+    async def scalar(self, *args, **kwargs):
+        return self.goal_choice
