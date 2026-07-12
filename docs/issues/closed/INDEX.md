@@ -498,6 +498,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
 | #982 | Phase 4 | [Phase 4.6][E1] Onboarding Goal Reset — first-life goals cho segment 22-35 | [phase-4/issue-982.md](by-phase/phase-4/issue-982.md) |
 | #984 | Phase 4 | [Phase 4.6][E2] Sửa đường rơi "chưa từng kích hoạt" — first-message tự nổ + đo tỉ lệ kích hoạt | [phase-4/issue-984.md](by-phase/phase-4/issue-984.md) |
+| #985 | Phase 4 | [Phase 4.6][E3] Decision Moment trong onboarding — 1 câu hỏi gắn goal + đúng 1 con số + độ nét thành thật | [phase-4/issue-985.md](by-phase/phase-4/issue-985.md) |
 
-**Total:** 494 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 20 Phase 4, 457 Pre-Phase)
+**Total:** 495 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 21 Phase 4, 457 Pre-Phase)
