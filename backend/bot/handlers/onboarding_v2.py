@@ -1183,8 +1183,10 @@ async def _trigger_first_twin(
     # after the chart, before the feedback prompt. Flag read at the edge; off
     # keeps the reveal byte-identical to pre-4.6. Runs synchronously here (not
     # in the feedback task) because it needs the live DB session, which does
-    # not survive the worker boundary.
-    if is_onboarding_decision_moment_enabled():
+    # not survive the worker boundary. Skipped for the demo Twin: its 50tr
+    # portfolio is framed as giả định, so answering a decision on it (and
+    # logging it as a real feasibility interaction) would blur that framing.
+    if not demo and is_onboarding_decision_moment_enabled():
         await _send_decision_moment(db, chat_id, user)
 
     # Schedule the in-moment feedback prompt 7s later in a fire-and-forget
@@ -1218,45 +1220,54 @@ async def _send_decision_moment(db: AsyncSession, chat_id: int, user: User) -> N
     from backend.services.goal_projection import get_avg_monthly_savings
 
     try:
-        session = await onboarding_service.get_session(db, user.id)
-        if session is None:
-            return
+        # A SAVEPOINT isolates every DB touch in this best-effort block. If a
+        # read or the log flush errors, only this savepoint rolls back — the
+        # outer transaction (incl. mark_twin_shown just above) stays healthy and
+        # the worker's boundary commit still succeeds. Without it a poisoned
+        # session would fail that commit and silently undo the whole reveal.
+        async with db.begin_nested():
+            session = await onboarding_service.get_session(db, user.id)
+            if session is None:
+                return
 
-        config = onboarding_decision.goal_config(session.goal_choice)
-        salutation = onboarding_service.salutation_of(user)
-        start = session.first_asset_value_vnd or Decimal(0)
+            config = onboarding_decision.goal_config(session.goal_choice)
+            salutation = onboarding_service.salutation_of(user)
+            start = session.first_asset_value_vnd or Decimal(0)
 
-        # Single DB read for the saving rate (the feasibility engine is pure);
-        # clarity runs a handful of lightweight indexed reads.
-        avg_savings = await get_avg_monthly_savings(db, user.id)
-        result = plan_feasibility_service.assess(
-            start, config.target_vnd, config.horizon_years, avg_savings
-        )
-        clarity = await clarity_service.compute_clarity(db, user.id)
+            # Single DB read for the saving rate (the feasibility engine is
+            # pure); clarity runs a handful of lightweight indexed reads.
+            avg_savings = await get_avg_monthly_savings(db, user.id)
+            result = plan_feasibility_service.assess(
+                start, config.target_vnd, config.horizon_years, avg_savings
+            )
+            clarity = await clarity_service.compute_clarity(db, user.id)
 
-        await send_message(
-            chat_id,
-            onboarding_decision.render_question(config, salutation=salutation),
-            parse_mode="HTML",
-        )
-        await send_message(
-            chat_id,
-            onboarding_decision.render_answer(
-                result, config, clarity, salutation=salutation
-            ),
-            parse_mode="HTML",
-        )
+            await send_message(
+                chat_id,
+                onboarding_decision.render_question(config, salutation=salutation),
+                parse_mode="HTML",
+            )
+            await send_message(
+                chat_id,
+                onboarding_decision.render_answer(
+                    result, config, clarity, salutation=salutation
+                ),
+                parse_mode="HTML",
+            )
 
-        # Append-only funnel row. Onboarding always lands a verdict (there is
-        # no clarify turn), so success is always True; clarity_score threads the
-        # độ nét through for the E4 dashboard.
-        await decision_query_log_service.log_query(
-            db,
-            user_id=user.id,
-            query_type=QUERY_TYPE_FEASIBILITY,
-            success=True,
-            clarity_score=clarity.score,
-        )
+            # Append-only funnel row. Onboarding always lands a verdict (there
+            # is no clarify turn), so success is always True; clarity_score
+            # threads the độ nét through for the E4 dashboard.
+            await decision_query_log_service.log_query(
+                db,
+                user_id=user.id,
+                query_type=QUERY_TYPE_FEASIBILITY,
+                success=True,
+                clarity_score=clarity.score,
+            )
+
+        # Pure telemetry — outside the savepoint so a tracking hiccup can never
+        # roll back the funnel row we just flushed.
         analytics.track(
             "onboarding_decision_moment_shown",
             user_id=user.id,
