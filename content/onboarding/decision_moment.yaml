@@ -1,0 +1,54 @@
+# Phase 4.6 · E3 — Decision Moment trong onboarding.
+#
+# Ngay sau Twin reveal, Bé Tiền hỏi ĐÚNG 1 câu quyết định gắn goal đã chọn rồi
+# trả lời liền với đúng 1 con số + độ nét thành thật. Tái dùng
+# plan_feasibility_service + clarity_service (Phase 4.5) — không engine mới.
+#
+# Persona: honest-not-harsh, nói tiếng của 22-35 đang xây khoản đầu đời, 0 jargon.
+# {salutation} = anh/chị/bạn (fallback "bạn"). Mọi con số tiền ở đây là CONFIG
+# (coerce sang Decimal ở formatter), không phải chuỗi hiển thị cứng.
+
+decision_moment:
+  # Câu hỏi + tham số feasibility theo từng goal. target_vnd / horizon_years là
+  # mốc tham chiếu điển hình cho segment Level 0→1, KHÔNG phải cam kết.
+  goals:
+    emergency_fund:
+      question: "🤔 Thử một câu nha: với nhịp hiện tại, bao lâu nữa {salutation} gom đủ quỹ khẩn cấp cho mình?"
+      goal_label: "quỹ khẩn cấp"
+      target_vnd: 60000000
+      horizon_years: 2
+    first_home:
+      question: "🤔 Thử một câu nha: với nhịp hiện tại, bao lâu nữa {salutation} đủ cọc căn nhà đầu tiên?"
+      goal_label: "cọc nhà đầu tiên"
+      target_vnd: 300000000
+      horizon_years: 5
+    wedding:
+      question: "🤔 Thử một câu nha: với nhịp hiện tại, bao lâu nữa {salutation} lo đủ cho đám cưới mơ ước?"
+      goal_label: "đám cưới"
+      target_vnd: 200000000
+      horizon_years: 3
+  # Fallback cho goal legacy / goal lạ — vẫn trả lời được, không vỡ flow.
+  default_goal:
+    question: "🤔 Thử một câu nha: với nhịp hiện tại, bao lâu nữa {salutation} chạm mốc mình mong?"
+    goal_label: "mục tiêu đầu tiên"
+    target_vnd: 100000000
+    horizon_years: 3
+  answers:
+    # on_track — đủ dữ liệu, đang trên đà: 1 con số = số tháng.
+    on_track: "Tin vui nè: với nhịp này, khoảng {months} tháng nữa là {salutation} chạm {goal_label} rồi 🎯"
+    # building — có tiết kiệm nhưng còn chặng dài: 1 con số = mức đang trên đà tới.
+    building: "Với nhịp hiện tại, {salutation} đang trên đà tới khoảng {reachable} trong {years}. {goal_label_cap} thường quanh {target} — mình đi từng bước là tới thôi 💪"
+    # direction — dữ liệu còn mỏng (chưa thấy nhịp tiết kiệm): 1 con số = mốc tham chiếu.
+    direction: "{goal_label_cap} thường quanh mức {target}. Nhịp tiết kiệm của {salutation} mình chưa nhìn ra, nên đây mới là điểm khởi đầu thôi — mà hướng đi thì đã rõ rồi ✨"
+  clarity:
+    # Dòng độ nét — luôn kèm sau câu trả lời để thành thật về mức tin cậy.
+    below: "📷 Thú thật ảnh tài chính của {salutation} còn hơi mờ ({score}/100) — {sharpen} là mình nhìn rõ hơn hẳn."
+    above: "📷 Ảnh tài chính của {salutation} mới đang thành hình ({score}/100){sharpen_tail}"
+    sharpen_tail: " — thêm {sharpen} nữa là nét dần lên đó."
+    # Gợi ý làm nét theo component thiếu nhất (map từ clarity_service component key).
+    sharpen:
+      assets: "thêm vài tài sản nữa (tiết kiệm, ví, vàng…)"
+      asset_freshness: "cập nhật lại số dư mới nhất"
+      income: "cho mình biết thu nhập hằng tháng"
+      expenses: "ghi lại vài khoản chi gần đây"
+      goals: "đặt một mục tiêu cụ thể"
