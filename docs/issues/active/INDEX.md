@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #961 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [issue-961.md](issue-961.md) |
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
+| #985 | [Phase 4.6][E3] Decision Moment trong onboarding — 1 câu hỏi gắn goal + đúng 1 con số + độ nét thành thật | [issue-985.md](issue-985.md) |
 
-**Total active:** 13
+**Total active:** 14
