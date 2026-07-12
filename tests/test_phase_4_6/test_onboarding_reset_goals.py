@@ -325,3 +325,94 @@ async def test_on_goal_picked_renders_reset_ack_and_accepts_new_code(monkeypatch
     assert seen_goal == [GOAL_EMERGENCY_FUND]
     expected_ack = _load_copy()["step_1_goal_reset"]["goal_acks"][GOAL_EMERGENCY_FUND]
     assert edits == [expected_ack]
+
+
+# ----- ack resolution survives a flag flip mid-keyboard --------------------
+
+
+def test_goal_ack_for_resolves_from_owning_block_regardless_of_flag(monkeypatch):
+    """The ack is resolved from whichever block *owns* the goal code, not from
+    the flag's current variant. A user shown one keyboard then hitting a button
+    after the flag flips must still get their ack (else the edit is skipped and
+    the old buttons linger)."""
+    from backend.bot.handlers import onboarding_v2
+    from backend.models.onboarding_session import (
+        GOAL_EMERGENCY_FUND,
+        GOAL_UNDERSTAND_WEALTH,
+    )
+
+    copy = _load_copy()
+    reset_ack = copy["step_1_goal_reset"]["goal_acks"][GOAL_EMERGENCY_FUND]
+    legacy_ack = copy["step_1_goal"]["goal_acks"][GOAL_UNDERSTAND_WEALTH]
+
+    # Flag OFF but the user picked a reset code (keyboard predates a rollback):
+    monkeypatch.delenv(onboarding_v2.ONBOARDING_RESET_FLAG_ENV, raising=False)
+    assert onboarding_v2._goal_ack_for(copy, GOAL_EMERGENCY_FUND) == reset_ack
+    # ...and a legacy code still resolves too.
+    assert onboarding_v2._goal_ack_for(copy, GOAL_UNDERSTAND_WEALTH) == legacy_ack
+
+    # Flag ON but the user picked a legacy code (keyboard predates a rollout):
+    monkeypatch.setenv(onboarding_v2.ONBOARDING_RESET_FLAG_ENV, "true")
+    assert onboarding_v2._goal_ack_for(copy, GOAL_UNDERSTAND_WEALTH) == legacy_ack
+    assert onboarding_v2._goal_ack_for(copy, GOAL_EMERGENCY_FUND) == reset_ack
+
+
+def test_goal_ack_for_returns_empty_for_unknown_code():
+    from backend.bot.handlers import onboarding_v2
+
+    assert onboarding_v2._goal_ack_for(_load_copy(), "no_such_goal") == ""
+
+
+def test_goal_ack_for_tolerates_missing_blocks():
+    """Resolution must not raise when a copy block is absent (e.g. reset block
+    not yet shipped)."""
+    from backend.bot.handlers import onboarding_v2
+
+    only_legacy = {"step_1_goal": {"goal_acks": {"track_spending": "ok"}}}
+    assert onboarding_v2._goal_ack_for(only_legacy, "track_spending") == "ok"
+    assert onboarding_v2._goal_ack_for(only_legacy, "emergency_fund") == ""
+    assert onboarding_v2._goal_ack_for({}, "track_spending") == ""
+
+
+@pytest.mark.asyncio
+async def test_on_goal_picked_edits_ack_after_flag_rolled_back(monkeypatch):
+    """Regression for the rollout/rollback window: user was shown the reset
+    keyboard, the operator flipped the flag OFF, then the user tapped a reset
+    goal. The ack must still be edited in so the buttons are cleared."""
+    from backend.bot.handlers import onboarding_v2
+    from backend.models.onboarding_session import GOAL_EMERGENCY_FUND
+    from backend.services.onboarding import onboarding_service
+
+    monkeypatch.delenv(onboarding_v2.ONBOARDING_RESET_FLAG_ENV, raising=False)
+
+    async def _set_goal(_db, _uid, goal, *, trust_card_enabled=True):
+        return SimpleNamespace(current_step="first_asset")
+
+    async def _answer(_cb, **_k):
+        return None
+
+    edits: list[str] = []
+
+    async def _edit(**kwargs):
+        edits.append(kwargs["text"])
+
+    async def _asset_prompt(_db, _chat_id, _user):
+        return None
+
+    monkeypatch.setattr(onboarding_service, "set_goal", _set_goal)
+    monkeypatch.setattr(onboarding_v2, "answer_callback", _answer)
+    monkeypatch.setattr(onboarding_v2, "edit_message_text", _edit)
+    monkeypatch.setattr(onboarding_v2, "_send_first_asset_prompt", _asset_prompt)
+    monkeypatch.setattr(onboarding_v2.analytics, "track", lambda *a, **k: None)
+
+    await onboarding_v2._on_goal_picked(
+        object(),
+        chat_id=55,
+        callback_id="cb",
+        message_id=9,
+        user=_user(),
+        goal_code=GOAL_EMERGENCY_FUND,
+    )
+
+    expected_ack = _load_copy()["step_1_goal_reset"]["goal_acks"][GOAL_EMERGENCY_FUND]
+    assert edits == [expected_ack]

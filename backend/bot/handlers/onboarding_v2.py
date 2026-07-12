@@ -203,6 +203,33 @@ def _goal_step_copy(copy: dict) -> dict:
     return copy["step_1_goal"]
 
 
+# Copy blocks that can hold a goal ack, active variant first. Ack resolution
+# scans these by *content* (which block owns the goal code) rather than by the
+# current flag value.
+_GOAL_COPY_BLOCKS = ("step_1_goal_reset", "step_1_goal")
+
+
+def _goal_ack_for(copy: dict, goal_code: str) -> str:
+    """Resolve the ack copy for ``goal_code`` from the block that owns it.
+
+    The goal code on the callback comes from the keyboard the user was *shown*,
+    which may predate a flag flip. If ``ONBOARDING_RESET_ENABLED`` is toggled
+    while a user sits on an already-sent keyboard, reading the ack from the
+    flag's *current* variant would look in the wrong block (legacy codes are
+    absent from reset ``goal_acks`` and vice versa), yield an empty ack, skip
+    the message edit, and strand the old buttons on screen. Scanning by content
+    keeps the ack correct across the rollout/rollback window.
+    """
+    for block_key in _GOAL_COPY_BLOCKS:
+        block = copy.get(block_key)
+        if not block:
+            continue
+        ack = block.get("goal_acks", {}).get(goal_code)
+        if ack:
+            return ack
+    return ""
+
+
 # ---------- Entry: /start with optional invite token -----------------
 
 
@@ -538,7 +565,7 @@ async def _on_goal_picked(
     await answer_callback(callback_id)
 
     copy = onboarding_service.load_copy()
-    ack = _goal_step_copy(copy)["goal_acks"].get(goal_code, "")
+    ack = _goal_ack_for(copy, goal_code)
     if message_id is not None and ack:
         try:
             await edit_message_text(
