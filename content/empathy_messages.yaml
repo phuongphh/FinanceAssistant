@@ -20,6 +20,7 @@
 #   {suggested_amount}  — pre-formatted currency string
 #   {salutation}        — how Bé Tiền addresses the user (anh/chị/bạn)
 #   {days_since_onboarding} — days since onboarding finished
+#   {days_since_start}  — days since the user first opened the bot
 #
 # TONE RULES (docs/tone_guide.md):
 # - Never use "đừng", "không nên", "phải", "sai", "tệ", "lãng phí".
@@ -135,3 +136,20 @@ onboarding_no_twin_return:
       Mấy hôm nay em vẫn để dành Twin của {salutation} ở đây nè.
 
       Em hiểu {salutation} bận — em không làm phiền nhiều đâu ạ. Chỉ là khi nào {salutation} muốn xem bức tranh tài chính của mình thay đổi ra sao, em luôn sẵn sàng ạ 🌿
+
+# Phase 4.6 Epic 2 — activation nudge ("chưa từng kích hoạt"). Fires when a
+# user opened the bot but never took a first step (no reply, onboarding
+# chưa xong) trong 1–7 ngày đầu. Voice: mở lời trước, ấm, không ép, không
+# nhắc "bạn im lặng" — chỉ chìa tay ra cho người 22-35 mới bắt đầu.
+never_activated:
+  conditions: "Opened the bot but no activity + onboarding unfinished, 1–7 days after first /start"
+  cooldown_days: 3
+  messages:
+    - |-
+      Chào {name} 👋 Em là Bé Tiền đây.
+
+      Hôm nọ {salutation} có ghé qua mà tụi mình chưa kịp bắt đầu. Không sao đâu ạ — chỉ cần {salutation} nhắn em một câu bất kỳ, em sẽ đi cùng {salutation} từng bước một nhé 🌱
+    - |-
+      {name} ơi, em vẫn ở đây nè 💚
+
+      Bắt đầu chuyện tiền nong nghe hơi ngợp, em biết. Nhưng mình đi từ từ thôi — {salutation} cứ nhắn em điều đang bận tâm nhất về tiền, rồi tụi mình gỡ dần cùng nhau ạ.

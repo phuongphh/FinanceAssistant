@@ -67,3 +67,15 @@ def is_tone_dial_enabled() -> bool:
     dark the /profile tone control is hidden and every surface renders in the
     default gentle voice, exactly as before Phase 4.5."""
     return _enabled(TONE_DIAL_ENABLED_ENV, default=False)
+
+
+ACTIVATION_NUDGE_ENABLED_ENV = "ACTIVATION_NUDGE_ENABLED"
+
+
+def is_activation_nudge_enabled() -> bool:
+    """Activation nudge — first-message-tự-nổ for never-activated users
+    (Phase 4.6 E2). OFF by default — opt-in experiment. When dark the hourly
+    job skips the ``never_activated`` empathy trigger AND the worker skips the
+    ``activation_first_reply`` funnel stamp, so behaviour is byte-identical to
+    pre-4.6. Read at the job / worker edge only (layer contract)."""
+    return _enabled(ACTIVATION_NUDGE_ENABLED_ENV, default=False)

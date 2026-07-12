@@ -100,6 +100,32 @@ ONBOARDING_SILENCE_MAX_DAYS = 30
 # "came back", so we only nudge when the count is still 0.
 TWIN_RETURN_MIN_DISTINCT_DAYS = 1
 
+# Phase 4.6 Epic 2 — activation nudge ("chưa từng kích hoạt"). The biggest
+# drop-off in the 6/2026 cohort is "0 tin nhắn": a user opens the bot /
+# taps /start, then goes silent without ever finishing onboarding or
+# sending a first message. We reach out first, inside a short activation
+# window measured from when they opened the bot. The lower bound gives them
+# a day to reply on their own; past the upper bound the generic
+# silent-N-days triggers take over (a ``bot_started`` event counts as
+# activity there), so this stays a focused first-touch nudge — never a
+# perpetual one. Fires at most twice in the window (see cooldown in the
+# trigger) so a genuinely dormant user isn't pestered.
+ACTIVATION_NUDGE_MIN_DAYS = 1
+ACTIVATION_NUDGE_MAX_DAYS = 7
+
+# Event types that do NOT count as the user "activating". ``bot_started`` is
+# the entry signal itself (opening the bot is not engagement); the empathy
+# rows are our own outbound nudges. Any OTHER event — a button tap, a
+# transaction, a miniapp open — means the user did something, so they're no
+# longer in the "0 tin nhắn" cohort.
+_NON_ACTIVATION_EVENT_TYPES = frozenset(
+    {
+        EventType.BOT_STARTED,
+        EventType.EMPATHY_FIRED,
+        EventType.EMPATHY_SENT,
+    }
+)
+
 
 @dataclass(frozen=True)
 class EmpathyTrigger:
@@ -116,16 +142,19 @@ async def check_all_triggers(
     *,
     now: datetime | None = None,
     include_proactive: bool = True,
+    include_activation_nudge: bool = False,
 ) -> Optional[EmpathyTrigger]:
     """Walk checks in priority order. Return first trigger not on cooldown.
 
     ``now`` override is for tests; production callers pass ``None``.
 
     ``include_proactive`` gates the Phase 4.4 proactive-companion trigger
-    (``onboarding_no_twin_return``). The engine never reads env itself —
-    the hourly job reads ``PROACTIVE_COMPANION_ENABLED`` and passes the
-    decision in, per the layer contract. When ``False`` the new trigger
-    is skipped while every pre-existing empathy trigger still fires.
+    (``onboarding_no_twin_return``). ``include_activation_nudge`` gates the
+    Phase 4.6 first-message trigger (``never_activated``). The engine never
+    reads env itself — the hourly job reads ``PROACTIVE_COMPANION_ENABLED`` /
+    ``ACTIVATION_NUDGE_ENABLED`` and passes the decisions in, per the layer
+    contract. When a flag is ``False`` its trigger is skipped while every
+    pre-existing empathy trigger still fires.
     """
     now = now or datetime.now(timezone.utc)
 
@@ -139,6 +168,12 @@ async def check_all_triggers(
     ]
     if include_proactive:
         checks.append(_check_onboarding_no_twin_return)
+    # The activation nudge owns the early window (1–7 days after opening the
+    # bot) for never-activated users, so it must be checked BEFORE the
+    # generic silent-N-days triggers — past day 7 its window closes and
+    # ``user_silent_7_days`` naturally takes over.
+    if include_activation_nudge:
+        checks.append(_check_never_activated)
     checks.extend(
         (
             _check_user_silent_7_days,
@@ -267,6 +302,54 @@ async def _check_onboarding_no_twin_return(
     )
 
 
+async def _check_never_activated(
+    db: AsyncSession, user: User, now: datetime
+) -> EmpathyTrigger | None:
+    """User opened the bot but never activated — the "0 tin nhắn" cohort.
+
+    Fires inside the activation window (``ACTIVATION_NUDGE_MIN_DAYS`` …
+    ``ACTIVATION_NUDGE_MAX_DAYS`` days after the *first* ``bot_started``
+    event) when the user:
+
+    - has NOT finished onboarding (``onboarding_completed_at is None``), and
+    - has no activity beyond opening the bot — no non-deleted expense and no
+      event outside ``_NON_ACTIVATION_EVENT_TYPES``.
+
+    Disjoint from ``onboarding_no_twin_return`` (which requires onboarding
+    *completed*), so the two never fire for the same user. Past the window
+    the generic silent-N-days triggers take over.
+    """
+    if user.onboarding_completed_at is not None:
+        return None
+
+    first_start_stmt = select(func.min(Event.timestamp)).where(
+        Event.user_id == user.id,
+        Event.event_type == EventType.BOT_STARTED,
+    )
+    first_start = (await db.execute(first_start_stmt)).scalar_one_or_none()
+    if first_start is None:
+        # No recorded bot open — outside this trigger's cohort.
+        return None
+    if first_start.tzinfo is None:
+        first_start = first_start.replace(tzinfo=timezone.utc)
+
+    days_since_start = (now - first_start).days
+    if not (
+        ACTIVATION_NUDGE_MIN_DAYS <= days_since_start < ACTIVATION_NUDGE_MAX_DAYS
+    ):
+        return None
+
+    if await _has_activated(db, user.id):
+        return None
+
+    return EmpathyTrigger(
+        name="never_activated",
+        priority=2,
+        cooldown_days=3,
+        context={"days_since_start": days_since_start},
+    )
+
+
 async def _check_user_silent_7_days(
     db: AsyncSession, user: User, now: datetime
 ) -> EmpathyTrigger | None:
@@ -365,6 +448,77 @@ async def _check_consecutive_over_budget(
 
 
 # ---------- Helpers -------------------------------------------------
+
+async def _has_activated(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """True if the user did anything beyond opening the bot.
+
+    "Activated" = logged a (non-deleted) expense OR produced any event
+    outside ``_NON_ACTIVATION_EVENT_TYPES`` (which excludes the entry
+    ``bot_started`` and our own empathy rows). Two cheap EXISTS-style
+    scalar queries — the second short-circuits when the first already
+    proves activation.
+    """
+    expense_stmt = (
+        select(Expense.id)
+        .where(
+            Expense.user_id == user_id,
+            Expense.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if (await db.execute(expense_stmt)).first() is not None:
+        return True
+
+    event_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type.notin_(_NON_ACTIVATION_EVENT_TYPES),
+        )
+        .limit(1)
+    )
+    return (await db.execute(event_stmt)).first() is not None
+
+
+async def should_track_activation_reply(
+    db: AsyncSession, user_id: uuid.UUID
+) -> bool:
+    """True if this user's message is their FIRST reply after a nudge.
+
+    Powers the E2 #2.2 activation funnel: ``activation_nudge_sent``
+    (Bé Tiền reached out first) vs ``activation_first_reply`` (the user
+    answered). We only want to stamp the reply once, and only for a user
+    we actually nudged — otherwise the funnel's denominator and numerator
+    stop lining up.
+
+    Returns True when a nudge WAS sent (``ACTIVATION_NUDGE_SENT`` row exists)
+    and no reply has been recorded yet (``ACTIVATION_FIRST_REPLY`` absent).
+    Env-free by design — the worker reads ``ACTIVATION_NUDGE_ENABLED`` at its
+    edge and only calls this when the flag is on (layer contract). Two cheap
+    limited scalar queries; the reply check short-circuits when no nudge was
+    ever sent.
+    """
+    nudge_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type == EventType.ACTIVATION_NUDGE_SENT,
+        )
+        .limit(1)
+    )
+    if (await db.execute(nudge_stmt)).first() is None:
+        return False
+
+    reply_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type == EventType.ACTIVATION_FIRST_REPLY,
+        )
+        .limit(1)
+    )
+    return (await db.execute(reply_stmt)).first() is None
+
 
 async def _days_since_last_activity(
     db: AsyncSession, user_id: uuid.UUID, *, now: datetime
