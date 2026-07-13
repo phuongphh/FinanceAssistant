@@ -23,7 +23,7 @@ import pytest
 from backend.api.admin import analytics as admin_analytics
 from backend.api.admin.analytics import VN_TZ, COHORT_UNATTRIBUTED
 from backend.models.admin_user import AdminUser
-from backend.models.decision_query_log import DecisionQueryLog
+from backend.models.user import User
 
 
 class _Row:
@@ -90,25 +90,45 @@ def cache_spy(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# tenant scoping — decision_query_logs has no tenant_id column
+# tenant scoping — decision_query_logs has no tenant_id column, so the query
+# joins ``users`` and scopes by ``users.tenant_id`` (no cross-tenant leak).
 # --------------------------------------------------------------------------
 
 
-def test_tenant_filter_falls_back_to_default_tenant_only():
-    # No tenant_id column → default tenant sees everything, others see nothing.
-    assert str(admin_analytics._tenant_filter(DecisionQueryLog, 1)) == "true"
-    assert str(admin_analytics._tenant_filter(DecisionQueryLog, 2)) == "false"
+def test_user_tenant_filter_scopes_by_users_column():
+    # decision_query_logs has no tenant_id, so scoping rides on users.tenant_id;
+    # every tenant (default or not) gets a real column predicate, not true/false.
+    assert str(admin_analytics._tenant_filter(User, 1)).startswith("users.tenant_id")
+    assert str(admin_analytics._tenant_filter(User, 2)).startswith("users.tenant_id")
 
 
 @pytest.mark.asyncio
-async def test_non_default_tenant_query_is_scoped_to_false(cache_spy):
+async def test_query_scopes_via_users_tenant_column(cache_spy):
     _, _, _ = cache_spy
     db = _FakeDB([_RowsResult([])])
 
     await admin_analytics.decision_adoption(weeks=4, admin=_admin(2), db=db)
 
-    # The where-clause carries the false() guard for a non-default tenant.
-    assert "false" in str(db.statements[0])
+    # The join+where scopes by users.tenant_id, not a decision_query_logs guard.
+    compiled = str(db.statements[0])
+    assert "users.tenant_id" in compiled
+    assert "users.deleted_at" in compiled
+
+
+@pytest.mark.asyncio
+async def test_clarity_is_averaged_per_active_user_not_per_interaction(cache_spy):
+    """độ nét (G2) is a per-active-user average, so the query rolls up by
+    user_id first (inner group-by) then averages those per-user means — a chatty
+    user cannot skew the cohort's độ nét by sheer interaction count."""
+    _, _, _ = cache_spy
+    db = _FakeDB([_RowsResult([])])
+
+    await admin_analytics.decision_adoption(weeks=4, admin=_admin(1), db=db)
+
+    compiled = str(db.statements[0])
+    # A nested subquery grouped by user_id feeds the outer per-cohort average.
+    assert "decision_query_logs.user_id" in compiled
+    assert "GROUP BY" in compiled.upper()
 
 
 # --------------------------------------------------------------------------

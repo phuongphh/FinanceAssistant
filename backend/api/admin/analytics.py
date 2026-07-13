@@ -397,17 +397,38 @@ async def decision_adoption(
 
     week_col = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", DecisionQueryLog.created_at)), Date)
     cohort_col = func.coalesce(DecisionQueryLog.cohort, COHORT_UNATTRIBUTED)
+    # Per-user rollup first so độ nét is averaged over *active users* (G2), not
+    # over raw interactions — a chatty user must not skew the cohort's độ nét.
+    # Join ``users`` and scope by ``users.tenant_id`` like the other user-facing
+    # charts: ``decision_query_logs`` has no tenant column, so filtering it alone
+    # would leak other tenants' rows.
+    per_user = (
+        select(
+            week_col.label("week"),
+            cohort_col.label("cohort"),
+            DecisionQueryLog.user_id.label("user_id"),
+            func.count().label("user_interactions"),
+            func.avg(DecisionQueryLog.clarity_score).label("user_clarity"),
+        )
+        .join(User, User.id == DecisionQueryLog.user_id)
+        .where(
+            User.deleted_at.is_(None),
+            _tenant_filter(User, tenant_id),
+            DecisionQueryLog.created_at >= start_dt,
+        )
+        .group_by(week_col, cohort_col, DecisionQueryLog.user_id)
+        .subquery()
+    )
     rows = (
         await db.execute(
             select(
-                week_col.label("week"),
-                cohort_col.label("cohort"),
-                func.count().label("interactions"),
-                func.count(func.distinct(DecisionQueryLog.user_id)).label("active_users"),
-                func.avg(DecisionQueryLog.clarity_score).label("avg_clarity"),
+                per_user.c.week.label("week"),
+                per_user.c.cohort.label("cohort"),
+                func.sum(per_user.c.user_interactions).label("interactions"),
+                func.count().label("active_users"),
+                func.avg(per_user.c.user_clarity).label("avg_clarity"),
             )
-            .where(_tenant_filter(DecisionQueryLog, tenant_id), DecisionQueryLog.created_at >= start_dt)
-            .group_by(week_col, cohort_col)
+            .group_by(per_user.c.week, per_user.c.cohort)
         )
     ).all()
 
