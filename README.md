@@ -33,7 +33,7 @@
 - ✅ Phase 4.3: Twin Enhancement + Habit Loop + Admin Dashboard
 - ✅ Phase 4.4: First-5-Minutes WOW
 - 🚀 Phase 4.5: Decision Engine Foundation ← **current**
-- 🔮 Phase 4.6: Onboarding Reset
+- ✅ Phase 4.6: Onboarding Reset
 - 🔮 Phase 4.7: Guardian Layer
 - 🔮 Phase 5.0: Zalo Channel Launch
 - 🔮 Phase 5.1: Zalo Core Product Parity
