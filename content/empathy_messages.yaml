@@ -120,6 +120,41 @@ consecutive_over_budget:
 
       Có thể ngân sách đặt hơi thấp so với nhu cầu thực tế chăng? Chúng ta điều chỉnh cho hợp lý hơn nhé — không có gì xấu hổ cả, thực tế đang nói với chúng ta một điều gì đó 🌱
 
+# Phase 4.7 Epic 1 — spending-drift warning. Fires when the current 30-day
+# spend drifts above the user's own 3-window median baseline (> 20% AND at
+# least the absolute floor). The point is the Twin consequence, so `messages`
+# is a dict keyed by the trigger's `copy_variant`:
+#   delay  — a goal slips a concrete number of months ({goal_label},
+#            {goal_delay_months})
+#   stall  — the drift would erase the whole saving rate; the goal stalls
+#            ({goal_label})
+#   plain  — drifting but no goal consequence to attach
+# {drift} = pre-formatted overshoot amount above baseline. Voice: honest, not
+# harsh — name the number, offer a choice, never scold.
+spending_drift:
+  conditions: "Current 30-day spend > 20% AND ≥ absolute floor above 3-window median baseline"
+  cooldown_days: 14
+  messages:
+    delay:
+      - |-
+        Em để ý nhịp chi tháng này của {salutation} nhỉnh hơn mọi khi chừng {drift} 🌿
+
+        Nếu giữ nhịp này, mốc "{goal_label}" có thể lùi thêm khoảng {goal_delay_months} tháng. Em kể để {salutation} nắm thôi ạ — mình cân lại một chút là kịp lại ngay 💚
+      - |-
+        Tháng này {salutation} chi nhiều hơn nền quen thuộc tầm {drift} đó ạ.
+
+        Em soi qua Twin giúp {salutation}: giữ đà này thì "{goal_label}" chậm lại khoảng {goal_delay_months} tháng. Không có gì gấp đâu — chỉ cần {salutation} thấy để chủ động chọn nhé 🌱
+    stall:
+      - |-
+        Em để ý tháng này {salutation} chi vượt nền quen khoảng {drift} 🌿
+
+        Nhịp này gần như dùng hết phần {salutation} vẫn để dành mỗi tháng, nên mốc "{goal_label}" khó tiến thêm được. Em kể để mình cùng nhìn lại một chút thôi ạ 💚
+    plain:
+      - |-
+        Em để ý nhịp chi tháng này của {salutation} cao hơn mọi khi chừng {drift} 🌿
+
+        Chưa có gì đáng lo đâu ạ — em chỉ ghi lại để {salutation} thấy bức tranh rõ hơn. Khi nào rảnh mình ngồi soi lại cùng nhau nhé 💚
+
 # Phase 4.4 Epic 3 — proactive activation nudge. Fires when an onboarded
 # user saw their Twin once (at the end of onboarding) but hasn't returned
 # to it within the activation window. Voice: "em để ý thấy…", warm, never

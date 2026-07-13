@@ -89,6 +89,16 @@ def render_tone_variant(
     if variant is None:
         return None
 
+    # A tone block whose copy branches on the situation nests one more level:
+    # ``{gentle: {delay: [...], stall: [...], plain: [...]}}``. The caller names
+    # the branch via a ``copy_variant`` context key (e.g. the ``spending_drift``
+    # empathy trigger). A plain list/string block (every other surface) skips
+    # this and behaves exactly as before.
+    if isinstance(variant, dict):
+        variant = variant.get(ctx.get("copy_variant"))
+        if variant is None:
+            return None
+
     template = random.choice(variant) if isinstance(variant, list) else variant
     if not isinstance(template, str) or not template:
         return None

@@ -1,9 +1,17 @@
-"""Feature flags for Phase 4.5 Decision Engine surfaces.
+"""Feature flags for Phase 4.5 Decision Engine + Phase 4.7 Guardian surfaces.
 
 These helpers are read at the handler / API-router / worker edge only — never
 inside a service (layer contract §"Service NEVER reads env"). Each Decision
 Engine capability ships dark so the operator can flip it on per-surface once
 validated in prod. Same pattern as ``onboarding_v2.is_v2_enabled``.
+
+Kill-switch note (Phase 4.7 §8, ``SCAM_CHECK_ENABLED``): the flag is read at the
+handler edge on every request, but ``os.environ`` only changes on process
+restart. To disable a Guardian surface in <24h *without* a code deploy, the
+operator sets the env var and restarts the service (``scripts/rebuild-finance-prod.sh``
+/ launchd reload) — see the §8 runbook in ``phase-4.7-detailed.md``. A
+DB/config runtime toggle is deferred to a later phase unless §8 one-strike
+demands instant-off.
 """
 
 from __future__ import annotations
@@ -79,3 +87,32 @@ def is_activation_nudge_enabled() -> bool:
     ``activation_first_reply`` funnel stamp, so behaviour is byte-identical to
     pre-4.6. Read at the job / worker edge only (layer contract)."""
     return _enabled(ACTIVATION_NUDGE_ENABLED_ENV, default=False)
+
+
+DRIFT_WARNING_ENABLED_ENV = "DRIFT_WARNING_ENABLED"
+
+
+def is_drift_warning_enabled() -> bool:
+    """Drift / overspend warnings — Phase 4.7 Epic 1. OFF by default (gated on
+    the G1 decision-adoption gate + owner sign-off). When dark the hourly
+    empathy job skips the ``spending_drift`` trigger while every pre-existing
+    empathy trigger still fires, so behaviour is byte-identical to pre-4.7.
+    Read at the job edge only — the empathy engine never reads env (layer
+    contract)."""
+    return _enabled(DRIFT_WARNING_ENABLED_ENV, default=False)
+
+
+SCAM_CHECK_ENABLED_ENV = "SCAM_CHECK_ENABLED"
+
+
+def is_scam_check_enabled() -> bool:
+    """Scam check v1 — Phase 4.7 Epic 2 (red line). OFF by default; flip is
+    gated on legal sign-off of the red-flags wording + disclaimer. When dark a
+    "kèo này có nên không?" question delegates to the generic advisory handler
+    (byte-identical pre-4.7), never ``out_of_scope``.
+
+    This flag is the §8 kill switch: on a harmful-output report the operator
+    sets ``SCAM_CHECK_ENABLED=false`` and restarts the service to take the
+    surface offline in <24h without a code deploy (see module docstring +
+    ``phase-4.7-detailed.md`` §8 runbook). Read at the handler edge only."""
+    return _enabled(SCAM_CHECK_ENABLED_ENV, default=False)

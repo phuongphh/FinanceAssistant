@@ -34,6 +34,7 @@ from backend.bot.personality import empathy_engine
 from backend.database import get_session_factory
 from backend.intent.handlers.decision_flags import (
     is_activation_nudge_enabled,
+    is_drift_warning_enabled,
     is_tone_dial_enabled,
 )
 from backend.jobs._active_users import get_active_users
@@ -210,6 +211,7 @@ async def _process_user(user: User, *, now: datetime) -> None:
             now=now,
             include_proactive=_proactive_companion_enabled(),
             include_activation_nudge=is_activation_nudge_enabled(),
+            include_drift=is_drift_warning_enabled(),
         )
         if not trigger:
             return

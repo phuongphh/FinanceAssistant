@@ -414,7 +414,13 @@ async def test_job_passes_include_activation_nudge(monkeypatch):
         return 0
 
     async def fake_check(
-        db, user, *, now=None, include_proactive=True, include_activation_nudge=False
+        db,
+        user,
+        *,
+        now=None,
+        include_proactive=True,
+        include_activation_nudge=False,
+        include_drift=False,
     ):
         captured["include_activation_nudge"] = include_activation_nudge
         return None

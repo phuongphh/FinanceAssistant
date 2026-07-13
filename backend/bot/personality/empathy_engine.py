@@ -45,6 +45,7 @@ from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.twin_view_event import TwinViewEvent
 from backend.models.user import User
+from backend.services.decision import drift_service
 from backend.services.onboarding.onboarding_service import salutation_of
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,13 @@ _NON_ACTIVATION_EVENT_TYPES = frozenset(
     }
 )
 
+# Phase 4.7 Epic 1 — spending-drift warning cooldown. A drift is a slow,
+# month-scale signal (baseline is a 3-window median), so a fortnight between
+# nudges is long enough not to nag yet short enough to catch a pace that keeps
+# climbing. Longer than the acute ``large_transaction`` (1 day) and the
+# ``never_activated`` (3 days) triggers, matching ``user_silent_7_days``.
+SPENDING_DRIFT_COOLDOWN_DAYS = 14
+
 
 @dataclass(frozen=True)
 class EmpathyTrigger:
@@ -143,6 +151,7 @@ async def check_all_triggers(
     now: datetime | None = None,
     include_proactive: bool = True,
     include_activation_nudge: bool = False,
+    include_drift: bool = False,
 ) -> Optional[EmpathyTrigger]:
     """Walk checks in priority order. Return first trigger not on cooldown.
 
@@ -150,11 +159,12 @@ async def check_all_triggers(
 
     ``include_proactive`` gates the Phase 4.4 proactive-companion trigger
     (``onboarding_no_twin_return``). ``include_activation_nudge`` gates the
-    Phase 4.6 first-message trigger (``never_activated``). The engine never
-    reads env itself — the hourly job reads ``PROACTIVE_COMPANION_ENABLED`` /
-    ``ACTIVATION_NUDGE_ENABLED`` and passes the decisions in, per the layer
-    contract. When a flag is ``False`` its trigger is skipped while every
-    pre-existing empathy trigger still fires.
+    Phase 4.6 first-message trigger (``never_activated``). ``include_drift``
+    gates the Phase 4.7 spending-drift trigger (``spending_drift``). The engine
+    never reads env itself — the hourly job reads ``PROACTIVE_COMPANION_ENABLED``
+    / ``ACTIVATION_NUDGE_ENABLED`` / ``DRIFT_WARNING_ENABLED`` and passes the
+    decisions in, per the layer contract. When a flag is ``False`` its trigger
+    is skipped while every pre-existing empathy trigger still fires.
     """
     now = now or datetime.now(timezone.utc)
 
@@ -166,6 +176,12 @@ async def check_all_triggers(
         _check_payday_splurge,
         _check_over_budget_monthly,
     ]
+    # A drift warning carries a concrete goal consequence, so it outranks the
+    # ambient "come back" / silent-N-days nudges — but it stays below the acute
+    # single-transaction signals above. Gated dark until the G1 gate + owner
+    # sign-off (``DRIFT_WARNING_ENABLED``).
+    if include_drift:
+        checks.append(_check_spending_drift)
     if include_proactive:
         checks.append(_check_onboarding_no_twin_return)
     # The activation nudge owns the early window (1–7 days after opening the
@@ -259,6 +275,46 @@ async def _check_over_budget_monthly(
 ) -> EmpathyTrigger | None:
     """STUB — needs per-user budget config (not yet modeled)."""
     return None
+
+
+async def _check_spending_drift(
+    db: AsyncSession, user: User, now: datetime
+) -> EmpathyTrigger | None:
+    """Current-window spend has drifted above the user's own recent baseline.
+
+    Delegates the whole assessment — baseline median, dual threshold, and the
+    Twin consequence — to ``drift_service.compute_drift`` (pure ``assess`` under
+    a read-only gatherer). We fire only when it reports ``is_drifting``; the
+    context carries a ``copy_variant`` so the copy renders the right shape:
+
+    - ``delay``  — a goal slips a concrete number of months,
+    - ``stall``  — the drift would erase the whole saving rate (goal stalls),
+    - ``plain``  — drifting but no goal consequence to attach.
+
+    The engine reads no env; ``DRIFT_WARNING_ENABLED`` is gated at the job edge
+    and threaded in via ``include_drift``.
+    """
+    assessment = await drift_service.compute_drift(db, user, now=now)
+    if assessment is None or not assessment.is_drifting:
+        return None
+
+    context: dict = {"drift": format_money_full(assessment.drift_amount)}
+    if assessment.pace_unsustainable and assessment.goal_label:
+        context["copy_variant"] = "stall"
+        context["goal_label"] = assessment.goal_label
+    elif assessment.goal_delay_months and assessment.goal_label:
+        context["copy_variant"] = "delay"
+        context["goal_label"] = assessment.goal_label
+        context["goal_delay_months"] = assessment.goal_delay_months
+    else:
+        context["copy_variant"] = "plain"
+
+    return EmpathyTrigger(
+        name="spending_drift",
+        priority=3,
+        cooldown_days=SPENDING_DRIFT_COOLDOWN_DAYS,
+        context=context,
+    )
 
 
 async def _check_onboarding_no_twin_return(
@@ -629,18 +685,23 @@ def render_message(
     if variant is not None:
         return variant
 
-    spec = _load_messages().get(trigger.name) or {}
-    templates = spec.get("messages") or []
-    if not templates:
-        logger.warning("No empathy template for trigger %s", trigger.name)
-        return ""
-
-    template = random.choice(templates)
     context = {
         "name": user.get_greeting_name(),
         "salutation": salutation,
         **trigger.context,
     }
+    spec = _load_messages().get(trigger.name) or {}
+    templates = spec.get("messages") or []
+    # A trigger whose copy branches on the situation (e.g. ``spending_drift``:
+    # delay / stall / plain) stores ``messages`` as a dict keyed by the
+    # ``copy_variant`` the trigger put in its context, instead of a flat list.
+    if isinstance(templates, dict):
+        templates = templates.get(context.get("copy_variant")) or []
+    if not templates:
+        logger.warning("No empathy template for trigger %s", trigger.name)
+        return ""
+
+    template = random.choice(templates)
     try:
         return template.format(**context)
     except KeyError as exc:
