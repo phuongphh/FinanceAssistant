@@ -502,6 +502,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #987 | Pre-Phase | Phase 4.6 E3 — decision-moment review follow-ups (already-reached copy, savepoint isolation, demo gate, one-number building) | [pre-phase/issue-987.md](by-phase/pre-phase/issue-987.md) |
 | #989 | Phase 4 | [Phase 4.6][E4] Instrumentation cohort mới → Admin dashboard — cohort tag + chart decision adoption | [phase-4/issue-989.md](by-phase/phase-4/issue-989.md) |
 | #991 | Pre-Phase | 4.6/E4 follow-up: tenant-scope the decision-adoption chart + average độ nét per active user | [pre-phase/issue-991.md](by-phase/pre-phase/issue-991.md) |
+| #993 | Pre-Phase | [4.6/E4] D28 retention theo cohort (tách segment mới vs legacy) | [pre-phase/issue-993.md](by-phase/pre-phase/issue-993.md) |
 
-**Total:** 498 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 22 Phase 4, 459 Pre-Phase)
+**Total:** 499 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 22 Phase 4, 460 Pre-Phase)
