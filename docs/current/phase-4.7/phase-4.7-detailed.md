@@ -24,7 +24,7 @@
 2. **Cảnh báo phải có hệ quả cụ thể.** "Chi vượt 3tr" một mình vô nghĩa; "giữ nhịp này, mốc mua nhà 2029 lùi 14 tháng" mới đổi hành vi. Delta tính qua `plan_feasibility_service`/`goal_projection` (Phase 4.5) — không đoán.
 3. **Nghiêm khắc được, sỉ nhục không.** Drift dùng tone dial gentle↔strict sẵn có (`tone_variants.yaml`). Sàn persona: KHÔNG "đừng/không nên/phải/sai/tệ/lãng phí"; KHÔNG bao giờ hạ nhục.
 4. **Scam check tuyệt đối không phán quyết.** Output = danh sách red-flags khớp + hướng dẫn tự kiểm chứng. KHÔNG "đây là lừa đảo", KHÔNG "đây là an toàn". Một câu verdict lọt qua = vi phạm red line.
-5. **Ship dark, kill nhanh.** Cả hai trụ sau feature flag từ ngày 1. Scam check có kill switch riêng đọc ở edge — tắt được trong <24h không cần deploy.
+5. **Ship dark, kill nhanh.** Cả hai trụ sau feature flag từ ngày 1. Scam check có kill switch riêng đọc ở edge — tắt được trong <24h bằng cách đổi env + restart service (KHÔNG cần deploy code mới); nếu vận hành cần tắt *tức thì* thì nâng lên DB/config runtime toggle (đề xuất phase sau). Off → delegate về `AdvisoryHandler`, byte-identical pre-4.7.
 
 ---
 
@@ -45,6 +45,7 @@ user dán "kèo" → classifier → intent scam_check (flag on)
    → scam_check_service.scan(text) khớp text với red-flags library (pure)
    → render: red-flags khớp + hướng dẫn tự kiểm chứng + disclaimer (KHÔNG verdict)
    → log decision_query_log(query_type=scam_check) flush-only
+   (flag off → delegate AdvisoryHandler, byte-identical pre-4.7)
 ```
 
 ---
@@ -69,14 +70,14 @@ user dán "kèo" → classifier → intent scam_check (flag on)
 - `backend/intent/handlers/decision_flags.py` — `SCAM_CHECK_ENABLED` (default false, kill switch)
 
 **E3 — Guardrails & instrumentation:**
-- `backend/models/decision_query_log.py` — `QUERY_TYPE_SCAM_CHECK`, `QUERY_TYPE_DRIFT`
+- `backend/models/decision_query_log.py` — `QUERY_TYPE_SCAM_CHECK` (chỉ scam_check user-initiated; drift stamp qua empathy `empathy_fired`, KHÔNG decision_query_log — tránh phồng G1/G2)
 - Report-harmful-output path (kill switch runbook) + legal review checklist
 
 ---
 
 ## 🗄️ New DB Columns / Tables
 
-Không có bảng mới. Drift + scam check ghi vào `decision_query_log` (Phase 4.5, append-only) qua `query_type` mới. Không migration nếu cột `query_type` đủ rộng (kiểm tra trong #E3).
+Không có bảng mới. **Scam check** (user-initiated) ghi vào `decision_query_log` (Phase 4.5, append-only) qua `query_type=scam_check`. **Drift** (proactive) stamp qua empathy `empathy_fired` event stream như mọi trigger khác — KHÔNG ghi decision_query_log (nếu ghi sẽ làm phồng metric G1/G2 vì `/charts/decision-adoption` aggregate mọi row không lọc query_type). Không migration nếu cột `query_type` đủ rộng (kiểm tra trong #E3).
 
 ---
 
@@ -91,7 +92,7 @@ Trigger `spending_drift` mới: so chi tiêu tháng hiện tại với baseline 
 Intent `scam_check`: user dán kèo → khớp với red-flags library → trả về flags khớp + hướng dẫn tự kiểm chứng + disclaimer. Flag + kill switch từ ngày 1. **Legal review wording bắt buộc trước ship.**
 
 ### Epic E3 — Guardrails, Kill Switch & Instrumentation
-Kill switch đọc ở edge (tắt <24h không deploy) + report-harmful-output path; log cả hai trụ vào `decision_query_log`; checklist legal review; §8 one-strike runbook.
+Kill switch đọc ở edge (tắt scam_check <24h — env + restart service, KHÔNG cần deploy code; nâng lên DB/config toggle nếu cần tắt tức thì) + report-harmful-output path; log **scam_check** vào `decision_query_log`, **drift** vào empathy event stream; checklist legal review; §8 one-strike runbook.
 
 ---
 
@@ -117,7 +118,7 @@ Kill switch đọc ở edge (tắt <24h không deploy) + report-harmful-output p
 | Red-flags library lệch pháp lý | Legal review wording trước ship (gate E3) |
 | Bật trước khi G1 pass | Cả hai flag default OFF; chỉ bật khi G1 mid-Sept pass |
 
-**Rollback:** tắt `DRIFT_WARNING_ENABLED` / `SCAM_CHECK_ENABLED` → hành vi byte-identical với pre-4.7 (empathy engine bỏ qua trigger, scam_check fallback out_of_scope/advisory).
+**Rollback:** tắt `DRIFT_WARNING_ENABLED` / `SCAM_CHECK_ENABLED` → hành vi byte-identical với pre-4.7 (empathy engine bỏ qua trigger drift; scam_check delegate về `AdvisoryHandler`). Env đổi có hiệu lực sau restart service — KHÔNG cần deploy code mới.
 
 ---
 
@@ -158,6 +159,6 @@ E3 trước vì kill switch + flag infra là điều kiện an toàn cho E2. E1 
 
 1. **Nội dung red-flags library** — danh sách red-flags + wording hướng dẫn tự kiểm chứng (nhạy pháp lý). *Đề xuất khởi tạo trong #2.1, owner + legal duyệt.*
 2. **Legal wording + disclaimer** — câu disclaimer "đây không phải lời khuyên pháp lý/đầu tư, chỉ là dấu hiệu để tự kiểm chứng". *Bắt buộc legal ký trước flip.*
-3. **Kill-switch cơ chế** — env flag ở edge là mặc định; có cần toggle runtime trên admin dashboard không? *Đề xuất: env flag + runbook; admin toggle để phase sau nếu cần.*
+3. **Kill-switch cơ chế** — env flag đọc ở edge là mặc định NHƯNG env chỉ đổi khi restart service, nên "tắt <24h không deploy" = đổi env + restart (không build/PR code mới). Có cần DB/config runtime toggle (tắt *tức thì*, không restart) trên admin dashboard không? *Đề xuất v1: env flag + runbook restart; nâng lên admin/DB toggle ở phase sau nếu §8 one-strike đòi tắt tức thì.*
 4. **Ngưỡng drift** — % trên baseline + sàn tuyệt đối (VND) để fire. *Đề xuất: >20% trên median 3 tháng VÀ ≥ sàn tuyệt đối; chốt trong #1.1.*
 5. **G1 gate** — xác nhận 4.7 được bật sau khi G1 mid-Sept pass. *Đến lúc đó build sau flag, không flip.*

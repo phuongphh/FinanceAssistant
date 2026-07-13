@@ -58,7 +58,7 @@ Decision Moment #4: user dán "kèo đầu tư" → Bé Tiền so với **red-fl
 ### Success criteria (Epic-level)
 - User dán kèo → trả về red-flags khớp + hướng dẫn tự kiểm chứng + disclaimer.
 - Output KHÔNG chứa verdict — test tự động khẳng định.
-- Flag `SCAM_CHECK_ENABLED` off → fallback out_of_scope/advisory không lỗi.
+- Flag `SCAM_CHECK_ENABLED` off → fallback về advisory handler (byte-identical pre-4.7), không lỗi.
 
 ### Child issues
 
@@ -71,8 +71,8 @@ Decision Moment #4: user dán "kèo đầu tư" → Bé Tiền so với **red-fl
 - **DoD:** unit test khớp đúng flag theo keyword/pattern; text sạch → list rỗng; service pure; **API không có field verdict/score.**
 
 #### Issue #2.3 — Intent + handler + formatter `red-line`
-- `backend/intent/intents.py`: `IntentType.SCAM_CHECK`. `backend/intent/classifier/llm_based.py`: mô tả intent (user dán kèo/hỏi "kèo này có nên không"). `backend/intent/dispatcher.py`: route. `backend/intent/handlers/scam_check.py`: gate `SCAM_CHECK_ENABLED` ở edge (off → fallback out_of_scope), gọi service, render, log. `backend/bot/formatters/scam_check.py`: render flags khớp + guide + disclaimer.
-- **DoD:** integration test intent → handler → output; **test khẳng định output KHÔNG chứa chuỗi verdict** ("lừa đảo", "an toàn", "nên đầu tư"…); flag off → fallback; env đọc ở handler edge.
+- `backend/intent/intents.py`: `IntentType.SCAM_CHECK`. `backend/intent/classifier/llm_based.py`: mô tả intent (user dán kèo/hỏi "kèo này có nên không"). `backend/intent/dispatcher.py`: route. `backend/intent/handlers/scam_check.py`: gate `SCAM_CHECK_ENABLED` ở edge (off → delegate về `AdvisoryHandler` như `decision_feasibility` pattern, KHÔNG out_of_scope), gọi service, render, log. `backend/bot/formatters/scam_check.py`: render flags khớp + guide + disclaimer.
+- **DoD:** integration test intent → handler → output; **test khẳng định output KHÔNG chứa chuỗi verdict** ("lừa đảo", "an toàn", "nên đầu tư"…); flag off → delegate `AdvisoryHandler` (byte-identical); env đọc ở handler edge.
 
 #### Issue #2.4 — Persona QA + legal review `persona-critical` `red-line`
 - Copy scam check: cảnh giác-không-hoảng-loạn, KHÔNG verdict, có disclaimer. prompt-tester + vi-localization-checker. **Legal review wording ký trước khi flip flag on.**
@@ -83,17 +83,17 @@ Decision Moment #4: user dán "kèo đầu tư" → Bé Tiền so với **red-fl
 ## 🅲 Epic #E3 — Guardrails, Kill Switch & Instrumentation
 
 ### Description
-Điều kiện an toàn để bật E2: kill switch tắt <24h không deploy, report-harmful-output path, log cả hai trụ vào `decision_query_log`, checklist legal + §8 one-strike runbook.
+Điều kiện an toàn để bật E2: kill switch (cơ chế tắt runtime — xem #3.1), report-harmful-output path, log **scam_check** (user-initiated) vào `decision_query_log`; drift (proactive) stamp qua empathy `empathy_fired` event stream — KHÔNG ghi decision_query_log để tránh làm phồng metric G1/G2. Checklist legal + §8 one-strike runbook.
 
 ### Child issues
 
 #### Issue #3.1 — Kill switch + flag infra `red-line`
-- `backend/intent/handlers/decision_flags.py`: `SCAM_CHECK_ENABLED` (default False) đọc ở edge; tắt = fallback tức thì không deploy. Runbook §8: 1 case verdict-sai-gây-thiệt-hại report → tắt trong 24h + post-mortem trước khi bật lại.
-- **DoD:** test flag off → scam_check fallback; runbook viết trong doc; kill switch không cần restart để có hiệu lực (đọc env mỗi request ở edge).
+- `backend/intent/handlers/decision_flags.py`: `SCAM_CHECK_ENABLED` (default False) đọc ở handler edge; tắt = scam_check delegate về `AdvisoryHandler`. **Cơ chế kill switch (owner ký #3 trong detailed):** env flag đọc mỗi request ở edge NHƯNG env chỉ đổi khi process restart → để tắt <24h *không* deploy code cần một trong hai: (a) runbook thao tác restart service (set env + `scripts/rebuild-finance-prod.sh` hoặc launchd reload — vẫn <24h, không cần build/PR), HOẶC (b) DB/config runtime toggle đọc ở edge (đề xuất phase sau nếu vận hành cần tắt tức thì). v1 chốt phương án (a) + runbook; nâng lên (b) nếu §8 one-strike đòi hỏi. Runbook §8: 1 case verdict-sai-gây-thiệt-hại report → tắt trong 24h + post-mortem trước khi bật lại.
+- **DoD:** test flag off → scam_check delegate advisory; runbook thao tác tắt (phương án a) viết trong doc, ghi rõ tắt cần restart service (KHÔNG cần deploy code mới); nếu chọn (b) thì toggle đọc ở edge.
 
-#### Issue #3.2 — Log drift + scam check vào `decision_query_log`
-- `backend/models/decision_query_log.py`: `QUERY_TYPE_DRIFT`, `QUERY_TYPE_SCAM_CHECK`. Ghi qua service flush-only. Migration chỉ nếu cột `query_type` không đủ rộng (kiểm tra + chốt trong issue).
-- **DoD:** log ghi đúng query_type; append-only giữ nguyên; migration sạch nếu có; PII: KHÔNG log full text kèo (chỉ metadata + flags khớp).
+#### Issue #3.2 — Log scam check vào `decision_query_log` (drift → empathy event stream)
+- `backend/models/decision_query_log.py`: `QUERY_TYPE_SCAM_CHECK` (chỉ scam_check — user-initiated). Ghi qua service flush-only. Migration chỉ nếu cột `query_type` không đủ rộng (kiểm tra + chốt trong issue). **Drift KHÔNG ghi decision_query_log:** đã stamp `empathy_fired` qua empathy engine (#1.2) như mọi trigger proactive khác — `/charts/decision-adoption` (analytics.py) aggregate MỌI row decision_query_log không lọc query_type nên log drift proactive vào đây sẽ làm phồng G1/G2 (active users / adoption). Giữ hai luồng tách biệt: decision_query_log = user-initiated decision queries; empathy event stream = proactive nudge.
+- **DoD:** scam_check log đúng `QUERY_TYPE_SCAM_CHECK`; drift KHÔNG xuất hiện trong decision_query_log (test khẳng định); append-only giữ nguyên; migration sạch nếu có; PII: KHÔNG log full text kèo (chỉ metadata + flags khớp).
 
 #### Issue #3.3 — Legal review checklist + phase-status sync
 - Checklist legal review (red-flags wording + disclaimer) là gate trước flip. Cập nhật `docs/current/phase-status.yaml` (4.7 status/detail_doc/issues_doc) + chạy `scripts/sync_phase_status.py`.
@@ -105,7 +105,8 @@ Decision Moment #4: user dán "kèo đầu tư" → Bé Tiền so với **red-fl
 
 ```
 E3 #3.1 (kill switch + flag) ──> E2 (scam check trên scaffolding an toàn)
-E3 #3.2 (log query_type) ──> E1 #1.2 + E2 #2.3 (cả hai ghi log)
+E3 #3.2 (log QUERY_TYPE_SCAM_CHECK) ──> E2 #2.3 (chỉ scam_check ghi decision_query_log)
+E1 #1.2 (drift) ──> empathy_fired event stream (KHÔNG decision_query_log)
 E1 (drift — song song, độc lập)
 E1 + E2 ──> #2.4 legal + persona QA ──> flip flag (gated G1 mid-Sept)
 ```
