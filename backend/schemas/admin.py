@@ -186,6 +186,25 @@ class DecisionAdoptionResponse(BaseModel):
     cohorts: list[DecisionAdoptionCohort]
 
 
+class DecisionRetentionCohort(BaseModel):
+    cohort: str
+    label: str
+    cohort_size: int
+    # w0..wN → % of *eligible* users (old enough to reach the offset) who were
+    # active that week. ``None`` where the window has no eligible users yet.
+    retention: dict[str, int | None]
+    # w0..wN → the denominator behind each retention %, so D28 is auditable.
+    eligible: dict[str, int]
+    # Convenience mirror of ``retention["w4"]`` (≈28 days); ``None`` if the
+    # requested window is shorter than five weeks or no user is old enough.
+    d28: int | None = None
+
+
+class DecisionRetentionResponse(BaseModel):
+    weeks: int
+    cohorts: list[DecisionRetentionCohort]
+
+
 class LicenseSummaryBucket(BaseModel):
     key: str
     count: int

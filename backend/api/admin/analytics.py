@@ -17,12 +17,14 @@ from backend.models.cost_budget import LLMCostLog
 from backend.models.decision_query_log import DecisionQueryLog
 from backend.models.event import Event
 from backend.models.feature_event import FeatureEvent
+from backend.models.onboarding_session import OnboardingSession, cohort_for_goal
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
 from backend.schemas.admin import (
     CohortRetentionResponse,
     DauChartResponse,
     DecisionAdoptionResponse,
+    DecisionRetentionResponse,
     FeatureClicksResponse,
     IntentBreakdownResponse,
     OverviewStatsResponse,
@@ -58,6 +60,9 @@ DECISION_COHORT_LABELS = {
     "legacy": "Cohort cũ (legacy)",
     COHORT_UNATTRIBUTED: "Chưa gắn cohort",
 }
+# D28 retention ≈ four weeks after signup, so it lives at week-offset 4 (w4) of a
+# cohort's retention curve. Feeds gate G2 (D28 ≥ 25%).
+D28_OFFSET = 4
 DEFAULT_TENANT_ID = 1
 
 
@@ -467,4 +472,121 @@ async def decision_adoption(
 
     response = {"weeks": week_list, "cohorts": cohorts}
     await cache_set(key, response, 1800)
+    return response
+
+
+@router.get("/charts/decision-retention", response_model=DecisionRetentionResponse)
+async def decision_retention(
+    weeks: int = Query(default=8, ge=1, le=26),
+    admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Signup→week-N retention, split by onboarding cohort — headline D28 (G2).
+
+    Complements ``decision-adoption`` (which is anchored on the calendar week of
+    each interaction) with a classic retention curve anchored on each user's
+    *signup week*, bucketed by their onboarding cohort (``reset`` first-life vs
+    ``legacy`` asset-management vs ``unattributed``). Retention at offset *k* is
+    the share of that cohort's users who were old enough to reach week *k* and
+    had any activity in it — so the denominator (``eligible``) shrinks for later
+    offsets rather than diluting them with users who have not had the time yet.
+    ``d28`` mirrors offset 4 (≈28 days), the metric behind gate G2 (≥25%).
+
+    Activity reuses ``events`` (same signal as ``cohort-retention``); tenant
+    isolation rides on ``users.tenant_id`` and the payload is aggregate-only
+    (cohort sizes + percentages), so no PII ever leaves the query.
+    """
+    tenant_id = _admin_tenant_id(admin)
+    key = f"admin:tenant:{tenant_id}:charts:decision-retention:{weeks}"
+    cached = await cache_get(key)
+    if cached is not None:
+        return cached
+
+    today = datetime.now(VN_TZ).date()
+    current_week = today - timedelta(days=today.weekday())
+    first_week = current_week - timedelta(weeks=weeks - 1)
+    start_dt = datetime.combine(first_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+
+    # Each user's signup week + onboarding cohort (left join keeps users who
+    # never opened an onboarding session — they fall to ``unattributed``).
+    signup_week_col = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", User.created_at)), Date)
+    user_rows = (
+        await db.execute(
+            select(User.id, signup_week_col.label("signup_week"), OnboardingSession.goal_choice)
+            .outerjoin(OnboardingSession, OnboardingSession.user_id == User.id)
+            .where(
+                User.deleted_at.is_(None),
+                _tenant_filter(User, tenant_id),
+                User.created_at >= start_dt,
+            )
+        )
+    ).all()
+
+    user_signup: dict = {}
+    user_cohort: dict = {}
+    cohort_users: dict[str, set] = defaultdict(set)
+    for uid, signup_week, goal_choice in user_rows:
+        cohort = cohort_for_goal(goal_choice) or COHORT_UNATTRIBUTED
+        user_signup[uid] = signup_week
+        user_cohort[uid] = cohort
+        cohort_users[cohort].add(uid)
+
+    activity_expr = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", Event.timestamp)), Date)
+    if user_signup:
+        activity_rows = (
+            await db.execute(
+                select(Event.user_id, activity_expr.label("active_week"))
+                .where(
+                    Event.user_id.in_(list(user_signup.keys())),
+                    _tenant_filter(Event, tenant_id),
+                    Event.timestamp >= start_dt,
+                )
+                .distinct()
+            )
+        ).all()
+    else:
+        activity_rows = []
+
+    # (cohort, offset) -> users active at that offset from their own signup week.
+    retained: dict[tuple[str, int], set] = defaultdict(set)
+    for uid, active_week in activity_rows:
+        signup_week = user_signup.get(uid)
+        if signup_week is None or active_week < signup_week:
+            continue
+        offset = int((active_week - signup_week).days / 7)
+        if offset < weeks:
+            retained[(user_cohort[uid], offset)].add(uid)
+
+    cohorts = []
+    for cohort, label in DECISION_COHORT_LABELS.items():
+        members = cohort_users.get(cohort)
+        if not members:
+            continue  # skip a cohort with no users in the window
+        # A user is eligible for offset k once k weeks have elapsed since signup.
+        max_elapsed = {uid: int((current_week - user_signup[uid]).days / 7) for uid in members}
+        retention: dict[str, int | None] = {}
+        eligible: dict[str, int] = {}
+        for offset in range(weeks):
+            key_name = f"w{offset}"
+            eligible_count = sum(1 for uid in members if max_elapsed[uid] >= offset)
+            eligible[key_name] = eligible_count
+            if eligible_count == 0:
+                retention[key_name] = None
+            elif offset == 0:
+                retention[key_name] = 100
+            else:
+                retention[key_name] = round((len(retained[(cohort, offset)]) / eligible_count) * 100)
+        cohorts.append(
+            {
+                "cohort": cohort,
+                "label": label,
+                "cohort_size": len(members),
+                "retention": retention,
+                "eligible": eligible,
+                "d28": retention.get(f"w{D28_OFFSET}"),
+            }
+        )
+
+    response = {"weeks": weeks, "cohorts": cohorts}
+    await cache_set(key, response, 86400)
     return response

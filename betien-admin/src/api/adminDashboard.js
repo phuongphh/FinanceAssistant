@@ -38,6 +38,10 @@ export function getDecisionAdoption(weeks = 8) {
   return apiFetch(buildAdminDashboardPath('/charts/decision-adoption', { weeks }));
 }
 
+export function getDecisionRetention(weeks = 8) {
+  return apiFetch(buildAdminDashboardPath('/charts/decision-retention', { weeks }));
+}
+
 export function getLicenseSummary() {
   return apiFetch('/licenses/summary');
 }
