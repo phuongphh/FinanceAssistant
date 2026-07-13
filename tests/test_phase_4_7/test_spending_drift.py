@@ -215,6 +215,72 @@ def test_assess_threshold_overrides_are_honoured():
 
 
 # ============================================================
+# _spend_windows — history gate excludes internal transfers
+# ============================================================
+
+
+class _ScalarResult:
+    def __init__(self, value):
+        self._value = value
+
+    def scalar_one_or_none(self):
+        return self._value
+
+
+class _RowsResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _WindowsGateDB:
+    """Fake session for ``_spend_windows``' first (MIN expense_date) query.
+
+    It keys its answer off whether the *executed* MIN statement carries the
+    internal-category exclusion: if the production code applies the filter it
+    sees the user's earliest *non-internal* expense; if the filter is missing
+    it sees the earlier internal-transfer row. So the gate only returns ``None``
+    when the filter is really in the query — testing the fix, not the fake.
+    """
+
+    def __init__(self, *, earliest_all, earliest_noninternal):
+        self.earliest_all = earliest_all
+        self.earliest_noninternal = earliest_noninternal
+        self.calls = 0
+
+    async def execute(self, stmt):
+        self.calls += 1
+        sql = str(stmt).upper()
+        if self.calls == 1:
+            has_filter = "CATEGORY" in sql and "NOT IN" in sql
+            value = self.earliest_noninternal if has_filter else self.earliest_all
+            return _ScalarResult(value)
+        # No further query should run once the gate short-circuits to None.
+        raise AssertionError("gate should have returned before the spend query")
+
+
+@pytest.mark.asyncio
+async def test_spend_windows_gate_ignores_internal_transfer_history():
+    # The only pre-cutoff expense is an internal transfer (day -100), but the
+    # earliest genuine consumption is recent (day -50), inside the baseline
+    # span — so there is NOT enough real history and the gate must return None.
+    from datetime import timedelta
+
+    from backend.services.decision.drift_service import _spend_windows
+
+    today = NOW_TS.date()
+    db = _WindowsGateDB(
+        earliest_all=today - timedelta(days=100),  # transfer, before cutoff
+        earliest_noninternal=today - timedelta(days=50),  # too recent
+    )
+    result = await _spend_windows(db, uuid.uuid4(), now=NOW_TS)
+    assert result is None
+    assert db.calls == 1  # short-circuited on the gate, never ran the spend query
+
+
+# ============================================================
 # _check_spending_drift trigger (#1.2)
 # ============================================================
 
@@ -313,6 +379,36 @@ async def test_check_drift_plain_when_delay_but_no_goal_label(monkeypatch):
     trigger = await empathy_engine._check_spending_drift(None, _drift_user(), NOW_TS)
     assert trigger is not None
     assert trigger.context["copy_variant"] == "plain"
+
+
+@pytest.mark.asyncio
+async def test_check_drift_html_escapes_goal_label(monkeypatch):
+    # The hourly job sends drift messages with parse_mode="HTML", so a
+    # user-authored goal name with HTML metacharacters must be escaped before
+    # it reaches the render context — otherwise it breaks Telegram's HTML
+    # parse (or injects markup).
+    _patch_compute(
+        monkeypatch,
+        _assessment(goal_label="Mua <nhà> & xe", goal_delay_months=6),
+    )
+    trigger = await empathy_engine._check_spending_drift(None, _drift_user(), NOW_TS)
+    assert trigger is not None
+    assert trigger.context["copy_variant"] == "delay"
+    assert trigger.context["goal_label"] == "Mua &lt;nhà&gt; &amp; xe"
+    assert "<" not in trigger.context["goal_label"]
+
+
+@pytest.mark.asyncio
+async def test_check_drift_html_escapes_goal_label_in_stall(monkeypatch):
+    # Same escaping guarantee on the stall variant path.
+    _patch_compute(
+        monkeypatch,
+        _assessment(goal_label="Quỹ <dự phòng>", pace_unsustainable=True),
+    )
+    trigger = await empathy_engine._check_spending_drift(None, _drift_user(), NOW_TS)
+    assert trigger is not None
+    assert trigger.context["copy_variant"] == "stall"
+    assert trigger.context["goal_label"] == "Quỹ &lt;dự phòng&gt;"
 
 
 # ============================================================

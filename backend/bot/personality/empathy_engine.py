@@ -26,6 +26,7 @@ Design choices
 """
 from __future__ import annotations
 
+import html
 import logging
 import random
 import uuid
@@ -298,13 +299,19 @@ async def _check_spending_drift(
     if assessment is None or not assessment.is_drifting:
         return None
 
+    # ``_process_user`` sends drift messages with ``parse_mode="HTML"``, so a
+    # user-authored goal name containing ``<``, ``>`` or ``&`` would otherwise
+    # break Telegram's HTML parse (or inject markup). Escape it once here,
+    # before it enters the render context.
+    goal_label = html.escape(assessment.goal_label) if assessment.goal_label else None
+
     context: dict = {"drift": format_money_full(assessment.drift_amount)}
-    if assessment.pace_unsustainable and assessment.goal_label:
+    if assessment.pace_unsustainable and goal_label:
         context["copy_variant"] = "stall"
-        context["goal_label"] = assessment.goal_label
-    elif assessment.goal_delay_months and assessment.goal_label:
+        context["goal_label"] = goal_label
+    elif assessment.goal_delay_months and goal_label:
         context["copy_variant"] = "delay"
-        context["goal_label"] = assessment.goal_label
+        context["goal_label"] = goal_label
         context["goal_delay_months"] = assessment.goal_delay_months
     else:
         context["copy_variant"] = "plain"

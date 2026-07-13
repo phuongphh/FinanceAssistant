@@ -234,6 +234,7 @@ async def _spend_windows(
         Expense.user_id == user_id,
         Expense.deleted_at.is_(None),
         Expense.transaction_type == "expense",
+        Expense.category.notin_(_INTERNAL_CATEGORIES),
     )
     earliest = (await db.execute(earliest_stmt)).scalar_one_or_none()
     baseline_start = (now - timedelta(days=MIN_HISTORY_WINDOWS * _WINDOW_DAYS)).date()
