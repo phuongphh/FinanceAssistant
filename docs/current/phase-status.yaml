@@ -244,8 +244,8 @@ phases:
     name: "Guardian Layer"
     status: planned
     duration: "~2-3 tuần"
-    detail_doc: ""
-    issues_doc: ""
+    detail_doc: "docs/current/phase-4.7/phase-4.7-detailed.md"
+    issues_doc: "docs/current/phase-4.7/phase-4.7-issues.md"
     description: "Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). Tháng 9/2026, gate G1 đo giữa tháng 9."
     completed_date: ""
     icon: "🔮"
