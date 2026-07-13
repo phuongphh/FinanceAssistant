@@ -503,6 +503,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #989 | Phase 4 | [Phase 4.6][E4] Instrumentation cohort mới → Admin dashboard — cohort tag + chart decision adoption | [phase-4/issue-989.md](by-phase/phase-4/issue-989.md) |
 | #991 | Pre-Phase | 4.6/E4 follow-up: tenant-scope the decision-adoption chart + average độ nét per active user | [pre-phase/issue-991.md](by-phase/pre-phase/issue-991.md) |
 | #993 | Pre-Phase | [4.6/E4] D28 retention theo cohort (tách segment mới vs legacy) | [pre-phase/issue-993.md](by-phase/pre-phase/issue-993.md) |
+| #994 | Pre-Phase | [4.6/E4][follow-up] Định nghĩa lại "product-active" làm denominator cho retention/DAU | [pre-phase/issue-994.md](by-phase/pre-phase/issue-994.md) |
 
-**Total:** 499 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 22 Phase 4, 460 Pre-Phase)
+**Total:** 500 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 22 Phase 4, 461 Pre-Phase)
