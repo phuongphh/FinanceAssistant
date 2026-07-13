@@ -2,7 +2,7 @@
 
 > Onboarding đổi khán giả: từ "quản lý tài sản" (nói với người đã có tài sản) → "lo cho xong chuyện tiền đầu đời" (nói với 22-35, Level 0→1). Sửa đường rơi "chưa từng kích hoạt", đưa decision moment đầu tiên vào ngay trong onboarding, và bắt đầu đo cohort mới trên admin dashboard.
 
-**Status:** 📝 Planning
+**Status:** ✅ Done — E1–E4 implemented + merged (13/07/2026)
 **Duration:** ~2 tuần (target: August 2026)
 **Branch:** `claude/phase-4-6-implementation-eg0g1a`
 **Strategy:** [`docs/current/strategy.md`](../strategy.md) — Strategy V4 §Roadmap Phase 4.6 (§138-142) + §Success Metrics/Gates (G1/G2)
@@ -137,15 +137,19 @@
 
 ## ✅ Definition of Done
 
-- [ ] Goal question reset hiện 3 goal đầu đời khi flag on; flag off → `step_1_goal` legacy byte-identical.
-- [ ] Goal code reset resolve đủ 3 asset state trong next-action matrix; goal lạ fallback `understand_wealth` không lỗi.
-- [ ] First message tự nổ cho user im lặng sau khi mở bot (E2); đo được tỉ lệ kích hoạt cohort mới.
-- [ ] Decision moment trong onboarding trả lời được với đúng 1 con số + goal, kèm độ nét thành thật + gợi ý làm nét (E3).
-- [ ] Admin dashboard tách cohort mới: decision interactions/user/tuần + độ nét avg + D28 (E4).
-- [ ] 3 flags có test on/off; tắt hết → onboarding y hệt trước 4.6.
-- [ ] 0 chuỗi "Decision Engine"/"GPS tài chính"/"CFO" trong user-facing copy (vi-localization-checker).
-- [ ] Persona gates pass: prompt-tester cho goal acks + decision moment × 3 xưng hô.
-- [ ] Toàn bộ test xanh; ruff + layer-contract-checker sạch.
+- [x] Goal question reset hiện 3 goal đầu đời khi flag on; flag off → `step_1_goal` legacy byte-identical.
+- [x] Goal code reset resolve đủ 3 asset state trong next-action matrix; goal lạ fallback `understand_wealth` không lỗi.
+- [x] First message tự nổ cho user im lặng sau khi mở bot (E2); đo được tỉ lệ kích hoạt cohort mới.
+- [x] Decision moment trong onboarding trả lời được với đúng 1 con số + goal, kèm độ nét thành thật + gợi ý làm nét (E3).
+- [x] Admin dashboard tách cohort mới: decision interactions/user/tuần + độ nét avg + D28 theo cohort (E4).
+- [x] 3 flags có test on/off; tắt hết → onboarding y hệt trước 4.6.
+- [x] 0 chuỗi "Decision Engine"/"GPS tài chính"/"CFO" trong user-facing copy (vi-localization-checker).
+- [x] Persona gates pass: prompt-tester cho goal acks + decision moment × 3 xưng hô.
+- [x] Toàn bộ test xanh; ruff + layer-contract-checker sạch.
+
+> **Shipped:** E1 + E2 (#983), E3 (#988), E4 (#990 chart decision-adoption, #992 tenant-scope + avg độ nét/active user, #995 D28 retention theo cohort). Tất cả đã merge vào `main`.
+>
+> **Follow-up không chặn phase:** [#994](https://github.com/phuongphh/financeassistant/issues/994) — định nghĩa lại denominator "product-active" cho retention/DAU (một **quyết định sản phẩm**, HELD chờ product owner chốt danh sách event types; không block DoD 4.6).
 
 ---
 
