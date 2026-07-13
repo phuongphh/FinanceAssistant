@@ -44,6 +44,7 @@ import {
   changeUserStatus,
   getCohortRetention,
   getDecisionAdoption,
+  getDecisionRetention,
   getDau,
   getFeatureClicks,
   getIntentBreakdown,
@@ -108,6 +109,7 @@ function DashboardContent() {
   const [userTiers, setUserTiers] = useState([]);
   const [cohorts, setCohorts] = useState([]);
   const [decisionAdoption, setDecisionAdoption] = useState({ weeks: [], cohorts: [] });
+  const [decisionRetention, setDecisionRetention] = useState({ weeks: 8, cohorts: [] });
   const [licenseSummary, setLicenseSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -119,7 +121,7 @@ function DashboardContent() {
       setError('');
       try {
         const days = selectedRange.days;
-        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload, decisionPayload, licensePayload] = await Promise.all([
+        const [overviewPayload, growthPayload, dauPayload, clicksPayload, intentPayload, tiersPayload, cohortPayload, decisionPayload, retentionPayload, licensePayload] = await Promise.all([
           getOverview(range),
           getUserGrowth(days),
           getDau(Math.min(days, 90)),
@@ -128,6 +130,7 @@ function DashboardContent() {
           getUserTiers(),
           getCohortRetention(8),
           getDecisionAdoption(8),
+          getDecisionRetention(8),
           getLicenseSummary(),
         ]);
         if (!alive) return;
@@ -139,6 +142,7 @@ function DashboardContent() {
         setUserTiers(tiersPayload.data || []);
         setCohorts(cohortPayload.cohorts || []);
         setDecisionAdoption({ weeks: decisionPayload.weeks || [], cohorts: decisionPayload.cohorts || [] });
+        setDecisionRetention({ weeks: retentionPayload.weeks || 8, cohorts: retentionPayload.cohorts || [] });
         setLicenseSummary(licensePayload);
       } catch (err) {
         if (alive) setError(err.message || 'Không tải được dashboard.');
@@ -171,6 +175,7 @@ function DashboardContent() {
         </section>
         <CohortRetentionTable loading={loading} cohorts={cohorts} />
         <DecisionAdoptionChart loading={loading} weeks={decisionAdoption.weeks} cohorts={decisionAdoption.cohorts} />
+        <DecisionRetentionTable loading={loading} weeks={decisionRetention.weeks} cohorts={decisionRetention.cohorts} />
         <LicenseFoundationCard loading={loading} summary={licenseSummary} />
         <UserDirectory refreshNonce={refreshNonce} />
       </div>
@@ -448,12 +453,20 @@ function CohortRetentionTable({ loading, cohorts }) {
   );
 }
 
-function RetentionCell({ value }) {
+function RetentionCell({ value, subLabel = null, highlight = false }) {
   const presentation = getRetentionCellPresentation(value);
-  if (!presentation) return <td className="rounded-xl bg-paper px-3 py-3" />;
+  const ring = highlight ? 'ring-1 ring-gold' : '';
+  if (!presentation) {
+    return (
+      <td className={`rounded-xl bg-paper px-3 py-3 text-center ${ring}`}>
+        {subLabel ? <span className="font-mono text-[10px] text-ink-400">{subLabel}</span> : null}
+      </td>
+    );
+  }
   return (
-    <td className={`rounded-xl px-3 py-3 text-center font-mono text-xs font-semibold ${presentation.className}`} style={presentation.style}>
-      {presentation.text}
+    <td className={`rounded-xl px-3 py-3 text-center font-mono text-xs font-semibold ${presentation.className} ${ring}`} style={presentation.style}>
+      <span>{presentation.text}</span>
+      {subLabel ? <span className="mt-0.5 block text-[10px] font-normal opacity-70">{subLabel}</span> : null}
     </td>
   );
 }
@@ -533,6 +546,70 @@ function DecisionAdoptionChart({ loading, weeks, cohorts }) {
         {busiest && busiest.total > 0
           ? `${busiest.cohort.label} dẫn đầu về tổng tương tác (${formatNumber(busiest.total)}); theo dõi interactions/user để so sánh mức gắn kết giữa các cohort.`
           : 'Chưa có decision query nào được ghi log để tách cohort.'}
+      </Insight>
+    </MetricShell>
+  );
+}
+
+const D28_KEY = 'w4';
+
+function retentionWeekKeys(weeks) {
+  const count = Math.min(Math.max(Number(weeks) || 0, 0), 26);
+  return Array.from({ length: count }, (_, offset) => `w${offset}`);
+}
+
+function DecisionRetentionTable({ loading, weeks, cohorts }) {
+  const weekKeys = retentionWeekKeys(weeks);
+  const leader = cohorts
+    .filter((cohort) => cohort.d28 !== null && cohort.d28 !== undefined)
+    .sort((a, b) => b.d28 - a.d28)[0];
+  return (
+    <MetricShell eyebrow="Retention" title="D28 theo cohort">
+      <p className="-mt-2 mb-4 text-xs text-ink-500">
+        Retention tính từ tuần user tham gia, tách segment mới (reset) khỏi cohort cũ (legacy). D28 (w4) là chỉ số gate G2 (≥25%); mẫu số là số user đủ thời gian chạm mốc.
+      </p>
+      {loading && cohorts.length === 0 ? (
+        <div className="h-56 animate-pulse rounded-2xl bg-ink-100" />
+      ) : cohorts.length === 0 ? (
+        <EmptyState message="Chưa đủ cohort để tách D28." className="h-48" />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-1 text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-[0.16em] text-ink-500">
+                <th className="sticky left-0 bg-porcelain px-3 py-2">Cohort</th>
+                <th className="px-3 py-2 text-right">Users</th>
+                {weekKeys.map((key) => (
+                  <th key={key} className={`px-3 py-2 text-center ${key === D28_KEY ? 'text-gold' : ''}`}>
+                    {key.toUpperCase()}
+                    {key === D28_KEY ? ' · D28' : ''}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cohorts.map((cohort) => (
+                <tr key={cohort.cohort}>
+                  <td className="sticky left-0 rounded-xl bg-paper px-3 py-3 text-xs font-medium text-ink-900">{cohort.label}</td>
+                  <td className="rounded-xl bg-paper px-3 py-3 text-right font-mono text-xs text-ink-500">{cohort.cohort_size}</td>
+                  {weekKeys.map((key) => (
+                    <RetentionCell
+                      key={key}
+                      value={cohort.retention?.[key]}
+                      subLabel={cohort.eligible?.[key] !== undefined ? `n=${cohort.eligible[key]}` : null}
+                      highlight={key === D28_KEY}
+                    />
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Insight>
+        {leader
+          ? `${leader.label} đang dẫn D28 ở mức ${leader.d28}% — so với gate G2 (≥25%). Mẫu số n= là số user đủ thời gian chạm mốc, nên các tuần sau có thể ít user hơn.`
+          : 'Chưa đủ user chạm mốc D28 để tách cohort — cần thêm thời gian tích luỹ cohort mới.'}
       </Insight>
     </MetricShell>
   );
