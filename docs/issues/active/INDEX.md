@@ -21,5 +21,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #999 | [Phase 4.7][E1 #1.2] empathy trigger _check_spending_drift (include_drift param) | [issue-999.md](issue-999.md) |
 | #1000 | [Phase 4.7][E1 #1.3] DRIFT_WARNING_ENABLED flag + job wiring | [issue-1000.md](issue-1000.md) |
 | #1001 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [issue-1001.md](issue-1001.md) |
+| #1002 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [issue-1002.md](issue-1002.md) |
 
-**Total active:** 17
+**Total active:** 18
