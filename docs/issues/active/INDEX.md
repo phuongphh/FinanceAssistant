@@ -19,6 +19,7 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
 | #998 | [Phase 4.7][E1 #1.1] drift_service — pure baseline + Twin-consequence delta | [issue-998.md](issue-998.md) |
 | #999 | [Phase 4.7][E1 #1.2] empathy trigger _check_spending_drift (include_drift param) | [issue-999.md](issue-999.md) |
+| #1000 | [Phase 4.7][E1 #1.3] DRIFT_WARNING_ENABLED flag + job wiring | [issue-1000.md](issue-1000.md) |
 | #1001 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [issue-1001.md](issue-1001.md) |
 
-**Total active:** 16
+**Total active:** 17
