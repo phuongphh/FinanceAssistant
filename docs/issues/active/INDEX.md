@@ -17,5 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #961 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [issue-961.md](issue-961.md) |
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
+| #998 | [Phase 4.7][E1 #1.1] drift_service — pure baseline + Twin-consequence delta | [issue-998.md](issue-998.md) |
 
-**Total active:** 13
+**Total active:** 14
