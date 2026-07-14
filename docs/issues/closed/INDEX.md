@@ -504,7 +504,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #991 | Pre-Phase | 4.6/E4 follow-up: tenant-scope the decision-adoption chart + average độ nét per active user | [pre-phase/issue-991.md](by-phase/pre-phase/issue-991.md) |
 | #993 | Pre-Phase | [4.6/E4] D28 retention theo cohort (tách segment mới vs legacy) | [pre-phase/issue-993.md](by-phase/pre-phase/issue-993.md) |
 | #994 | Pre-Phase | [4.6/E4][follow-up] Định nghĩa lại "product-active" làm denominator cho retention/DAU | [pre-phase/issue-994.md](by-phase/pre-phase/issue-994.md) |
+| #998 | Phase 4 | [Phase 4.7][E1 #1.1] drift_service — pure baseline + Twin-consequence delta | [phase-4/issue-998.md](by-phase/phase-4/issue-998.md) |
 | #1001 | Phase 4 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [phase-4/issue-1001.md](by-phase/phase-4/issue-1001.md) |
 
-**Total:** 501 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 23 Phase 4, 461 Pre-Phase)
+**Total:** 502 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 24 Phase 4, 461 Pre-Phase)
