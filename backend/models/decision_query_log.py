@@ -15,8 +15,18 @@ from backend.database import Base
 # lookup table.
 QUERY_TYPE_SHOCK = "shock"
 QUERY_TYPE_FEASIBILITY = "feasibility"
+# Phase 4.7 / E2 — user-initiated scam check ("kèo này có nên không?"). Only
+# this *user-initiated* Guardian surface logs here. Proactive drift warnings
+# (Phase 4.7 / E1) deliberately do NOT: they stamp the empathy ``empathy_fired``
+# event stream instead, because ``/charts/decision-adoption`` (see
+# ``backend/api/admin/analytics.py``) aggregates every row in this table with no
+# ``query_type`` filter, so logging a proactive nudge here would inflate the
+# G1/G2 adoption + active-user metrics. Fits ``String(32)`` — no migration.
+QUERY_TYPE_SCAM_CHECK = "scam_check"
 
-VALID_QUERY_TYPES = frozenset({QUERY_TYPE_SHOCK, QUERY_TYPE_FEASIBILITY})
+VALID_QUERY_TYPES = frozenset(
+    {QUERY_TYPE_SHOCK, QUERY_TYPE_FEASIBILITY, QUERY_TYPE_SCAM_CHECK}
+)
 
 
 class DecisionQueryLog(Base):
@@ -66,5 +76,6 @@ __all__ = [
     "DecisionQueryLog",
     "QUERY_TYPE_SHOCK",
     "QUERY_TYPE_FEASIBILITY",
+    "QUERY_TYPE_SCAM_CHECK",
     "VALID_QUERY_TYPES",
 ]

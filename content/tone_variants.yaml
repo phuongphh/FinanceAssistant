@@ -69,6 +69,45 @@ empathy:
 
         Không phán xét — nhưng đây là một pattern rõ. Muốn giữ mục tiêu thì đặt một mức trần cho cuối tuần là chắc ăn nhất.
 
+  # Spending-drift warning (Phase 4.7 E1). Nests one level past gentle/strict:
+  # the trigger's `copy_variant` (delay / stall / plain) picks the branch.
+  # {drift} = overshoot above baseline; {goal_label} = nearest goal name;
+  # {goal_delay_months} = months the goal slips (delay branch only). strict is
+  # thẳng thắn — names the number and the consequence — never sỉ nhục.
+  spending_drift:
+    gentle:
+      delay:
+        - |-
+          Em thấy tháng này {salutation} chi nhỉnh hơn mọi khi chừng {drift} 🌿
+
+          Giữ nhịp này thì mốc "{goal_label}" lùi thêm khoảng {goal_delay_months} tháng. Em kể để {salutation} nắm thôi — mình cân lại chút là kịp lại ngay 💚
+      stall:
+        - |-
+          Tháng này {salutation} chi vượt nền quen khoảng {drift} đó ạ 🌿
+
+          Nhịp này gần như dùng hết phần {salutation} vẫn để dành, nên "{goal_label}" khó tiến thêm. Mình cùng nhìn lại một chút nhé 💚
+      plain:
+        - |-
+          Em để ý nhịp chi tháng này của {salutation} cao hơn mọi khi chừng {drift} 🌿
+
+          Chưa có gì đáng lo đâu ạ — em ghi lại để {salutation} thấy bức tranh rõ hơn thôi 💚
+    strict:
+      delay:
+        - |-
+          Nói thẳng nha {salutation}: tháng này chi vượt nền quen {drift}.
+
+          Giữ nhịp này thì "{goal_label}" lùi khoảng {goal_delay_months} tháng. Cân lại phần chi thêm này là mốc về đúng hẹn.
+      stall:
+        - |-
+          Thẳng thắn nha {salutation}: tháng này chi vượt nền quen {drift}.
+
+          Mức này ăn gần hết phần để dành mỗi tháng, nên "{goal_label}" gần như đứng yên. Kéo phần chi thêm xuống thì mục tiêu mới nhích tiếp được.
+      plain:
+        - |-
+          Nói thẳng nha {salutation}: nhịp chi tháng này cao hơn nền quen {drift}.
+
+          Chưa thành vấn đề, nhưng đây là một pattern rõ — {salutation} nắm sớm để chủ động cân dòng tiền.
+
 # ============================================================
 # DECISION ANSWERS — feasibility / shock verdicts
 # ============================================================
