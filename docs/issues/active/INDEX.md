@@ -19,7 +19,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
 | #999 | [Phase 4.7][E1 #1.2] empathy trigger _check_spending_drift (include_drift param) | [issue-999.md](issue-999.md) |
 | #1000 | [Phase 4.7][E1 #1.3] DRIFT_WARNING_ENABLED flag + job wiring | [issue-1000.md](issue-1000.md) |
-| #1002 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [issue-1002.md](issue-1002.md) |
 | #1003 | [Phase 4.7][E3 #3.2] QUERY_TYPE_SCAM_CHECK constant (drift stays off decision_query_log) | [issue-1003.md](issue-1003.md) |
 
-**Total active:** 17
+**Total active:** 16
