@@ -509,6 +509,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1000 | Phase 4 | [Phase 4.7][E1 #1.3] DRIFT_WARNING_ENABLED flag + job wiring | [phase-4/issue-1000.md](by-phase/phase-4/issue-1000.md) |
 | #1001 | Phase 4 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [phase-4/issue-1001.md](by-phase/phase-4/issue-1001.md) |
 | #1002 | Phase 4 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [phase-4/issue-1002.md](by-phase/phase-4/issue-1002.md) |
+| #1003 | Phase 4 | [Phase 4.7][E3 #3.2] QUERY_TYPE_SCAM_CHECK constant (drift stays off decision_query_log) | [phase-4/issue-1003.md](by-phase/phase-4/issue-1003.md) |
 
-**Total:** 505 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 27 Phase 4, 461 Pre-Phase)
+**Total:** 506 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 461 Pre-Phase)
