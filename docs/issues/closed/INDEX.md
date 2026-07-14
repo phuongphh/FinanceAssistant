@@ -505,8 +505,9 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #993 | Pre-Phase | [4.6/E4] D28 retention theo cohort (tách segment mới vs legacy) | [pre-phase/issue-993.md](by-phase/pre-phase/issue-993.md) |
 | #994 | Pre-Phase | [4.6/E4][follow-up] Định nghĩa lại "product-active" làm denominator cho retention/DAU | [pre-phase/issue-994.md](by-phase/pre-phase/issue-994.md) |
 | #998 | Phase 4 | [Phase 4.7][E1 #1.1] drift_service — pure baseline + Twin-consequence delta | [phase-4/issue-998.md](by-phase/phase-4/issue-998.md) |
+| #999 | Phase 4 | [Phase 4.7][E1 #1.2] empathy trigger _check_spending_drift (include_drift param) | [phase-4/issue-999.md](by-phase/phase-4/issue-999.md) |
 | #1001 | Phase 4 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [phase-4/issue-1001.md](by-phase/phase-4/issue-1001.md) |
 | #1002 | Phase 4 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [phase-4/issue-1002.md](by-phase/phase-4/issue-1002.md) |
 
-**Total:** 503 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 25 Phase 4, 461 Pre-Phase)
+**Total:** 504 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 26 Phase 4, 461 Pre-Phase)
