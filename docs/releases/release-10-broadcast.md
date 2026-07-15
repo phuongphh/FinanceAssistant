@@ -1,16 +1,15 @@
-# Release 10 — Broadcast Message (1.4.5.0)
+# Release 10 — Broadcast Message (1.4.7.0.1)
 
-> **Mục đích:** Tin nhắn gửi cho **tất cả user** thông báo về bản cập nhật 1.4.5.0.
+> **Mục đích:** Tin nhắn gửi cho **tất cả user** thông báo về bản cập nhật 1.4.7.0.1.
 > **Không phải deploy notes nội bộ.** Giọng văn Bé Tiền — ấm áp, thuần Việt, không jargon.
 
-> **⚠️ Lưu ý nội bộ (KHÔNG gửi cho user) — gate theo feature flag:**
-> Bản cập nhật này tập trung vào **khả năng hỏi một câu quyết định thật** (Phase 4.5) mà onboarding mới (Phase 4.6) đưa lên tuyến đầu. Chỉ broadcast **sau khi** đã bật flag tương ứng ở production, nếu không user bấm thử sẽ không thấy gì:
-> - Khối "Hỏi một câu, có hướng đi ngay" → cần `PLAN_FEASIBILITY_QA_ENABLED`
-> - Khối "Thanh độ nét" → cần `CLARITY_METER_ENABLED`
-> - Khối "Thử nếu… thì sao" → cần `SHOCK_SIMULATION_ENABLED`
-> - Xuất Excel `/export` → `EXPORT_EXCEL_ENABLED` đã `true` sẵn
+> **⚠️ Lưu ý nội bộ (KHÔNG gửi cho user) — trạng thái flag ở release này:**
+> Bản cập nhật này tập trung vào **khả năng hỏi một câu quyết định thật** (Phase 4.5) mà onboarding mới (Phase 4.6) đưa lên tuyến đầu. Ở release production lần này **cả 3 flag đều BẬT**, nên **cả 3 khối tính năng ở dưới đều gửi**:
+> - Khối "Hỏi một câu, có hướng đi ngay" → `PLAN_FEASIBILITY_QA_ENABLED` = **on** ✅
+> - Khối "Thanh độ nét" → `CLARITY_METER_ENABLED` = **on** ✅
+> - Khối "Thử nếu… thì sao" → `SHOCK_SIMULATION_ENABLED` = **on** ✅
+> - Xuất Excel `/export` → `EXPORT_EXCEL_ENABLED` đã `true` sẵn ✅
 >
-> Nếu ở lần release này **không** bật khối nào ở trên thì **bỏ khối đó ra** khỏi bản gửi.
 > **KHÔNG** nhắc tới Phase 4.7 (Guardian Layer — drift warning E1 + guardrail/kill-switch E3 đang build dark, flag off; scam-check E2 legal-blocked) và **KHÔNG** nhắc chi tiết nội bộ onboarding reset (chỉ chạm user mới) — đúng nguyên tắc không quảng cáo tính năng chưa bật.
 
 ---
