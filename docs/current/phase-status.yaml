@@ -37,7 +37,7 @@
 #   2. If you flip current_phase, set the previous phase's status to "done".
 #   3. Commit. The workflow updates all marker sections.
 
-current_phase: "4.5"
+current_phase: "4.7"
 
 phases:
   - id: "1"
@@ -222,13 +222,13 @@ phases:
 
   - id: "4.5"
     name: "Decision Engine Foundation"
-    status: current
+    status: done
     duration: "~3 tuần"
     detail_doc: "docs/current/phase-4.5/phase-4.5-detailed.md"
     issues_doc: "docs/current/phase-4.5/phase-4.5-issues.md"
     description: "Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel (.xlsx), tone dial, one-time re-engagement cho cohort dormant. Kickoff 09/07/2026, target ship late July 2026. 5 Epics / 17 issues."
-    completed_date: ""
-    icon: "🧭"
+    completed_date: "2026-07-10"
+    icon: "✅"
 
   - id: "4.6"
     name: "Onboarding Reset"
@@ -242,13 +242,13 @@ phases:
 
   - id: "4.7"
     name: "Guardian Layer"
-    status: planned
+    status: current
     duration: "~2-3 tuần"
     detail_doc: "docs/current/phase-4.7/phase-4.7-detailed.md"
     issues_doc: "docs/current/phase-4.7/phase-4.7-issues.md"
-    description: "Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). Tháng 9/2026, gate G1 đo giữa tháng 9."
+    description: "Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). Tháng 9/2026, gate G1 đo giữa tháng 9. IN PROGRESS: E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark, chỉ bật khi G1 pass); E2 scam-check bị legal-blocked, chưa build."
     completed_date: ""
-    icon: "🔮"
+    icon: "🛡️"
 
   - id: "5.0"
     name: "Zalo Channel Launch"

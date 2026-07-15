@@ -2,7 +2,7 @@
 
 > Twin đổi nghề: từ "tương lai bạn trông thế nào?" (ngắm) → "bạn nên làm gì?" (quyết định). Ship 2 decision moments đầu tiên trên engine có sẵn + độ nét v1 + 2 quick wins từ feedback + 1 đợt re-engagement duy nhất.
 
-**Status:** 📝 Planning
+**Status:** ✅ Done — E1–E5 implemented + merged (10/07/2026)
 **Duration:** ~3 tuần (target ship: late July 2026)
 **Branch:** `claude/finance-assistant-strategy-wz76aj`
 **Strategy:** [`docs/current/strategy.md`](../strategy.md) — Strategy V4 §Differentiator + §Roadmap Phase 4.5

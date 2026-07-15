@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Decision Engine Foundation** (current) — [detail](docs/current/phase-4.5/phase-4.5-detailed.md)
+🚀 **Guardian Layer** (current) — [detail](docs/current/phase-4.7/phase-4.7-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).

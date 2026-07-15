@@ -4,6 +4,11 @@
 
 **Chốt lịch:** Tháng 9/2026, ~2-3 tuần. **Gate G1** (decision adoption) đo giữa tháng 9 — 4.7 build sau flag từ bây giờ nhưng **chỉ bật khi G1 pass** (Strategy V4 §180). Nếu G1 fail → dừng 4.7, re-diagnose bằng interview trước khi bật.
 
+**Trạng thái build (cập nhật 15/07/2026):** 🛡️ IN PROGRESS.
+- ✅ **E1 — Drift warning** (`drift_service.py` + empathy trigger `_check_spending_drift`) đã merged nhưng **FLAG OFF** (build dark, chỉ bật khi G1 pass).
+- ✅ **E3 — Guardrail flag + kill-switch infra** đã merged, FLAG OFF.
+- ⛔ **E2 — Scam check** legal-blocked, **chưa build** (chờ product-owner quyết định #994).
+
 ---
 
 ## 📋 Changelog vs Strategy V4
