@@ -153,8 +153,8 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-4.4/phase-4.4-detailed.md`](docs/current/phase-4.4/phase-4.4-detailed.md) — First-5-Minutes WOW: salutation foundation, screenshot onboarding, proactive companion (The Reading gỡ bỏ 29/05/2026)
-- **Current phase:** [`docs/current/phase-4.5/phase-4.5-detailed.md`](docs/current/phase-4.5/phase-4.5-detailed.md) — Decision Engine Foundation (Strategy V4); sau đó 4.6 Onboarding Reset → 4.7 Guardian → 5.0-5.2 Zalo → 5.3 Encryption
+- **Recently completed phase:** [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) — Onboarding Reset (done 13/07/2026); trước đó 4.5 Decision Engine Foundation (done 10/07/2026)
+- **Current phase:** [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked); sau đó 5.0-5.2 Zalo → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -193,13 +193,13 @@ Quick reference:
 
 ### Current phase
 
-Phase 4.5 — Decision Engine Foundation (Strategy V4): shock simulation + liquidation advice, plan-to-goal feasibility Q&A, độ nét meter v1, Excel export + tone dial, decision query log + re-engagement một lần. Tiếp theo: 4.6 Onboarding Reset → 4.7 Guardian Layer → 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End.
+Phase 4.7 — Guardian Layer: drift/overspend warnings gắn hệ quả Twin (E1) + scam-check v1 red-flags KHÔNG verdict (E2). Đã merged FLAG OFF (build dark, chỉ bật khi gate G1 pass): E1 drift warning + E3 guardrail flag/kill-switch infra. E2 scam-check legal-blocked, chưa build. Tiếp theo: 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End. Trước đó đã done: 4.5 Decision Engine Foundation (10/07/2026), 4.6 Onboarding Reset (13/07/2026).
 
-Detail: [`docs/current/phase-4.4/phase-4.4-detailed.md`](docs/current/phase-4.4/phase-4.4-detailed.md) · [`docs/current/phase-4.5/phase-4.5-detailed.md`](docs/current/phase-4.5/phase-4.5-detailed.md)
+Detail: [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) · [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md)
 
 ## Active Breaking Changes
 
-(None currently — Phase 4.5 planning is additive over 4.4)
+(None currently — Phase 4.7 Guardian Layer builds dark, flags OFF; additive over 4.6)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 

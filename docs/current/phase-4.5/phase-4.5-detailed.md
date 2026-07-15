@@ -168,17 +168,17 @@
 
 ## ✅ Definition of Done
 
-- [ ] Shock sim end-to-end: câu hỏi tự nhiên → so sánh phương án rút → khuyến nghị thứ tự → redraw danh mục; 0 persist hypothetical.
-- [ ] Feasibility Q&A trả lời thành thật cả 6 FeasibilityBand; case NEEDS_REVISION luôn kèm mốc trong tầm tay.
-- [ ] Độ nét hiện trên: Twin Mini App, Twin Telegram view, mọi decision answer; nhập data → tăng ngay lập tức; dưới ngưỡng → humble mode.
-- [ ] `/export` trả file .xlsx mở được trong Excel + import Google Sheets; số tiền đúng format.
-- [ ] Tone dial đổi được trong /profile, persist, ảnh hưởng empathy + decision copy; tone strict pass persona floor test.
-- [ ] `decision_query_log` ghi đủ mọi decision query với clarity_score.
-- [ ] Broadcast script dry-run cho số đếm đúng cohort dormant; chạy thật idempotent.
-- [ ] 5 flags có test on/off; tắt hết flags → behavior y hệt trước 4.5.
-- [ ] 0 chuỗi "Decision Engine"/"GPS tài chính"/"CFO" trong user-facing copy (vi-localization-checker).
-- [ ] Persona gates pass: prompt-tester cho shock/feasibility answers × 3 xưng hô × 2 tone.
-- [ ] Toàn bộ test xanh; ruff + layer-contract-checker sạch.
+- [x] Shock sim end-to-end: câu hỏi tự nhiên → so sánh phương án rút → khuyến nghị thứ tự → redraw danh mục; 0 persist hypothetical.
+- [x] Feasibility Q&A trả lời thành thật cả 6 FeasibilityBand; case NEEDS_REVISION luôn kèm mốc trong tầm tay.
+- [x] Độ nét hiện trên: Twin Mini App, Twin Telegram view, mọi decision answer; nhập data → tăng ngay lập tức; dưới ngưỡng → humble mode.
+- [x] `/export` trả file .xlsx mở được trong Excel + import Google Sheets; số tiền đúng format.
+- [x] Tone dial đổi được trong /profile, persist, ảnh hưởng empathy + decision copy; tone strict pass persona floor test.
+- [x] `decision_query_log` ghi đủ mọi decision query với clarity_score.
+- [x] Broadcast script dry-run cho số đếm đúng cohort dormant; chạy thật idempotent.
+- [x] 5 flags có test on/off; tắt hết flags → behavior y hệt trước 4.5.
+- [x] 0 chuỗi "Decision Engine"/"GPS tài chính"/"CFO" trong user-facing copy (vi-localization-checker).
+- [x] Persona gates pass: prompt-tester cho shock/feasibility answers × 3 xưng hô × 2 tone.
+- [x] Toàn bộ test xanh; ruff + layer-contract-checker sạch.
 
 ---
 
