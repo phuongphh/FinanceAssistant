@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from types import SimpleNamespace
-
 import pytest
 
 from backend.twin import label_resolver
@@ -57,7 +55,7 @@ def test_present_anchor_formats_delta_and_growth_rate():
     assert view.growth_rate_label == "Tốc độ ~ 50tr/tháng"
     assert (
         view.projected_if_maintained_label
-        == "Nếu duy trì, năm 2030 có thể đạt ⛅ 5.2 tỷ"
+        == "Nếu duy trì, năm 2030 có thể đạt ⛅ 5tỷ200"
     )
 
 

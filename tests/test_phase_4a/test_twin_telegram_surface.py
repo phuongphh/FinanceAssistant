@@ -99,7 +99,8 @@ async def test_twin_handler_sends_photo_with_cone_caption(monkeypatch):
         object(), chat_id=123, user=FakeUser(), notifier=notifier
     )
 
-    assert notifier.messages == []
+    assert len(notifier.messages) == 1
+    assert "Vì sao Twin thay đổi?" in str(notifier.messages[0][2]["reply_markup"])
     assert notifier.photos[0][1] == b"png-bytes"
     caption = notifier.photos[0][2]["caption"]
     assert "vùng khả năng từ 150tr đến 350tr" in caption

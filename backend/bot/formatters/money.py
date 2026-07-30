@@ -13,6 +13,11 @@ def _to_decimal(amount) -> Decimal:
         return amount
     if isinstance(amount, int):
         return Decimal(amount)
+    if isinstance(amount, str):
+        # Projection payloads are JSON-safe and therefore commonly carry
+        # Decimal values as numeric strings.  Parse those directly instead of
+        # applying repr(), which adds quotes and makes Decimal reject them.
+        return Decimal(amount.strip())
     return Decimal(repr(amount))
 
 

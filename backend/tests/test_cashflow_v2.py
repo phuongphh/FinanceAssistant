@@ -363,7 +363,9 @@ class TestAlertDedup:
                 AsyncMock(return_value=forecast),
             ),
             patch("backend.cashflow.alert._get_redis", return_value=mock_redis),
-            patch("backend.cashflow.alert.get_notifier", return_value=mock_notifier),
+            patch("backend.cashflow.alert.resolve_targets", return_value=[
+                MagicMock(channel="telegram", notifier=mock_notifier, target_id="12345")
+            ]),
         ):
             from backend.cashflow.alert import check_and_send_alert
             sent = await check_and_send_alert(None, user, [])
@@ -399,7 +401,9 @@ class TestAlertDedup:
                 AsyncMock(return_value=forecast),
             ),
             patch("backend.cashflow.alert._get_redis", return_value=mock_redis),
-            patch("backend.cashflow.alert.get_notifier", return_value=mock_notifier),
+            patch("backend.cashflow.alert.resolve_targets", return_value=[
+                MagicMock(channel="telegram", notifier=mock_notifier, target_id="12345")
+            ]),
             patch("backend.cashflow.alert._load_copy", return_value={}),
         ):
             from backend.cashflow.alert import check_and_send_alert

@@ -72,6 +72,7 @@ def _make_fake_session() -> MagicMock:
     session.rollback = AsyncMock()
     # Services now flush() instead of commit() (Phase B1).
     session.flush = AsyncMock()
+    session.get = AsyncMock(return_value=None)
     # route_update issues an UPDATE to stamp user_id before commit —
     # execute must be awaitable.
     session.execute = AsyncMock(return_value=MagicMock(rowcount=0))
@@ -172,7 +173,7 @@ class TestRouteUpdate:
             "backend.services.dashboard_service.get_or_create_user",
             new_callable=AsyncMock, return_value=(fake_user, True),
         ), patch(
-            "backend.bot.handlers.onboarding.resume_or_start",
+            "backend.bot.handlers.onboarding_v2.handle_start",
             new_callable=AsyncMock,
         ):
             await telegram_worker.route_update(
@@ -236,7 +237,11 @@ class TestRouteUpdate:
             "backend.bot.handlers.goal_entry.cancel_wizard",
             new_callable=AsyncMock,
             return_value=True,
-        ) as mock_cancel:
+        ) as mock_cancel, patch(
+            "backend.services.dashboard_service.get_user_by_telegram_id",
+            new_callable=AsyncMock,
+            return_value=fake_user,
+        ):
             await telegram_worker.route_update(
                 {
                     "update_id": 50,

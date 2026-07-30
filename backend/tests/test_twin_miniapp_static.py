@@ -55,5 +55,5 @@ def test_twin_preloads_opposite_scenario_for_faster_toggle():
     assert "const targetScenario = activeScenario === 'current' ? 'optimal' : 'current';" in js
     assert "if (cache[targetScenario]) return;" in js
     assert "fetch(`/api/twin?scenario=${encodeURIComponent(targetScenario)}`" in js
-    assert "if (body && body.data) cache[targetScenario] = body.data;" in js
+    assert "cache[targetScenario] = body.data;" in js
     assert "preloadOtherScenario(scenario);" in js

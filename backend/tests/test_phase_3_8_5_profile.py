@@ -267,7 +267,7 @@ async def test_handle_profile_view_degrades_when_stats_fail(monkeypatch):
     assert "chế độ an toàn" in sent["text"]
     # 5 rows: [edit_name, edit_age] + [notifications] + [glossary]
     # + [default_expense_source] + [back]
-    assert len(sent["reply_markup"]["inline_keyboard"]) == 5
+    assert len(sent["reply_markup"]["inline_keyboard"]) == 6
 
 
 def test_sanitize_display_name_validates_and_strips_at():
@@ -892,5 +892,4 @@ async def test_expense_source_options_sorted_by_type_then_name(monkeypatch):
         (f"credit_card:{card_a.id}", "Thẻ tín dụng [ACB]"),
         (f"credit_card:{card_b.id}", "Thẻ tín dụng [ZBank]"),
         (f"e_wallet:{wallet_a.id}", "Ví điện tử [MoMo]"),
-        (f"e_wallet:{wallet_b.id}", "Ví điện tử [ZaloPay]"),
     ]

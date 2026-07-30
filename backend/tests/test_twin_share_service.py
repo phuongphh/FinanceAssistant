@@ -25,6 +25,7 @@ def _snapshot(cone):
     return SimpleNamespace(
         latest_cone=cone,
         projection=SimpleNamespace(cone_data=cone),
+        is_value_stale=False,
     )
 
 

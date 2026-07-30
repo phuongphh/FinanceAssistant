@@ -66,6 +66,7 @@ def _fake_session():
     # auto-creating a non-coroutine attribute if a handler calls into
     # a real service under these mocks.
     session.flush = AsyncMock()
+    session.get = AsyncMock(return_value=None)
     # route_update issues UPDATE telegram_updates SET user_id = ?
     # before committing — execute must be awaitable.
     session.execute = AsyncMock(return_value=MagicMock(rowcount=0))
@@ -76,11 +77,11 @@ class TestOnboardingDispatch:
     """Drive route_update through each step of the 5-step onboarding."""
 
     @pytest.mark.asyncio
-    @patch("backend.bot.handlers.onboarding.send_welcome_back", new_callable=AsyncMock)
+    @patch("backend.bot.handlers.onboarding_v2.handle_start", new_callable=AsyncMock)
     @patch("backend.bot.handlers.onboarding.step_1_welcome", new_callable=AsyncMock)
     @patch("backend.services.dashboard_service.get_or_create_user", new_callable=AsyncMock)
     async def test_start_for_new_user_triggers_welcome(
-        self, mock_get_or_create, mock_step_1, mock_welcome_back
+        self, mock_get_or_create, mock_step_1, mock_handle_start
     ):
         user = _fake_user(step=0, is_onboarded=False)
         mock_get_or_create.return_value = (user, True)
@@ -99,8 +100,8 @@ class TestOnboardingDispatch:
                 },
             })
 
-        mock_step_1.assert_awaited_once()
-        mock_welcome_back.assert_not_called()
+        mock_handle_start.assert_awaited_once()
+        mock_step_1.assert_not_called()
 
     @pytest.mark.asyncio
     @patch("backend.bot.handlers.onboarding.send_welcome_back", new_callable=AsyncMock)
@@ -169,7 +170,10 @@ class TestOnboardingDispatch:
         )
 
         sess = _fake_session()
-        with patch.object(
+        with patch(
+            "backend.bot.handlers.onboarding_v2.handle_name_text_input",
+            new=AsyncMock(return_value=False),
+        ), patch.object(
             telegram_worker, "get_session_factory",
             return_value=MagicMock(return_value=sess),
         ):

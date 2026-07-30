@@ -8,6 +8,7 @@ verification and the claim-then-enqueue contract.
 """
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.database import get_db
@@ -18,8 +19,14 @@ async def _fake_db():
     yield None
 
 
-app.dependency_overrides[get_db] = _fake_db
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _db_override():
+    app.dependency_overrides[get_db] = _fake_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 def _noop_enqueue(update_id, data):

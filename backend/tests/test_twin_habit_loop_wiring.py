@@ -54,7 +54,7 @@ async def test_open_twin_callback_forwards_and_tracks_click():
 
     sent_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     sent_result = MagicMock()
-    sent_result.scalar_one_or_none.return_value = sent_at
+    sent_result.one_or_none.return_value = (sent_at, {})
     opened_result = MagicMock()
     opened_result.first.return_value = ("already-opened",)
     db.execute = AsyncMock(side_effect=[sent_result, opened_result])
