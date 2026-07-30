@@ -23,9 +23,11 @@ Release 10 gom toàn bộ work kể từ release 9 (merge prod gần nhất #956
    formatter nhận Decimal dạng chuỗi từ projection payload, build info trong miniapp,
    khôi phục độ tin cậy của full test suite.
 
-> ⚠️ **Tất cả feature flag của 4.5/4.6/4.7 đều default OFF trong code.** Deploy này
-> **không tự thay đổi hành vi** với user hiện tại — xem section _Config / env_ để biết
-> flag nào cần bật thủ công trên prod cho đúng nội dung broadcast.
+> ⚠️ **Gần như toàn bộ feature flag của 4.5/4.6/4.7 default OFF trong code — trừ một
+> ngoại lệ: `EXPORT_EXCEL_ENABLED` default `true`.** Deploy trần vì vậy **có** bật
+> `/export` (lệnh + nút menu) cho user hiện tại; mọi surface còn lại vẫn dark.
+> Xem section _Config / env_ để biết flag nào cần bật thủ công cho đúng nội dung
+> broadcast, và vì sao nên set `EXPORT_EXCEL_ENABLED=false` ở release này.
 
 ---
 
@@ -59,8 +61,8 @@ Chạy theo thứ tự (`alembic upgrade head`) — chain nối tiếp head hi�
 | Thứ tự | Revision | File | Mô tả |
 |---|---|---|---|
 | 1 | `20260710tone45` | `20260710_phase45_tone_reengagement.py` | Tone preference (gentle/strict) + state re-engagement broadcast |
-| 2 | `20260710dqlog45` | `20260710_phase45_decision_query_log.py` | Bảng append-only `decision_query_log` (E5) |
-| 3 | `20260712dqcohort46` | `20260712_phase46_decision_query_log_cohort.py` | Thêm cohort tag vào `decision_query_log` (4.6 E4) |
+| 2 | `20260710dqlog45` | `20260710_phase45_decision_query_log.py` | Bảng append-only `decision_query_logs` (E5) |
+| 3 | `20260712dqcohort46` | `20260712_phase46_decision_query_log_cohort.py` | Thêm cohort tag vào `decision_query_logs` (4.6 E4) |
 
 Tất cả đều **additive** (thêm bảng / thêm cột nullable) → an toàn, không cần backfill,
 code cũ ignore được nếu phải rollback code mà giữ DB.
@@ -71,9 +73,11 @@ code cũ ignore được nếu phải rollback code mà giữ DB.
 
 **Không có env key mới bắt buộc** — `.env.example` không đổi trong release này.
 
-Toàn bộ feature flag đọc ở handler/job edge (`backend/intent/handlers/decision_flags.py`,
-`backend/bot/handlers/onboarding_v2.py`) và **default OFF**, nên deploy trần sẽ giữ nguyên
-hành vi hiện tại. Broadcast 1.4.7.0.1 (`docs/releases/release-10-broadcast.md`) quảng bá 3
+Feature flag đọc ở handler/job edge (`backend/intent/handlers/decision_flags.py`,
+`backend/bot/handlers/onboarding_v2.py`). Tất cả **default OFF** — **trừ
+`EXPORT_EXCEL_ENABLED` default `true`** (xem `is_export_excel_enabled()`), nên deploy trần
+sẽ bật `/export` chứ không giữ nguyên 100% hành vi hiện tại.
+Broadcast 1.4.7.0.1 (`docs/releases/release-10-broadcast.md`) quảng bá 3
 tính năng — **phải bật 3 flag dưới đây trên prod rồi restart service TRƯỚC khi gửi broadcast**:
 
 | Env var | Đặt | Bật cái gì |
@@ -81,21 +85,35 @@ tính năng — **phải bật 3 flag dưới đây trên prod rồi restart ser
 | `PLAN_FEASIBILITY_QA_ENABLED` | `true` | Hỏi một câu quyết định → feasibility Q&A |
 | `CLARITY_METER_ENABLED` | `true` | Thanh "độ nét" trên mỗi câu trả lời |
 | `SHOCK_SIMULATION_ENABLED` | `true` | Thử "nếu… thì sao" trên bản sao số liệu |
-| `EXPORT_EXCEL_ENABLED` | *(default `true`)* | `/export` — đã ON sẵn, không cần set |
 
 Giữ **OFF** ở release này (không nằm trong broadcast):
 
 | Env var | Lý do |
 |---|---|
+| `EXPORT_EXCEL_ENABLED` | ⚠️ **Default `true` — phải set `false` thủ công.** `/export` là tính năng mới hoàn toàn (chưa từng lên prod) và code review phát hiện 2 lỗi chưa fix: (a) `_build_cashflow_sheet` ghi text của user vào cell mà không escape → chuỗi bắt đầu bằng `=` thành công thức Excel; (b) `_gather` không lọc `transaction_type` nên row `money_in` bị xuất ra như khoản chi. Bật lại sau khi có PR fix. |
 | `DRIFT_WARNING_ENABLED` | Phase 4.7 E1 build dark — chỉ bật khi gate G1 pass + owner sign-off |
 | `SCAM_CHECK_ENABLED` | Phase 4.7 E2 legal-blocked; đây cũng là kill switch §8 |
 | `TONE_DIAL_ENABLED` | Opt-in experiment, chưa quảng bá |
 | `ACTIVATION_NUDGE_ENABLED` | Opt-in experiment cho cohort never-activated |
 | `ONBOARDING_RESET_ENABLED` / `ONBOARDING_DECISION_MOMENT_ENABLED` | Onboarding reset — bật riêng khi muốn chạy cho user mới |
 
-> Flag đọc từ `os.environ`, chỉ đổi khi **restart process** —
-> `scripts/rebuild-finance-prod.sh` / launchd reload. Đây là cơ chế kill-switch <24h
-> không cần deploy code (xem §8 runbook trong `phase-4.7-detailed.md`).
+> ⚠️ **Set flag ở đâu — sửa `.env` KHÔNG đủ.** `decision_flags.py` đọc thẳng
+> `os.environ`, trong khi `.env` chỉ được pydantic-settings nạp vào object `Settings`
+> (`backend/config/__init__.py`, `env_file=".env"`) — nó **không** ghi vào `os.environ`.
+> Cả hai launchd plist template cũng không có key `EnvironmentVariables` cho flag và
+> không source `.env`. Thêm dòng vào `.env` rồi reload agent ⇒ flag vẫn ở default.
+>
+> Dùng một trong hai cách:
+>
+> 1. `launchctl setenv EXPORT_EXCEL_ENABLED false` (lặp cho từng flag) → rồi
+>    `launchctl kickstart -k gui/$(id -u)/com.financeassistant.backend`; hoặc
+> 2. thêm block `<key>EnvironmentVariables</key>` chứa các flag vào
+>    `launchd/com.financeassistant.backend.plist.template` (+ `.scheduler.`),
+>    chạy lại `scripts/install-launchd.sh`, rồi reload.
+>
+> Cách (1) nhanh, hợp với kill-switch; cách (2) bền qua reboot. Flag chỉ đổi khi
+> **restart process** — đây là cơ chế kill-switch <24h không cần deploy code
+> (xem §8 runbook trong `phase-4.7-detailed.md`).
 
 ---
 
@@ -182,7 +200,8 @@ tính năng lỗi là set flag về `false` rồi restart service — không ph�
 ## Sanity checks sau deploy
 
 - [ ] `/about` hiển thị version `1.4.7.0.1`
-- [ ] `alembic upgrade head` chạy clean → có bảng `decision_query_log` + cột cohort
+- [ ] `alembic upgrade head` chạy clean → có bảng `decision_query_logs` (số nhiều, khớp
+      `DecisionQueryLog.__tablename__`) + cột cohort
 - [ ] Bot phản hồi `/start` bằng welcome message Bé Tiền
 - [ ] Gửi 1 transaction text → ghi nhận và lưu DB
 - [ ] Gửi 1 ảnh receipt → OCR trả kết quả < 15s
