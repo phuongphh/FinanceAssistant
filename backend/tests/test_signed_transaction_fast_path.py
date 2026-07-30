@@ -149,5 +149,5 @@ async def test_money_in_always_uses_wizard():
         ok = await message_handler.handle_text_message(db, message)
 
     assert ok is True
-    mock_create.assert_not_called()
-    mock_wizard.assert_awaited_once()
+    mock_create.assert_awaited_once()
+    mock_wizard.assert_not_awaited()

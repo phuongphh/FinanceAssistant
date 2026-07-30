@@ -81,12 +81,16 @@ async def test_credit_card_wizard_happy_path(monkeypatch):
     monkeypatch.setattr("backend.bot.handlers.credit_card_entry.wizard_service.clear", AsyncMock())
     monkeypatch.setattr(
         "backend.bot.handlers.credit_card_entry.create_credit_card",
-        AsyncMock(return_value=SimpleNamespace(bank_name="MSB", debt_balance=100000000, closing_date=20)),
+            AsyncMock(return_value=SimpleNamespace(
+                id="card-1", bank_name="MSB", credit_limit=100000000,
+                debt_balance=100000000, closing_date=20,
+            )),
     )
 
     msg = {"chat": {"id": 1}, "from": {"id": 1}}
     assert await credit_card_entry.handle_credit_card_text_input(None, {**msg, "text": "MSB"})
     assert await credit_card_entry.handle_credit_card_text_input(None, {**msg, "text": "100tr"})
+    assert await credit_card_entry.handle_credit_card_text_input(None, {**msg, "text": "10tr"})
     assert await credit_card_entry.handle_credit_card_text_input(None, {**msg, "text": "20"})
     assert any("Đã thêm thẻ tín dụng thành công" in s for s in sent)
 

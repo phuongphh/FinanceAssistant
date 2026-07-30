@@ -390,6 +390,27 @@ async def _navigate(
         )
         analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
         return
+    elif target == "twin":
+        # Twin is the product's primary visual surface.  Do not depend on
+        # editMessageText here: Telegram cannot edit every kind of source
+        # message (old menu/photo bubbles are common after a Twin share), and
+        # a rejected edit made this entry point look like a dead button.
+        # Sending a fresh bubble is the same fail-open behaviour used below,
+        # but makes it deterministic for this high-value route.
+        text, keyboard = format_submenu(user, target, level=level)
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=None,
+            reply_markup=keyboard,
+            **message_kwargs_for_animation(text, "submenu"),
+        )
+        analytics.track(
+            "menu_navigated",
+            user_id=user_id,
+            properties={"to": target},
+        )
+        return
     else:
         text, keyboard = format_submenu(user, target, level=level)
 
@@ -771,7 +792,6 @@ async def _action_assets_net_worth(
     """
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
-    from backend.wealth.services import net_worth_calculator
 
     breakdown = await _calculate_stored_current_with_wait(
         db=db, user_id=user.id, chat_id=chat_id

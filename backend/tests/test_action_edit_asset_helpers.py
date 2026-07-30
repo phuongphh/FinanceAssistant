@@ -44,7 +44,7 @@ class TestParseQuantity:
         [
             ("200 cổ", Decimal("200")),
             ("200co", Decimal("200")),
-            ("0.5 BTC", Decimal("5")),  # decimals are stripped — see note
+            ("0.5 BTC", Decimal("0.5")),
             ("10 ETH", Decimal("10")),
             ("5 chỉ", Decimal("5")),
             ("100 share", Decimal("100")),
@@ -55,10 +55,7 @@ class TestParseQuantity:
         ],
     )
     def test_quantity_parse(self, raw, expected):
-        # Note: fractional crypto amounts ("0.5 BTC") collapse the
-        # decimal point in the simple impl. That's acceptable for V1 —
-        # the wizard fallback covers fractional sizing precisely. The
-        # test pins the current behaviour so changes are intentional.
+        # Fractional crypto quantities retain their decimal precision.
         assert _parse_quantity(raw) == expected
 
 

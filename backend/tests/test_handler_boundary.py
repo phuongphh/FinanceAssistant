@@ -25,7 +25,9 @@ HANDLER_DIR = Path(__file__).resolve().parents[1] / "bot" / "handlers"
 FORBIDDEN_PATTERNS = [
     # select(User).where(User.telegram_id == ...) — classic duplication
     # of dashboard_service.get_user_by_telegram_id.
-    re.compile(r"\bselect\s*\(\s*User\b"),
+    # Match selecting the entity itself, not legitimate aggregate columns
+    # such as select(User.acquisition_source, func.count()).
+    re.compile(r"\bselect\s*\(\s*User\s*\)"),
     re.compile(r"\bUser\.telegram_id\s*=="),
 ]
 

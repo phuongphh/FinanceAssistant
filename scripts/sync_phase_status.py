@@ -244,14 +244,14 @@ def update_marker(content: str, marker_id: str, new_content: str) -> tuple[str, 
         If marker is missing, returns content unchanged with found=False.
     """
     pattern = re.compile(
-        rf"(<!-- BEGIN: {re.escape(marker_id)} -->\n).*?(\n<!-- END: {re.escape(marker_id)} -->)",
+        rf"(<!-- BEGIN: {re.escape(marker_id)} -->\n).*?(<!-- END: {re.escape(marker_id)} -->)",
         re.DOTALL,
     )
 
     if not pattern.search(content):
         return content, False
 
-    return pattern.sub(rf"\1{new_content}\2", content), True
+    return pattern.sub(rf"\1{new_content}\n\2", content), True
 
 
 def sync_file(path: Path, rendered: dict[str, str], dry_run: bool = False) -> bool:
@@ -261,7 +261,10 @@ def sync_file(path: Path, rendered: dict[str, str], dry_run: bool = False) -> bo
 
     ``rendered`` maps marker_id → rendered content for every supported marker.
     """
-    rel_path = path.relative_to(REPO_ROOT)
+    try:
+        rel_path = path.relative_to(REPO_ROOT)
+    except ValueError:
+        rel_path = path
 
     if not path.exists():
         print(f"  SKIP: {rel_path} (does not exist)")
@@ -272,7 +275,11 @@ def sync_file(path: Path, rendered: dict[str, str], dry_run: bool = False) -> bo
 
     found_markers = []
     for marker_id, new_content in rendered.items():
-        new_content = rewrite_links_relative(new_content, path.parent)
+        try:
+            new_content = rewrite_links_relative(new_content, path.parent)
+        except ValueError:
+            # Temporary/external files have no repo-relative link context.
+            pass
         content, found = update_marker(content, marker_id, new_content)
         if found:
             # short label = part after the colon
@@ -292,6 +299,33 @@ def sync_file(path: Path, rendered: dict[str, str], dry_run: bool = False) -> bo
     action = "WOULD UPDATE" if dry_run else "✓ UPDATED"
     print(f"  {action}: {rel_path} (markers: {', '.join(found_markers)})")
     return True
+
+
+def rewrite_file(path: Path, data: dict) -> bool:
+    """Backward-compatible one-file sync helper used by tooling and tests."""
+    if not path.exists():
+        return False
+    content = path.read_text(encoding="utf-8")
+    known = {
+        CURRENT_LINE_MARKER,
+        ROADMAP_TABLE_MARKER,
+        STATUS_LIST_MARKER,
+        CURRENT_BLOCK_MARKER,
+    }
+    for marker in re.findall(r"<!-- BEGIN: (phase-status:[^ ]+) -->", content):
+        if marker not in known:
+            print(f"Unknown marker: {marker}", file=sys.stderr)
+    rendered = {
+        CURRENT_LINE_MARKER: render_current_line(data),
+        ROADMAP_TABLE_MARKER: render_roadmap_table(data),
+        STATUS_LIST_MARKER: render_status_list(data),
+        CURRENT_BLOCK_MARKER: render_current_block(data),
+    }
+    return sync_file(path, rendered)
+
+
+# Historical name retained for callers that imported the sync script.
+load_status = load_phase_status
 
 
 def seed_test_cases_markers(dry_run: bool = False) -> list[Path]:
