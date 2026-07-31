@@ -26,8 +26,10 @@ Release 10 gom toàn bộ work kể từ release 9 (merge prod gần nhất #956
 > ⚠️ **Gần như toàn bộ feature flag của 4.5/4.6/4.7 default OFF trong code — trừ một
 > ngoại lệ: `EXPORT_EXCEL_ENABLED` default `true`.** Deploy trần vì vậy **có** bật
 > `/export` (lệnh + nút menu) cho user hiện tại; mọi surface còn lại vẫn dark.
+> Hai lỗi `/export` mà code review chỉ ra (formula injection + row `money_in` xuất
+> nhầm thành khoản chi) **đã fix trong release này**, nên giữ nguyên default `true`.
 > Xem section _Config / env_ để biết flag nào cần bật thủ công cho đúng nội dung
-> broadcast, và vì sao nên set `EXPORT_EXCEL_ENABLED=false` ở release này.
+> broadcast.
 
 ---
 
@@ -76,25 +78,25 @@ code cũ ignore được nếu phải rollback code mà giữ DB.
 Feature flag đọc ở handler/job edge (`backend/intent/handlers/decision_flags.py`,
 `backend/bot/handlers/onboarding_v2.py`). Tất cả **default OFF** — **trừ
 `EXPORT_EXCEL_ENABLED` default `true`** (xem `is_export_excel_enabled()`), nên deploy trần
-sẽ bật `/export` chứ không giữ nguyên 100% hành vi hiện tại.
+đã bật sẵn `/export`.
 Broadcast 1.4.7.0.1 (`docs/releases/release-10-broadcast.md`) quảng bá 3
-tính năng — **phải bật 3 flag dưới đây trên prod rồi restart service TRƯỚC khi gửi broadcast**:
+tính năng — **phải bật các flag dưới đây trên prod rồi restart service TRƯỚC khi gửi broadcast**:
 
 | Env var | Đặt | Bật cái gì |
 |---|---|---|
 | `PLAN_FEASIBILITY_QA_ENABLED` | `true` | Hỏi một câu quyết định → feasibility Q&A |
 | `CLARITY_METER_ENABLED` | `true` | Thanh "độ nét" trên mỗi câu trả lời |
 | `SHOCK_SIMULATION_ENABLED` | `true` | Thử "nếu… thì sao" trên bản sao số liệu |
+| `TONE_DIAL_ENABLED` | `true` | Tone dial gentle/strict — copy strict đã phủ đủ 7 trigger empathy + verdict feasibility |
+| `ACTIVATION_NUDGE_ENABLED` | `true` | Nudge cohort chưa kích hoạt (guardrail cooldown + quiet hours đã có) |
+| `EXPORT_EXCEL_ENABLED` | `true` (default) | `/export` Excel — không cần set tay, chỉ đừng set `false` |
 
 Giữ **OFF** ở release này (không nằm trong broadcast):
 
 | Env var | Lý do |
 |---|---|
-| `EXPORT_EXCEL_ENABLED` | ⚠️ **Default `true` — phải set `false` thủ công.** `/export` là tính năng mới hoàn toàn (chưa từng lên prod) và code review phát hiện 2 lỗi chưa fix: (a) `_build_cashflow_sheet` ghi text của user vào cell mà không escape → chuỗi bắt đầu bằng `=` thành công thức Excel; (b) `_gather` không lọc `transaction_type` nên row `money_in` bị xuất ra như khoản chi. Bật lại sau khi có PR fix. |
 | `DRIFT_WARNING_ENABLED` | Phase 4.7 E1 build dark — chỉ bật khi gate G1 pass + owner sign-off |
 | `SCAM_CHECK_ENABLED` | Phase 4.7 E2 legal-blocked; đây cũng là kill switch §8 |
-| `TONE_DIAL_ENABLED` | Opt-in experiment, chưa quảng bá |
-| `ACTIVATION_NUDGE_ENABLED` | Opt-in experiment cho cohort never-activated |
 | `ONBOARDING_RESET_ENABLED` / `ONBOARDING_DECISION_MOMENT_ENABLED` | Onboarding reset — bật riêng khi muốn chạy cho user mới |
 
 > ⚠️ **Set flag ở đâu — sửa `.env` KHÔNG đủ.** `decision_flags.py` đọc thẳng
@@ -105,7 +107,7 @@ Giữ **OFF** ở release này (không nằm trong broadcast):
 >
 > Dùng một trong hai cách:
 >
-> 1. `launchctl setenv EXPORT_EXCEL_ENABLED false` (lặp cho từng flag) → rồi
+> 1. `launchctl setenv TONE_DIAL_ENABLED true` (lặp cho từng flag) → rồi
 >    `launchctl kickstart -k gui/$(id -u)/com.financeassistant.backend`; hoặc
 > 2. thêm block `<key>EnvironmentVariables</key>` chứa các flag vào
 >    `launchd/com.financeassistant.backend.plist.template` (+ `.scheduler.`),
@@ -164,11 +166,26 @@ Giữ **OFF** ở release này (không nằm trong broadcast):
 - **Build info trong miniapp** — bust cache WebView theo mỗi deploy.
 - **Full test suite ổn định trở lại** (Closes #371).
 
+### Ship-readiness fixes cho release này
+
+- **`/export` — formula injection** — mọi text do user nhập (tên tài sản, label/note dòng
+  tiền, tên mục tiêu) đi qua `_safe_text` trước khi vào cell: chuỗi bắt đầu bằng
+  `=` `+` `-` `@` được prefix một dấu nháy đơn nên spreadsheet giữ nó là literal thay vì
+  chạy công thức. User vẫn đọc đúng chữ mình gõ.
+- **`/export` — row `money_in` xuất nhầm thành khoản chi** — hướng của mỗi dòng nay do
+  `transaction_type` của chính row quyết định (`money_in` → "Thu"), thay vì mặc định "Chi".
+  Chọn *map* chứ không *filter*: export là data portability, không được âm thầm bỏ dòng.
+- **Tone dial phủ đủ trigger** — bổ sung block `gentle`/`strict` cho
+  `user_silent_30_days`, `onboarding_no_twin_return`, `never_activated`. Trước đó user chọn
+  strict vẫn nhận copy gentle ở 3/7 trigger — dial là nửa sự thật. Thêm test đối chiếu danh
+  sách trigger trong `empathy_engine` để trigger mới không lặng lẽ thiếu copy.
+
 ---
 
 ## Pre-deploy checklist
 
-- [ ] Prod secrets / env file đã set 3 flag broadcast ở trên (nếu định gửi broadcast)
+- [ ] Prod secrets / env file đã set 5 flag broadcast ở trên (nếu định gửi broadcast)
+- [ ] `EXPORT_EXCEL_ENABLED` **không** bị set `false` ở đâu (default `true` là đúng ý)
 - [ ] DB backup snapshot trong vòng 24h gần nhất
 - [ ] Telegram bot token & webhook URL không đổi
 - [ ] Disk space VPS còn ≥ 20%
@@ -210,7 +227,10 @@ tính năng lỗi là set flag về `false` rồi restart service — không ph�
 - [ ] Số tiền hiển thị đúng ở mọi surface đọc từ projection payload (không mất phần thập phân)
 - [ ] Scheduler / hourly empathy job chạy đúng ở lần fire đầu tiên, log không ERROR
 - [ ] **Với flag OFF:** "3 năm nữa đủ cọc nhà chưa?" rơi về advisory chung, KHÔNG `out_of_scope`
-- [ ] **Sau khi bật 3 flag + restart:** feasibility Q&A trả lời có thanh độ nét; "nếu rút 100tr thì sao" chạy shock simulation
-- [ ] `/export` trả file Excel
+- [ ] **Sau khi bật flag + restart:** feasibility Q&A trả lời có thanh độ nét; "nếu rút 100tr thì sao" chạy shock simulation
+- [ ] `/export` trả file Excel; mở file kiểm tra: dòng thu nhập nằm ở cột "Thu", và một
+      khoản test đặt tên `=1+1` hiện đúng chữ `=1+1` chứ không thành công thức
+- [ ] `TONE_DIAL_ENABLED` ON → đổi tone sang strict, nudge empathy đổi giọng (thẳng thắn,
+      không sỉ nhục)
 - [ ] `DRIFT_WARNING_ENABLED` vẫn OFF → hourly job không gửi cảnh báo drift cho ai
 - [ ] `docker compose logs backend --tail 100` — không ERROR/CRITICAL

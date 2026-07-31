@@ -56,6 +56,45 @@ empathy:
 
         Không sao cả, nhưng bỏ lâu thì bức tranh tài chính mờ dần đó. {salutation} quay lại ghi vài dòng cho mình bắt nhịp lại nha.
 
+  # {days_silent} = whole days since last activity (30+ band).
+  user_silent_30_days:
+    gentle:
+      - |-
+        {name} ơi... lâu rồi mình chưa gặp {salutation}.
+
+        Mình không biết {salutation} đang bận, hay mình chưa đủ hữu ích. Nếu có gì mình làm tốt hơn được, {salutation} nói cho mình biết nha 🙏
+    strict:
+      - |-
+        {days_silent} ngày rồi mình chưa nhận được dòng nào từ {salutation}.
+
+        Nói thẳng nha: để trống lâu vậy thì mọi con số đều cũ, bức tranh tài chính gần như không còn dùng để quyết định được nữa. {salutation} ghi lại vài dòng là mình dựng lại ngay — hoặc nói cho mình biết chỗ nào chưa ổn để mình sửa.
+
+  # {days_since_onboarding} = whole days since the user finished onboarding.
+  onboarding_no_twin_return:
+    gentle:
+      - |-
+        Em thấy {salutation} vẽ Twin tài chính hôm trước rồi mà chưa ghé lại 🌱
+
+        Không gấp đâu ạ — Twin rõ nét dần mỗi lần {salutation} thêm một con số mới. Khi nào rảnh {salutation} ghé xem em cập nhật tới đâu nhé 💚
+    strict:
+      - |-
+        {days_since_onboarding} ngày rồi {salutation} chưa quay lại xem Twin.
+
+        Nói thẳng nha: Twin vẫn đứng ở con số hôm đầu, nên nó chưa phản ánh đúng tình hình của {salutation} lúc này. Thêm vài con số mới là bức tranh khớp lại ngay.
+
+  # {days_since_start} = whole days since the first /start.
+  never_activated:
+    gentle:
+      - |-
+        Chào {name} 👋 Em là Bé Tiền đây.
+
+        Hôm nọ {salutation} có ghé qua mà tụi mình chưa kịp bắt đầu. Không sao đâu ạ — {salutation} nhắn em một câu bất kỳ, em đi cùng {salutation} từng bước một nhé 🌱
+    strict:
+      - |-
+        {name} ơi, {days_since_start} ngày rồi mà tụi mình vẫn chưa bắt đầu.
+
+        Nói thẳng nha: chưa có con số nào thì em chưa giúp được gì cho {salutation} cả. Chỉ một câu thôi — {salutation} đang giữ bao nhiêu, hay đang lo khoản nào — là mình khởi động được ngay.
+
   # {weekend_pct} = share of the week's spend that landed on the weekend.
   weekend_high_spending:
     gentle:
