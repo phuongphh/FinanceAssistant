@@ -46,6 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models.expense import Expense
 from backend.models.goal import Goal
 from backend.models.income_record import IncomeRecord
+from backend.services.expense_service import TRANSACTION_TYPE_MONEY_IN
 from backend.wealth.models.asset import Asset
 
 _COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "export_copy.yaml"
@@ -55,6 +56,12 @@ _COPY_PATH = Path(__file__).resolve().parents[3] / "content" / "export_copy.yaml
 # exact Decimal; this only controls display.
 _MONEY_FMT = "#,##0"
 _DATE_FMT = "yyyy-mm-dd"
+
+# Spreadsheet apps treat a cell starting with any of these as a live formula.
+# User-typed text ("=Ăn uống", "-tiền taxi", "+thưởng") would then execute on
+# open — the CSV/Excel injection class. Everything user-controlled goes through
+# ``_safe_text`` before it reaches a cell.
+_FORMULA_PREFIXES = ("=", "+", "-", "@")
 
 
 @lru_cache(maxsize=1)
@@ -70,6 +77,18 @@ def _sheet_copy(key: str) -> dict:
 def _asset_type_label(asset_type: str) -> str:
     labels = _copy().get("asset_type_labels") or {}
     return str(labels.get(asset_type, asset_type))
+
+
+def _safe_text(value: str | None) -> str:
+    """Neutralise a user-supplied string so Excel/Sheets never runs it.
+
+    A leading ``=``/``+``/``-``/``@`` makes the cell a formula; prefixing a
+    single quote keeps the text intact for the reader while forcing the cell
+    to stay a literal. The apostrophe is a display-level escape — the user
+    still sees exactly what they typed.
+    """
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(_FORMULA_PREFIXES) else text
 
 
 # ---------------------------------------------------------------------------
@@ -143,8 +162,8 @@ def _build_assets_sheet(ws: Worksheet, data: ExportData) -> None:
     _write_header(ws, list(copy.get("headers") or []))
     for a in data.assets:
         r = ws.max_row + 1
-        ws.cell(row=r, column=1, value=_asset_type_label(a.asset_type))
-        ws.cell(row=r, column=2, value=a.name)
+        ws.cell(row=r, column=1, value=_safe_text(_asset_type_label(a.asset_type)))
+        ws.cell(row=r, column=2, value=_safe_text(a.name))
         _money_cell(ws, r, 3, a.current_value)
         _money_cell(ws, r, 4, a.initial_value)
         _money_cell(ws, r, 5, a.gain_loss)
@@ -166,8 +185,8 @@ def _build_cashflow_sheet(ws: Worksheet, data: ExportData) -> None:
             row=r, column=1, value=income_label if c.is_income else expense_label
         )
         ws.cell(row=r, column=2, value=c.on_date).number_format = _DATE_FMT
-        ws.cell(row=r, column=3, value=c.label)
-        ws.cell(row=r, column=4, value=c.note)
+        ws.cell(row=r, column=3, value=_safe_text(c.label))
+        ws.cell(row=r, column=4, value=_safe_text(c.note))
         _money_cell(ws, r, 5, c.amount)
 
 
@@ -177,7 +196,7 @@ def _build_goals_sheet(ws: Worksheet, data: ExportData) -> None:
     _write_header(ws, list(copy.get("headers") or []))
     for g in data.goals:
         r = ws.max_row + 1
-        ws.cell(row=r, column=1, value=g.name)
+        ws.cell(row=r, column=1, value=_safe_text(g.name))
         _money_cell(ws, r, 2, g.target_amount)
         _money_cell(ws, r, 3, g.current_amount)
         _money_cell(ws, r, 4, g.remaining_amount)
@@ -285,9 +304,12 @@ async def gather_export_data(db: AsyncSession, user_id: uuid.UUID) -> ExportData
             )
         )
     for exp in expense_rows:
+        # ``expenses`` holds both directions — a ``money_in`` row is money
+        # arriving, not a spend. Exporting it under "Chi" double-counts the
+        # user's outflow, so the row's own type decides the direction.
         cashflow.append(
             CashflowRow(
-                is_income=False,
+                is_income=exp.transaction_type == TRANSACTION_TYPE_MONEY_IN,
                 on_date=exp.expense_date,
                 label=exp.category or exp.merchant or "",
                 note=exp.note or exp.merchant or "",

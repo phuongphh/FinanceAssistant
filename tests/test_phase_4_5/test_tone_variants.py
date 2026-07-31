@@ -235,14 +235,68 @@ def test_render_message_none_tone_is_legacy(monkeypatch):
 def test_render_message_falls_back_when_no_tone_block():
     """A trigger with no tone block still renders via legacy copy."""
     trigger = EmpathyTrigger(
-        name="user_silent_30_days",  # no block in tone_variants.yaml
+        name="payday_splurge",  # legacy-only key, no block in tone_variants.yaml
         priority=5,
-        cooldown_days=60,
-        context={"days_silent": 42},
+        cooldown_days=30,
+        context={"suggested_amount": "3tr"},
     )
     user = _FakeUser(salutation="bạn")
     text = render_message(trigger, user, tone="strict")
     assert text  # legacy empathy_messages.yaml copy
+
+
+# Every trigger the empathy engine can fire (empathy_engine.check_all_triggers).
+# A trigger missing from tone_variants.yaml silently serves gentle legacy copy
+# to a user who explicitly asked for strict — the dial would be a half-truth.
+_ENGINE_TRIGGERS = {
+    "large_transaction": {"amount": "12tr"},
+    "spending_drift": {
+        "drift": "2tr",
+        "goal_label": "Quỹ khẩn cấp",
+        "goal_delay_months": 3,
+        "copy_variant": "delay",
+    },
+    "onboarding_no_twin_return": {"days_since_onboarding": 5},
+    "never_activated": {"days_since_start": 3},
+    "user_silent_7_days": {"days_silent": 9},
+    "user_silent_30_days": {"days_silent": 42},
+    "weekend_high_spending": {"weekend_pct": "62%"},
+}
+
+
+@pytest.mark.parametrize("trigger_name", sorted(_ENGINE_TRIGGERS))
+@pytest.mark.parametrize("tone", ["gentle", "strict"])
+def test_every_engine_trigger_has_tone_copy(trigger_name, tone):
+    """The dial covers all 7 triggers, in both tones, with no unfilled
+    placeholder and no positioning leak."""
+    text = tone_fmt.render_tone_variant(
+        f"empathy.{trigger_name}",
+        tone,
+        salutation="anh",
+        name="Minh",
+        **_ENGINE_TRIGGERS[trigger_name],
+    )
+    assert text is not None, f"empathy.{trigger_name} has no {tone} block"
+    assert "{" not in text and "}" not in text
+    for banned in _BANNED_POSITIONING:
+        assert banned not in text
+
+
+def test_trigger_list_matches_the_engine():
+    """Guards the map above against drift in empathy_engine: a new or renamed
+    trigger must be added here (and given tone copy), otherwise the coverage
+    test above would keep passing while the real trigger goes dark."""
+    import inspect
+    import re
+
+    source = inspect.getsource(empathy_engine)
+    emitted = set(
+        re.findall(r"EmpathyTrigger\(\s*name=\"([a-z0-9_]+)\"", source)
+    )
+    assert emitted == set(_ENGINE_TRIGGERS), (
+        f"engine emits {sorted(emitted)}, tone coverage lists "
+        f"{sorted(_ENGINE_TRIGGERS)}"
+    )
 
 
 # --------------------------------------------------------------------------
