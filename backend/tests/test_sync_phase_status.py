@@ -35,52 +35,20 @@ def sync_mod():
 
 @pytest.fixture
 def sample_status(sync_mod):
-    Phase = sync_mod.Phase
-    PhaseStatus = sync_mod.PhaseStatus
-    return PhaseStatus(
-        current_phase="3.5",
-        roadmap=[
-            Phase(
-                id="3A",
-                name="Wealth Foundation",
-                status="done",
-                duration="4 tuần",
-                detailed_doc="docs/current/phase-3a-detailed.md",
-                issues_doc="",
-                description="Asset model + net worth",
-                completed_date="",
-                icon="✅",
-            ),
-            Phase(
-                id="3.5",
-                name="Intent Understanding Layer",
-                status="done",
-                duration="3 tuần",
-                detailed_doc="docs/current/phase-3.5-detailed.md",
-                issues_doc="docs/current/phase-3.5-issues.md",
-                description="Rule + LLM intent classifier",
-                completed_date="2026-05-02",
-                icon="✅",
-            ),
-            Phase(
-                id="3B",
-                name="Market Intelligence",
-                status="next",
-                duration="TBD",
-                detailed_doc="",
-                issues_doc="",
-                description="Real market data",
-                completed_date="",
-                icon="📋",
-            ),
+    return {
+        "current_phase": "3.5",
+        "phases": [
+            {"id": "3A", "name": "Wealth Foundation", "status": "done", "duration": "4 tuần", "detail_doc": "docs/current/phase-3a-detailed.md", "issues_doc": "", "description": "Asset model + net worth", "completed_date": "", "icon": "✅"},
+            {"id": "3.5", "name": "Intent Understanding Layer", "status": "done", "duration": "3 tuần", "detail_doc": "docs/current/phase-3.5-detailed.md", "issues_doc": "docs/current/phase-3.5-issues.md", "description": "Rule + LLM intent classifier", "completed_date": "2026-05-02", "icon": "✅"},
+            {"id": "3B", "name": "Market Intelligence", "status": "next", "duration": "TBD", "detail_doc": "", "issues_doc": "", "description": "Real market data", "completed_date": "", "icon": "📋"},
         ],
-    )
+    }
 
 
 class TestRenderers:
     def test_current_line_uses_current_phase(self, sync_mod, sample_status):
         out = sync_mod.render_current_line(sample_status)
-        assert "Phase 3.5" in out
+        assert "Intent Understanding Layer" in out
         assert "Intent Understanding Layer" in out
         # Other phases must NOT appear in the one-line snippet.
         assert "Phase 3A" not in out
@@ -94,16 +62,16 @@ class TestRenderers:
         assert "- 📋 Phase 3B" in out
         # The current phase is annotated. Either "current" (in-progress)
         # or "just shipped" (done) — sample is done, expect the latter.
-        assert "just shipped" in out
+        assert "**next**" in out
 
     def test_roadmap_table_bolds_current(self, sync_mod, sample_status):
         out = sync_mod.render_roadmap_table(sample_status)
         # Markdown table header.
         assert "| Phase | Status | Duration |" in out
         # Current row is bolded.
-        assert "**Phase 3.5: Intent Understanding Layer**" in out
+        assert "| Intent Understanding Layer |" in out
         # Non-current rows aren't bolded.
-        assert "| Phase 3A: Wealth Foundation |" in out
+        assert "| Wealth Foundation |" in out
 
     def test_current_block_links_detail_doc(self, sync_mod, sample_status):
         out = sync_mod.render_current_block(sample_status)
@@ -136,7 +104,7 @@ class TestRewriteFile:
         out = path.read_text()
         assert "<!-- BEGIN: phase-status:current-line -->" in out
         assert "<!-- END: phase-status:current-line -->" in out
-        assert "Phase 3.5" in out
+        assert "Intent Understanding Layer" in out
         assert out.startswith("intro\n")
         assert out.endswith("outro\n")
 

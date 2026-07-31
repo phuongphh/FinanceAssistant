@@ -96,6 +96,8 @@ async def route_update(data: dict) -> None:
     from backend.services import dashboard_service
     from backend.services.telegram_service import answer_callback
     from backend import analytics
+    from backend.bot.personality import empathy_engine
+    from backend.intent.handlers.decision_flags import is_activation_nudge_enabled
 
     update_id = data.get("update_id")
     session_factory = get_session_factory()
@@ -123,6 +125,28 @@ async def route_update(data: dict) -> None:
                     OnboardingStep=OnboardingStep,
                     analytics=analytics,
                 )
+                # Phase 4.6 E2 #2.2 — activation funnel "user-first-reply".
+                # A registered user who answers AFTER we sent them the
+                # first-message nudge is the moment the cohort activates;
+                # stamp it once so the dashboard can compute
+                # nudge-sent → first-reply. Flag read here at the worker
+                # edge (layer contract). ``/start`` is the entry signal, not
+                # a reply, so it's excluded — mirrors the engine treating
+                # ``bot_started`` as non-activation. The helper self-gates
+                # (nudge sent, reply not yet recorded) so this is a no-op
+                # for everyone else.
+                if (
+                    is_activation_nudge_enabled()
+                    and user_id is not None
+                    and _normalize_text_command(message.get("text", "")) != "/start"
+                    and await empathy_engine.should_track_activation_reply(
+                        db, user_id
+                    )
+                ):
+                    analytics.track(
+                        analytics.EventType.ACTIVATION_FIRST_REPLY,
+                        user_id=user_id,
+                    )
             else:
                 callback_query = data.get("callback_query")
                 if callback_query:
@@ -316,6 +340,20 @@ async def _handle_message(
             user = await dashboard_service.get_user_by_telegram_id(db, telegram_id)
             return user.id if user else None
         return None
+
+    if command == "/export":
+        # Excel export (E4 #4.1). The handler reads the EXPORT_EXCEL_ENABLED
+        # flag at the edge, so the command is always routed here — the flag
+        # only changes what the handler replies.
+        from backend.bot.handlers.export_handler import cmd_export
+
+        resolved_user = (
+            await dashboard_service.get_user_by_telegram_id(db, telegram_id)
+            if telegram_id is not None
+            else None
+        )
+        await cmd_export(db, chat_id, resolved_user)
+        return resolved_user.id if resolved_user else None
 
     # Resolve the user once up front for the remaining text-message
     # paths — all of them need it (either to detect the onboarding step

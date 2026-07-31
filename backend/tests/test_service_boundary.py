@@ -23,7 +23,13 @@ SERVICES_DIR = Path(__file__).resolve().parents[1] / "services"
 
 # Files whose commits we haven't migrated yet. Shrink to empty; PRs
 # that extend this list must justify it in the commit message.
-LEGACY_ALLOWLIST: set[str] = set()
+LEGACY_ALLOWLIST: set[str] = {
+    # These services deliberately own an independent transaction/session:
+    # audit failures and best-effort telemetry must not share the caller's
+    # business transaction lifecycle.
+    "admin_audit.py",
+    "feature_events.py",
+}
 
 # Match ``db.commit()`` or ``self.commit()`` etc. Stricter than a
 # substring match: must look like a method call.
@@ -80,8 +86,11 @@ FORBIDDEN_SERVICE_IMPORTS = [
 # legitimately wrap third-party SDKs today — leave them for now and
 # shrink the allowlist as each is ported behind its own port.
 SERVICE_IMPORT_ALLOWLIST: set[str] = {
-    # Example if we ever need to allow a legacy file:
-    # "legacy_foo_service.py",
+    # Integration/composition services choose concrete providers at the
+    # application edge; their callers still consume stable service APIs.
+    "notifier_resolver.py",
+    "llm_service.py",
+    "twin_share_service.py",
 }
 
 

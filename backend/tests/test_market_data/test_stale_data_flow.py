@@ -36,7 +36,7 @@ class _DB:
         self.assets = assets
         self.calls = 0
 
-    async def execute(self, stmt):
+    async def execute(self, stmt, *args, **kwargs):
         self.calls += 1
         if self.calls == 2:
             return _Result(rows=self.assets)
@@ -71,6 +71,7 @@ async def test_stale_data_flow_shows_stale_banner_when_provider_down():
 
     with patch("backend.wealth.services.asset_service.get_user_assets", AsyncMock(return_value=assets)), \
          patch("backend.wealth.services.net_worth_calculator.calculate_historical", AsyncMock(return_value=Decimal("10000000"))), \
+         patch("backend.wealth.services.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
          patch("backend.briefing.morning_briefing.get_crypto_quote", side_effect=_provider_down), \
          patch("backend.briefing.morning_briefing.get_gold_quote", AsyncMock(return_value=None)), \
          patch("backend.briefing.morning_briefing.get_relevant_news", AsyncMock(return_value=[])), \

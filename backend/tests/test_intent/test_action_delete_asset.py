@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import importlib
-import sys
 import uuid
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,9 +30,9 @@ def delete_handler_module():
     fake_asset_entry._confirm_asset_delete = AsyncMock()
     fake_asset_entry.show_asset_delete_matches_list = AsyncMock()
 
-    with patch.dict(sys.modules, {"backend.bot.handlers.asset_entry": fake_asset_entry}):
-        mod = importlib.import_module("backend.intent.handlers.action_delete_asset")
-        mod = importlib.reload(mod)
+    from backend.intent.handlers import action_delete_asset as mod
+
+    with patch.object(mod, "asset_entry_handlers", fake_asset_entry):
         yield mod
 
 

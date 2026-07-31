@@ -526,7 +526,7 @@ async def _handle_change_category(*, db, user, args, callback_id, chat_id, messa
         )
         return
 
-    is_money_in = (expense.transaction_type or "expense") == "money_in"
+    is_money_in = (getattr(expense, "transaction_type", None) or "expense") == "money_in"
 
     if len(args) == 1:
         await edit_message_reply_markup(

@@ -321,9 +321,16 @@ jobs:
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
 
           if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists, updating title + body..."
-            gh pr edit "$EXISTING_PR" --title "$PR_TITLE" --body "$PR_BODY"
-            echo "✅ Updated PR #$EXISTING_PR with $NUM_COUNT Closes line(s)"
+            # PR đã tồn tại → KHÔNG chạy `gh pr edit`. Hai lý do:
+            #   1. `gh pr edit` gọi ngầm GraphQL đụng field org (login/name/slug)
+            #      → đòi scope `read:org` mà PAT_TOKEN không có → job đỏ oan
+            #      dù test/review đều xanh.
+            #   2. `--body "$PR_BODY"` sẽ đè body do người/Claude soạn tay
+            #      (giàu context) bằng body generic "AI generated implementation".
+            # Closes lines đã được đưa vào body ngay lúc PR được TẠO (nhánh else),
+            # nên bỏ qua bước update là an toàn cho auto-close.
+            echo "PR #$EXISTING_PR already exists — leaving its title + body as-is."
+            echo "ℹ️  Skipping gh pr edit (tránh clobber body + tránh cần scope read:org)."
           else
             echo "Creating new PR..."
             NEW_PR=$(gh pr create \

@@ -1,5 +1,16 @@
 # Phase 4.1 — Kill Criteria
 
+> **⚠️ UPDATE 05/07/2026 — §1 ĐÃ TRIP:** Cohort soft launch tháng 6/2026
+> (~23 users) cho D28 dưới ngưỡng 20% (gần như toàn bộ dormant, nhiều user
+> chưa từng activate). Action plan của §1 đã được thực thi dưới dạng
+> **Strategy V4 pivot** (Decision Engine + segment 22-35) — xem
+> [strategy.md](../../current/strategy.md) và
+> [MIGRATION_NOTES_V3_TO_V4.md](../../archive/MIGRATION_NOTES_V3_TO_V4.md).
+> Kill criteria đã được recalibrate trong Strategy V4 (§1′ không cho phép
+> pivot lần 3, §5′/§7′ đo trên cohort mới, §8 scam-check one-strike mới).
+> Document này giữ nguyên làm record của Phase 4.1; phiên bản hiện hành
+> nằm trong strategy.md → "Success Metrics & Kill Criteria V4".
+
 > **Story:** P4.1-C3 (Issue #508)
 > **Owner per criterion:** see column below. Final go/no-go: operator (=
 > founder).

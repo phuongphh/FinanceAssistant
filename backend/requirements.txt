@@ -36,6 +36,9 @@ lxml>=5.0.0
 matplotlib>=3.8.0
 numpy>=1.26.0
 
+# Excel export (Phase 4.5 E4 — /export)
+openpyxl>=3.1.0
+
 # Security
 bcrypt>=4.1.0
 

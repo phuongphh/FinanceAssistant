@@ -199,6 +199,10 @@ submenu_assets:
       callback: "menu:assets:advisor"
       description: "Phân tích phân bổ, gợi ý tái cân bằng"
 
+    - label: "📥 Tải file Excel"
+      callback: "menu:assets:export"
+      description: "Xuất tài sản, thu chi, mục tiêu ra file Excel"
+
     - label: "◀️ Quay về"
       callback: "menu:main"
 

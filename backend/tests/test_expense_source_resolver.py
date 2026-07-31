@@ -205,11 +205,11 @@ def _expense(
 
 @pytest.mark.asyncio
 class TestResolveSourceLabel:
-    async def test_money_in_returns_none(self):
+    async def test_money_in_cash_returns_cash_label(self):
         uid = _mk_user_id()
         exp = _expense(user_id=uid, source_type="cash", transaction_type="money_in")
         db = MagicMock()
-        assert await resolver.resolve_source_label_for_expense(db, exp) is None
+        assert await resolver.resolve_source_label_for_expense(db, exp) == "Tiền mặt"
 
     async def test_no_source_type(self):
         exp = _expense(user_id=_mk_user_id())

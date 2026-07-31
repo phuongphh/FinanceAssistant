@@ -26,6 +26,7 @@ Design choices
 """
 from __future__ import annotations
 
+import html
 import logging
 import random
 import uuid
@@ -40,10 +41,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.analytics import EventType
 from backend.bot.formatters.money import format_money_full
+from backend.bot.formatters.tone import render_tone_variant
 from backend.models.event import Event
 from backend.models.expense import Expense
 from backend.models.twin_view_event import TwinViewEvent
 from backend.models.user import User
+from backend.services.decision import drift_service
 from backend.services.onboarding.onboarding_service import salutation_of
 
 logger = logging.getLogger(__name__)
@@ -99,6 +102,39 @@ ONBOARDING_SILENCE_MAX_DAYS = 30
 # "came back", so we only nudge when the count is still 0.
 TWIN_RETURN_MIN_DISTINCT_DAYS = 1
 
+# Phase 4.6 Epic 2 — activation nudge ("chưa từng kích hoạt"). The biggest
+# drop-off in the 6/2026 cohort is "0 tin nhắn": a user opens the bot /
+# taps /start, then goes silent without ever finishing onboarding or
+# sending a first message. We reach out first, inside a short activation
+# window measured from when they opened the bot. The lower bound gives them
+# a day to reply on their own; past the upper bound the generic
+# silent-N-days triggers take over (a ``bot_started`` event counts as
+# activity there), so this stays a focused first-touch nudge — never a
+# perpetual one. Fires at most twice in the window (see cooldown in the
+# trigger) so a genuinely dormant user isn't pestered.
+ACTIVATION_NUDGE_MIN_DAYS = 1
+ACTIVATION_NUDGE_MAX_DAYS = 7
+
+# Event types that do NOT count as the user "activating". ``bot_started`` is
+# the entry signal itself (opening the bot is not engagement); the empathy
+# rows are our own outbound nudges. Any OTHER event — a button tap, a
+# transaction, a miniapp open — means the user did something, so they're no
+# longer in the "0 tin nhắn" cohort.
+_NON_ACTIVATION_EVENT_TYPES = frozenset(
+    {
+        EventType.BOT_STARTED,
+        EventType.EMPATHY_FIRED,
+        EventType.EMPATHY_SENT,
+    }
+)
+
+# Phase 4.7 Epic 1 — spending-drift warning cooldown. A drift is a slow,
+# month-scale signal (baseline is a 3-window median), so a fortnight between
+# nudges is long enough not to nag yet short enough to catch a pace that keeps
+# climbing. Longer than the acute ``large_transaction`` (1 day) and the
+# ``never_activated`` (3 days) triggers, matching ``user_silent_7_days``.
+SPENDING_DRIFT_COOLDOWN_DAYS = 14
+
 
 @dataclass(frozen=True)
 class EmpathyTrigger:
@@ -115,15 +151,20 @@ async def check_all_triggers(
     *,
     now: datetime | None = None,
     include_proactive: bool = True,
+    include_activation_nudge: bool = False,
+    include_drift: bool = False,
 ) -> Optional[EmpathyTrigger]:
     """Walk checks in priority order. Return first trigger not on cooldown.
 
     ``now`` override is for tests; production callers pass ``None``.
 
     ``include_proactive`` gates the Phase 4.4 proactive-companion trigger
-    (``onboarding_no_twin_return``). The engine never reads env itself —
-    the hourly job reads ``PROACTIVE_COMPANION_ENABLED`` and passes the
-    decision in, per the layer contract. When ``False`` the new trigger
+    (``onboarding_no_twin_return``). ``include_activation_nudge`` gates the
+    Phase 4.6 first-message trigger (``never_activated``). ``include_drift``
+    gates the Phase 4.7 spending-drift trigger (``spending_drift``). The engine
+    never reads env itself — the hourly job reads ``PROACTIVE_COMPANION_ENABLED``
+    / ``ACTIVATION_NUDGE_ENABLED`` / ``DRIFT_WARNING_ENABLED`` and passes the
+    decisions in, per the layer contract. When a flag is ``False`` its trigger
     is skipped while every pre-existing empathy trigger still fires.
     """
     now = now or datetime.now(timezone.utc)
@@ -136,8 +177,20 @@ async def check_all_triggers(
         _check_payday_splurge,
         _check_over_budget_monthly,
     ]
+    # A drift warning carries a concrete goal consequence, so it outranks the
+    # ambient "come back" / silent-N-days nudges — but it stays below the acute
+    # single-transaction signals above. Gated dark until the G1 gate + owner
+    # sign-off (``DRIFT_WARNING_ENABLED``).
+    if include_drift:
+        checks.append(_check_spending_drift)
     if include_proactive:
         checks.append(_check_onboarding_no_twin_return)
+    # The activation nudge owns the early window (1–7 days after opening the
+    # bot) for never-activated users, so it must be checked BEFORE the
+    # generic silent-N-days triggers — past day 7 its window closes and
+    # ``user_silent_7_days`` naturally takes over.
+    if include_activation_nudge:
+        checks.append(_check_never_activated)
     checks.extend(
         (
             _check_user_silent_7_days,
@@ -225,6 +278,52 @@ async def _check_over_budget_monthly(
     return None
 
 
+async def _check_spending_drift(
+    db: AsyncSession, user: User, now: datetime
+) -> EmpathyTrigger | None:
+    """Current-window spend has drifted above the user's own recent baseline.
+
+    Delegates the whole assessment — baseline median, dual threshold, and the
+    Twin consequence — to ``drift_service.compute_drift`` (pure ``assess`` under
+    a read-only gatherer). We fire only when it reports ``is_drifting``; the
+    context carries a ``copy_variant`` so the copy renders the right shape:
+
+    - ``delay``  — a goal slips a concrete number of months,
+    - ``stall``  — the drift would erase the whole saving rate (goal stalls),
+    - ``plain``  — drifting but no goal consequence to attach.
+
+    The engine reads no env; ``DRIFT_WARNING_ENABLED`` is gated at the job edge
+    and threaded in via ``include_drift``.
+    """
+    assessment = await drift_service.compute_drift(db, user, now=now)
+    if assessment is None or not assessment.is_drifting:
+        return None
+
+    # ``_process_user`` sends drift messages with ``parse_mode="HTML"``, so a
+    # user-authored goal name containing ``<``, ``>`` or ``&`` would otherwise
+    # break Telegram's HTML parse (or inject markup). Escape it once here,
+    # before it enters the render context.
+    goal_label = html.escape(assessment.goal_label) if assessment.goal_label else None
+
+    context: dict = {"drift": format_money_full(assessment.drift_amount)}
+    if assessment.pace_unsustainable and goal_label:
+        context["copy_variant"] = "stall"
+        context["goal_label"] = goal_label
+    elif assessment.goal_delay_months and goal_label:
+        context["copy_variant"] = "delay"
+        context["goal_label"] = goal_label
+        context["goal_delay_months"] = assessment.goal_delay_months
+    else:
+        context["copy_variant"] = "plain"
+
+    return EmpathyTrigger(
+        name="spending_drift",
+        priority=3,
+        cooldown_days=SPENDING_DRIFT_COOLDOWN_DAYS,
+        context=context,
+    )
+
+
 async def _check_onboarding_no_twin_return(
     db: AsyncSession, user: User, now: datetime
 ) -> EmpathyTrigger | None:
@@ -263,6 +362,54 @@ async def _check_onboarding_no_twin_return(
         priority=3,
         cooldown_days=30,
         context={"days_since_onboarding": days_since},
+    )
+
+
+async def _check_never_activated(
+    db: AsyncSession, user: User, now: datetime
+) -> EmpathyTrigger | None:
+    """User opened the bot but never activated — the "0 tin nhắn" cohort.
+
+    Fires inside the activation window (``ACTIVATION_NUDGE_MIN_DAYS`` …
+    ``ACTIVATION_NUDGE_MAX_DAYS`` days after the *first* ``bot_started``
+    event) when the user:
+
+    - has NOT finished onboarding (``onboarding_completed_at is None``), and
+    - has no activity beyond opening the bot — no non-deleted expense and no
+      event outside ``_NON_ACTIVATION_EVENT_TYPES``.
+
+    Disjoint from ``onboarding_no_twin_return`` (which requires onboarding
+    *completed*), so the two never fire for the same user. Past the window
+    the generic silent-N-days triggers take over.
+    """
+    if user.onboarding_completed_at is not None:
+        return None
+
+    first_start_stmt = select(func.min(Event.timestamp)).where(
+        Event.user_id == user.id,
+        Event.event_type == EventType.BOT_STARTED,
+    )
+    first_start = (await db.execute(first_start_stmt)).scalar_one_or_none()
+    if first_start is None:
+        # No recorded bot open — outside this trigger's cohort.
+        return None
+    if first_start.tzinfo is None:
+        first_start = first_start.replace(tzinfo=timezone.utc)
+
+    days_since_start = (now - first_start).days
+    if not (
+        ACTIVATION_NUDGE_MIN_DAYS <= days_since_start < ACTIVATION_NUDGE_MAX_DAYS
+    ):
+        return None
+
+    if await _has_activated(db, user.id):
+        return None
+
+    return EmpathyTrigger(
+        name="never_activated",
+        priority=2,
+        cooldown_days=3,
+        context={"days_since_start": days_since_start},
     )
 
 
@@ -365,6 +512,77 @@ async def _check_consecutive_over_budget(
 
 # ---------- Helpers -------------------------------------------------
 
+async def _has_activated(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """True if the user did anything beyond opening the bot.
+
+    "Activated" = logged a (non-deleted) expense OR produced any event
+    outside ``_NON_ACTIVATION_EVENT_TYPES`` (which excludes the entry
+    ``bot_started`` and our own empathy rows). Two cheap EXISTS-style
+    scalar queries — the second short-circuits when the first already
+    proves activation.
+    """
+    expense_stmt = (
+        select(Expense.id)
+        .where(
+            Expense.user_id == user_id,
+            Expense.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if (await db.execute(expense_stmt)).first() is not None:
+        return True
+
+    event_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type.notin_(_NON_ACTIVATION_EVENT_TYPES),
+        )
+        .limit(1)
+    )
+    return (await db.execute(event_stmt)).first() is not None
+
+
+async def should_track_activation_reply(
+    db: AsyncSession, user_id: uuid.UUID
+) -> bool:
+    """True if this user's message is their FIRST reply after a nudge.
+
+    Powers the E2 #2.2 activation funnel: ``activation_nudge_sent``
+    (Bé Tiền reached out first) vs ``activation_first_reply`` (the user
+    answered). We only want to stamp the reply once, and only for a user
+    we actually nudged — otherwise the funnel's denominator and numerator
+    stop lining up.
+
+    Returns True when a nudge WAS sent (``ACTIVATION_NUDGE_SENT`` row exists)
+    and no reply has been recorded yet (``ACTIVATION_FIRST_REPLY`` absent).
+    Env-free by design — the worker reads ``ACTIVATION_NUDGE_ENABLED`` at its
+    edge and only calls this when the flag is on (layer contract). Two cheap
+    limited scalar queries; the reply check short-circuits when no nudge was
+    ever sent.
+    """
+    nudge_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type == EventType.ACTIVATION_NUDGE_SENT,
+        )
+        .limit(1)
+    )
+    if (await db.execute(nudge_stmt)).first() is None:
+        return False
+
+    reply_stmt = (
+        select(Event.id)
+        .where(
+            Event.user_id == user_id,
+            Event.event_type == EventType.ACTIVATION_FIRST_REPLY,
+        )
+        .limit(1)
+    )
+    return (await db.execute(reply_stmt)).first() is None
+
+
 async def _days_since_last_activity(
     db: AsyncSession, user_id: uuid.UUID, *, now: datetime
 ) -> int | None:
@@ -451,20 +669,46 @@ async def count_empathy_fired_today(
 
 # ---------- Rendering ----------------------------------------------
 
-def render_message(trigger: EmpathyTrigger, user: User) -> str:
-    """Pick a random variation from YAML and substitute placeholders."""
+def render_message(
+    trigger: EmpathyTrigger, user: User, *, tone: str | None = None
+) -> str:
+    """Pick a random variation from YAML and substitute placeholders.
+
+    ``tone`` threads the tone dial (E4 #4.3). ``None`` (dial dark) renders the
+    legacy ``empathy_messages.yaml`` copy exactly as before; a live
+    ``"gentle"`` / ``"strict"`` consults ``tone_variants.yaml`` first and only
+    falls back to the legacy copy when that trigger has no tone block yet. The
+    ``TONE_DIAL_ENABLED`` flag is read by the hourly job, never here — the
+    engine stays env-free.
+    """
+    salutation = salutation_of(user)
+    variant = render_tone_variant(
+        f"empathy.{trigger.name}",
+        tone,
+        salutation=salutation,
+        name=user.get_greeting_name(),
+        **trigger.context,
+    )
+    if variant is not None:
+        return variant
+
+    context = {
+        "name": user.get_greeting_name(),
+        "salutation": salutation,
+        **trigger.context,
+    }
     spec = _load_messages().get(trigger.name) or {}
     templates = spec.get("messages") or []
+    # A trigger whose copy branches on the situation (e.g. ``spending_drift``:
+    # delay / stall / plain) stores ``messages`` as a dict keyed by the
+    # ``copy_variant`` the trigger put in its context, instead of a flat list.
+    if isinstance(templates, dict):
+        templates = templates.get(context.get("copy_variant")) or []
     if not templates:
         logger.warning("No empathy template for trigger %s", trigger.name)
         return ""
 
     template = random.choice(templates)
-    context = {
-        "name": user.get_greeting_name(),
-        "salutation": salutation_of(user),
-        **trigger.context,
-    }
     try:
         return template.format(**context)
     except KeyError as exc:

@@ -479,6 +479,37 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #922 | Pre-Phase | default_money_in_source: configurable default income source + money-in confirm UX | [pre-phase/issue-922.md](by-phase/pre-phase/issue-922.md) |
 | #924 | Pre-Phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [pre-phase/issue-924.md](by-phase/pre-phase/issue-924.md) |
 | #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
+| #964 | Phase 4 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [phase-4/issue-964.md](by-phase/phase-4/issue-964.md) |
+| #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
+| #966 | Phase 4 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [phase-4/issue-966.md](by-phase/phase-4/issue-966.md) |
+| #967 | Phase 4 | [Phase 4.5 / E3] 3.4 — Flag CLARITY_METER_ENABLED | [phase-4/issue-967.md](by-phase/phase-4/issue-967.md) |
+| #968 | Phase 4 | [Phase 4.5 / E2] 2.1 — plan_feasibility_service.assess() | [phase-4/issue-968.md](by-phase/phase-4/issue-968.md) |
+| #969 | Phase 4 | [Phase 4.5 / E2] 2.2 — Intent decision_feasibility + handler | [phase-4/issue-969.md](by-phase/phase-4/issue-969.md) |
+| #970 | Phase 4 | [Phase 4.5 / E2] 2.3 — Copy feasibility + persona QA | [phase-4/issue-970.md](by-phase/phase-4/issue-970.md) |
+| #971 | Phase 4 | [Phase 4.5 / E1] 1.1 — shock_simulation_service.simulate_shock() | [phase-4/issue-971.md](by-phase/phase-4/issue-971.md) |
+| #972 | Phase 4 | [Phase 4.5 / E1] 1.2 — liquidation_advisor.rank_options() | [phase-4/issue-972.md](by-phase/phase-4/issue-972.md) |
+| #973 | Phase 4 | [Phase 4.5 / E1] 1.3 — Intent decision_shock + handler + flag | [phase-4/issue-973.md](by-phase/phase-4/issue-973.md) |
+| #974 | Phase 4 | [Phase 4.5 / E1] 1.4 — Portfolio redraw sau shock | [phase-4/issue-974.md](by-phase/phase-4/issue-974.md) |
+| #975 | Phase 4 | [Phase 4.5 / E1] 1.5 — Copy shock sim + persona QA | [phase-4/issue-975.md](by-phase/phase-4/issue-975.md) |
+| #976 | Phase 4 | [Phase 4.5 / E4] 4.1 — export_service + /export entry | [phase-4/issue-976.md](by-phase/phase-4/issue-976.md) |
+| #977 | Phase 4 | [Phase 4.5 / E4] 4.2 — Migration tone_preference + /profile setting | [phase-4/issue-977.md](by-phase/phase-4/issue-977.md) |
+| #978 | Phase 4 | [Phase 4.5 / E4] 4.3 — tone_variants.yaml + áp dụng | [phase-4/issue-978.md](by-phase/phase-4/issue-978.md) |
+| #979 | Phase 4 | [Phase 4.5 / E5] 5.1 — decision_query_log model + ghi log | [phase-4/issue-979.md](by-phase/phase-4/issue-979.md) |
+| #980 | Phase 4 | [Phase 4.5 / E5] 5.2 — Broadcast script one-time | [phase-4/issue-980.md](by-phase/phase-4/issue-980.md) |
+| #982 | Phase 4 | [Phase 4.6][E1] Onboarding Goal Reset — first-life goals cho segment 22-35 | [phase-4/issue-982.md](by-phase/phase-4/issue-982.md) |
+| #984 | Phase 4 | [Phase 4.6][E2] Sửa đường rơi "chưa từng kích hoạt" — first-message tự nổ + đo tỉ lệ kích hoạt | [phase-4/issue-984.md](by-phase/phase-4/issue-984.md) |
+| #985 | Phase 4 | [Phase 4.6][E3] Decision Moment trong onboarding — 1 câu hỏi gắn goal + đúng 1 con số + độ nét thành thật | [phase-4/issue-985.md](by-phase/phase-4/issue-985.md) |
+| #987 | Pre-Phase | Phase 4.6 E3 — decision-moment review follow-ups (already-reached copy, savepoint isolation, demo gate, one-number building) | [pre-phase/issue-987.md](by-phase/pre-phase/issue-987.md) |
+| #989 | Phase 4 | [Phase 4.6][E4] Instrumentation cohort mới → Admin dashboard — cohort tag + chart decision adoption | [phase-4/issue-989.md](by-phase/phase-4/issue-989.md) |
+| #991 | Pre-Phase | 4.6/E4 follow-up: tenant-scope the decision-adoption chart + average độ nét per active user | [pre-phase/issue-991.md](by-phase/pre-phase/issue-991.md) |
+| #993 | Pre-Phase | [4.6/E4] D28 retention theo cohort (tách segment mới vs legacy) | [pre-phase/issue-993.md](by-phase/pre-phase/issue-993.md) |
+| #994 | Pre-Phase | [4.6/E4][follow-up] Định nghĩa lại "product-active" làm denominator cho retention/DAU | [pre-phase/issue-994.md](by-phase/pre-phase/issue-994.md) |
+| #998 | Phase 4 | [Phase 4.7][E1 #1.1] drift_service — pure baseline + Twin-consequence delta | [phase-4/issue-998.md](by-phase/phase-4/issue-998.md) |
+| #999 | Phase 4 | [Phase 4.7][E1 #1.2] empathy trigger _check_spending_drift (include_drift param) | [phase-4/issue-999.md](by-phase/phase-4/issue-999.md) |
+| #1000 | Phase 4 | [Phase 4.7][E1 #1.3] DRIFT_WARNING_ENABLED flag + job wiring | [phase-4/issue-1000.md](by-phase/phase-4/issue-1000.md) |
+| #1001 | Phase 4 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [phase-4/issue-1001.md](by-phase/phase-4/issue-1001.md) |
+| #1002 | Phase 4 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [phase-4/issue-1002.md](by-phase/phase-4/issue-1002.md) |
+| #1003 | Phase 4 | [Phase 4.7][E3 #3.2] QUERY_TYPE_SCAM_CHECK constant (drift stays off decision_query_log) | [phase-4/issue-1003.md](by-phase/phase-4/issue-1003.md) |
 
-**Total:** 475 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 1 Phase 4, 457 Pre-Phase)
+**Total:** 506 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 461 Pre-Phase)

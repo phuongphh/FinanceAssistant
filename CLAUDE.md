@@ -1,4 +1,4 @@
-# CLAUDE.md — Personal CFO Assistant
+# CLAUDE.md — Bé Tiền (Decision Engine)
 
 Source of truth for Claude Code working on this codebase.
 Read this before any code changes. For implementation details, open the corresponding phase doc linked below.
@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **First-5-Minutes WOW** (current) — [detail](docs/current/phase-4.4/phase-4.4-detailed.md)
+🚀 **Guardian Layer** (current) — [detail](docs/current/phase-4.7/phase-4.7-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -73,12 +73,14 @@ For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-stat
 - Test by reading aloud — if cringy or robotic, rewrite
 - "Bé Tiền" persona: warm, supportive, NEVER harsh on overspending or past-due
 - **Customer-facing positioning:** Bé Tiền is a *người đồng hành quản lý tài sản*
-  (companion that helps manage assets). Internal docs may use "Personal CFO"
-  as shorthand for product positioning, but it MUST NEVER appear in
+  (companion that helps manage assets). Internal docs use "Decision Engine"
+  as shorthand for product positioning (Strategy V4 — "Personal CFO" is
+  retired even internally; see `docs/current/strategy.md`). Neither
+  "Decision Engine", "GPS tài chính", nor "CFO" may EVER appear in
   user-facing text (welcome bubbles, chart watermarks, briefings, share
-  images, public-facing announcement copy). "CFO" reads cold and corporate
-  to a Vietnamese mass-affluent user — use *người đồng hành* / *quản lý
-  tài sản* instead.
+  images, public-facing announcement copy) — use *người đồng hành* /
+  *quản lý tài sản* instead. Target user per V4: 22-35 tuổi, Level 0→1
+  ("thế hệ đang xây"), NOT mass affluent.
 
 ### Soft delete pattern
 - Never hard-delete user data
@@ -151,8 +153,8 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md) — Twin enhancement (weather metaphor + story-first), habit loop, Twin admin dashboard
-- **Next phase:** Phase 5.0 — Encryption End-to-End (after June 2026 soft launch)
+- **Recently completed phase:** [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) — Onboarding Reset (done 13/07/2026); trước đó 4.5 Decision Engine Foundation (done 10/07/2026)
+- **Current phase:** [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked); sau đó 5.0-5.2 Zalo → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -178,26 +180,26 @@ Quick reference:
 
 ---
 
-## Phase 4.3 — Status: DONE ✅
+## Phase 4.4 — Status: DONE ✅
 
-**Status:** ✅ Implementation complete. Phase 4.3 turned the Financial Twin from a hard-to-grasp feature into a habit-forming experience, and added a Twin admin dashboard. 4 Epics / 15 stories.
+**Status:** ✅ Implementation complete (30/05/2026). Phase 4.4 làm 5 phút đầu tiên của user mới thành trải nghiệm WOW. 3 Epics còn hiệu lực / ~12 issues.
 
-### Shipped in Phase 4.3
+### Shipped in Phase 4.4
 
-- **Weather metaphor** thay P10/P50/P90 — 🌧️ Khiêm tốn / ⛅ Bình thường / ☀️ Lạc quan — để người dùng hiểu probability cone mà không cần đọc số percentile.
-- **Life-outcome translation** + **story-first narrative** (4-5 màn swipe) + **mascot personification** giúp Twin kể chuyện thay vì bày số liệu.
-- **Habit loop**: on-demand recompute (<5s) + causality ("vì sao thay đổi") + action prompt + negative delta handling + delta threshold + return tease để kéo người dùng quay lại.
-- **Twin admin dashboard** 4 sections: engagement funnel, loop health, comprehension, delta distribution.
+- **Salutation foundation** — `users.salutation` (anh/chị/bạn), hỏi trong onboarding, thread vào mọi surface có giọng nói; user cũ fallback "bạn".
+- **Screenshot onboarding** — chụp màn hình app ngân hàng → OCR → số dư → net worth ~30s, luôn có fallback gõ tay.
+- **Proactive companion** — trigger empathy mới "im lặng sau onboarding", chạy qua job hourly với cooldown + quiet hours.
+- **The Reading GỠ BỎ (29/05/2026)** — Reading v0+v1 phản tác dụng; đã xoá code + flag, onboarding đi thẳng goal → asset → Twin.
 
-### Next phase
+### Current phase
 
-Phase 5.0 — Encryption End-to-End (sau soft launch June 2026).
+Phase 4.7 — Guardian Layer: drift/overspend warnings gắn hệ quả Twin (E1) + scam-check v1 red-flags KHÔNG verdict (E2). Đã merged FLAG OFF (build dark, chỉ bật khi gate G1 pass): E1 drift warning + E3 guardrail flag/kill-switch infra. E2 scam-check legal-blocked, chưa build. Tiếp theo: 5.0-5.2 Zalo (OA sẵn sàng, amendment 08/07/2026) → 5.3 Encryption End-to-End. Trước đó đã done: 4.5 Decision Engine Foundation (10/07/2026), 4.6 Onboarding Reset (13/07/2026).
 
-Detail: [`docs/current/phase-4.3/phase-4.3-detailed.md`](docs/current/phase-4.3/phase-4.3-detailed.md)
+Detail: [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) · [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md)
 
 ## Active Breaking Changes
 
-(None currently — Phase 4.3 is additive over 4.2.5)
+(None currently — Phase 4.7 Guardian Layer builds dark, flags OFF; additive over 4.6)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 

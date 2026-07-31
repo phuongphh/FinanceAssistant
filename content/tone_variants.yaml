@@ -1,0 +1,162 @@
+# Tone dial variants — Phase 4.5 / E4 #4.3.
+#
+# Home of every copy block that changes shape with the user's tone dial
+# (users.tone_preference: gentle / strict). Loaded by
+# backend/bot/formatters/tone.py through a cached loader; edits require a
+# process restart (same convention as every other content/*.yaml).
+#
+# WIRING (layer contract): the TONE_DIAL_ENABLED flag is read once at the
+# handler / job edge. When the dial is dark, callers pass tone=None and every
+# surface renders its legacy copy (empathy_messages.yaml / decision_copy.yaml)
+# exactly as before Phase 4.5 — nothing here is consulted. When the dial is
+# live, the edge resolves users.tone_preference to "gentle" / "strict" and the
+# formatter threads the matching block below.
+#
+# PERSONA FLOOR — NON-NEGOTIABLE (kill criterion, strategy §persona floor):
+# "strict" is *thẳng thắn* — it names the number, tells the truth, and drops
+# the cushioning. It is NEVER *sỉ nhục*: no word that shames, blames, or calls
+# the user lazy / stupid / a failure. Bé Tiền is a người đồng hành in both
+# tones. test_strict_never_humiliates guards this with a blocklist — if you
+# add copy that trips it, the copy is wrong, not the test.
+#
+# Placeholders (str.format): {salutation} = anh/chị/bạn, {name} = greeting
+# name, plus the per-key context noted inline. Never reorder without updating
+# the caller. Banned in ALL text: "Decision Engine", "GPS tài chính", "CFO".
+
+# ============================================================
+# EMPATHY MESSAGES — proactive companion nudges
+# ============================================================
+# Keys mirror empathy_engine trigger names. gentle/strict are lists; the
+# renderer picks one at random (same as empathy_messages.yaml).
+
+empathy:
+  # {amount} = formatted money of the outlier expense.
+  large_transaction:
+    gentle:
+      - |-
+        Ồ giao dịch lớn nha — {amount} đó {salutation}.
+
+        Mình xếp vào đâu cho hợp lý nhỉ? Hay {salutation} cho mình thêm chút context 🌱
+    strict:
+      - |-
+        {amount} — khoản lớn đó {salutation}.
+
+        Nói thẳng nha: mình ghi rõ khoản này để {salutation} nắm dòng tiền, đừng để nó trôi qua rồi cuối tháng mới giật mình.
+
+  # {days_silent} = whole days since last activity.
+  user_silent_7_days:
+    gentle:
+      - |-
+        👋 Lâu rồi không gặp {salutation}.
+
+        Mọi thứ ổn không? {salutation} bận thì cứ lo việc của mình nhé — mình vẫn ở đây khi cần 🌱
+    strict:
+      - |-
+        {days_silent} ngày rồi mình chưa thấy {salutation} ghi gì.
+
+        Không sao cả, nhưng bỏ lâu thì bức tranh tài chính mờ dần đó. {salutation} quay lại ghi vài dòng cho mình bắt nhịp lại nha.
+
+  # {days_silent} = whole days since last activity (30+ band).
+  user_silent_30_days:
+    gentle:
+      - |-
+        {name} ơi... lâu rồi mình chưa gặp {salutation}.
+
+        Mình không biết {salutation} đang bận, hay mình chưa đủ hữu ích. Nếu có gì mình làm tốt hơn được, {salutation} nói cho mình biết nha 🙏
+    strict:
+      - |-
+        {days_silent} ngày rồi mình chưa nhận được dòng nào từ {salutation}.
+
+        Nói thẳng nha: để trống lâu vậy thì mọi con số đều cũ, bức tranh tài chính gần như không còn dùng để quyết định được nữa. {salutation} ghi lại vài dòng là mình dựng lại ngay — hoặc nói cho mình biết chỗ nào chưa ổn để mình sửa.
+
+  # {days_since_onboarding} = whole days since the user finished onboarding.
+  onboarding_no_twin_return:
+    gentle:
+      - |-
+        Em thấy {salutation} vẽ Twin tài chính hôm trước rồi mà chưa ghé lại 🌱
+
+        Không gấp đâu ạ — Twin rõ nét dần mỗi lần {salutation} thêm một con số mới. Khi nào rảnh {salutation} ghé xem em cập nhật tới đâu nhé 💚
+    strict:
+      - |-
+        {days_since_onboarding} ngày rồi {salutation} chưa quay lại xem Twin.
+
+        Nói thẳng nha: Twin vẫn đứng ở con số hôm đầu, nên nó chưa phản ánh đúng tình hình của {salutation} lúc này. Thêm vài con số mới là bức tranh khớp lại ngay.
+
+  # {days_since_start} = whole days since the first /start.
+  never_activated:
+    gentle:
+      - |-
+        Chào {name} 👋 Em là Bé Tiền đây.
+
+        Hôm nọ {salutation} có ghé qua mà tụi mình chưa kịp bắt đầu. Không sao đâu ạ — {salutation} nhắn em một câu bất kỳ, em đi cùng {salutation} từng bước một nhé 🌱
+    strict:
+      - |-
+        {name} ơi, {days_since_start} ngày rồi mà tụi mình vẫn chưa bắt đầu.
+
+        Nói thẳng nha: chưa có con số nào thì em chưa giúp được gì cho {salutation} cả. Chỉ một câu thôi — {salutation} đang giữ bao nhiêu, hay đang lo khoản nào — là mình khởi động được ngay.
+
+  # {weekend_pct} = share of the week's spend that landed on the weekend.
+  weekend_high_spending:
+    gentle:
+      - |-
+        Haha cuối tuần mà {salutation} 😄 Tận hưởng thôi!
+
+        Mình nhắc nhẹ chút: cuối tuần {salutation} thường chi nhiều hơn — biết để tính ngân sách thực tế hơn 🌸
+    strict:
+      - |-
+        {weekend_pct} chi tiêu dồn vào cuối tuần đó {salutation}.
+
+        Không phán xét — nhưng đây là một pattern rõ. Muốn giữ mục tiêu thì đặt một mức trần cho cuối tuần là chắc ăn nhất.
+
+  # Spending-drift warning (Phase 4.7 E1). Nests one level past gentle/strict:
+  # the trigger's `copy_variant` (delay / stall / plain) picks the branch.
+  # {drift} = overshoot above baseline; {goal_label} = nearest goal name;
+  # {goal_delay_months} = months the goal slips (delay branch only). strict is
+  # thẳng thắn — names the number and the consequence — never sỉ nhục.
+  spending_drift:
+    gentle:
+      delay:
+        - |-
+          Em thấy tháng này {salutation} chi nhỉnh hơn mọi khi chừng {drift} 🌿
+
+          Giữ nhịp này thì mốc "{goal_label}" lùi thêm khoảng {goal_delay_months} tháng. Em kể để {salutation} nắm thôi — mình cân lại chút là kịp lại ngay 💚
+      stall:
+        - |-
+          Tháng này {salutation} chi vượt nền quen khoảng {drift} đó ạ 🌿
+
+          Nhịp này gần như dùng hết phần {salutation} vẫn để dành, nên "{goal_label}" khó tiến thêm. Mình cùng nhìn lại một chút nhé 💚
+      plain:
+        - |-
+          Em để ý nhịp chi tháng này của {salutation} cao hơn mọi khi chừng {drift} 🌿
+
+          Chưa có gì đáng lo đâu ạ — em ghi lại để {salutation} thấy bức tranh rõ hơn thôi 💚
+    strict:
+      delay:
+        - |-
+          Nói thẳng nha {salutation}: tháng này chi vượt nền quen {drift}.
+
+          Giữ nhịp này thì "{goal_label}" lùi khoảng {goal_delay_months} tháng. Cân lại phần chi thêm này là mốc về đúng hẹn.
+      stall:
+        - |-
+          Thẳng thắn nha {salutation}: tháng này chi vượt nền quen {drift}.
+
+          Mức này ăn gần hết phần để dành mỗi tháng, nên "{goal_label}" gần như đứng yên. Kéo phần chi thêm xuống thì mục tiêu mới nhích tiếp được.
+      plain:
+        - |-
+          Nói thẳng nha {salutation}: nhịp chi tháng này cao hơn nền quen {drift}.
+
+          Chưa thành vấn đề, nhưng đây là một pattern rõ — {salutation} nắm sớm để chủ động cân dòng tiền.
+
+# ============================================================
+# DECISION ANSWERS — feasibility / shock verdicts
+# ============================================================
+# Single strings (one verdict per band). Only the emotionally-loaded lines
+# get a tone variant; the encouraging bands stay in decision_copy.yaml.
+
+decision:
+  # Plan-to-goal feasibility, NEEDS_REVISION band. {actual} = current
+  # monthly saving rate (formatted). The reachable-target pivot is appended
+  # by the formatter afterwards, in either tone — we never end on a flat "no".
+  feasibility_needs_revision:
+    gentle: "Thành thật nha: ở nhịp để dành hiện tại (~{actual}/tháng) thì con số này hơi quá sức trong khoảng thời gian đó."
+    strict: "Nói thẳng nha {salutation}: với mức để dành ~{actual}/tháng, con số này chưa tới được trong khoảng thời gian đó — cần tăng để dành hoặc nới thời gian ra thì mới khả thi."

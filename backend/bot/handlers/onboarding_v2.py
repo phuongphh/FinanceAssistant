@@ -162,6 +162,97 @@ def is_trust_card_enabled() -> bool:
     )
 
 
+ONBOARDING_RESET_FLAG_ENV = "ONBOARDING_RESET_ENABLED"
+
+
+def is_onboarding_reset_enabled() -> bool:
+    """Phase 4.6 goal reset for the 22-35 / Level 0→1 segment is OFF by default.
+
+    When on, the goal question renders the first-life goal set
+    (``step_1_goal_reset``: quỹ khẩn cấp / mua nhà đầu tiên / cưới) instead of
+    the legacy asset-management set (``step_1_goal``). It ships dark so the
+    operator can flip it on once the reset copy is validated; existing users
+    mid-onboarding are unaffected because goal codes are stored, not the copy.
+    Read at the handler edge and never inside a service (layer contract),
+    same pattern as ``is_v2_enabled`` / ``is_trust_card_enabled``.
+    """
+    import os
+
+    return os.environ.get(ONBOARDING_RESET_FLAG_ENV, "false").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+ONBOARDING_DECISION_MOMENT_FLAG_ENV = "ONBOARDING_DECISION_MOMENT_ENABLED"
+
+
+def is_onboarding_decision_moment_enabled() -> bool:
+    """Phase 4.6 E3 — the in-onboarding decision moment is OFF by default.
+
+    When on, right after the Twin reveal Bé Tiền poses one goal-specific
+    decision question and answers it with a single number + honest độ nét,
+    reusing the Phase 4.5 feasibility + clarity services. When off, onboarding
+    ends at the Twin reveal exactly as before 4.6 (byte-identical). Read at the
+    handler edge and never inside a service (layer contract), same pattern as
+    ``is_v2_enabled`` / ``is_onboarding_reset_enabled``.
+    """
+    import os
+
+    return os.environ.get(ONBOARDING_DECISION_MOMENT_FLAG_ENV, "false").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+# Fallback display order for the goal buttons when the content block omits an
+# explicit ``order`` list (legacy ``step_1_goal`` predates the key).
+_DEFAULT_GOAL_ORDER = ("understand_wealth", "plan_goal", "track_spending")
+
+
+def _goal_step_copy(copy: dict) -> dict:
+    """Return the goal-question copy block for the active onboarding variant.
+
+    Reset flow → ``step_1_goal_reset`` (falls back to ``step_1_goal`` if the
+    reset block is somehow absent so the flag can never strand a user without
+    a goal question). Legacy flow → ``step_1_goal``.
+    """
+    if is_onboarding_reset_enabled() and copy.get("step_1_goal_reset"):
+        return copy["step_1_goal_reset"]
+    return copy["step_1_goal"]
+
+
+# Copy blocks that can hold a goal ack, active variant first. Ack resolution
+# scans these by *content* (which block owns the goal code) rather than by the
+# current flag value.
+_GOAL_COPY_BLOCKS = ("step_1_goal_reset", "step_1_goal")
+
+
+def _goal_ack_for(copy: dict, goal_code: str) -> str:
+    """Resolve the ack copy for ``goal_code`` from the block that owns it.
+
+    The goal code on the callback comes from the keyboard the user was *shown*,
+    which may predate a flag flip. If ``ONBOARDING_RESET_ENABLED`` is toggled
+    while a user sits on an already-sent keyboard, reading the ack from the
+    flag's *current* variant would look in the wrong block (legacy codes are
+    absent from reset ``goal_acks`` and vice versa), yield an empty ack, skip
+    the message edit, and strand the old buttons on screen. Scanning by content
+    keeps the ack correct across the rollout/rollback window.
+    """
+    for block_key in _GOAL_COPY_BLOCKS:
+        block = copy.get(block_key)
+        if not block:
+            continue
+        ack = block.get("goal_acks", {}).get(goal_code)
+        if ack:
+            return ack
+    return ""
+
+
 # ---------- Entry: /start with optional invite token -----------------
 
 
@@ -357,29 +448,19 @@ async def _send_welcome_and_goal(db: AsyncSession, chat_id: int, user: User) -> 
 
 async def _send_goal_question(db: AsyncSession, chat_id: int, user: User) -> None:
     copy = onboarding_service.load_copy()
-    step = copy["step_1_goal"]
+    step = _goal_step_copy(copy)
     prefix = step["callback_prefix"]
     text = f"<b>{step['header']}</b>\n\n{step['body']}"
+    # Build the keyboard from the content ``order`` list so the goal set is a
+    # content + flag concern rather than a hardcoded branch — one button per
+    # row (matches the salutation keyboard layout).
+    order = step.get("order") or _DEFAULT_GOAL_ORDER
+    buttons = step["buttons"]
     keyboard = {
         "inline_keyboard": [
-            [
-                {
-                    "text": step["buttons"]["understand_wealth"],
-                    "callback_data": f"{prefix}understand_wealth",
-                }
-            ],
-            [
-                {
-                    "text": step["buttons"]["plan_goal"],
-                    "callback_data": f"{prefix}plan_goal",
-                }
-            ],
-            [
-                {
-                    "text": step["buttons"]["track_spending"],
-                    "callback_data": f"{prefix}track_spending",
-                }
-            ],
+            [{"text": buttons[code], "callback_data": f"{prefix}{code}"}]
+            for code in order
+            if code in buttons
         ]
     }
     await send_message(chat_id, text, parse_mode="HTML", reply_markup=keyboard)
@@ -507,7 +588,7 @@ async def _on_goal_picked(
     await answer_callback(callback_id)
 
     copy = onboarding_service.load_copy()
-    ack = copy["step_1_goal"]["goal_acks"].get(goal_code, "")
+    ack = _goal_ack_for(copy, goal_code)
     if message_id is not None and ack:
         try:
             await edit_message_text(
@@ -1097,12 +1178,113 @@ async def _trigger_first_twin(
         properties={"demo": demo},
     )
 
+    # Phase 4.6 E3 — the decision moment is the climax of the reveal: pose one
+    # goal-specific decision question and answer it with a single number right
+    # after the chart, before the feedback prompt. Flag read at the edge; off
+    # keeps the reveal byte-identical to pre-4.6. Runs synchronously here (not
+    # in the feedback task) because it needs the live DB session, which does
+    # not survive the worker boundary. Skipped for the demo Twin: its 50tr
+    # portfolio is framed as giả định, so answering a decision on it (and
+    # logging it as a real feasibility interaction) would blur that framing.
+    if not demo and is_onboarding_decision_moment_enabled():
+        await _send_decision_moment(db, chat_id, user)
+
     # Schedule the in-moment feedback prompt 7s later in a fire-and-forget
     # task. We capture the chat_id + user_id only (no DB session, no model
     # — those don't survive the worker boundary).
     asyncio.create_task(
         _send_feedback_prompt_after_delay(chat_id=chat_id, user_id=user.id, delay=7.0)
     )
+
+
+async def _send_decision_moment(db: AsyncSession, chat_id: int, user: User) -> None:
+    """Phase 4.6 E3 — one goal-specific decision question + a single-number answer.
+
+    Reuses the Phase 4.5 services (``plan_feasibility_service`` + ``clarity_service``)
+    — no new engine. Reads the chosen goal from the session to pick the question
+    and its typical milestone, answers on the spot with exactly one number, and
+    appends an honest độ nét line (usually low this early). The only write is one
+    append-only ``decision_query_log`` row via the flush-only service; the worker
+    owns the commit.
+
+    Best-effort by design: the decision moment must never break the Twin reveal,
+    so any failure is logged and swallowed — the user still keeps their Twin.
+    """
+    from backend.bot.formatters import onboarding_decision
+    from backend.models.decision_query_log import QUERY_TYPE_FEASIBILITY
+    from backend.models.onboarding_session import cohort_for_goal
+    from backend.services.decision import (
+        clarity_service,
+        decision_query_log_service,
+        plan_feasibility_service,
+    )
+    from backend.services.goal_projection import get_avg_monthly_savings
+
+    try:
+        # A SAVEPOINT isolates every DB touch in this best-effort block. If a
+        # read or the log flush errors, only this savepoint rolls back — the
+        # outer transaction (incl. mark_twin_shown just above) stays healthy and
+        # the worker's boundary commit still succeeds. Without it a poisoned
+        # session would fail that commit and silently undo the whole reveal.
+        async with db.begin_nested():
+            session = await onboarding_service.get_session(db, user.id)
+            if session is None:
+                return
+
+            config = onboarding_decision.goal_config(session.goal_choice)
+            salutation = onboarding_service.salutation_of(user)
+            start = session.first_asset_value_vnd or Decimal(0)
+
+            # Single DB read for the saving rate (the feasibility engine is
+            # pure); clarity runs a handful of lightweight indexed reads.
+            avg_savings = await get_avg_monthly_savings(db, user.id)
+            result = plan_feasibility_service.assess(
+                start, config.target_vnd, config.horizon_years, avg_savings
+            )
+            clarity = await clarity_service.compute_clarity(db, user.id)
+
+            await send_message(
+                chat_id,
+                onboarding_decision.render_question(config, salutation=salutation),
+                parse_mode="HTML",
+            )
+            await send_message(
+                chat_id,
+                onboarding_decision.render_answer(
+                    result, config, clarity, salutation=salutation
+                ),
+                parse_mode="HTML",
+            )
+
+            # Append-only funnel row. Onboarding always lands a verdict (there
+            # is no clarify turn), so success is always True; clarity_score
+            # threads the độ nét through for the E4 dashboard, and the cohort
+            # tag (free from the session goal) lets the chart split the new
+            # first-life segment from the legacy cohort.
+            await decision_query_log_service.log_query(
+                db,
+                user_id=user.id,
+                query_type=QUERY_TYPE_FEASIBILITY,
+                success=True,
+                clarity_score=clarity.score,
+                cohort=cohort_for_goal(session.goal_choice),
+            )
+
+        # Pure telemetry — outside the savepoint so a tracking hiccup can never
+        # roll back the funnel row we just flushed.
+        analytics.track(
+            "onboarding_decision_moment_shown",
+            user_id=user.id,
+            properties={
+                "goal": session.goal_choice,
+                # band is a str either way (FeasibilityBand is a str-Enum, but the
+                # projection hands back bare strings) — normalise to the short code.
+                "band": getattr(result.band, "value", result.band),
+                "clarity_score": clarity.score,
+            },
+        )
+    except Exception:
+        logger.exception("Decision moment failed for user %s", user.id)
 
 
 async def _resolve_twin_cone(

@@ -4,7 +4,7 @@
 > không phải tuần thứ 2. Twin vẫn là payoff/differentiator — phase này dựng
 > *cái hook kéo người ta tới được Twin*.
 
-**Status:** 📋 Planned (chèn trước Phase 5.0 Encryption)
+**Status:** ✅ Done (completed 30/05/2026) — nguồn sự thật: CLAUDE.md "Shipped in Phase 4.4". The Reading (WOW #1) đã gỡ bỏ 29/05/2026; salutation + screenshot onboarding + proactive companion đã ship.
 **Duration mục tiêu:** ~7-10 ngày (ship trước soft launch tháng 6/2026)
 **Branch:** `claude/determined-fermi-UyOWK`
 
@@ -211,15 +211,15 @@ nơi đọc + test on/off (xem Issue #1.3, #2.3, #3.1 trong issues doc).
 
 ## ✅ Definition of Done
 
-- [ ] Migration salutation applied; user cũ fallback "bạn" không lỗi.
-- [ ] Onboarding hỏi tên + xưng hô (3 nút) trước goal.
+- [x] Migration salutation applied; user cũ fallback "bạn" không lỗi.
+- [x] Onboarding hỏi tên + xưng hô (3 nút) trước goal.
 - [x] ~~Reading v0/v1~~ → **GỠ BỎ**; onboarding đi thẳng goal → asset → Twin; `asset_ack` bắc cầu, demo path sạch (test `test_onboarding_no_reading.py`).
-- [ ] Screenshot parse số dư ≥ 2 bank với fallback gõ tay (hoặc cắt scope có ghi chú).
-- [ ] Empathy trigger mới gửi qua job hourly, copy ấm, đúng xưng hô.
-- [ ] `vi-localization-checker` pass; 0 chuỗi VN hardcode; mọi copy ở YAML.
-- [ ] `layer-contract-checker` pass; 0 `db.commit()` trong service.
-- [ ] Twin teaser phút-4 vẫn nguyên (không regression onboarding v2).
-- [ ] 2 feature flag còn lại (`SCREENSHOT_ONBOARDING_ENABLED`, `PROACTIVE_COMPANION_ENABLED`) đọc ở router/worker; mỗi flag có test on/off; tắt được riêng không lỗi. (`READING_ENABLED` đã gỡ.)
+- [x] Screenshot parse số dư ≥ 2 bank với fallback gõ tay (hoặc cắt scope có ghi chú).
+- [x] Empathy trigger mới gửi qua job hourly, copy ấm, đúng xưng hô.
+- [x] `vi-localization-checker` pass; 0 chuỗi VN hardcode; mọi copy ở YAML.
+- [x] `layer-contract-checker` pass; 0 `db.commit()` trong service.
+- [x] Twin teaser phút-4 vẫn nguyên (không regression onboarding v2).
+- [x] 2 feature flag còn lại (`SCREENSHOT_ONBOARDING_ENABLED`, `PROACTIVE_COMPANION_ENABLED`) đọc ở router/worker; mỗi flag có test on/off; tắt được riêng không lỗi. (`READING_ENABLED` đã gỡ.)
 
 ---
 

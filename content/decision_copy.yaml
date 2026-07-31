@@ -1,0 +1,123 @@
+# Decision Engine copy — Phase 4.5 (clarity meter, feasibility, shock).
+#
+# Bé Tiền persona: ấm áp, đồng hành, KHÔNG bao giờ phán xét. Đọc thành tiếng —
+# nếu nghe máy móc hay khô khan thì viết lại.
+#
+# CẤM tuyệt đối trong text hiển thị cho user: "Decision Engine", "GPS tài chính",
+# "CFO". Dùng "người đồng hành" / "quản lý tài sản" thay thế.
+
+clarity:
+  # {score} = số nguyên 0..100. Một dòng gọn đứng đầu mọi câu trả lời decision.
+  line: "🔍 Ảnh tương lai đang nét khoảng {score}%"
+
+  # Dưới ngưỡng khiêm tốn: thành thật rằng bức tranh còn mờ, rồi chỉ ra đúng
+  # một thứ đáng bổ sung nhất (không dồn dập, không làm user thấy thiếu sót).
+  humble_intro: "Mình mới thấy được một phần bức tranh nên câu trả lời còn hơi mờ nha."
+  humble_suggest: "Thêm {component} là mình nhìn rõ hơn hẳn đó."
+
+  # Trên ngưỡng: vẫn nhẹ nhàng gợi một việc để nét hơn nữa (trọng số cao nhất).
+  sharpen_suggest: "Muốn nét hơn nữa thì thêm {component} nhé."
+
+  # Tên thành phần được đưa vào các câu gợi ý ở trên.
+  components:
+    assets: "thông tin tài sản"
+    asset_freshness: "giá trị tài sản mới nhất"
+    income: "nguồn thu nhập"
+    expenses: "lịch sử chi tiêu"
+    goals: "mục tiêu tài chính"
+
+# ---------------------------------------------------------------------------
+# Plan-to-goal feasibility Q&A — Phase 4.5 / E2.
+#
+# User hỏi một giả định: "Mình muốn có {target} sau {years} năm, khả thi không?"
+# Bé Tiền trả lời trung thực nhưng KHÔNG bao giờ phán xét. Ba tông giọng chính:
+#   khả thi (EASY/FEASIBLE) — cần cố (STRETCH/AMBITIOUS) — bất khả thi hiện tại
+#   (NEEDS_REVISION). Khi ngoài tầm với, luôn xoay sang "mức mình với tới được"
+#   thay vì chốt một câu "không".
+# ---------------------------------------------------------------------------
+feasibility:
+  # Dòng mở đầu, nhắc lại chính câu hỏi để user thấy mình được lắng nghe.
+  # {target} + {years} đã format sẵn.
+  intro: "Mình thử tính giúp: để có {target} trong {years} nha."
+
+  # khả thi — EASY / FEASIBLE. {actual} = mức để dành/tháng hiện tại.
+  feasible: "Tin vui nè — với mức để dành khoảng {actual}/tháng, mục tiêu này hoàn toàn trong tầm tay mình luôn 🎯"
+
+  # cần cố — STRETCH / AMBITIOUS. {required} = mức cần/tháng, {actual} = hiện tại.
+  stretch: "Được đó, nhưng phải hơi cố chút: cần để dành khoảng {required}/tháng (giờ mình đang ~{actual}/tháng). Nhích thêm một nhịp, hoặc nới thời gian ra xíu là ổn nha."
+
+  # bất khả thi ở nhịp hiện tại — NEEDS_REVISION. Không phán xét, xoay sang pivot.
+  needs_revision: "Thành thật nha: ở nhịp để dành hiện tại (~{actual}/tháng) thì con số này hơi quá sức trong khoảng thời gian đó."
+
+  # Câu xoay hướng trung thực khi ngoài tầm với. {reachable} = mốc với tới được,
+  # {years} = cùng khoảng thời gian. Luôn đi kèm needs_revision (và có thể cả
+  # ambitious nếu muốn nhẹ nhàng hơn).
+  reachable_pivot: "Nhưng đừng lo — cũng trong {years} đó, mình hoàn toàn với tới được khoảng {reachable}. Mình bắt đầu từ mốc này rồi tăng tốc sau cũng được mà 💪"
+
+  # Đã đạt/đã vượt mục tiêu ngay từ đầu.
+  already_reached: "Ơ mình có sẵn hơn con số đó rồi mà! Mục tiêu này coi như trong túi 🎉 Đặt một đích cao hơn thử nha?"
+
+  # Chưa đủ dữ liệu dòng tiền (chưa biết mức để dành) — UNKNOWN.
+  unknown: "Mình chưa biết mỗi tháng mình để dành được bao nhiêu nên chưa dám chốt khả thi hay không. Thêm nguồn thu nhập + vài khoản chi gần đây là mình tính được ngay nha."
+
+  # Hỏi lại đúng một câu khi thiếu tham số. Ưu tiên hỏi target trước, rồi mốc thời gian.
+  clarify_target: "Mình muốn tính giúp nè — mình đang nhắm tới con số bao nhiêu vậy? (vd: 1 tỷ)"
+  clarify_horizon: "Ok, mình muốn đạt {target} trong bao lâu vậy? (vd: 5 năm)"
+
+# ---------------------------------------------------------------------------
+# Shock simulation + liquidation advice — Phase 4.5 / E1.
+#
+# User hỏi một giả định căng: "Nếu phải chi {amount} thì sao? Rút từ đâu?"
+# Bé Tiền dùng ẩn dụ THỜI TIẾT thay cho số phần trăm khô khan — user cảm được
+# mức độ mà không bị ngợp con số. KHÔNG bao giờ đọc ra p10/p50/p90.
+#
+# legal-guardrail: TUYỆT ĐỐI không gợi ý mua/bán sản phẩm bên ngoài, không nêu
+# tên quỹ/mã/ngân hàng. Chỉ sắp xếp thứ tự rút từ chính tài sản user đang có.
+# ---------------------------------------------------------------------------
+shock:
+  # Dòng mở đầu, nhắc lại giả định. {amount} đã format sẵn.
+  intro: "Mình thử hình dung giúp: nếu phải rút {amount} ra ngay bây giờ nha."
+
+  # Ẩn dụ thời tiết theo mức độ (severity). KHÔNG có số phần trăm.
+  weather:
+    light: "☀️ Cũng chỉ như một cơn mưa rào thôi — hành trình dài của mình gần như không xê dịch mấy."
+    moderate: "🌦️ Trời có râm mát hơn thật, nhưng mình vẫn đi tiếp ngon lành, không có gì đáng ngại."
+    heavy: "🌧️ Đây là một cơn mưa to đó nha — có hơi thấm, nhưng mình che chắn khéo là vượt được."
+    severe: "⛈️ Thành thật nha, đây là một cơn giông thật sự — nó lay hành trình của mình kha khá, mình cần cân nhắc kỹ."
+
+  # Kết luận trấn an: quỹ đạo dài hạn có hồi lại không. {years} đã format sẵn.
+  recovers: "Tin vui là nhìn dài hơi ~{years} tới, guồng của mình vẫn hồi lại được trên mức hôm nay — mình không bị lùi lại đâu."
+  no_recovers: "Chỗ này mình nói thẳng: nhìn dài hơi ~{years} tới, guồng tài sản khó về lại mức hôm nay nếu rút khoản này. Cân nhắc kỹ giúp mình nha."
+
+  # Dẫn vào phần "rút từ đâu ít hại nhất". Danh sách redraw do formatter riêng dựng.
+  redraw_intro: "Nếu buộc phải xoay khoản này, mình gợi ý thứ tự rút để ít ảnh hưởng đường dài nhất:"
+
+  # Không đủ thanh khoản để phủ hết khoản cần rút. {shortfall} đã format sẵn.
+  # legal-guardrail: chỉ nói thật là chưa đủ, KHÔNG gợi ý vay/sản phẩm bên ngoài.
+  insufficient: "Gom hết các khoản có thể xoay thì vẫn còn thiếu khoảng {shortfall} nha. Mình chưa dám khuyên rút thêm chỗ nào khác — chỗ này mình muốn tính kỹ cùng nhau."
+
+  # Portfolio trống — chưa có tài sản nào để mô phỏng.
+  empty_portfolio: "Mình chưa nắm được tài sản của mình nên chưa mô phỏng được cú này. Thêm vài khoản mình đang có là mình tính giúp ngay nha."
+
+  # Thiếu số tiền — hỏi lại đúng một câu.
+  clarify_amount: "Mình tính giúp nè — mình đang tính phải chi khoảng bao nhiêu vậy? (vd: 200tr)"
+
+  # Cửa xác nhận khi khoản rút quá lớn (>50% tài sản ròng). Hỏi lại trước khi vẽ
+  # kịch bản nặng, để user không giật mình. {amount} đã format sẵn.
+  confirm_large: "Khoản {amount} này khá lớn so với tài sản của mình đó nha — mình vẫn muốn xem thử kịch bản nếu phải rút chứ?"
+
+# ---------------------------------------------------------------------------
+# Re-engagement broadcast — Phase 4.5 / E5 #5.2 (gửi MỘT LẦN).
+#
+# Nhắn cho nhóm user đã lâu không ghé (dormant) rằng Bé Tiền giờ đã trả lời
+# được những câu hỏi "nếu... thì sao". Ấm áp, không trách móc chuyện vắng mặt,
+# không hối thúc. Chỉ chạy thật sau khi E1-E3 đã live (xem runbook trong script).
+# ---------------------------------------------------------------------------
+reengagement:
+  body: |-
+    Bé Tiền giờ trả lời được câu này rồi nè:
+
+    "Nếu tháng sau mình phải chi 200tr thì tài sản ra sao, nên rút từ đâu?"
+    "Muốn có 1 tỷ sau 5 năm — với mình thì khả thi không?"
+
+    Mình luôn ở đây, hỏi mình thử một câu xem sao nha 🌿

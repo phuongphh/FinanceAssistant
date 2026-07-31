@@ -86,7 +86,10 @@ function makeContext() {
         expand: () => {},
         close: () => {},
         themeParams: {},
-        initData: '',
+        // A dashboard opened inside Telegram always receives initData.  Keep
+        // the smoke environment realistic so DashboardCommon reaches fetch
+        // instead of intentionally stopping at its NO_INIT_DATA guard.
+        initData: 'query_id=smoke-test&hash=not-validated-client-side',
         initDataUnsafe: { user: { language_code: 'vi' } },
         showAlert: () => {},
         showConfirm: (_msg, cb) => { if (cb) cb(false); },

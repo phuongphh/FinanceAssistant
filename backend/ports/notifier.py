@@ -43,6 +43,18 @@ class Notifier(Protocol):
         **kwargs: Any,
     ) -> dict | None: ...
 
+    async def send_document(
+        self,
+        chat_id: int,
+        document: bytes,
+        filename: str,
+        *,
+        caption: str = "",
+        mime_type: str = "application/octet-stream",
+        reply_markup: dict | None = None,
+        **kwargs: Any,
+    ) -> dict | None: ...
+
 
 _notifier: Notifier | None = None
 

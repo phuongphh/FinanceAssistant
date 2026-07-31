@@ -66,6 +66,7 @@ async def build_twin_payload(
     *,
     scenario: str = twin_projection_service.SCENARIO_CURRENT,
     exclude_event_ids: set[uuid.UUID] | None = None,
+    include_clarity: bool = False,
 ) -> dict[str, Any]:
     """Return the latest Twin projection payload for a user.
 
@@ -73,11 +74,27 @@ async def build_twin_payload(
     path, preserving the Phase 4A "weekly heavy, daily light" performance
     principle. If no projection exists, callers still receive an authenticated
     empty-state payload rather than an exception.
+
+    ``include_clarity`` (Phase 4.5, Issue #3.2) folds the deterministic Độ Nét
+    score into the payload under ``"clarity"``. It is gated by the caller (the
+    ``CLARITY_METER_ENABLED`` flag lives at the router edge) so the read path
+    stays free of env reads and the score is computed only when the surface
+    actually renders it. The key is always present (``None`` when off) so the
+    payload shape is stable for clients.
     """
     if scenario not in _ALLOWED_SCENARIOS:
         raise ValueError(f"Unsupported Twin scenario: {scenario}")
 
     snapshot = await twin_query_service.get_twin_snapshot(db, user_id)
+
+    # Độ Nét meter — deterministic, read-only, computable for ANY user state
+    # (including the empty-state path below), so old users never error out.
+    clarity_payload = None
+    if include_clarity:
+        from backend.services.decision import clarity_service
+
+        clarity_result = await clarity_service.compute_clarity(db, user_id)
+        clarity_payload = clarity_service.to_payload(clarity_result)
     user = (
         await db.execute(select(User).where(User.id == user_id))
     ).scalar_one_or_none()
@@ -127,6 +144,7 @@ async def build_twin_payload(
             "scenario_labels": labels,
             "show_technical_terms": show_technical_terms,
             "story_flow": {"mode": "empty", "screens": []},
+            "clarity": clarity_payload,
         }
 
     # For comparison deltas: always load both scenarios regardless of view scenario
@@ -226,6 +244,7 @@ async def build_twin_payload(
         ),
         "scenario_cards": scenario_cards,
         "excluded_event_count": excluded_count,
+        "clarity": clarity_payload,
     }
     payload["story_flow"] = build_story_flow(
         payload, full_flow=await should_show_full_story(db, user_id)

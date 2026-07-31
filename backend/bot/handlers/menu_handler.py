@@ -390,6 +390,27 @@ async def _navigate(
         )
         analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
         return
+    elif target == "twin":
+        # Twin is the product's primary visual surface.  Do not depend on
+        # editMessageText here: Telegram cannot edit every kind of source
+        # message (old menu/photo bubbles are common after a Twin share), and
+        # a rejected edit made this entry point look like a dead button.
+        # Sending a fresh bubble is the same fail-open behaviour used below,
+        # but makes it deterministic for this high-value route.
+        text, keyboard = format_submenu(user, target, level=level)
+        await send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=None,
+            reply_markup=keyboard,
+            **message_kwargs_for_animation(text, "submenu"),
+        )
+        analytics.track(
+            "menu_navigated",
+            user_id=user_id,
+            properties={"to": target},
+        )
+        return
     else:
         text, keyboard = format_submenu(user, target, level=level)
 
@@ -771,7 +792,6 @@ async def _action_assets_net_worth(
     """
     from backend.intent.wealth_adapt import decorate, style_for_level
     from backend.wealth.ladder import detect_level
-    from backend.wealth.services import net_worth_calculator
 
     breakdown = await _calculate_stored_current_with_wait(
         db=db, user_id=user.id, chat_id=chat_id
@@ -1850,6 +1870,19 @@ async def _action_twin_life_events(
     await cmd_life_events(db, chat_id, user)
 
 
+async def _action_assets_export(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    """Phase 4.5 E4 #4.1 — export tài sản/thu chi/mục tiêu ra file Excel.
+
+    ``cmd_export`` reads the ``EXPORT_EXCEL_ENABLED`` flag at the edge, so
+    the button is always wired; the flag only changes what it replies.
+    """
+    from backend.bot.handlers.export_handler import cmd_export
+
+    await cmd_export(db, chat_id, user)
+
+
 _DIRECT_HANDLERS = {
     ("assets", "net_worth"): _action_assets_net_worth,
     ("assets", "report"): _action_assets_report,
@@ -1862,6 +1895,7 @@ _DIRECT_HANDLERS = {
     ("assets", "edit"): _action_assets_manage,
     ("assets", "mark_rental"): _action_assets_mark_rental,
     ("assets", "life_insurance"): _action_assets_life_insurance,
+    ("assets", "export"): _action_assets_export,
     ("expenses", "report"): _action_expenses_report,
     ("expenses", "manage"): _action_expenses_manage,
     ("expenses", "ocr_prompt"): _action_expenses_ocr_prompt,

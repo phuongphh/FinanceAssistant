@@ -56,8 +56,13 @@ def test_next_action_yaml_contains_unique_copy_for_each_cell():
     copy = next_action_service.load_copy()
     texts = [cell["text"] for row in copy["matrix"].values() for cell in row.values()]
 
-    assert len(texts) == 9
-    assert len(set(texts)) == 9
+    # Every cell across every asset state carries its own copy — no goal reuses
+    # another's CTA text. Phase 4.6 grew the matrix from the 3 legacy goals to
+    # 6 (adding the first-life reset goals), so the count is derived from the
+    # matrix rather than hardcoded.
+    expected = sum(len(row) for row in copy["matrix"].values())
+    assert len(texts) == expected
+    assert len(set(texts)) == expected
 
 
 def test_briefing_quality_templates_have_editorial_hook_and_short_copy():

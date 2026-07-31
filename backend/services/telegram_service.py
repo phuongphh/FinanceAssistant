@@ -259,6 +259,55 @@ async def send_photo(
     return None
 
 
+async def send_document(
+    chat_id: int,
+    document_bytes: bytes,
+    filename: str,
+    caption: str = "",
+    mime_type: str = "application/octet-stream",
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> dict | None:
+    """Send a document (e.g. an Excel export) via multipart upload.
+
+    Mirrors :func:`send_photo` — same singleton client, same caption
+    sanitization and reply_markup size guard — but hits ``sendDocument``
+    so the file arrives as a downloadable attachment rather than an inline
+    photo.
+    """
+    if not settings.telegram_bot_token:
+        logger.warning("TELEGRAM_BOT_TOKEN not configured")
+        return None
+
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendDocument"
+    data: dict = {"chat_id": str(chat_id)}
+    if caption:
+        if parse_mode == "Markdown":
+            caption = sanitize_markdown(caption)
+        data["caption"] = caption
+        data["parse_mode"] = parse_mode
+    if reply_markup:
+        serialized = json.dumps(reply_markup, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > _REPLY_MARKUP_SAFE_MAX_BYTES:
+            logger.error(
+                "Telegram sendDocument reply_markup is %d bytes (cap %d). "
+                "Dropping markup to avoid silent failure.",
+                len(serialized.encode("utf-8")),
+                _REPLY_MARKUP_SAFE_MAX_BYTES,
+            )
+        else:
+            data["reply_markup"] = serialized
+
+    files = {"document": (filename, document_bytes, mime_type)}
+
+    client = await _get_client()
+    resp = await client.post(url, data=data, files=files, timeout=30)
+    if resp.status_code == 200:
+        return resp.json()
+    logger.error("Telegram sendDocument error: %s %s", resp.status_code, resp.text)
+    return None
+
+
 async def answer_callback(
     callback_id: str,
     text: str | None = None,

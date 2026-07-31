@@ -160,6 +160,6 @@ async def test_compare_optimal_handler_sends_dual_cone_caption_with_actions():
     assert len(notifier.photos) == 1
     photo = notifier.photos[0]
     assert photo.photo == b"png-bytes"
-    assert "1.8 tỷ → 2.4 tỷ (+33%)" in photo.caption
-    assert "15tr/tháng → 16.5tr/tháng" in photo.caption
+    assert "1tỷ800 → 2tỷ400 (+33%)" in photo.caption
+    assert "15tr/tháng → 16tr500/tháng" in photo.caption
     assert "không phải lời khuyên đầu tư" in photo.caption

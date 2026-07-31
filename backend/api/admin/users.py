@@ -19,6 +19,8 @@ from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
 from backend.services.admin_audit import log_action
 from backend.services.onboarding.wealth_inference_service import infer_segment
+from backend.services.user_status_service import STATUSES as _SHARED_STATUSES
+from backend.services.user_status_service import classify_status
 from backend.utils.pii import mask_name
 from backend.utils.time_human import humanize_vi
 
@@ -27,7 +29,7 @@ router = APIRouter(prefix="/users", tags=["admin-users"])
 DEFAULT_TENANT_ID = 1
 SORT_KEYS = {"last_active_desc", "cost_desc", "joined_desc", "messages_desc"}
 TIERS = {"starter", "young_pro", "mass_affluent", "hnw"}
-STATUSES = {"active", "at_risk", "dormant", "new", "suspended"}
+STATUSES = set(_SHARED_STATUSES)
 
 
 class AdminUserListItem(BaseModel):
@@ -111,31 +113,11 @@ def _usd_from_vnd(value: Any) -> float:
     return round(float(value or 0) / 25_000, 6)
 
 
-def _classify_status(
-    created_at: datetime, last_active_at: datetime | None, manual_status: str | None
-) -> str:
-    if manual_status == "suspended":
-        return "suspended"
-    now = datetime.now(timezone.utc)
-    created = (
-        created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
-    )
-    last_active = (
-        None
-        if last_active_at is None
-        else (
-            last_active_at
-            if last_active_at.tzinfo
-            else last_active_at.replace(tzinfo=timezone.utc)
-        )
-    )
-    if now - created < timedelta(days=3):
-        return "new"
-    if last_active is None or now - last_active > timedelta(days=7):
-        return "dormant"
-    if now - last_active > timedelta(days=3):
-        return "at_risk"
-    return "active"
+# Lifecycle status now lives in the shared ``user_status_service`` so the admin
+# console and the re-engagement broadcast (Phase 4.5 E5 #5.2) classify "dormant"
+# identically. Kept as a module-level alias so the two call sites below — and the
+# admin tests — keep the same name.
+_classify_status = classify_status
 
 
 def _base_user_stats_stmt(tenant_id: int):

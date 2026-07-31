@@ -75,9 +75,9 @@ async def test_handle_name_text_input_saves_name_and_moves_to_goal():
         "backend.bot.handlers.onboarding_v2.send_message",
         new=AsyncMock(),
     ) as send_message_mock, patch(
-        "backend.bot.handlers.onboarding_v2._send_goal_question",
+        "backend.bot.handlers.onboarding_v2._send_salutation_question",
         new=AsyncMock(),
-    ) as send_goal_mock, patch(
+    ) as send_salutation_mock, patch(
         "backend.bot.handlers.onboarding_v2.analytics.track",
     ) as track_mock:
         consumed = await onboarding_v2.handle_name_text_input(db, 123, user, "Minh")
@@ -85,9 +85,9 @@ async def test_handle_name_text_input_saves_name_and_moves_to_goal():
     assert consumed is True
     assert user.display_name == "Minh"
     set_display_name_mock.assert_awaited_once_with(db, user.id, "Minh")
-    db.flush.assert_awaited_once()
+    assert db.flush.await_count == 2
     assert send_message_mock.await_count == 1
-    send_goal_mock.assert_awaited_once_with(db, 123, user)
+    send_salutation_mock.assert_awaited_once_with(db, 123, user)
     track_mock.assert_called_once_with("onboarding_v2_name_captured", user_id=user.id)
 
 

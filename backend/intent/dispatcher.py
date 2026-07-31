@@ -50,6 +50,8 @@ READ_INTENTS = frozenset(
         IntentType.QUERY_GOALS,
         IntentType.QUERY_GOAL_PROGRESS,
         IntentType.QUERY_CREDIT_CARD_DEBT,
+        IntentType.DECISION_FEASIBILITY,
+        IntentType.DECISION_SHOCK,
     }
 )
 
@@ -89,6 +91,14 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.PLANNING,
         IntentType.GREETING,
         IntentType.HELP,
+        # Feasibility copy owns its own warm tone (and, when dark, delegates
+        # to advisory which already skips) — a personality wrap would double
+        # up the voice.
+        IntentType.DECISION_FEASIBILITY,
+        # Shock copy owns its own warm weather-metaphor tone (and, when dark,
+        # delegates to advisory which already skips) — a personality wrap would
+        # double up the voice.
+        IntentType.DECISION_SHOCK,
         IntentType.ACTION_RECORD_SAVING,
         IntentType.ACTION_QUICK_TRANSACTION,
         IntentType.ACTION_ADD_ASSET,
@@ -419,6 +429,16 @@ class IntentDispatcher:
             )
 
             return QueryCreditCardDebtHandler()
+        if intent == IntentType.DECISION_FEASIBILITY:
+            from backend.intent.handlers.decision_feasibility import (
+                DecisionFeasibilityHandler,
+            )
+
+            return DecisionFeasibilityHandler()
+        if intent == IntentType.DECISION_SHOCK:
+            from backend.intent.handlers.decision_shock import DecisionShockHandler
+
+            return DecisionShockHandler()
         if intent == IntentType.ADVISORY:
             from backend.intent.handlers.advisory import AdvisoryHandler
 

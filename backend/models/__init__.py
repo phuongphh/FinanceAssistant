@@ -59,9 +59,17 @@ from backend.models.license import (
 )
 from backend.models.onboarding_session import (
     ALL_GOALS,
+    COHORT_LEGACY,
+    COHORT_RESET,
+    GOAL_EMERGENCY_FUND,
+    GOAL_FIRST_HOME,
     GOAL_PLAN_GOAL,
     GOAL_TRACK_SPENDING,
     GOAL_UNDERSTAND_WEALTH,
+    GOAL_WEDDING,
+    LEGACY_GOALS,
+    RESET_GOALS,
+    cohort_for_goal,
     SEGMENT_HNW,
     SEGMENT_MASS_AFFLUENT,
     SEGMENT_STARTER,
@@ -87,6 +95,12 @@ from backend.models.positioning_survey import (
     POSITIONING_UNCLEAR,
     VALID_POSITIONING_RESPONSES,
     PositioningSurveyResponse,
+)
+from backend.models.decision_query_log import (
+    QUERY_TYPE_FEASIBILITY,
+    QUERY_TYPE_SHOCK,
+    VALID_QUERY_TYPES,
+    DecisionQueryLog,
 )
 
 __all__ = [
@@ -157,7 +171,15 @@ __all__ = [
     "GOAL_UNDERSTAND_WEALTH",
     "GOAL_PLAN_GOAL",
     "GOAL_TRACK_SPENDING",
+    "GOAL_EMERGENCY_FUND",
+    "GOAL_FIRST_HOME",
+    "GOAL_WEDDING",
+    "LEGACY_GOALS",
+    "RESET_GOALS",
     "ALL_GOALS",
+    "COHORT_RESET",
+    "COHORT_LEGACY",
+    "cohort_for_goal",
     "SEGMENT_STARTER",
     "SEGMENT_YOUNG_PRO",
     "SEGMENT_MASS_AFFLUENT",
@@ -175,4 +197,8 @@ __all__ = [
     "VALID_POSITIONING_RESPONSES",
     "ALIGNED_POSITIONING_RESPONSES",
     "MISALIGNED_POSITIONING_RESPONSES",
+    "DecisionQueryLog",
+    "QUERY_TYPE_SHOCK",
+    "QUERY_TYPE_FEASIBILITY",
+    "VALID_QUERY_TYPES",
 ]

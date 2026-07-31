@@ -289,7 +289,11 @@ def _render_html_with_version(html_path: Path) -> str:
             count=1,
         )
     if _VERSION_MARKER_PATTERN.search(bumped):
-        bumped = _VERSION_MARKER_PATTERN.sub("", bumped, count=1)
+        marker = (
+            '<p class="app-build" aria-label="Application build">'
+            f'build {_GIT_SHA} · assets {_STATIC_VERSION}</p>'
+        )
+        bumped = _VERSION_MARKER_PATTERN.sub(marker, bumped, count=1)
     return bumped
 
 

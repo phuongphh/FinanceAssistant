@@ -14,13 +14,17 @@ from backend.database import get_db
 from backend.models.admin_user import AdminUser
 from backend.models.agent_audit_log import AgentAuditLog
 from backend.models.cost_budget import LLMCostLog
+from backend.models.decision_query_log import DecisionQueryLog
 from backend.models.event import Event
 from backend.models.feature_event import FeatureEvent
+from backend.models.onboarding_session import OnboardingSession, cohort_for_goal
 from backend.models.portfolio_asset import PortfolioAsset
 from backend.models.user import User
 from backend.schemas.admin import (
     CohortRetentionResponse,
     DauChartResponse,
+    DecisionAdoptionResponse,
+    DecisionRetentionResponse,
     FeatureClicksResponse,
     IntentBreakdownResponse,
     OverviewStatsResponse,
@@ -47,6 +51,18 @@ INTENT_LABELS = {
     "llm_classifier": "LLM classified",
     "clarification": "Cần clarify",
 }
+# Onboarding cohort of the decision-adoption chart. ``unattributed`` buckets the
+# NULL-cohort rows (pre-4.6 logs + users who never chose an onboarding goal).
+# Ordered so the new first-life segment reads first, legacy second.
+COHORT_UNATTRIBUTED = "unattributed"
+DECISION_COHORT_LABELS = {
+    "reset": "Segment mới (reset)",
+    "legacy": "Cohort cũ (legacy)",
+    COHORT_UNATTRIBUTED: "Chưa gắn cohort",
+}
+# D28 retention ≈ four weeks after signup, so it lives at week-offset 4 (w4) of a
+# cohort's retention curve. Feeds gate G2 (D28 ≥ 25%).
+D28_OFFSET = 4
 DEFAULT_TENANT_ID = 1
 
 
@@ -351,5 +367,226 @@ async def cohort_retention(
                 retention[key_name] = round((len(retained[(cohort_week, offset)]) / size) * 100) if size else 0
         out.append({"cohort_week": cohort_week, "cohort_size": size, "retention": retention})
     response = {"cohorts": out}
+    await cache_set(key, response, 86400)
+    return response
+
+
+@router.get("/charts/decision-adoption", response_model=DecisionAdoptionResponse)
+async def decision_adoption(
+    weeks: int = Query(default=8, ge=1, le=26),
+    admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Weekly Decision-Engine adoption, split by onboarding cohort.
+
+    Reads the append-only ``decision_query_logs`` (Phase 4.5) tagged with the
+    onboarding cohort in #4.1, and reports per week × cohort: interactions (row
+    count), active users (distinct ``user_id``), interactions/user, and the
+    average độ nét. Feeds gates G1/G2 — does the new first-life ``reset`` segment
+    engage the decision surfaces differently from the ``legacy`` cohort?
+
+    Output is aggregate-only (counts + averages) so no PII ever leaves the
+    query; tenant isolation and JWT auth match the other admin charts.
+    """
+    tenant_id = _admin_tenant_id(admin)
+    key = f"admin:tenant:{tenant_id}:charts:decision-adoption:{weeks}"
+    cached = await cache_get(key)
+    if cached is not None:
+        return cached
+
+    today = datetime.now(VN_TZ).date()
+    current_week = today - timedelta(days=today.weekday())
+    first_week = current_week - timedelta(weeks=weeks - 1)
+    start_dt = datetime.combine(first_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+    week_list = [first_week + timedelta(weeks=offset) for offset in range(weeks)]
+
+    week_col = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", DecisionQueryLog.created_at)), Date)
+    cohort_col = func.coalesce(DecisionQueryLog.cohort, COHORT_UNATTRIBUTED)
+    # Per-user rollup first so độ nét is averaged over *active users* (G2), not
+    # over raw interactions — a chatty user must not skew the cohort's độ nét.
+    # Join ``users`` and scope by ``users.tenant_id`` like the other user-facing
+    # charts: ``decision_query_logs`` has no tenant column, so filtering it alone
+    # would leak other tenants' rows.
+    per_user = (
+        select(
+            week_col.label("week"),
+            cohort_col.label("cohort"),
+            DecisionQueryLog.user_id.label("user_id"),
+            func.count().label("user_interactions"),
+            func.avg(DecisionQueryLog.clarity_score).label("user_clarity"),
+        )
+        .join(User, User.id == DecisionQueryLog.user_id)
+        .where(
+            User.deleted_at.is_(None),
+            _tenant_filter(User, tenant_id),
+            DecisionQueryLog.created_at >= start_dt,
+        )
+        .group_by(week_col, cohort_col, DecisionQueryLog.user_id)
+        .subquery()
+    )
+    rows = (
+        await db.execute(
+            select(
+                per_user.c.week.label("week"),
+                per_user.c.cohort.label("cohort"),
+                func.sum(per_user.c.user_interactions).label("interactions"),
+                func.count().label("active_users"),
+                func.avg(per_user.c.user_clarity).label("avg_clarity"),
+            )
+            .group_by(per_user.c.week, per_user.c.cohort)
+        )
+    ).all()
+
+    # (cohort, week) -> metrics, so we can emit a dense series per cohort.
+    by_cohort: dict[str, dict[date, dict]] = defaultdict(dict)
+    for row in rows:
+        interactions = int(row.interactions)
+        active_users = int(row.active_users)
+        by_cohort[row.cohort][row.week] = {
+            "week": row.week,
+            "interactions": interactions,
+            "active_users": active_users,
+            "interactions_per_user": round(interactions / active_users, 2) if active_users else 0.0,
+            "avg_clarity": round(float(row.avg_clarity), 1) if row.avg_clarity is not None else None,
+        }
+
+    cohorts = []
+    for cohort, label in DECISION_COHORT_LABELS.items():
+        weeks_seen = by_cohort.get(cohort)
+        if not weeks_seen:
+            continue  # skip a cohort with zero interactions in the window
+        points = [
+            weeks_seen.get(
+                week,
+                {
+                    "week": week,
+                    "interactions": 0,
+                    "active_users": 0,
+                    "interactions_per_user": 0.0,
+                    "avg_clarity": None,
+                },
+            )
+            for week in week_list
+        ]
+        cohorts.append({"cohort": cohort, "label": label, "points": points})
+
+    response = {"weeks": week_list, "cohorts": cohorts}
+    await cache_set(key, response, 1800)
+    return response
+
+
+@router.get("/charts/decision-retention", response_model=DecisionRetentionResponse)
+async def decision_retention(
+    weeks: int = Query(default=8, ge=1, le=26),
+    admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Signup→week-N retention, split by onboarding cohort — headline D28 (G2).
+
+    Complements ``decision-adoption`` (which is anchored on the calendar week of
+    each interaction) with a classic retention curve anchored on each user's
+    *signup week*, bucketed by their onboarding cohort (``reset`` first-life vs
+    ``legacy`` asset-management vs ``unattributed``). Retention at offset *k* is
+    the share of that cohort's users who were old enough to reach week *k* and
+    had any activity in it — so the denominator (``eligible``) shrinks for later
+    offsets rather than diluting them with users who have not had the time yet.
+    ``d28`` mirrors offset 4 (≈28 days), the metric behind gate G2 (≥25%).
+
+    Activity reuses ``events`` (same signal as ``cohort-retention``); tenant
+    isolation rides on ``users.tenant_id`` and the payload is aggregate-only
+    (cohort sizes + percentages), so no PII ever leaves the query.
+    """
+    tenant_id = _admin_tenant_id(admin)
+    key = f"admin:tenant:{tenant_id}:charts:decision-retention:{weeks}"
+    cached = await cache_get(key)
+    if cached is not None:
+        return cached
+
+    today = datetime.now(VN_TZ).date()
+    current_week = today - timedelta(days=today.weekday())
+    first_week = current_week - timedelta(weeks=weeks - 1)
+    start_dt = datetime.combine(first_week, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+
+    # Each user's signup week + onboarding cohort (left join keeps users who
+    # never opened an onboarding session — they fall to ``unattributed``).
+    signup_week_col = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", User.created_at)), Date)
+    user_rows = (
+        await db.execute(
+            select(User.id, signup_week_col.label("signup_week"), OnboardingSession.goal_choice)
+            .outerjoin(OnboardingSession, OnboardingSession.user_id == User.id)
+            .where(
+                User.deleted_at.is_(None),
+                _tenant_filter(User, tenant_id),
+                User.created_at >= start_dt,
+            )
+        )
+    ).all()
+
+    user_signup: dict = {}
+    user_cohort: dict = {}
+    cohort_users: dict[str, set] = defaultdict(set)
+    for uid, signup_week, goal_choice in user_rows:
+        cohort = cohort_for_goal(goal_choice) or COHORT_UNATTRIBUTED
+        user_signup[uid] = signup_week
+        user_cohort[uid] = cohort
+        cohort_users[cohort].add(uid)
+
+    activity_expr = cast(func.date_trunc("week", func.timezone("Asia/Ho_Chi_Minh", Event.timestamp)), Date)
+    if user_signup:
+        activity_rows = (
+            await db.execute(
+                select(Event.user_id, activity_expr.label("active_week"))
+                .where(
+                    Event.user_id.in_(list(user_signup.keys())),
+                    _tenant_filter(Event, tenant_id),
+                    Event.timestamp >= start_dt,
+                )
+                .distinct()
+            )
+        ).all()
+    else:
+        activity_rows = []
+
+    # (cohort, offset) -> users active at that offset from their own signup week.
+    retained: dict[tuple[str, int], set] = defaultdict(set)
+    for uid, active_week in activity_rows:
+        signup_week = user_signup.get(uid)
+        if signup_week is None or active_week < signup_week:
+            continue
+        offset = int((active_week - signup_week).days / 7)
+        if offset < weeks:
+            retained[(user_cohort[uid], offset)].add(uid)
+
+    cohorts = []
+    for cohort, label in DECISION_COHORT_LABELS.items():
+        members = cohort_users.get(cohort)
+        if not members:
+            continue  # skip a cohort with no users in the window
+        # A user is eligible for offset k once k weeks have elapsed since signup.
+        max_elapsed = {uid: int((current_week - user_signup[uid]).days / 7) for uid in members}
+        retention: dict[str, int | None] = {}
+        eligible: dict[str, int] = {}
+        for offset in range(weeks):
+            key_name = f"w{offset}"
+            eligible_count = sum(1 for uid in members if max_elapsed[uid] >= offset)
+            eligible[key_name] = eligible_count
+            if eligible_count == 0:
+                retention[key_name] = None
+            elif offset == 0:
+                retention[key_name] = 100
+            else:
+                retention[key_name] = round((len(retained[(cohort, offset)]) / eligible_count) * 100)
+        cohorts.append(
+            {
+                "cohort": cohort,
+                "label": label,
+                "cohort_size": len(members),
+                "retention": retention,
+                "eligible": eligible,
+                "d28": retention.get(f"w{D28_OFFSET}"),
+            }
+        )
+
+    response = {"weeks": weeks, "cohorts": cohorts}
     await cache_set(key, response, 86400)
     return response

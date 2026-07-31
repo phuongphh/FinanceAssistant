@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.progress_bar import make_progress_bar
+from backend.intent.handlers.decision_flags import is_tone_dial_enabled
 from backend.models.user import User
 from backend.models.credit_card import CreditCard
 from backend.profile.models.user_profile import AGE_RANGES, UserProfile
@@ -79,6 +80,7 @@ class ProfileUserSnapshot:
     briefing_enabled: bool = True
     briefing_time: time | None = None
     twin_show_technical_terms: bool = False
+    tone_preference: str | None = None
 
 
 def profile_keyboard(*, editable: bool = True) -> dict[str, list[list[dict[str, str]]]]:
@@ -178,57 +180,74 @@ def age_keyboard() -> dict[str, list[list[dict[str, str]]]]:
 
 def notification_keyboard(
     profile: UserProfile,
+    *,
+    tone_enabled: bool = False,
+    tone_preference: str | None = None,
 ) -> dict[str, list[list[dict[str, str]]]]:
     briefing_status = _notification_state_label(profile.briefing_enabled)
     reminder_status = _notification_state_label(profile.reminder_enabled)
-    return {
-        "inline_keyboard": [
+    rows: list[list[dict[str, str]]] = [
+        [
+            {
+                "text": _copy(
+                    "keyboards", "notifications", "toggle_briefing"
+                ).format(state=briefing_status),
+                "callback_data": "profile:toggle:briefing",
+            }
+        ],
+        [
+            {
+                "text": _copy("keyboards", "notifications", "time_briefing").format(
+                    time=_fmt_time(profile.briefing_time)
+                ),
+                "callback_data": "profile:time_menu:briefing",
+            }
+        ],
+        [
+            {
+                "text": _copy(
+                    "keyboards", "notifications", "toggle_reminder"
+                ).format(state=reminder_status),
+                "callback_data": "profile:toggle:reminder",
+            }
+        ],
+        [
+            {
+                "text": _copy("keyboards", "notifications", "time_reminder").format(
+                    time=_fmt_time(profile.reminder_time)
+                ),
+                "callback_data": "profile:time_menu:reminder",
+            }
+        ],
+        [
+            {
+                "text": _copy("keyboards", "notifications", "twin_terms"),
+                "callback_data": "profile:toggle_twin_terms",
+            }
+        ],
+    ]
+    # Phase 4.5 E4 #4.2 — tone dial. Gated at the edge: when the flag is dark
+    # the row is absent and the voice stays the default gentle tone.
+    if tone_enabled:
+        rows.append(
             [
                 {
                     "text": _copy(
-                        "keyboards", "notifications", "toggle_briefing"
-                    ).format(state=briefing_status),
-                    "callback_data": "profile:toggle:briefing",
+                        "keyboards", "notifications", "toggle_tone"
+                    ).format(state=_tone_label(tone_preference)),
+                    "callback_data": "profile:toggle_tone",
                 }
-            ],
-            [
-                {
-                    "text": _copy("keyboards", "notifications", "time_briefing").format(
-                        time=_fmt_time(profile.briefing_time)
-                    ),
-                    "callback_data": "profile:time_menu:briefing",
-                }
-            ],
-            [
-                {
-                    "text": _copy(
-                        "keyboards", "notifications", "toggle_reminder"
-                    ).format(state=reminder_status),
-                    "callback_data": "profile:toggle:reminder",
-                }
-            ],
-            [
-                {
-                    "text": _copy("keyboards", "notifications", "time_reminder").format(
-                        time=_fmt_time(profile.reminder_time)
-                    ),
-                    "callback_data": "profile:time_menu:reminder",
-                }
-            ],
-            [
-                {
-                    "text": _copy("keyboards", "notifications", "twin_terms"),
-                    "callback_data": "profile:toggle_twin_terms",
-                }
-            ],
-            [
-                {
-                    "text": _copy("keyboards", "notifications", "back"),
-                    "callback_data": "profile:view",
-                }
-            ],
+            ]
+        )
+    rows.append(
+        [
+            {
+                "text": _copy("keyboards", "notifications", "back"),
+                "callback_data": "profile:view",
+            }
         ]
-    }
+    )
+    return {"inline_keyboard": rows}
 
 
 def time_keyboard(kind: str) -> dict[str, list[list[dict[str, str]]]]:
@@ -351,7 +370,13 @@ async def handle_profile_view(
     else:
         stats = _fallback_stats()
         notice = notice or PROFILE_DEGRADED_NOTICE
-    text = render_profile(profile, user_snapshot, stats, notice=notice)
+    text = render_profile(
+        profile,
+        user_snapshot,
+        stats,
+        notice=notice,
+        tone_enabled=is_tone_dial_enabled(),
+    )
     if message_id is None:
         await send_message(
             chat_id=chat_id,
@@ -394,6 +419,10 @@ async def handle_profile_callback(
     profile = await get_or_create_profile(db, user.id)
     parts = data.split(":")
     action = parts[1] if len(parts) > 1 else ""
+    # Read the tone-dial flag once at the edge (layer contract §"Service NEVER
+    # reads env"); threaded into the notifications panel so the row appears
+    # only when the capability is live.
+    tone_enabled = is_tone_dial_enabled()
     await answer_callback(callback_id)
 
     if action == "view":
@@ -432,7 +461,13 @@ async def handle_profile_callback(
         return True
 
     if action == "notifications":
-        await _render_notifications(chat_id, message_id, profile)
+        await _render_notifications(
+            chat_id,
+            message_id,
+            profile,
+            tone_enabled=tone_enabled,
+            tone_preference=user.tone_preference,
+        )
         return True
 
     if action == "glossary":
@@ -471,6 +506,25 @@ async def handle_profile_callback(
         await handle_profile_view(db, chat_id, user, message_id=message_id)
         return True
 
+    if action == "toggle_tone":
+        # Flag dark → ignore a stale button from a client that still shows it.
+        if not tone_enabled:
+            return True
+        # NULL / "gentle" → "strict"; "strict" → back to the default gentle
+        # voice. NULL is the default gentle tone, so the first tap flips to
+        # strict.
+        current = getattr(user, "tone_preference", None)
+        user.tone_preference = "gentle" if current == "strict" else "strict"
+        await db.flush()
+        await _render_notifications(
+            chat_id,
+            message_id,
+            profile,
+            tone_enabled=tone_enabled,
+            tone_preference=user.tone_preference,
+        )
+        return True
+
     if action == "toggle" and len(parts) >= 3:
         kind = parts[2]
         if kind == "briefing":
@@ -481,7 +535,13 @@ async def handle_profile_callback(
         else:
             return True
         await db.flush()
-        await _render_notifications(chat_id, message_id, profile)
+        await _render_notifications(
+            chat_id,
+            message_id,
+            profile,
+            tone_enabled=tone_enabled,
+            tone_preference=user.tone_preference,
+        )
         return True
 
     if action == "time_menu" and len(parts) >= 3:
@@ -508,7 +568,13 @@ async def handle_profile_callback(
             )
             return True
         await _set_notification_time(db, user, profile, kind, parsed)
-        await _render_notifications(chat_id, message_id, profile)
+        await _render_notifications(
+            chat_id,
+            message_id,
+            profile,
+            tone_enabled=tone_enabled,
+            tone_preference=user.tone_preference,
+        )
         return True
 
     if action == "custom_time" and len(parts) >= 3:
@@ -609,6 +675,7 @@ def render_profile(
     stats: dict[str, Any],
     *,
     notice: str | None = None,
+    tone_enabled: bool = False,
 ) -> str:
     pv = _load_copy()["profile_view"]
     level = stats["wealth_level"]
@@ -646,6 +713,16 @@ def render_profile(
                 else pv["state_off"]
             )
         ),
+    ]
+    # Phase 4.5 E4 #4.2 — tone dial. Only surfaced when the flag is live; the
+    # value falls back to the default gentle voice when never chosen (NULL).
+    if tone_enabled:
+        lines.append(
+            pv["field_tone"].format(
+                value=_tone_label(getattr(user, "tone_preference", None))
+            )
+        )
+    lines += [
         "",
         pv["section_overview"],
         pv["field_account_age"].format(days=stats["account_age_days"]),
@@ -771,6 +848,9 @@ async def _render_notifications(
     chat_id: int,
     message_id: int | None,
     profile: UserProfile,
+    *,
+    tone_enabled: bool = False,
+    tone_preference: str | None = None,
 ) -> None:
     panel = _load_copy()["notifications_panel"]
     briefing_state = _notification_state_label(profile.briefing_enabled)
@@ -785,18 +865,21 @@ async def _render_notifications(
             panel["reminder_time"].format(time=_fmt_time(profile.reminder_time)),
         ]
     )
+    keyboard = notification_keyboard(
+        profile, tone_enabled=tone_enabled, tone_preference=tone_preference
+    )
     if message_id is None:
         await send_message(
             chat_id=chat_id,
             text=text,
-            reply_markup=notification_keyboard(profile),
+            reply_markup=keyboard,
         )
         return
     await edit_message_text(
         chat_id=chat_id,
         message_id=message_id,
         text=text,
-        reply_markup=notification_keyboard(profile),
+        reply_markup=keyboard,
     )
 
 
@@ -835,6 +918,7 @@ def _snapshot_user(user: User) -> ProfileUserSnapshot:
         twin_show_technical_terms=bool(
             getattr(user, "twin_show_technical_terms", False)
         ),
+        tone_preference=getattr(user, "tone_preference", None),
     )
 
 
@@ -1176,6 +1260,13 @@ def _decode_source_token(token_or_key: str, options: list[tuple[str, str]]) -> s
 def _notification_state_label(enabled: bool) -> str:
     key = "notification_state_on" if enabled else "notification_state_off"
     return _copy("keyboards", key)
+
+
+def _tone_label(tone_preference: str | None) -> str:
+    """Human label for the tone dial. NULL / anything but ``"strict"`` reads
+    as the default gentle voice, so existing users need no backfill."""
+    key = "tone_strict" if tone_preference == "strict" else "tone_gentle"
+    return _copy("profile_view", key)
 
 
 def _age_confirm_text(value: str | None) -> str:

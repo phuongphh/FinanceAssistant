@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.intent.handlers.decision_flags import is_clarity_meter_enabled
 from backend.life_events.impact import parse_event_ids
 from backend.miniapp.auth import require_miniapp_auth
 from backend.miniapp.routes import _resolve_user
@@ -61,15 +62,15 @@ async def get_twin(
     """Return latest Twin projection JSON for the authenticated Mini App user."""
     user = await _resolve_user(auth, db)
     excluded = parse_event_ids(exclude_event_ids)
+    include_clarity = is_clarity_meter_enabled()
     try:
-        if excluded:
-            payload = await twin_api_service.build_twin_payload(
-                db, user.id, scenario=scenario, exclude_event_ids=excluded
-            )
-        else:
-            payload = await twin_api_service.build_twin_payload(
-                db, user.id, scenario=scenario
-            )
+        payload = await twin_api_service.build_twin_payload(
+            db,
+            user.id,
+            scenario=scenario,
+            exclude_event_ids=excluded or None,
+            include_clarity=include_clarity,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

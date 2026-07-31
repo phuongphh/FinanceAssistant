@@ -1,0 +1,68 @@
+# Excel export copy (Phase 4.5, Epic E4, Issue #4.1).
+#
+# All user-facing strings for the /export workbook live here — never
+# hardcoded in code (CLAUDE.md §Vietnamese localization). The workbook is a
+# tài liệu người dùng tự tải về, giọng Bé Tiền vẫn ấm áp, không phán xét.
+#
+# NOTE: "Decision Engine" / "GPS tài chính" / "CFO" tuyệt đối KHÔNG được
+# xuất hiện ở đây — đây là surface người dùng nhìn thấy.
+
+# Tên file gửi qua Telegram. ``{date}`` được điền YYYY-MM-DD ở handler edge.
+filename: "be-tien-tai-san-{date}.xlsx"
+
+# Caption đính kèm khi gửi file.
+caption: "Đây là file Excel tài sản của {salutation} nè 📊 Mình gom tài sản, thu chi và mục tiêu vào 3 sheet cho dễ xem nha."
+caption_empty: "File Excel của {salutation} đây nha 📊 Hiện mình chưa có nhiều dữ liệu nên file còn trống — {salutation} nhập thêm tài sản, thu chi hay mục tiêu là lần sau đầy đủ liền 💛"
+
+# Người dùng chưa đăng ký / không tìm thấy.
+not_registered: "Mình chưa thấy hồ sơ của bạn. Bạn gõ /start để mình làm quen trước nha 💛"
+
+# Feature flag off — surface không tồn tại.
+disabled: "Tính năng xuất Excel đang tạm tắt. Bạn quay lại sau nha 💛"
+
+# Thông báo trong lúc dựng file (gửi trước khi upload).
+building: "⏳ Đang gói dữ liệu vào Excel cho {salutation}..."
+
+sheets:
+  assets:
+    title: "Tài sản"
+    headers:
+      - "Loại tài sản"
+      - "Tên"
+      - "Giá trị hiện tại (VND)"
+      - "Giá trị ban đầu (VND)"
+      - "Lãi/lỗ (VND)"
+      - "Ngày sở hữu"
+      - "Định giá lần cuối"
+  cashflow:
+    title: "Thu chi"
+    headers:
+      - "Loại"
+      - "Ngày"
+      - "Hạng mục / Nguồn"
+      - "Mô tả"
+      - "Số tiền (VND)"
+    # Nhãn cột "Loại" cho từng dòng.
+    row_income: "Thu"
+    row_expense: "Chi"
+  goals:
+    title: "Mục tiêu"
+    headers:
+      - "Mục tiêu"
+      - "Cần đạt (VND)"
+      - "Đã có (VND)"
+      - "Còn thiếu (VND)"
+      - "Tiến độ (%)"
+      - "Hạn chót"
+
+# Nhãn tiếng Việt cho ``asset_type`` thô trong DB; thiếu key thì fallback
+# về chính giá trị thô nên thêm loại mới không cần đụng code.
+asset_type_labels:
+  cash: "Tiền mặt / Tiền gửi"
+  stock: "Cổ phiếu"
+  crypto: "Crypto"
+  gold: "Vàng"
+  real_estate: "Bất động sản"
+  bond: "Trái phiếu"
+  fund: "Quỹ"
+  other: "Khác"

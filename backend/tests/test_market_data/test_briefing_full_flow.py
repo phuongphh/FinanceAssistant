@@ -53,7 +53,7 @@ class _BriefingDB:
             deposit_type="online",
         )
 
-    async def execute(self, stmt):
+    async def execute(self, stmt, *args, **kwargs):
         self.calls += 1
         if self.calls == 1:
             return _Result(scalar=self.vnindex)
@@ -128,6 +128,7 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
 
     with patch("backend.wealth.services.asset_service.get_user_assets", AsyncMock(return_value=assets)), \
          patch("backend.wealth.services.net_worth_calculator.calculate_historical", AsyncMock(return_value=Decimal("107000000"))), \
+         patch("backend.wealth.services.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
          patch("backend.market_data.client.get_price_cache", return_value=cache), \
          patch("backend.market_data.client.get_stock_provider", return_value=stock_provider), \
          patch("backend.market_data.client.get_crypto_provider", return_value=crypto_provider), \
@@ -142,10 +143,10 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
     assert "Danh mục" in result.text
     assert "Top tin liên quan" in result.text
     assert "Gợi ý nhanh" in result.text
-    assert "stock" in result.text
-    assert "crypto" in result.text
-    assert "gold" in result.text
-    assert "155tr500" in result.sections["net_worth"]
+    assert "VNM" in result.text
+    assert "BTC" in result.text
+    assert "SJC" in result.text
+    assert "150tr455" in result.sections["net_worth"]
     assert await redis.get("market_data:stock:VNM") is not None
     assert await redis.get("market_data:crypto:BTC") is not None
     assert result.is_stale is False
