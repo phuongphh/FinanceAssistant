@@ -40,13 +40,15 @@ Nền 4B có 2 lỗi khiến Zalo **không thể chạy production**: webhook ve
 
 #### Issue #1.2 — Sửa webhook signature verification `blocking-prod`
 - `backend/routers/zalo.py`: thay `_verify_zalo_signature` — tính `sha256(app_id + data + timestamp + oa_secret_key)` với `data` = raw body string, `timestamp` lấy từ payload; chấp header dạng `mac=<hex>`. So sánh constant-time. Thêm `ZALO_SIGNATURE_ENFORCE` (default true; đặt false trong soak 48h đầu → log-only, vẫn xử lý).
-- **DoD:** unit test với vector dựng tay + ≥1 payload thật từ staging; sai chữ ký → 403 và log KHÔNG chứa `user_id`/token; enforce=false → log warning nhưng vẫn 200; secret rỗng (dev) vẫn bypass như cũ.
+- **Fail-closed khi thiếu secret:** `ZALO_OA_SECRET_KEY` rỗng/thiếu **KHÔNG được bypass verification khi `ZALO_CHANNEL_ENABLED=true`**. Bypass chỉ hợp lệ khi channel tắt (dev/test). Kiểm tra ở **startup invariant** trong lifespan: `ZALO_CHANNEL_ENABLED=true` + secret rỗng → raise, app không boot (đổi tên biến hay quên set secret trên prod phải nổ lúc deploy, không phải im lặng nhận webhook giả).
+- **DoD:** unit test với vector dựng tay + ≥1 payload thật từ staging; sai chữ ký → 403 và log KHÔNG chứa `user_id`/token; enforce=false → log warning nhưng vẫn 200; **test: channel ON + secret rỗng → app fail to start (không phải bypass); channel OFF + secret rỗng → bypass như cũ**.
 
 #### Issue #1.3 — `zalo_oa_credentials` + `zalo_token_service` (refresh atomic) `blocking-prod`
 - `backend/models/zalo_oa_credential.py`: 1 row/OA — `access_token`, `refresh_token`, `expires_at`, `updated_at`. Docstring ghi rõ đây là **ngoại lệ multi-tenant có chủ ý** (credential cấp OA, không per-user) và token **không bao giờ được log**.
 - `backend/services/zalo_token_service.py`: `get_valid_token()` — refresh khi còn <5 phút; gọi `POST https://oauth.zaloapp.com/v4/oa/access_token`; **ghi access_token + refresh_token mới trong CÙNG transaction**; `pg_advisory_xact_lock` chống 2 worker refresh song song (refresh_token single-use — refresh đôi = mất OA). Service flush-only, `app_id`/`app_secret` **inject qua tham số**, không đọc env.
 - Migration `zalo_oa_credentials` + script seed token lần đầu (đọc từ env, ghi vào DB, chạy 1 lần).
-- **DoD:** test refresh khi sắp hết hạn; test 2 coroutine gọi đồng thời → đúng 1 lần refresh; test crash sau khi Zalo trả token mới nhưng trước commit → row cũ giữ nguyên, retry thành công; token không xuất hiện trong log/`repr`.
+- **Crash-safety — transaction KHÔNG đủ:** refresh_token là single-use và xoay ở **phía Zalo** ngay khi request thành công. Nếu process chết sau khi Zalo trả token mới nhưng trước khi commit, rollback trả row về refresh_token **đã bị Zalo vô hiệu hoá** → mọi retry sau đó fail vĩnh viễn, phải xác thực lại OA bằng tay. DB transaction không thể làm HTTP call atomic. Thiết kế bắt buộc: **write-ahead** — commit `refresh_pending` (lưu refresh_token sắp dùng + `attempted_at`) **trước** khi gọi Zalo, gọi Zalo, rồi commit token mới + clear pending. Khởi động lại thấy row `refresh_pending` → **không tự retry mù**; log CRITICAL + alert runbook "cần xoay token tay" và để `get_valid_token()` fail rõ ràng. Đây là điều kiện đánh đổi có chủ ý: thà fail ồn còn hơn đốt refresh_token.
+- **DoD:** test refresh khi sắp hết hạn; test 2 coroutine gọi đồng thời → đúng 1 lần refresh; **test crash sau khi Zalo trả token mới nhưng trước commit → khởi động lại phát hiện `refresh_pending`, KHÔNG retry mù, raise + log CRITICAL** (không assert "retry thành công" — về mặt giao thức là không thể); runbook có mục xoay token tay từ trạng thái này; token không xuất hiện trong log/`repr`.
 
 #### Issue #1.4 — `ZaloOAClient` nhận token provider `blocking-prod`
 - `backend/adapters/zalo_oa.py`: `__init__(token_provider: Callable[[], Awaitable[str]])` thay `access_token: str`; `_post` lấy token mỗi lần gửi; **retry 1 lần khi gặp mã lỗi token-hết-hạn** (mã chốt ở #1.1) sau khi force-refresh. Bỏ `get_zalo_oa_client()` đọc settings; giữ shim tương thích cho test cũ.
@@ -77,7 +79,14 @@ Hiện webhook xử lý business ngay trong request, không dedup, và chỉ hi�
 
 #### Issue #2.3 — `zalo_inbound` handler: token flow + intent dispatch
 - `backend/bot/handlers/zalo_inbound.py`: chưa link → giữ nguyên luồng token `BT-XXXXXX` của 4B (không đổi hành vi); đã link → gọi intent classifier + dispatcher chung. Intent ngoài whitelist thin-slice (#4.1) → copy `fallback` lịch sự trong `content/zalo.yaml`, KHÔNG lỗi.
-- **DoD:** integration test: chưa-link + token → link thành công (regression 4B); đã-link + "ăn trưa 50k" → tạo transaction; đã-link + intent chưa hỗ trợ → copy fallback; mọi output ≤300 ký tự, không Markdown.
+- ⚠️ **Dùng lại dispatcher là chưa đủ để có phản hồi trên Zalo** — xem #2.4. Intent capture đi qua `ActionQuickTransactionHandler`, handler này tự gửi confirmation card rồi `return ""`; với user chỉ-Zalo thì không có tin nào ra cả.
+- **DoD:** integration test: chưa-link + token → link thành công (regression 4B); đã-link + "ăn trưa 50k" → tạo transaction **và user nhận được xác nhận trên Zalo** (phụ thuộc #2.4); đã-link + intent chưa hỗ trợ → copy fallback; mọi output ≤300 ký tự, không Markdown.
+
+#### Issue #2.4 — Confirmation phải trung lập kênh `blocking-prod`
+- **Vấn đề đã xác minh trong code hiện tại:** `backend/intent/handlers/action_quick_transaction.py:187-227` gọi `send_transaction_confirmation(...)` rồi `return ""` ("card đã gửi, dispatcher khỏi gửi gì"). Nhưng `backend/bot/handlers/transaction.py:44-83` là **Telegram-only**: `if not user or not user.telegram_id: return` rồi `send_message(chat_id=user.telegram_id, ..., parse_mode="HTML", reply_markup=transaction_actions_keyboard(...))`. User chỉ-Zalo (telegram_id NULL) → early-return im lặng, dispatcher cũng không gửi vì handler trả chuỗi rỗng → **user gõ "ăn trưa 50k" trên Zalo thấy giao dịch được ghi nhưng không nhận phản hồi nào**. Cùng vấn đề với `send_transaction_batch_confirmation`.
+- Sửa: đưa confirmation qua `Notifier` port (`get_notifier()`) thay vì `send_message` trực tiếp, hoặc để handler **trả nội dung xác nhận** cho dispatcher và để renderer từng kênh quyết định trình bày (Telegram: HTML + inline keyboard; Zalo: text ≤300 ký tự, không Markdown, không nút ở 5.0). Inline keyboard là **Telegram-only affordance** — Zalo bỏ nút, giữ nguyên nội dung số liệu.
+- Rà nốt các handler khác cùng pattern "tự gửi rồi `return \"\"`" trước khi mở dispatcher ở 5.1 (#4.1) — liệt kê trong PR.
+- **DoD:** test user chỉ-Zalo gõ "ăn trưa 50k" → nhận đúng 1 tin xác nhận trên Zalo, ≤300 ký tự, không Markdown; test user Telegram → card HTML + inline keyboard **byte-identical với trước** (không regress); test batch (nhiều item) cả 2 kênh; PR có danh sách handler còn tự-gửi kèm kết luận.
 
 ---
 
@@ -94,12 +103,13 @@ Zalo chỉ cho gửi tối đa **8 tin tư vấn miễn phí trong 48h** kể t�
 ### Child issues
 
 #### Issue #3.1 — `zalo_message_window` model + service
-- `backend/models/zalo_message_window.py`: `user_id` NOT NULL indexed, `last_interaction_at`, `window_started_at`, `free_msg_count`. `backend/services/zalo_window_service.py`: `record_inbound()` (mở/reset cửa sổ), `record_outbound()` (tăng đếm), `can_send()` → `(bool, reason)`. Pure/flush-only, hằng số 48h/8 tin lấy từ bảng platform facts (#1.1).
+- `backend/models/zalo_message_window.py`: `user_id` NOT NULL indexed, `last_interaction_at`, `window_started_at`, `free_msg_count`. `backend/services/zalo_window_service.py`: `record_inbound()` (mở/reset cửa sổ), `reserve_send()` → `(bool, reason)` (**đặt chỗ atomic trước khi gửi**, xem #3.2), `release_send()` (bù trừ khi gửi fail). `can_send()` chỉ dùng để *hiển thị/observability*, **không được dùng làm cổng chặn trước khi gửi** — đó là race. Pure/flush-only, hằng số 48h/8 tin lấy từ bảng platform facts (#1.1).
 - **DoD:** unit test cửa sổ mở/đóng theo mốc 48h; đếm reset khi user tương tác mới; `can_send` trả đúng `reason` (`window_closed`/`quota_exhausted`/`ok`); dùng UTC nhất quán, test qua mốc timezone Asia/Ho_Chi_Minh.
 
 #### Issue #3.2 — Wire vào `notifier_resolver` + worker
-- `backend/services/notifier_resolver.py`: chỉ thêm kênh zalo khi `can_send()` ok. `zalo_worker` gọi `record_inbound()` mỗi tin vào; đường gửi gọi `record_outbound()` sau khi gửi thành công.
-- **DoD:** test job proactive khi cửa sổ đóng → 0 request Zalo, Telegram vẫn gửi; test đúng 8 tin rồi tin thứ 9 bị chặn; test user chưa link Zalo → hành vi không đổi.
+- `backend/services/notifier_resolver.py`: chỉ thêm kênh zalo khi `reserve_send()` trả ok. `zalo_worker` gọi `record_inbound()` mỗi tin vào; đường gửi gọi `release_send()` khi gửi thất bại vì lỗi không-phải-quota.
+- **Chống TOCTOU — `can_send()` rồi mới gửi là race:** 2 job chạy song song ở `free_msg_count == 7` cùng thấy "ok" → cùng gửi → 9 tin, vượt trần Zalo. Phải **đặt chỗ trước khi gửi, không đếm sau khi gửi**: `reserve_send()` tăng `free_msg_count` bằng `UPDATE ... SET free_msg_count = free_msg_count + 1 WHERE ... AND free_msg_count < 8 RETURNING` (atomic, commit trước khi gọi Zalo); gửi thất bại vì lỗi không-phải-quota → `release_send()` bù trừ. Thà đếm dư 1 khi crash giữa chừng còn hơn vượt trần thật.
+- **DoD:** test job proactive khi cửa sổ đóng → 0 request Zalo, Telegram vẫn gửi; test đúng 8 tin rồi tin thứ 9 bị chặn; **test concurrency: N coroutine gửi đồng thời ở `free_msg_count = 7` → đúng 1 request tới Zalo, phần còn lại bị chặn với `reason=quota_exhausted`**; test gửi fail → `release_send()` trả lại chỗ; test user chưa link Zalo → hành vi không đổi.
 
 #### Issue #3.3 — Observability quota
 - Log có cấu trúc + counter cho mỗi lần bị chặn (theo `reason`). Endpoint/health snippet đọc `remain`/`total` từ quota API Zalo để đối chiếu đếm nội bộ với thực tế.

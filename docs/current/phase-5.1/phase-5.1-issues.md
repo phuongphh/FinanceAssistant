@@ -45,7 +45,8 @@
 #### Issue #1.2 — `media_url_service` (publish + resolve) `privacy-critical`
 - `backend/services/media_url_service.py`: `publish(user_id, data: bytes, content_type, ttl_seconds) -> str` (lưu bytes vào storage, sinh token `secrets.token_urlsafe(32)`, ghi row với hash, trả URL); `resolve(token) -> bytes | None` (hash → tra row → kiểm `expires_at`/`deleted_at` → đọc storage). **Flush-only, không commit, không đọc env** — base URL và TTL mặc định truyền vào từ edge.
 - Storage v1: filesystem dưới thư mục cấu hình được (không commit file vào repo). Interface đủ hẹp để đổi sang object storage sau mà không sửa caller.
-- **DoD:** service pure theo layer contract (no commit, no env read); unit test publish→resolve round-trip; token hết hạn → `None`; token sai → `None`; token đã soft-delete → `None`; test khẳng định 2 lần publish cùng bytes cho 2 token khác nhau.
+- ⚠️ **Rò rỉ file mồ côi khi rollback:** service flush-only nên `publish()` ghi bytes ra storage *ngay* nhưng row `media_objects` chỉ tồn tại sau khi caller commit. Caller rollback/crash giữa chừng → **file nằm lại trên đĩa mà không có row nào trỏ tới**, và job dọn (#1.4) quét theo row nên **không bao giờ tìm thấy** — biểu đồ tài chính của user nằm vĩnh viễn trên đĩa. Bắt buộc chọn 1 trong 2: (a) **ghi row trước, ghi bytes sau** — `publish()` chỉ flush row (trạng thái `pending`), bytes được ghi ở edge sau khi commit thành công; hoặc (b) **quét theo storage** — #1.4 liệt kê file trên storage, đối chiếu ngược với DB, xoá file không có row và cũ hơn grace period. (b) rẻ hơn để làm ngay, (a) sạch hơn về lâu dài — chốt trong PR.
+- **DoD:** service pure theo layer contract (no commit, no env read); unit test publish→resolve round-trip; token hết hạn → `None`; token sai → `None`; token đã soft-delete → `None`; test khẳng định 2 lần publish cùng bytes cho 2 token khác nhau; **test: publish rồi rollback → không còn file mồ côi sau khi job dọn chạy** (test này là điều kiện đủ cho cả 2 phương án trên).
 
 #### Issue #1.3 — `GET /api/v1/media/{token}` router `privacy-critical`
 - `backend/routers/media.py`: endpoint no-auth (token tự chứng), gọi `media_url_service.resolve`, trả `Response(content=..., media_type=...)` với header `Cache-Control: no-store` + `X-Content-Type-Options: nosniff`. Hết hạn/không tồn tại → **404 giống hệt nhau** (không phân biệt để tránh dò). Mount trong `backend/main.py`. Rate limit cơ bản theo IP.
@@ -53,7 +54,8 @@
 
 #### Issue #1.4 — Job dọn media hết hạn
 - `backend/jobs/cleanup_media.py`: chạy định kỳ (đề xuất hằng giờ), soft-delete row hết hạn + xoá file storage tương ứng. Đăng ký vào scheduler. Đọc cấu hình grace period ở job edge.
-- **DoD:** unit test chọn đúng tập row hết hạn (không đụng row còn hạn); file bị xoá khỏi storage; job idempotent (chạy 2 lần không lỗi); log số object dọn được.
+- **Quét cả file mồ côi** (nếu #1.2 chọn phương án (b)): liệt kê storage, file không có row `media_objects` tương ứng **và** mtime cũ hơn grace period → xoá. Grace period phải dài hơn khoảng cách publish→commit dài nhất để không xoá nhầm file đang chờ commit.
+- **DoD:** unit test chọn đúng tập row hết hạn (không đụng row còn hạn); file bị xoá khỏi storage; **test file mồ côi (có file, không có row) bị dọn sau grace period, và KHÔNG bị dọn khi còn trong grace period**; job idempotent (chạy 2 lần không lỗi); log số object dọn được, tách riêng số row-driven và số orphan.
 
 ---
 
@@ -130,7 +132,8 @@ Telegram `Button(text, callback_data, web_app_url)` có `callback_data` đi ngư
 
 #### Issue #4.2 — Rà `users.telegram_id` nullable + user chỉ-Zalo
 - Kiểm tra schema hiện tại: `telegram_id` có NOT NULL/unique không. Nếu chặn user chỉ-Zalo → migration làm nullable (giữ unique partial cho row non-null). Rà mọi query/service giả định user luôn có `telegram_id`.
-- **DoD:** báo cáo danh sách chỗ giả định có Telegram (kể cả nếu kết luận là "không cần migration"); migration sạch nếu có; test suite chạy được với fixture user chỉ có `zalo_user_id`; không query nào nổ `None`.
+- ⚠️ **Đã xác minh 1 chỗ vỡ chắc chắn — Pydantic response schema admin:** `backend/api/admin/users.py` khai báo `telegram_id: int` **bắt buộc, không nullable** trong cả `AdminUserListItem` và `AdminUserDetailResponse`. User chỉ-Zalo (telegram_id NULL) lọt vào list → Pydantic `ValidationError` lúc serialize → **500 làm hỏng cả trang danh sách user của admin**, không chỉ 1 row. Sửa thành `telegram_id: int | None = None` trong cùng PR với migration, và rà thêm mọi Pydantic schema/`response_model` khác có `telegram_id` non-optional.
+- **DoD:** báo cáo danh sách chỗ giả định có Telegram (kể cả nếu kết luận là "không cần migration"); migration sạch nếu có; **test admin list + admin detail với user chỉ-Zalo → 200, không ValidationError**; test suite chạy được với fixture user chỉ có `zalo_user_id`; không query nào nổ `None`.
 
 #### Issue #4.3 — Onboarding bắt đầu từ Zalo `persona-critical`
 - `backend/services/zalo_linking_service.py`: tạo user mới từ `zalo_user_id` khi chưa có link và tin đến không phải token `BT-XXXXXX`. Chạy đúng flow onboarding hiện tại (salutation → goal → asset → Twin) qua renderer Zalo. Giữ nguyên luồng redeem token cho user Telegram sẵn có — **không được regress**.

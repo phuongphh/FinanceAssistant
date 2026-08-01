@@ -148,14 +148,14 @@ Bài học V3: onboard nhanh → data mỏng → forecast không thuyết phục
 #### Phase 5.0 — Zalo Channel Launch *(~2 tuần, October 2026 — amendment 08/07/2026)*
 - Zalo OA **đã sẵn sàng** → không cần spike verification dài; đi thẳng vào webhook + adapter (dựng trên Zalo adapter foundation Phase 4B).
 - Validate constraints thực tế: 300-char limit, no-Markdown — content layer phải adapt, không copy nguyên Telegram format.
-- Core flows chạy được trên Zalo: capture thu chi, báo cáo, Twin view cơ bản.
+- Core flows chạy được trên Zalo: capture thu chi + báo cáo (thin slice). **Twin view để 5.1** — 5.0 chỉ dựng hạ tầng kênh (signature, token, dedup, quota), không hứa Twin.
 
 #### Phase 5.1 — Zalo Core Product Parity *(~2-3 tuần, October–November 2026)*
 - Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, **decision queries** (hook chính của V4 phải có mặt trên kênh mới từ đầu).
 - Metric Zalo đo chung khung với Telegram: decision interactions/user/tuần + D28 theo cohort, tách theo channel trên admin dashboard.
 
 #### Phase 5.2 — Zalo Mini App *(~2-3 tuần, November–December 2026)*
-- Zalo Mini App tương đương Telegram Mini App: Twin dashboard, portfolio view, interactive cone, initData verification trên Zalo SDK.
+- Zalo Mini App tương đương Telegram Mini App: Twin dashboard, portfolio view, interactive cone. **Zalo KHÔNG có `initData` kiểu Telegram** — client gọi `getAccessToken()` của `zmp-sdk`, backend verify token đó qua Zalo Graph API rồi mới cấp session; bundle là static, deploy qua `zmp-cli` (không server-render HTML như Telegram Mini App hiện tại).
 
 #### Phase 5.3 — Encryption End-to-End *(~2-3 tuần, December 2026 – January 2027 — dời sau Zalo)*
 - Như kế hoạch V3 (at-rest + in-transit hardening, không expose user-facing). Dời sau Zalo 5.0-5.2 (amendment 08/07/2026) vì OA sẵn sàng là cơ hội mở kênh trước Tết; encryption vẫn là nghĩa vụ hạ tầng trước khi scale — **phải xong trước khi chi tiền growth Tết**.

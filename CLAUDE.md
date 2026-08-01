@@ -194,7 +194,7 @@ Quick reference:
 
 ### Current phase
 
-Phase 5.0 — Zalo Channel Launch (start 01/08/2026): OAuth token refresh (refresh_token single-use, xoay mỗi lần refresh), webhook verify `X-ZEvent-Signature`, adapter gửi CS message trong cửa sổ 48h / tối đa 8 tin tư vấn, core flows (capture, báo cáo, Twin cơ bản) chạy trên Zalo sau flag `ZALO_CHANNEL_ENABLED`. Tiếp theo: 5.1 Parity → 5.2 Mini App → 5.3 Encryption End-to-End.
+Phase 5.0 — Zalo Channel Launch (start 01/08/2026): OAuth token refresh (refresh_token single-use, xoay mỗi lần refresh), webhook verify `X-ZEvent-Signature`, adapter gửi CS message trong cửa sổ 48h / tối đa 8 tin tư vấn, thin slice (capture thu chi + báo cáo) chạy trên Zalo sau flag `ZALO_CHANNEL_ENABLED` — Twin view + toàn bộ dispatcher để 5.1. Tiếp theo: 5.1 Parity → 5.2 Mini App → 5.3 Encryption End-to-End.
 
 Phase 4.7 Guardian Layer **pended 01/08/2026** (founder decision): E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark); E2 scam-check legal-blocked, chưa build. Nối lại khi gate G1 pass. Trước đó đã done: 4.5 Decision Engine Foundation (10/07/2026), 4.6 Onboarding Reset (13/07/2026).
 

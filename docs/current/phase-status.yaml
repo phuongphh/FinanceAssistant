@@ -256,7 +256,7 @@ phases:
     duration: "~2 tuần"
     detail_doc: "docs/current/phase-5.0/phase-5.0-detailed.md"
     issues_doc: "docs/current/phase-5.0/phase-5.0-issues.md"
-    description: "Tháng 10/2026 (start sớm 01/08/2026 vì 4.7 pended). Zalo OA đã sẵn sàng: OAuth token refresh single-use + webhook signature X-ZEvent-Signature + adapter gửi CS message trong cửa sổ 48h/8 tin, validate giới hạn ký tự + no-Markdown với real flows, core flows (capture, báo cáo, Twin cơ bản) chạy trên Zalo sau flag ZALO_CHANNEL_ENABLED."
+    description: "Tháng 10/2026 (start sớm 01/08/2026 vì 4.7 pended). Zalo OA đã sẵn sàng: OAuth token refresh single-use + webhook signature X-ZEvent-Signature + adapter gửi CS message trong cửa sổ 48h/8 tin, validate giới hạn ký tự + no-Markdown với real flows, thin slice (capture thu chi + báo cáo) chạy trên Zalo sau flag ZALO_CHANNEL_ENABLED. Twin view + toàn bộ dispatcher để 5.1."
     completed_date: ""
     icon: "💬"
 
