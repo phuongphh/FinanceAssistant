@@ -105,10 +105,22 @@ a bug in this adapter.
 
 ### Fail-closed startup invariant
 
-If `ZALO_CHANNEL_ENABLED=true` and `ZALO_OA_SECRET_KEY` is empty, the
-application **refuses to boot**. There is no "channel on, verification
-off" state: that combination accepts unauthenticated writes to a
-messaging channel from anyone who finds the URL.
+If `ZALO_CHANNEL_ENABLED=true` and any of `ZALO_APP_ID`,
+`ZALO_OA_SECRET_KEY` or `ZALO_APP_SECRET` is empty, the application
+**refuses to boot**, and the error names every one that is missing.
+
+The first two are the verification story: there is no "channel on,
+verification off" state, because that combination accepts
+unauthenticated writes to a messaging channel from anyone who finds the
+URL.
+
+`ZALO_APP_SECRET` is in the same invariant for a different reason — it
+is the `secret_key` header on token refresh, a *different value* from
+the OA secret key. Boot without it and everything works right up until
+the first hourly refresh, which fails after the write-ahead
+`refresh_pending` marker is already durable. By then only a human can
+clear it (see the runbook below), so the check belongs at startup rather
+than an hour in.
 
 The dev bypass (empty secret ⇒ skip verification) is legal only while
 the channel is off, where the route isn't mounted anyway.
@@ -226,9 +238,25 @@ Checking then sending is a TOCTOU race: two jobs both reading
 makes the database the arbiter. `can_send()` exists but is
 **observability only** — it must never gate a send.
 
-`release_send()` deliberately does *not* fire when Zalo rejects for
-quota or window reasons: in that case Zalo counted the attempt too, and
-giving the slot back would let us over-send.
+The line `release_send()` draws is **"did the request reach Zalo?"**, not
+"did it succeed?":
+
+- Refunded — the request demonstrably never left us: no usable token,
+  empty arguments, `ConnectError`/`ConnectTimeout`, a token rejection with
+  no fresh token to retry with, or an unexpected exception mid-call. The
+  slot was never spent, so keeping it would silently shrink the allowance.
+- **Not** refunded — Zalo answered *no* (`ZaloSendRejected`, which covers
+  quota and window rejections along with any other app-level error). Zalo
+  counted the attempt too; giving the slot back would let us over-send,
+  and against a consistently-rejecting OA it would turn a retry into an
+  unbounded outbound loop.
+
+A rejection is an ordinary delivery failure, not a bug: it returns `None`
+to the caller like every other block, logs its own `zalo.send.rejected`
+warning, and also lands in the normal `zalo.send.blocked` line under
+`send_failed` so a rejection spike shows up in the same aggregate as
+everything else that failed to arrive. The unexpected-exception path is
+the one that both refunds *and* re-raises.
 
 All window arithmetic is in UTC. `window_expires_at` is a stored
 timestamp, never a recomputed local-time boundary, so nothing changes
@@ -254,6 +282,15 @@ across the Asia/Ho_Chi_Minh offset.
 
    A reason outside this list means code and runbook have drifted apart;
    the snapshot endpoint raises `zalo_block_reason_unknown` for it.
+3. Replies arriving, but always the same one? Check whether the account is
+   **suspended**. A suspended account is suspended on every channel:
+   `zalo_inbound` gates on `user_status.is_user_allowed` before the
+   classifier, answers with `account.suspended` from `content/zalo.yaml`,
+   and dispatches nothing. It is checked on the linking path too, so a
+   fresh `/link_zalo` code cannot be used as a reset — redemption still
+   binds the sender (useful the moment an admin lifts the suspension) but
+   the confirmation is withheld. The log line says `account suspended`
+   without the reason, because the handler does not know it.
 
 Log lines carry the **masked** sender (`mask_zalo_id`) and never the
 message body. The matching analytics events carry no identifier at all —
@@ -388,9 +425,18 @@ Two deliberate exceptions to "off means gone":
    no user surface. Unmounting the instrument at the exact moment an
    incident starts would remove the only view of what happened.
 2. **The startup invariant still fires.** `ZALO_CHANNEL_ENABLED=true` with
-   an empty `ZALO_OA_SECRET_KEY` refuses to boot — flipping the flag back
+   any of the three secrets empty refuses to boot — flipping the flag back
    on with a half-populated env fails loudly rather than serving an
    unauthenticated webhook.
+
+Because of (1), credential resolution deliberately **outlives the flag**:
+`ZaloOAClient` still loads its token with `ZALO_CHANNEL_ENABLED=false`, so
+`/admin/zalo-quota` keeps answering during a rollback. What the flag gates
+is *sending*, via `ZaloOAClient.is_send_enabled`, which `notifier_resolver`
+checks before `is_configured`. A rolled-back server therefore stays silent
+on Zalo even with a perfectly good token in the table — and the skip is a
+debug line, not a warning, because a deliberate flag-off is not an
+incident.
 
 Turning it back on is the same flag plus the [signature soak](#signature-soak-rollout)
 if the credentials changed while it was off.

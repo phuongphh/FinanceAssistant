@@ -27,6 +27,10 @@ from backend.utils import zalo_signature
 
 APP_ID = "app-1234"
 SECRET = "oa-secret-key"
+# Distinct from SECRET on purpose: ZALO_OA_SECRET_KEY signs the webhook,
+# ZALO_APP_SECRET authenticates the token refresh. Reusing one value here
+# would hide a mix-up between the two.
+APP_SECRET = "zalo-app-secret"
 TIMESTAMP = "1754092800000"
 
 
@@ -273,23 +277,34 @@ def test_startup_invariant_allows_disabled_channel_without_secrets():
 
 def test_startup_invariant_allows_enabled_channel_with_secrets():
     zalo_signature.assert_startup_invariant(
-        channel_enabled=True, oa_secret_key=SECRET, app_id=APP_ID
+        channel_enabled=True,
+        oa_secret_key=SECRET,
+        app_id=APP_ID,
+        app_secret=APP_SECRET,
     )
 
 
 @pytest.mark.parametrize(
-    ("secret", "app_id", "expected"),
+    ("secret", "app_id", "app_secret", "expected"),
     [
-        ("", APP_ID, "ZALO_OA_SECRET_KEY"),
-        (SECRET, "", "ZALO_APP_ID"),
+        ("", APP_ID, APP_SECRET, "ZALO_OA_SECRET_KEY"),
+        (SECRET, "", APP_SECRET, "ZALO_APP_ID"),
+        # ZALO_APP_SECRET is a *different* value from the OA secret key:
+        # it authenticates the token-refresh call. Booting without it
+        # works right up until the hourly refresh, by which point the
+        # write-ahead marker is durable and only a human can clear it.
+        (SECRET, APP_ID, "", "ZALO_APP_SECRET"),
     ],
 )
 def test_startup_invariant_names_the_missing_secret(
-    secret: str, app_id: str, expected: str
+    secret: str, app_id: str, app_secret: str, expected: str
 ):
     with pytest.raises(RuntimeError) as exc:
         zalo_signature.assert_startup_invariant(
-            channel_enabled=True, oa_secret_key=secret, app_id=app_id
+            channel_enabled=True,
+            oa_secret_key=secret,
+            app_id=app_id,
+            app_secret=app_secret,
         )
     assert expected in str(exc.value)
 
@@ -297,11 +312,12 @@ def test_startup_invariant_names_the_missing_secret(
 def test_startup_invariant_lists_every_missing_secret():
     with pytest.raises(RuntimeError) as exc:
         zalo_signature.assert_startup_invariant(
-            channel_enabled=True, oa_secret_key="", app_id=""
+            channel_enabled=True, oa_secret_key="", app_id="", app_secret=""
         )
     message = str(exc.value)
     assert "ZALO_OA_SECRET_KEY" in message
     assert "ZALO_APP_ID" in message
+    assert "ZALO_APP_SECRET" in message
 
 
 def test_startup_invariant_error_never_leaks_the_secret(caplog):
@@ -309,6 +325,10 @@ def test_startup_invariant_error_never_leaks_the_secret(caplog):
     with caplog.at_level(logging.CRITICAL):
         with pytest.raises(RuntimeError) as exc:
             zalo_signature.assert_startup_invariant(
-                channel_enabled=True, oa_secret_key="", app_id="super-secret-app-id"
+                channel_enabled=True,
+                oa_secret_key="",
+                app_id="super-secret-app-id",
+                app_secret="super-secret-app-secret",
             )
     assert "super-secret-app-id" not in str(exc.value)
+    assert "super-secret-app-secret" not in str(exc.value)

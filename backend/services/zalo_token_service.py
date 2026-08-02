@@ -358,6 +358,19 @@ async def _begin_refresh(
                 f"See {RUNBOOK}"
             )
 
+        # Everything the HTTP call needs must be validated *before* the
+        # write-ahead commit. ZALO_APP_SECRET is checked in _post_refresh
+        # too (it is the header that authenticates the call), but failing
+        # there would leave a durable refresh_pending marker behind for a
+        # request that never left the process — and _guard_pending turns
+        # that marker into a permanent, human-only stop. A missing secret
+        # is a config error; it must not cost an OA re-authorisation.
+        if not get_settings().zalo_app_secret:
+            raise ZaloTokenMissing(
+                "ZALO_APP_SECRET is not configured — refusing to start a "
+                f"refresh for app_id={app_id} that cannot be authenticated."
+            )
+
         # 3 — write-ahead. This COMMIT is the whole point of the protocol:
         # after it, a crash is diagnosable instead of silent.
         row.refresh_pending_token = row.refresh_token

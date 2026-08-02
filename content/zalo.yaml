@@ -116,6 +116,15 @@ fallback:
   # Người chưa liên kết mà gõ linh tinh vẫn cần biết đường đi tiếp —
   # dùng lại linking.token_invalid, không thêm copy mới.
 
+# Tài khoản bị admin tạm khoá (users.manual_status = suspended). Cùng
+# một hàng rào như bên Telegram, nhưng copy ở đây chứ không hardcode
+# trong code. Giọng Bé Tiền: nói rõ tình trạng, chỉ đường liên hệ,
+# không trách móc và không giải thích lý do khoá (Bé Tiền không biết).
+account:
+  suspended: |-
+    Tài khoản của bạn đang tạm khoá nên Bé Tiền chưa ghi nhận được.
+    Bạn nhắn admin@nuitruc.ai để mở lại giúp mình nhé 🙏
+
 # Zalo chỉ cho phép trả lời trong 48h sau tin nhắn cuối của user.
 # Dùng khi user quay lại sau khi Bé Tiền phải nuốt một tin nhắn chủ động.
 window_closed:

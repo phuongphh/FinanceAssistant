@@ -71,7 +71,19 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
 
     if user.zalo_user_id:
         zalo_client = get_zalo_oa_client()
-        if zalo_client.is_configured:
+        if not zalo_client.is_send_enabled:
+            # The documented rollback is "flip ZALO_CHANNEL_ENABLED=false
+            # and restart". Credentials survive that flip on purpose (the
+            # admin quota diagnostics need them), so the flag has to be
+            # read here as well — otherwise a leftover legacy
+            # ZALO_OA_ACCESS_TOKEN keeps proactive fan-outs delivering to
+            # a channel the operator believes is off.
+            logger.debug(
+                "User %s has zalo_user_id but ZALO_CHANNEL_ENABLED is false — "
+                "skipping Zalo channel",
+                user.id,
+            )
+        elif zalo_client.is_configured:
             targets.append(
                 ChannelTarget(
                     channel="zalo",
@@ -81,8 +93,8 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
             )
         else:
             logger.warning(
-                "User %s has zalo_user_id but ZALO_OA_ACCESS_TOKEN not set — "
-                "skipping Zalo channel",
+                "User %s has zalo_user_id but no Zalo OA credential is "
+                "available — skipping Zalo channel",
                 user.id,
             )
 

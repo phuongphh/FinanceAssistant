@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select, update as sa_update
@@ -63,8 +63,76 @@ ORPHAN_BATCH_LIMIT = 100
 # within one cutoff window no matter when it went stale.
 RECOVERY_INTERVAL = 120  # seconds
 
+# 2020-01-01T00:00:00Z in epoch milliseconds. Anything below this is not a
+# Zalo timestamp — it is a seconds-vs-milliseconds mix-up, a zero, or a
+# hand-edited row. Zalo OA did not exist in a form we integrate with
+# before this date, so the bound is safe and generous.
+_MIN_PLAUSIBLE_EPOCH_MS = 1_577_836_800_000
 
-async def route_event(payload: dict) -> UUID | None:
+# How far ahead of our own clock an inbound timestamp may sit before we
+# stop believing it. Zalo's clock and ours are both NTP-disciplined, so a
+# few minutes covers real skew; a timestamp days in the future would
+# otherwise pin a reply window open past its true expiry.
+_MAX_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def _now() -> datetime:
+    """Timezone-aware UTC now — the window service compares against it."""
+    return datetime.now(timezone.utc)
+
+
+def _inbound_moment(event) -> datetime | None:
+    """When Zalo says this message was sent, as tz-aware UTC.
+
+    Returns ``None`` when the payload carries nothing we can trust, which
+    tells :func:`~backend.services.zalo_window_service.record_inbound` to
+    fall back to its own clock.
+
+    A stale-but-plausible timestamp is *honoured* rather than replaced
+    with now(). Orphan recovery re-processes an event minutes — sometimes
+    hours — after Zalo delivered it, and the 48h reply window runs from
+    the message, not from our recovery pass. Opening a fresh window off
+    the recovery clock would hand us free-message slots Zalo has already
+    stopped accepting, so every send would fail with a quota error we
+    counted as available. Together with ``record_inbound``'s monotonic
+    upsert, honouring the real moment also makes a re-delivered webhook a
+    no-op instead of an extension.
+
+    Implausible values (pre-2020, non-numeric, or far in the future) fall
+    back to ``None``: a bad clock should degrade to "treat it as now", not
+    open a window in 2087.
+    """
+    raw = getattr(event, "timestamp", "") or ""
+    try:
+        epoch_ms = int(raw)
+    except (TypeError, ValueError):
+        logger.warning("zalo.worker non-numeric timestamp %r — using server clock", raw)
+        return None
+
+    if epoch_ms < _MIN_PLAUSIBLE_EPOCH_MS:
+        logger.warning(
+            "zalo.worker implausible timestamp %s (pre-2020) — using server clock",
+            epoch_ms,
+        )
+        return None
+
+    try:
+        moment = datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        logger.warning(
+            "zalo.worker un-representable timestamp %s — using server clock", epoch_ms
+        )
+        return None
+
+    if moment > _now() + _MAX_CLOCK_SKEW:
+        logger.warning(
+            "zalo.worker timestamp %s is in the future — using server clock", epoch_ms
+        )
+        return None
+    return moment
+
+
+async def route_event(payload: dict, *, msg_id: str | None = None) -> UUID | None:
     """Dispatch one Zalo event to the inbound handler.
 
     Opens a fresh ``AsyncSession`` — by the time this background task
@@ -76,6 +144,16 @@ async def route_event(payload: dict) -> UUID | None:
     caller can stamp it on the ``zalo_updates`` row. ``None`` for
     unlinked senders — they have no user row yet, which is exactly why
     ``zalo_updates.user_id`` is nullable.
+
+    When ``msg_id`` is given, the ``zalo_updates`` row is marked ``done``
+    **in this same transaction**, atomically with whatever the handler
+    wrote. Marking it afterwards from a second session leaves a window
+    where the expense is committed but the row still reads
+    ``processing``; a crash inside that window hands the event to orphan
+    recovery, which re-runs it and records the same "ăn trưa 50k" twice.
+    Dedup on ``msg_id`` cannot save us there — the row is ours already,
+    the claim succeeded, the second run is a *replay* of our own work.
+    One transaction removes the window entirely.
 
     Re-parses ``payload`` rather than taking a :class:`ZaloEvent`
     argument: orphan recovery only has the stored JSON to work from, so
@@ -114,6 +192,17 @@ async def route_event(payload: dict) -> UUID | None:
                 await zalo_window_service.bind_user(
                     db, zalo_user_id=event.sender_id, user_id=user_id
                 )
+            if msg_id is not None:
+                await db.execute(
+                    sa_update(ZaloUpdate)
+                    .where(ZaloUpdate.msg_id == msg_id)
+                    .values(
+                        status=STATUS_DONE,
+                        processed_at=_now(),
+                        error_message=None,
+                        **({"user_id": user_id} if user_id is not None else {}),
+                    )
+                )
             await db.commit()
             return user_id
 
@@ -140,13 +229,20 @@ async def _open_reply_window(db: AsyncSession, event) -> None:
     a crash between the two commits leaves a window row for a message we
     never processed, which expires on its own in 48h.
 
+    The window is anchored to Zalo's own ``timestamp`` (see
+    :func:`_inbound_moment`), not to when this task happens to run, so a
+    recovered event opens the window the user actually earned rather than
+    a fresh 48h from the recovery pass.
+
     Non-text events (follow, delivery receipts) don't open a reply
     window here; the router already drops them before claiming a row,
     and the check keeps the recovery path honest if that ever changes.
     """
     if not event.is_text:
         return
-    await zalo_window_service.record_inbound(db, zalo_user_id=event.sender_id)
+    await zalo_window_service.record_inbound(
+        db, zalo_user_id=event.sender_id, now=_inbound_moment(event)
+    )
     await db.commit()
 
 
@@ -157,10 +253,14 @@ async def process_event_safely(msg_id: str, payload: dict) -> None:
     surface to Zalo as a non-2xx (the webhook has already answered 200
     by this point anyway). Failures are recorded on the row so an
     operator can replay from ``zalo_updates``.
+
+    The success stamp is *not* applied here: ``route_event`` writes it
+    inside its own transaction so the row and the handler's work land
+    together. Only the failure stamp needs a second session, because by
+    then the first one has rolled back.
     """
     try:
-        user_id = await route_event(payload)
-        await _mark_status(msg_id, STATUS_DONE, user_id=user_id)
+        await route_event(payload, msg_id=msg_id)
     except Exception as exc:  # noqa: BLE001 — swallowing is the point.
         logger.exception("zalo.worker route_event failed: msg_id=%s", msg_id)
         await _mark_status(msg_id, STATUS_FAILED, error=str(exc)[:2000])

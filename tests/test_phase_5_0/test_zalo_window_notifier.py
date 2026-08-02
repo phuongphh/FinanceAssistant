@@ -32,6 +32,7 @@ import pytest
 
 from backend.adapters import zalo_window_notifier as mod
 from backend.adapters.zalo_notifier import ZaloNotifier
+from backend.adapters.zalo_oa import ZaloSendRejected
 from backend.adapters.zalo_window_notifier import (
     WindowedZaloNotifier,
     build_zalo_notifier,
@@ -60,6 +61,10 @@ class FakeOAClient:
     """
 
     is_configured = True
+    # The resolver checks the channel flag before the credential (#2):
+    # credentials outlive ``ZALO_CHANNEL_ENABLED=false`` on purpose, so
+    # the flag has to be the thing that gates fan-out.
+    is_send_enabled = True
 
     def __init__(self, store, *, ok: bool = True, error: Exception | None = None):
         self._store = store
@@ -483,6 +488,109 @@ async def test_a_failed_refund_never_masks_the_delivery_failure(window_store, ca
 
 
 # ---------------------------------------------------------------------------
+# Rejection — the half of the ledger that is *not* refunded (#4)
+# ---------------------------------------------------------------------------
+#
+# The line release draws is "did the request reach Zalo?", not "did it
+# succeed?". ``False`` means it demonstrably never left us and is safe to
+# refund; ``ZaloSendRejected`` means Zalo answered no and may already have
+# charged the attempt. These tests pin that asymmetry, because getting it
+# backwards is how a user whose sends Zalo keeps rejecting loops forever
+# against our own counter.
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_send_keeps_the_slot_spent(window_store):
+    await open_window(window_store)
+    client = FakeOAClient(
+        window_store, error=ZaloSendRejected("app error -32 after 3 retries")
+    )
+
+    result = await notifier_for(window_store, client).send_message(0, "thử")
+
+    # Same answer to the caller as any other delivery failure — the
+    # ``Notifier`` port owes them ``None``, not an exception.
+    assert result is None
+    assert window_store.rows[SENDER].free_msg_count == 1
+    assert "release" not in window_store.events
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_photo_keeps_its_slot_too(window_store):
+    """Same rule on the image path — one CS message, one slot, and the
+    OA charged for it either way."""
+    await open_window(window_store)
+    client = FakeOAClient(window_store, error=ZaloSendRejected("http 400"))
+
+    result = await notifier_for(window_store, client).send_photo(
+        0, b"", caption="biểu đồ", image_url="https://cdn.example/c.png"
+    )
+
+    assert result is None
+    assert window_store.rows[SENDER].free_msg_count == 1
+    assert "release" not in window_store.events
+
+
+@pytest.mark.asyncio
+async def test_a_rejection_is_logged_and_counted_without_the_sender_id(
+    window_store, caplog
+):
+    """It reaches both sinks the runbook greps for: its own
+    ``zalo.send.rejected`` warning, and the ordinary blocked line under
+    ``send_failed`` so a rejection spike shows up in the same aggregate
+    as every other kind of "nothing arrived"."""
+    await open_window(window_store)
+    client = FakeOAClient(window_store, error=ZaloSendRejected("http 400 boom"))
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        await notifier_for(window_store, client).send_message(0, "thử")
+
+    blob = "\n".join(r.getMessage() for r in caplog.records)
+    assert "zalo.send.rejected" in blob
+    assert f"{mod.BLOCKED_LOG_RECORD} reason={svc.REASON_SEND_FAILED}" in blob
+    assert SENDER not in blob
+    # ``used`` is the count *after* the reservation: the slot is gone, and
+    # the log has to say so or the runbook's arithmetic stops working.
+    assert "used=1" in blob
+
+
+@pytest.mark.asyncio
+async def test_a_rejection_never_re_raises_into_the_caller(window_store):
+    """A rejection is an ordinary delivery failure, not a bug — unlike
+    the unexpected-exception path, which refunds *and* propagates."""
+    await open_window(window_store)
+    rejected = FakeOAClient(window_store, error=ZaloSendRejected("nope"))
+    bug = FakeOAClient(window_store, error=RuntimeError("socket closed mid-write"))
+
+    assert await notifier_for(window_store, rejected).send_message(0, "a") is None
+    with pytest.raises(RuntimeError):
+        await notifier_for(window_store, bug).send_message(0, "b")
+
+    # One spent (the rejection), one reserved-then-refunded (the bug).
+    assert window_store.rows[SENDER].free_msg_count == 1
+    assert window_store.events.count("release") == 1
+
+
+@pytest.mark.asyncio
+async def test_repeated_rejections_exhaust_the_allowance_and_stop(window_store):
+    """The ceiling this asymmetry exists to hold.
+
+    Eight rejected sends spend the window; the ninth is refused before
+    the transport is touched, so a failing OA can't be turned into an
+    unbounded outbound loop.
+    """
+    await open_window(window_store)
+    client = FakeOAClient(window_store, error=ZaloSendRejected("http 400"))
+    notifier = notifier_for(window_store, client)
+
+    for _ in range(FREE_MESSAGE_QUOTA + 1):
+        assert await notifier.send_message(0, "thử") is None
+
+    assert len(client.sent) == FREE_MESSAGE_QUOTA
+    assert window_store.rows[SENDER].free_msg_count == FREE_MESSAGE_QUOTA
+
+
+# ---------------------------------------------------------------------------
 # Concurrency
 # ---------------------------------------------------------------------------
 
@@ -558,6 +666,40 @@ def test_the_resolver_hands_out_window_aware_notifiers(monkeypatch):
     zalo_target = next(t for t in targets if t.channel == "zalo")
     assert isinstance(zalo_target.notifier, WindowedZaloNotifier)
     assert zalo_target.target_id == SENDER
+
+
+def test_the_resolver_drops_zalo_when_the_channel_flag_is_off(monkeypatch, caplog):
+    """``ZALO_CHANNEL_ENABLED=false`` must be a real kill switch (#2/#6).
+
+    Credentials deliberately outlive the flag so ``/admin/zalo-quota``
+    still answers during a rollback — which means the credential can no
+    longer be what gates fan-out. ``is_send_enabled`` is, and it is
+    checked *before* ``is_configured`` so a rolled-back server stays
+    silent on Zalo even with a perfectly good token in the table.
+    """
+    from types import SimpleNamespace
+
+    from backend.services import notifier_resolver
+
+    class DisabledClient(FakeOAClient):
+        is_configured = True
+        is_send_enabled = False
+
+    monkeypatch.setattr(
+        notifier_resolver, "get_zalo_oa_client", lambda: DisabledClient(None)
+    )
+    monkeypatch.setattr(notifier_resolver, "get_notifier", lambda: object())
+
+    user = SimpleNamespace(id="u-1", telegram_id=12345, zalo_user_id=SENDER)
+    with caplog.at_level(logging.WARNING, logger="backend.services.notifier_resolver"):
+        targets = notifier_resolver.resolve_targets(user)
+
+    # Telegram is untouched: a rollback must not cost the user their
+    # alerts, only the channel that was rolled back.
+    assert [t.channel for t in targets] == ["telegram"]
+    # And it is not an error — a deliberate flag-off is not worth waking
+    # anyone at 3am, unlike the missing-credential case below it.
+    assert caplog.records == []
 
 
 def test_no_production_module_builds_a_bare_zalo_notifier():

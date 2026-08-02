@@ -125,6 +125,7 @@ async def lifespan(app: FastAPI):
         channel_enabled=settings.zalo_channel_enabled,
         oa_secret_key=settings.zalo_oa_secret_key,
         app_id=settings.zalo_app_id,
+        app_secret=settings.zalo_app_secret,
     )
 
     # Block until PostgreSQL is reachable. This prevents the race where

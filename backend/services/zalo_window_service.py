@@ -50,7 +50,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -183,11 +183,33 @@ async def record_inbound(
     can never unlink an already-bound sender: an unlinked inbound
     (``user_id=None``) leaves an existing binding alone.
 
-    Returns the new ``window_expires_at`` so the caller can log it
-    without a second read.
+    **Monotonic.** The window only ever moves forward: an inbound whose
+    ``now`` is not newer than the stored ``last_inbound_at`` leaves the
+    row untouched. Both replay paths depend on this. Orphan recovery
+    re-processes an event minutes after the fact, and Zalo itself
+    re-delivers a webhook whose 200 we were too slow to return — in both
+    cases the message was already accounted for, and re-applying it would
+    extend a 48h window past its real expiry *and* hand back the free
+    messages already spent inside it. Zalo's own counter would not move,
+    so the next send would be rejected by Zalo while our ledger still
+    believed it had room, which is precisely the drift this table exists
+    to prevent.
+
+    Returns the ``window_expires_at`` that is actually stored afterwards —
+    the new one when the row advanced, the pre-existing one when the
+    inbound was stale — so a caller can log the truth without a second
+    read.
     """
     moment = now or _now()
     expires_at = moment + timedelta(hours=WINDOW_HOURS)
+
+    # "This inbound is newer than what we have." A NULL ``last_inbound_at``
+    # counts as newer: the row exists but has never seen a message, so
+    # there is no window to protect.
+    is_newer = or_(
+        ZaloMessageWindow.last_inbound_at.is_(None),
+        ZaloMessageWindow.last_inbound_at < moment,
+    )
 
     stmt = pg_insert(ZaloMessageWindow).values(
         zalo_user_id=zalo_user_id,
@@ -198,21 +220,41 @@ async def record_inbound(
         created_at=moment,
         updated_at=moment,
     )
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[ZaloMessageWindow.zalo_user_id],
-        set_={
-            "last_inbound_at": moment,
-            "window_expires_at": expires_at,
-            "free_msg_count": 0,
-            "updated_at": moment,
-            # COALESCE(incoming, existing): binds on first sight, never
-            # clears an existing binding on a later anonymous inbound.
-            "user_id": func.coalesce(stmt.excluded.user_id, ZaloMessageWindow.user_id),
-        },
+    stmt = (
+        stmt.on_conflict_do_update(
+            index_elements=[ZaloMessageWindow.zalo_user_id],
+            set_={
+                "last_inbound_at": case(
+                    (is_newer, moment), else_=ZaloMessageWindow.last_inbound_at
+                ),
+                "window_expires_at": case(
+                    (is_newer, expires_at), else_=ZaloMessageWindow.window_expires_at
+                ),
+                "free_msg_count": case(
+                    (is_newer, 0), else_=ZaloMessageWindow.free_msg_count
+                ),
+                # Bumped unconditionally: we did see this row, and an
+                # ``updated_at`` that lies about that makes a replay
+                # invisible to anyone reading the table during an incident.
+                "updated_at": moment,
+                # COALESCE(incoming, existing): binds on first sight, never
+                # clears an existing binding on a later anonymous inbound.
+                # Not gated on ``is_newer`` — learning who a sender is can
+                # never be the wrong direction, whatever the timestamp says.
+                "user_id": func.coalesce(
+                    stmt.excluded.user_id, ZaloMessageWindow.user_id
+                ),
+            },
+        )
+        .returning(ZaloMessageWindow.window_expires_at)
+        .execution_options(synchronize_session=False)
     )
-    await db.execute(stmt)
+    stored = (await db.execute(stmt)).scalar_one_or_none()
     await db.flush()
-    return expires_at
+    # ``stored`` is None only if the statement somehow matched nothing;
+    # DO UPDATE always writes a row here, so falling back to ``expires_at``
+    # is a belt-and-braces default rather than a real branch.
+    return _as_utc(stored) or expires_at
 
 
 async def bind_user(

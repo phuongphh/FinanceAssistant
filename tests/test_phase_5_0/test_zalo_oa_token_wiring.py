@@ -265,7 +265,10 @@ async def test_only_one_refresh_per_send(wire):
     client = zalo_oa.ZaloOAClient(
         token_provider=_Provider("stale-token"), token_refresher=refresher
     )
-    assert await client.send_message("u", "hi") is False
+    # Zalo answered — twice, with a token it says is bad. The quota slot
+    # may already be spent, so this is a rejection, not a fail-open.
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
     assert transport.calls == 2
     assert refresher.calls == 1
 
@@ -325,7 +328,8 @@ async def test_replay_does_not_spend_a_backoff_slot(wire):
     client = zalo_oa.ZaloOAClient(
         token_provider=_Provider("stale-token"), token_refresher=_Refresher(FRESH)
     )
-    assert await client.send_message("u", "hi") is False
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
 
     assert transport.calls == 5
     assert transport.tokens[0] == "stale-token"
@@ -349,7 +353,8 @@ async def test_transient_app_codes_give_up_after_three_retries(wire):
     transport = wire([_app_error(-239)])
 
     client = zalo_oa.ZaloOAClient(access_token=STATIC)
-    assert await client.send_message("u", "hi") is False
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
     assert transport.calls == 4
 
 
@@ -368,12 +373,30 @@ def _settings(**overrides) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def test_no_callables_when_the_channel_is_off():
-    """Flag off ⇒ the client is exactly the Phase 4B one."""
+def test_credentials_survive_the_channel_flag():
+    """The flag governs *sending*, not credential resolution.
+
+    ``/admin/zalo-quota`` is mounted unconditionally so an operator can
+    read the OA's allowance before a rollout and — more importantly —
+    after a rollback. If the provider vanished with the flag, those
+    endpoints would report "unavailable" at exactly the moment the
+    runbook says to use them.
+    """
     provider, refresher = zalo_oa._make_token_callables(
         _settings(zalo_channel_enabled=False)
     )
-    assert provider is None and refresher is None
+    assert provider is not None and refresher is not None
+
+
+def test_send_is_disabled_when_the_channel_is_off(monkeypatch):
+    """The gate that *did* move: sending, checked at the emitting edges."""
+    monkeypatch.setattr(
+        zalo_oa, "get_settings", lambda: _settings(zalo_channel_enabled=False)
+    )
+    assert zalo_oa.ZaloOAClient(access_token=STATIC).is_send_enabled is False
+
+    monkeypatch.setattr(zalo_oa, "get_settings", _settings)
+    assert zalo_oa.ZaloOAClient(access_token=STATIC).is_send_enabled is True
 
 
 def test_no_callables_without_an_app_id():
@@ -479,15 +502,24 @@ def test_factory_wires_the_provider_when_the_channel_is_on(monkeypatch):
         zalo_oa._reset_for_tests()
 
 
-def test_factory_leaves_the_static_path_alone_when_the_channel_is_off(monkeypatch):
+def test_factory_keeps_the_static_token_as_a_fallback_when_the_channel_is_off(
+    monkeypatch,
+):
+    """Flag off still yields a *readable* client, just not a sending one.
+
+    The DB-backed provider stays wired (admin diagnostics), the legacy
+    static token stays as its fallback, and ``is_send_enabled`` is the
+    single thing that goes false.
+    """
     monkeypatch.setattr(
         zalo_oa, "get_settings", lambda: _settings(zalo_channel_enabled=False)
     )
     zalo_oa._reset_for_tests()
     try:
         client = zalo_oa.get_zalo_oa_client()
-        assert client._token_provider is None
-        assert client._token_refresher is None
+        assert client._token_provider is not None
+        assert client._token_refresher is not None
         assert client._static_token == STATIC
+        assert client.is_send_enabled is False
     finally:
         zalo_oa._reset_for_tests()

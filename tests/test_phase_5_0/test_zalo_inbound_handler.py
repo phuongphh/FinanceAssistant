@@ -30,6 +30,7 @@ from backend.intent.dispatcher import (
     _WIZARD_LAUNCHING_INTENTS,
 )
 from backend.intent.intents import IntentType
+from backend.services.user_status import STATUS_ACTIVE, STATUS_SUSPENDED
 from backend.services.zalo_linking_service import LinkRedemption
 from backend.utils import zalo_copy
 from backend.utils.zalo_events import ZaloEvent
@@ -53,10 +54,22 @@ def _event(
 
 
 class _SpySession:
-    """Fails loudly if the handler tries to own a transaction."""
+    """Fails loudly if the handler tries to own a transaction.
 
-    def __init__(self) -> None:
+    Also serves the one read the handler makes through a service that
+    still needs the session: ``is_user_allowed`` looks up
+    ``users.manual_status`` (#5). Modelling it as a plain scalar keeps
+    this module free of the ORM — the value is all the gate looks at.
+    """
+
+    def __init__(self, *, manual_status: str = STATUS_ACTIVE) -> None:
         self.committed = False
+        self.manual_status = manual_status
+        self.scalars_read = 0
+
+    async def scalar(self, _stmt):
+        self.scalars_read += 1
+        return self.manual_status
 
     async def commit(self):  # pragma: no cover — asserted, not exercised
         self.committed = True
@@ -269,6 +282,118 @@ async def test_unlinked_sender_gets_the_linking_nudge(monkeypatch, zalo_out):
 
     assert result is None
     assert "/link_zalo" in zalo_out.sent[0][1]
+
+
+# --------------------------------------------------------------------------
+# Suspension gate (#5)
+# --------------------------------------------------------------------------
+#
+# Telegram refuses a suspended account at its worker. Without the same
+# refusal here, Zalo would be the way *around* the suspension — which is
+# the only reason these tests care about a second channel at all.
+
+
+@pytest.mark.asyncio
+async def test_suspended_sender_is_answered_but_never_dispatched(
+    monkeypatch, zalo_out, install_intent_stack
+):
+    linked = _FakeUser()
+    _stub_service(monkeypatch, linked=linked)
+    pipeline, dispatcher = install_intent_stack()
+
+    result = await zalo_inbound.handle_inbound_event(
+        _SpySession(manual_status=STATUS_SUSPENDED), event=_event("ăn trưa 50k")
+    )
+
+    # Not classified either: the gate sits before the LLM, so a suspended
+    # account can't spend the classifier budget by messaging in a loop.
+    assert pipeline.texts == []
+    assert dispatcher.calls == []
+    assert zalo_out.sent == [(0, zalo_copy.text("account", "suspended"))]
+    # The row still learns who sent it. An audit trail that stops at the
+    # gate is the one you need when the suspension is disputed.
+    assert result == linked.id
+
+
+@pytest.mark.asyncio
+async def test_suspended_account_cannot_relink_its_way_past_the_gate(
+    monkeypatch, zalo_out, telegram_out
+):
+    """The token branch is checked too — a fresh code must not act as a
+    reset. Redemption itself still runs (the binding is useful the moment
+    an admin lifts the suspension); what is withheld is the confirmation
+    promising a channel that will refuse the next message."""
+    user = _FakeUser()
+    _stub_service(
+        monkeypatch,
+        redemption=LinkRedemption(status="linked", user_id=user.id),
+        user=user,
+    )
+
+    result = await zalo_inbound.handle_inbound_event(
+        _SpySession(manual_status=STATUS_SUSPENDED), event=_event(TOKEN)
+    )
+
+    assert result == user.id
+    assert zalo_out.sent == [(0, zalo_copy.text("account", "suspended"))]
+    assert telegram_out.sent == []
+
+
+@pytest.mark.asyncio
+async def test_an_unlinked_suspended_sender_still_gets_the_linking_nudge(
+    monkeypatch, zalo_out
+):
+    """Nobody to suspend yet: with no binding there is no account to look
+    up, so the gate must not fire — and must not cost a query either."""
+    _stub_service(monkeypatch, linked=None)
+    db = _SpySession(manual_status=STATUS_SUSPENDED)
+
+    result = await zalo_inbound.handle_inbound_event(db, event=_event("xin chào"))
+
+    assert result is None
+    assert db.scalars_read == 0
+    assert "/link_zalo" in zalo_out.sent[0][1]
+
+
+@pytest.mark.asyncio
+async def test_active_account_passes_the_gate_at_the_cost_of_one_read(
+    monkeypatch, zalo_out, install_intent_stack
+):
+    """Pins the price of the gate on the hot path: a single scalar read,
+    on the same session the worker already opened."""
+    _stub_service(monkeypatch, linked=_FakeUser())
+    _, dispatcher = install_intent_stack()
+    db = _SpySession(manual_status=STATUS_ACTIVE)
+
+    await zalo_inbound.handle_inbound_event(db, event=_event("ăn trưa 50k"))
+
+    assert db.scalars_read == 1
+    assert len(dispatcher.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_suspension_notice_never_names_the_sender_or_the_reason(
+    monkeypatch, zalo_out, caplog
+):
+    """The handler doesn't know *why* an admin suspended the account, so
+    the bubble points at a human instead of guessing — and the log keeps
+    its hands off the sender id like every other line here."""
+    _stub_service(monkeypatch, linked=_FakeUser())
+
+    with caplog.at_level(logging.DEBUG):
+        await zalo_inbound.handle_inbound_event(
+            _SpySession(manual_status=STATUS_SUSPENDED), event=_event("ăn trưa 50k")
+        )
+
+    blob = "\n".join(record.getMessage() for record in caplog.records)
+    assert "account suspended" in blob
+    assert SENDER_ID not in blob
+
+    body = zalo_out.sent[0][1]
+    # Copy lives in content/zalo.yaml, never inline — a missing key would
+    # degrade to the raw marker, which this catches.
+    assert "account.suspended" not in body
+    assert "tạm khoá" in body
 
 
 # --------------------------------------------------------------------------

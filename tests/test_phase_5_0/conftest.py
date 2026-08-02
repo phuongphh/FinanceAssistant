@@ -66,6 +66,12 @@ class FakeWindowStore:
         # "window committed before the handler runs" ordering is the
         # whole point of #3.1's wiring and is invisible to counters.
         self.events: list[str] = []
+        # Params of every ``zalo_updates`` write the worker made through
+        # this session. The success stamp rides the handler's own
+        # transaction (#7), so it shows up here rather than in the
+        # ``_mark_status`` spy — and its position in ``events`` relative
+        # to ``commit`` is the whole claim.
+        self.marked: list[dict] = []
 
     # -- session surface ---------------------------------------------------
 
@@ -75,6 +81,10 @@ class FakeWindowStore:
         params = compiled.params
         self.statements.append(sql)
 
+        if "zalo_updates" in sql:
+            self.events.append("mark_done")
+            self.marked.append(params)
+            return _FakeResult(rowcount=1)
         if "ON CONFLICT" in sql:
             self.events.append("record_inbound")
             return self._upsert(params)
@@ -108,12 +118,21 @@ class FakeWindowStore:
     def _upsert(self, params):
         key = params["zalo_user_id"]
         row = self.rows.setdefault(key, FakeWindowRow(key))
-        row.last_inbound_at = params["last_inbound_at"]
-        row.window_expires_at = params["window_expires_at"]
-        row.free_msg_count = params["free_msg_count"]
-        # coalesce(excluded.user_id, zalo_message_window.user_id)
+        moment = params["last_inbound_at"]
+        # The three CASE arms: the window only moves forward. A NULL
+        # ``last_inbound_at`` counts as newer — the row exists but has
+        # never seen a message, so there is no window to protect.
+        if row.last_inbound_at is None or row.last_inbound_at < moment:
+            row.last_inbound_at = moment
+            row.window_expires_at = params["window_expires_at"]
+            row.free_msg_count = params["free_msg_count"]
+        # coalesce(excluded.user_id, zalo_message_window.user_id) — set
+        # outside the CASE, so a stale inbound can still teach us who the
+        # sender is without reopening their window.
         row.user_id = params["user_id"] or row.user_id
-        return _FakeResult(rowcount=1)
+        # RETURNING window_expires_at — what is *stored*, not what was
+        # offered, which is the difference the monotonic guard creates.
+        return _FakeResult(rowcount=1, scalar=row.window_expires_at)
 
     def _bind(self, params):
         row = self.rows.get(params["zalo_user_id_1"])
@@ -166,12 +185,20 @@ class _FakeRow:
 
 
 class _FakeResult:
-    def __init__(self, rows=None, rowcount: int = 0) -> None:
+    def __init__(self, rows=None, rowcount: int = 0, scalar=None) -> None:
         self._rows = rows or []
         self.rowcount = rowcount
+        self._scalar = scalar
 
     def first(self):
         return self._rows[0] if self._rows else None
+
+    def scalar_one_or_none(self):
+        # ``record_inbound`` reads the RETURNING column this way. The
+        # monotonic upsert always writes *something*, so a real Postgres
+        # always yields a row here — ``None`` would mean the statement
+        # matched nothing, which the CASE-based form cannot produce.
+        return self._scalar
 
 
 @pytest.fixture()

@@ -174,7 +174,18 @@ class ZaloNotifier:
         """Send a plain-text message to the bound Zalo user.
 
         Returns a minimal dict on success (so callers can branch on
-        truthiness like the Telegram path) or ``None`` on failure.
+        truthiness like the Telegram path) or ``None`` when the request
+        never reached Zalo.
+
+        :class:`~backend.adapters.zalo_oa.ZaloSendRejected` is allowed to
+        propagate rather than being collapsed into ``None``: only the
+        window notifier that wraps this one can act on the distinction
+        (refund the reserved slot vs. keep it), and swallowing it here
+        would throw that information away one layer too early. The
+        ``Notifier`` port's "implementations do not raise" contract still
+        holds for callers, because :func:`~backend.adapters.
+        zalo_window_notifier.build_zalo_notifier` is the only sanctioned
+        way to construct a Zalo notifier and it always wraps.
         """
         plain = strip_markdown(text)
         body = truncate_for_zalo(plain)

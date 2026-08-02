@@ -72,6 +72,33 @@ _TOKEN_EXPIRED_CODES: frozenset[int] = frozenset({-216, -201})
 # Transient app-level codes that ride the same backoff schedule as 429.
 _TRANSIENT_CODES: frozenset[int] = frozenset({-32, -239})
 
+
+class ZaloSendRejected(Exception):
+    """Zalo refused a send it may already have charged us for.
+
+    The distinction this carries is the only thing that lets the quota
+    ledger stay honest. ``False`` from a send means *the request never
+    reached Zalo* — no token, no TCP connection, an auth rejection — so
+    the caller may safely give the reserved free-message slot back.
+    This exception means the opposite: Zalo answered, and it answered no.
+
+    Why that must not be refunded: Zalo enforces the same 48h window and
+    8-message ceiling we count locally, and the two can drift (a clock
+    skew, a window we opened on a message Zalo dropped, a manual replay).
+    When they drift, every rejection would refund the slot, the local
+    count would never advance, and the next send would try again —
+    hammering ``/message/cs`` with a message the platform has already
+    decided it will never deliver. Holding the slot converges instead:
+    the local ledger catches up with the platform's and stops.
+
+    Adapter-internal by construction. It crosses ``ZaloNotifier`` (also
+    an adapter) and is caught by
+    :class:`backend.adapters.zalo_window_notifier.WindowedZaloNotifier`,
+    which is the only sanctioned way to build a Zalo notifier — so it
+    never escapes into a handler and the ``Notifier`` port's
+    "implementations do not raise" contract stays intact.
+    """
+
 # Shared httpx client so repeated alert fan-outs keep TCP keep-alive
 # instead of re-establishing TLS for every send.
 _client: httpx.AsyncClient | None = None
@@ -148,6 +175,28 @@ class ZaloOAClient:
         """
         return bool(self._static_token or self._token_provider)
 
+    @property
+    def is_send_enabled(self) -> bool:
+        """Whether outbound Zalo traffic is switched on for this process.
+
+        Separate from :attr:`is_configured` on purpose. "Do we hold usable
+        credentials?" and "may we send?" are different questions, and
+        conflating them broke both directions: with the flag folded into
+        credential resolution, ``ZALO_CHANNEL_ENABLED=false`` silently
+        disabled the ``/admin/zalo-quota`` diagnostics the rollback
+        runbook tells an operator to read, while a leftover static
+        ``ZALO_OA_ACCESS_TOKEN`` kept proactive fan-outs sending after the
+        same documented rollback.
+
+        So: credentials resolve regardless of the flag, and the flag is
+        enforced at the two edges that actually emit — the inbound webhook
+        (mounted only when the flag is on, so no reactive reply exists to
+        send) and proactive target resolution in ``notifier_resolver``.
+        Read live rather than cached at construction so flipping the flag
+        needs a restart, not a redeploy of the wiring.
+        """
+        return bool(get_settings().zalo_channel_enabled)
+
     async def _resolve_token(self) -> str:
         """Token for this send. Never raises — fail-open contract.
 
@@ -184,8 +233,13 @@ class ZaloOAClient:
             return ""
 
     async def send_message(self, recipient_id: str, text: str) -> bool:
-        """Send a plain-text message to a Zalo user_id. Returns True on
-        success, False on any failure (caller treats False as fail-open).
+        """Send a plain-text message to a Zalo user_id.
+
+        Returns ``True`` on success and ``False`` when the request never
+        left this process (no credentials, empty arguments, connection
+        refused) — the caller treats ``False`` as fail-open and may hand
+        back a reserved quota slot. Raises :class:`ZaloSendRejected` when
+        Zalo answered no; see :meth:`_post`.
         """
         if not self.is_configured:
             logger.warning("ZaloOAClient: access token not configured — skipping send")
@@ -211,6 +265,8 @@ class ZaloOAClient:
         ``message.attachment``. We pass ``image_url`` rather than raw
         bytes because the OA API expects a publicly-reachable URL; the
         caller is responsible for uploading or proxying the bytes.
+
+        Same return/raise contract as :meth:`send_message`.
         """
         if not self.is_configured:
             logger.warning("ZaloOAClient: access token not configured — skipping image send")
@@ -340,6 +396,15 @@ class ZaloOAClient:
         return None
 
     async def _post(self, path: str, payload: dict) -> bool:
+        """POST one CS message.
+
+        Returns ``True`` when Zalo accepted it and ``False`` only when the
+        request demonstrably never reached Zalo — no usable token, or the
+        connection could not be established. Every other failure means
+        Zalo answered and answered *no*, which may already have consumed a
+        free-message slot, and is reported by raising
+        :class:`ZaloSendRejected` so the quota ledger is not refunded.
+        """
         token = await self._resolve_token()
         if not token:
             logger.warning(
@@ -366,11 +431,26 @@ class ZaloOAClient:
                 resp = await client.post(
                     url, json=payload, headers={"access_token": token}
                 )
-            except (httpx.RequestError, httpx.HTTPError) as exc:
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                # The connection was never established, so the request
+                # never reached Zalo and cannot have been charged. This is
+                # the one transport failure whose outcome we actually know.
                 logger.warning(
-                    "Zalo OA POST %s failed (network): %s — fail-open", path, exc
+                    "Zalo OA POST %s failed to connect: %s — fail-open", path, exc
                 )
                 return False
+            except (httpx.RequestError, httpx.HTTPError) as exc:
+                # Anything else — read timeout, write error, broken pipe
+                # mid-response — means the bytes may well have landed and
+                # been processed. Unknown outcome is treated as *sent*:
+                # over-counting one message is recoverable, exceeding the
+                # 8-message ceiling is not.
+                logger.warning(
+                    "Zalo OA POST %s failed (network, outcome unknown): %s", path, exc
+                )
+                raise ZaloSendRejected(
+                    f"transport failure with unknown outcome on {path}: {exc}"
+                ) from exc
 
             if resp.status_code == 200:
                 # Zalo also signals app-level errors with HTTP 200 + an
@@ -418,7 +498,9 @@ class ZaloOAClient:
                     err_code,
                     (data or {}).get("message"),
                 )
-                return False
+                raise ZaloSendRejected(
+                    f"Zalo rejected {path} with app error code={err_code}"
+                )
 
             if resp.status_code == 429:
                 if backoffs_used < len(_RETRY_BACKOFFS_SECONDS):
@@ -438,7 +520,9 @@ class ZaloOAClient:
                     path,
                     len(_RETRY_BACKOFFS_SECONDS) + 1,
                 )
-                return False
+                raise ZaloSendRejected(
+                    f"Zalo rate-limited {path} for the whole retry budget"
+                )
 
             # Non-retryable HTTP error.
             logger.warning(
@@ -447,7 +531,9 @@ class ZaloOAClient:
                 path,
                 resp.text[:200],
             )
-            return False
+            raise ZaloSendRejected(
+                f"Zalo returned HTTP {resp.status_code} on {path}"
+            )
 
 
 def _parse_json_safe(resp: httpx.Response) -> dict | None:
@@ -489,9 +575,18 @@ def _make_token_callables(
 ) -> tuple[TokenProvider | None, TokenRefresher | None]:
     """Wire the adapter to ``zalo_token_service`` (composition root).
 
-    Returns ``(None, None)`` when the channel is off or no app id is
-    configured, which leaves the client on the Phase 4B static-token path
-    — identical behaviour to before 5.0.
+    Returns ``(None, None)`` when no app id is configured, which leaves
+    the client on the Phase 4B static-token path — identical behaviour to
+    before 5.0.
+
+    Deliberately **not** gated on ``ZALO_CHANNEL_ENABLED``. The flag
+    governs sending, not credential resolution: the ``/admin/zalo-quota``
+    router is mounted unconditionally precisely so an operator can read
+    the OA's allowance before a rollout and after a rollback, and a
+    provider that disappears with the flag makes those endpoints report
+    "unavailable" exactly when the runbook says to use them. Sending is
+    gated at the edges instead — see
+    :attr:`ZaloOAClient.is_send_enabled`.
 
     The import is local so ``backend.adapters`` keeps no import-time
     dependency on ``backend.services``; the *policy* for what a token
@@ -506,7 +601,7 @@ def _make_token_callables(
       fail-open with an actionable log line already written by the
       token service.
     """
-    if not settings.zalo_channel_enabled or not settings.zalo_app_id:
+    if not settings.zalo_app_id:
         return None, None
 
     from backend.services import zalo_token_service as token_service

@@ -35,6 +35,8 @@ from backend.models.zalo_message_window import (
 )
 from backend.services import zalo_window_service as svc
 
+from .conftest import FakeWindowRow
+
 _PG = postgresql.dialect()
 
 SENDER = "zalo-sender-should-never-be-logged"
@@ -92,6 +94,105 @@ async def test_new_inbound_resets_the_allowance(window_store):
     assert (
         await svc.reserve_send(window_store, zalo_user_id=SENDER, now=later)
     ).granted
+
+
+# ---------------------------------------------------------------------------
+# The window only moves forward (#3)
+# ---------------------------------------------------------------------------
+#
+# Zalo redelivers, and redeliveries do not arrive in order. An upsert that
+# writes whatever the latest *delivery* says would let a replay of an old
+# event roll the window back — and, worse, zero ``free_msg_count`` while
+# the current window is half spent, handing back allowance the OA has
+# already charged. The guard is a CASE on ``last_inbound_at``.
+
+
+@pytest.mark.asyncio
+async def test_a_stale_inbound_neither_extends_the_window_nor_refunds(window_store):
+    fresh = await _open_window(window_store, at=T0 + timedelta(hours=1))
+    for _ in range(3):
+        await svc.reserve_send(
+            window_store, zalo_user_id=SENDER, now=T0 + timedelta(hours=1)
+        )
+
+    stored = await _open_window(window_store, at=T0)  # the late replay
+
+    row = window_store.rows[SENDER]
+    assert row.last_inbound_at == T0 + timedelta(hours=1)
+    assert row.window_expires_at == fresh
+    assert row.free_msg_count == 3
+    # RETURNING reports what is *stored*, not what was offered — a caller
+    # logging the expiry must not be told about a window that lost.
+    assert stored == fresh
+
+
+@pytest.mark.asyncio
+async def test_a_replay_at_the_same_instant_is_not_newer(window_store):
+    """The equality edge, which is where an off-by-one lands.
+
+    A duplicate delivery of the *same* event carries the same timestamp.
+    ``<`` rather than ``<=`` is what stops it from resetting the counter.
+    """
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    await _open_window(window_store, at=T0)
+
+    assert window_store.rows[SENDER].free_msg_count == 1
+
+
+@pytest.mark.asyncio
+async def test_a_stale_inbound_still_teaches_us_who_the_sender_is(window_store):
+    """The binding sits outside the CASE on purpose: learning an identity
+    is never the wrong direction, whatever the timestamp says."""
+    await _open_window(window_store, at=T0 + timedelta(hours=1))
+    user_id = uuid4()
+
+    await _open_window(window_store, at=T0, user_id=user_id)
+
+    row = window_store.rows[SENDER]
+    assert row.user_id == user_id
+    assert row.window_expires_at == T0 + timedelta(hours=1 + WINDOW_HOURS)
+
+
+@pytest.mark.asyncio
+async def test_a_first_ever_inbound_on_an_empty_row_counts_as_newer(window_store):
+    """A row can exist with no ``last_inbound_at`` — bound by ``bind_user``
+    before any message was recorded. NULL must read as "no window to
+    protect", not as a value the guard compares against."""
+    window_store.rows[SENDER] = FakeWindowRow(SENDER)
+    assert window_store.rows[SENDER].last_inbound_at is None
+
+    stored = await _open_window(window_store)
+
+    assert stored == T0 + timedelta(hours=WINDOW_HOURS)
+    assert window_store.rows[SENDER].window_expires_at == stored
+
+
+@pytest.mark.asyncio
+async def test_the_monotonic_upsert_always_writes_a_row(window_store):
+    """Shape, not sequence — and the reason the guard is a CASE rather
+    than ``on_conflict_do_update(..., where=...)``.
+
+    A WHERE-filtered DO UPDATE writes *nothing* when the incoming event is
+    stale, so ``RETURNING`` yields no row and the caller cannot tell "the
+    window held" from "the statement matched nothing". Moving the guard
+    into the SET arms keeps the write unconditional: the row is always
+    touched, so the expiry always comes back.
+    """
+    await _open_window(window_store)
+    sql = window_store.statements[-1]
+
+    assert "ON CONFLICT" in sql and "DO UPDATE" in sql
+    # No WHERE between the SET list and RETURNING — that is the whole claim.
+    assert "WHERE" not in sql.split("DO UPDATE")[1].split("RETURNING")[0]
+    assert "RETURNING" in sql
+    # All three window columns move together, each behind the same guard.
+    for column in ("last_inbound_at", "window_expires_at", "free_msg_count"):
+        assert f"{column} = CASE WHEN" in sql
+    # ``updated_at`` is deliberately *not* guarded: we did see this row,
+    # and a timestamp that hides a replay is useless during an incident.
+    assert "updated_at = CASE" not in sql
 
 
 @pytest.mark.asyncio

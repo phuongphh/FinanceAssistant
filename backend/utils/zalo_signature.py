@@ -143,7 +143,11 @@ def verify(
 
 
 def assert_startup_invariant(
-    *, channel_enabled: bool, oa_secret_key: str, app_id: str
+    *,
+    channel_enabled: bool,
+    oa_secret_key: str,
+    app_id: str,
+    app_secret: str = "",
 ) -> None:
     """Fail closed at boot rather than open at runtime.
 
@@ -151,6 +155,14 @@ def assert_startup_invariant(
     finds the webhook URL can write to a messaging channel. There is no
     safe degraded mode for that combination, so the process refuses to
     start instead of silently accepting unauthenticated events.
+
+    ``app_secret`` (``ZALO_APP_SECRET``) is checked here for a different
+    reason: it authenticates the *token refresh* call, and Zalo's
+    ``refresh_token`` is single-use. A channel that boots without it
+    discovers the gap only when the hourly refresh runs, which is the
+    worst possible moment — the write-ahead marker is durable by then and
+    only a human working the runbook can clear it. Cheaper to refuse the
+    boot.
 
     Raises:
         RuntimeError: when the channel is enabled but unverifiable.
@@ -162,11 +174,14 @@ def assert_startup_invariant(
         missing.append("ZALO_OA_SECRET_KEY")
     if not app_id:
         missing.append("ZALO_APP_ID")
+    if not app_secret:
+        missing.append("ZALO_APP_SECRET")
     if missing:
         raise RuntimeError(
             "ZALO_CHANNEL_ENABLED=true but "
             + ", ".join(missing)
-            + " is empty — webhook signatures could not be verified. "
-            "Set the secrets or disable the channel. "
+            + " is empty — the webhook could not be verified or the OA "
+            "token could not be refreshed. Set the secrets or disable the "
+            "channel. "
             "See docs/conventions/zalo-operations.md#fail-closed-startup-invariant"
         )

@@ -64,6 +64,7 @@ from backend.intent.intents import IntentType
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
 from backend.services import zalo_linking_service
+from backend.services.user_status import is_user_allowed
 from backend.utils.zalo_copy import linking as linking_copy, text as zalo_text
 from backend.utils.zalo_events import ZaloEvent
 
@@ -128,6 +129,15 @@ async def handle_inbound_event(db: AsyncSession, *, event: ZaloEvent) -> UUID | 
     notifier = build_zalo_notifier(event.sender_id)
     linked = await zalo_linking_service.get_linked_user(db, event.sender_id)
 
+    # A suspended account is suspended on every channel. Telegram rejects
+    # at its worker (``_reject_if_suspended``); without the same gate here
+    # Zalo would be the way around it — the sender could keep recording
+    # transactions and reading balances on an account an admin has closed.
+    # Checked before the token branch too, so a suspended user cannot
+    # re-link their way past it either.
+    if linked is not None and not await is_user_allowed(db, linked.id):
+        return await _reject_suspended(notifier, user_id=linked.id)
+
     token = zalo_linking_service.normalize_token_input(event.text)
     if token:
         return await _redeem(
@@ -144,6 +154,24 @@ async def handle_inbound_event(db: AsyncSession, *, event: ZaloEvent) -> UUID | 
 
     await notifier.send_message(0, linking_copy("token_invalid"))
     return None
+
+
+async def _reject_suspended(
+    notifier: WindowedZaloNotifier, *, user_id: UUID | None
+) -> UUID | None:
+    """Answer a suspended account and stop.
+
+    Returns the user id anyway so the ``zalo_updates`` row still records
+    who sent the message — a suspended user's traffic is exactly what an
+    operator wants to be able to trace.
+
+    Never logs the sender id, and never says *why* the account was
+    suspended: this handler doesn't know, and guessing in the bubble
+    would be worse than the contact address.
+    """
+    logger.info("zalo.inbound rejected: account suspended")
+    await notifier.send_message(0, zalo_text("account", "suspended"))
+    return user_id
 
 
 def _plain_body(text: str) -> str:
@@ -277,6 +305,12 @@ async def _redeem(
     logger.info("zalo.inbound link_redemption status=%s", result.status)
 
     if result.status in _LINKED_STATUSES:
+        # The binding is left in place — it costs nothing and means the
+        # user is already linked when an admin lifts the suspension. What
+        # we withhold is the cheery confirmation on both channels, which
+        # would promise a channel that is about to refuse every message.
+        if result.user_id is not None and not await is_user_allowed(db, result.user_id):
+            return await _reject_suspended(notifier, user_id=result.user_id)
         await notifier.send_message(0, linking_copy("confirm_zalo"))
         await _confirm_on_telegram(db, user_id=result.user_id)
         return result.user_id

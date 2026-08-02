@@ -41,13 +41,22 @@ a message nobody received; the reverse ordering would let eight
 concurrent sends all read 7 and all deliver. *Thà đếm dư 1 khi crash
 giữa chừng còn hơn vượt trần thật.*
 
-Release is deliberately narrow. ``ZaloOAClient`` collapses every
-failure into ``False``, so a quota rejection from Zalo and a socket
-timeout look identical here — but the client has already exhausted its
-retries by then, and it declines to send at all when the token is
-unusable. What reaches us as a failure is overwhelmingly transport, and
-:func:`release_send` guards on window identity so a refund can never
-land in a window a newer inbound message has since opened.
+Release is deliberately narrow, and the line it draws is *"did the
+request reach Zalo?"* — not *"did it succeed?"*. ``ZaloOAClient``
+answers ``False`` only when the send demonstrably never left us (no
+usable token, empty arguments, connection refused); those are safe to
+refund, because Zalo cannot have counted a message it never saw. When
+Zalo answered and answered no — an app error, a non-retryable HTTP
+status, a rate-limit that outlasted the retry budget, or a transport
+failure mid-flight whose outcome we cannot know — the client raises
+:class:`~backend.adapters.zalo_oa.ZaloSendRejected` and we keep the
+slot spent. Refunding those would let a user whose sends Zalo is
+rejecting for quota reasons loop forever against our own counter,
+which is exactly the ceiling this file exists to hold.
+
+:func:`release_send` additionally guards on window identity, so even a
+sanctioned refund can never land in a window a newer inbound message
+has since opened.
 """
 
 from __future__ import annotations
@@ -62,7 +71,11 @@ from backend.adapters.zalo_notifier import (
     strip_markdown,
     truncate_for_zalo,
 )
-from backend.adapters.zalo_oa import ZaloOAClient, get_zalo_oa_client
+from backend.adapters.zalo_oa import (
+    ZaloOAClient,
+    ZaloSendRejected,
+    get_zalo_oa_client,
+)
 from backend.database import get_session_factory
 from backend.services import zalo_window_service
 
@@ -223,6 +236,28 @@ class WindowedZaloNotifier:
 
         try:
             result = await send()
+        except ZaloSendRejected as exc:
+            # Zalo answered, and answered no. It may already have charged
+            # the OA for the attempt, so the slot stays spent — the whole
+            # point of the exception is that it is *not* the fail-open
+            # ``False`` case below. Not re-raised: this is an ordinary
+            # delivery failure, not a bug, and the ``Notifier`` port owes
+            # its callers ``None`` for that.
+            logger.warning(
+                "zalo.send.rejected kind=%s zalo_user=%s used=%d remaining=%d: %s",
+                kind,
+                zalo_window_service.mask_zalo_id(self._zalo_user_id),
+                reservation.free_msg_count,
+                reservation.remaining,
+                exc,
+            )
+            self._blocked(
+                REASON_SEND_FAILED,
+                kind=kind,
+                used=reservation.free_msg_count,
+                remaining=reservation.remaining,
+            )
+            return None
         except Exception:
             # The port says implementations don't raise, so this is a bug
             # rather than a delivery failure — but the ledger still has to

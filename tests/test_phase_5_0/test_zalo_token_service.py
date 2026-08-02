@@ -610,6 +610,48 @@ async def test_missing_app_secret_fails_before_the_http_call(env, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_missing_app_secret_leaves_no_marker_behind(env, monkeypatch):
+    """A config error must not cost an OA re-authorisation (#1).
+
+    ``ZALO_APP_SECRET`` is checked in ``_post_refresh`` as well, but
+    failing *there* is too late: the write-ahead marker is already durable
+    by then, and ``_guard_pending`` turns a durable marker into a
+    permanent, human-only stop. So the check has to sit before the commit.
+    """
+    row = _seed(env, expires_at=_utcnow() - timedelta(minutes=1))
+    monkeypatch.setattr(env.settings, "zalo_app_secret", "")
+
+    with pytest.raises(svc.ZaloTokenMissing) as exc:
+        await svc.get_access_token()
+
+    assert "ZALO_APP_SECRET" in str(exc.value)
+    # Nothing was written: no pending commit, and the refresh token that a
+    # marker would have stranded is still the one on the row.
+    assert "commit:pending" not in env.ops
+    assert row.refresh_pending_token is None
+    assert row.refresh_pending_at is None
+    assert row.refresh_token == REFRESH
+
+
+@pytest.mark.asyncio
+async def test_the_next_attempt_recovers_once_the_secret_is_restored(env, monkeypatch):
+    """The point of leaving no marker: fixing the env is the whole fix.
+
+    Had the first attempt committed one, this second call would raise
+    ``ZaloTokenRefreshInFlight`` and then ``ZaloTokenRefreshStuck`` — with
+    a correct config — until someone edited the credential row by hand.
+    """
+    _seed(env, expires_at=_utcnow() - timedelta(minutes=1))
+    monkeypatch.setattr(env.settings, "zalo_app_secret", "")
+    with pytest.raises(svc.ZaloTokenMissing):
+        await svc.get_access_token()
+
+    monkeypatch.setattr(env.settings, "zalo_app_secret", "app-secret")
+
+    assert await svc.get_access_token() == "access-token-new"
+
+
+@pytest.mark.asyncio
 async def test_missing_app_id_is_rejected(env, monkeypatch):
     monkeypatch.setattr(env.settings, "zalo_app_id", "")
 

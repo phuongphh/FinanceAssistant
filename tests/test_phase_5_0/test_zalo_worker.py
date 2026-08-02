@@ -227,19 +227,30 @@ def marks(monkeypatch) -> list[dict]:
 
 
 @pytest.mark.asyncio
-async def test_successful_event_is_marked_done_with_its_user(monkeypatch, marks):
-    user_id = uuid4()
+async def test_success_stamps_nothing_from_a_second_session(monkeypatch, marks):
+    """The ``done`` stamp is *not* written here.
 
-    async def _fake_route(payload):
+    ``route_event`` writes it inside the same transaction as the
+    handler's own work, so the row and the expense land together. A
+    second ``_mark_status`` session afterwards would reopen the crash
+    window this design exists to close — and would also be a second
+    round-trip on the happy path. What ``process_event_safely`` still
+    owns is the msg_id: it must reach ``route_event`` for the stamp to
+    be possible at all.
+    """
+    user_id = uuid4()
+    seen: list[str | None] = []
+
+    async def _fake_route(payload, *, msg_id=None):
+        seen.append(msg_id)
         return user_id
 
     monkeypatch.setattr(zalo_worker, "route_event", _fake_route)
 
     await zalo_worker.process_event_safely("m-1", _payload())
 
-    assert marks == [
-        {"msg_id": "m-1", "status": STATUS_DONE, "error": None, "user_id": user_id}
-    ]
+    assert seen == ["m-1"]
+    assert marks == []
 
 
 @pytest.mark.asyncio
@@ -247,7 +258,7 @@ async def test_handler_exception_never_escapes_the_task(monkeypatch, marks):
     """An unhandled handler bug must not kill the event loop — the
     webhook has already answered 200, there is nobody left to tell."""
 
-    async def _boom(payload):
+    async def _boom(payload, *, msg_id=None):
         raise RuntimeError("deepseek exploded")
 
     monkeypatch.setattr(zalo_worker, "route_event", _boom)
@@ -265,7 +276,7 @@ async def test_failure_does_not_clear_a_previously_resolved_user(monkeypatch, ma
     "set it to NULL" — otherwise a failed retry would erase the binding a
     successful first pass recorded."""
 
-    async def _boom(payload):
+    async def _boom(payload, *, msg_id=None):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(zalo_worker, "route_event", _boom)
@@ -277,7 +288,7 @@ async def test_failure_does_not_clear_a_previously_resolved_user(monkeypatch, ma
 
 @pytest.mark.asyncio
 async def test_error_message_is_truncated(monkeypatch, marks):
-    async def _boom(payload):
+    async def _boom(payload, *, msg_id=None):
         raise RuntimeError("x" * 5000)
 
     monkeypatch.setattr(zalo_worker, "route_event", _boom)
@@ -446,7 +457,7 @@ def routed(monkeypatch, window_store):
         zalo_worker, "get_session_factory", lambda: _SessionFactory(window_store)
     )
 
-    async def _invoke(*, user_id=None, payload=None):
+    async def _invoke(*, user_id=None, payload=None, msg_id=None):
         from backend.bot.handlers import zalo_inbound
 
         async def _fake_handle(db, *, event):
@@ -454,7 +465,7 @@ def routed(monkeypatch, window_store):
             return user_id
 
         monkeypatch.setattr(zalo_inbound, "handle_inbound_event", _fake_handle)
-        await zalo_worker.route_event(payload or _payload())
+        await zalo_worker.route_event(payload or _payload(), msg_id=msg_id)
         return window_store
 
     return _invoke
@@ -521,3 +532,161 @@ async def test_a_failing_handler_leaves_the_window_open(routed, monkeypatch):
     # ``routed`` installed the store + settings; the window survived the
     # handler blowing up because it was committed before dispatch.
     assert zalo_worker.get_session_factory().session.commits == 1
+
+
+# --------------------------------------------------------------------------
+# route_event — the done stamp rides the handler's own transaction (#7)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_done_is_stamped_inside_the_handler_transaction(routed):
+    """No window between "expense committed" and "row says done".
+
+    Stamping from a second session leaves a gap where a crash hands the
+    event back to orphan recovery, which replays it and records the same
+    transaction twice — dedup can't help, the row is already ours. The
+    assertion is purely about *ordering*: the mark must land before the
+    final commit, not after it.
+    """
+    user_id = uuid4()
+
+    store = await routed(user_id=user_id, msg_id="m-42")
+
+    assert store.events == [
+        "record_inbound",
+        "commit",
+        "handle",
+        "bind_user",
+        "mark_done",
+        "commit",
+    ]
+    marked = store.marked[0]
+    assert marked["msg_id_1"] == "m-42"
+    assert marked["status"] == STATUS_DONE
+    assert marked["user_id"] == user_id
+    # Clearing the error is part of the stamp: a row that failed, was
+    # replayed by recovery, and then succeeded must not keep advertising
+    # the stale traceback.
+    assert marked["error_message"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_unlinked_sender_is_stamped_without_a_user(routed):
+    """``user_id`` is omitted rather than written as NULL.
+
+    The handler genuinely doesn't know who this is. Writing NULL would
+    be indistinguishable from "we know it is nobody", and on a replay of
+    an event whose first pass *did* resolve a user it would erase the
+    binding.
+    """
+    store = await routed(user_id=None, msg_id="m-43")
+
+    assert "user_id" not in store.marked[0]
+    assert store.marked[0]["status"] == STATUS_DONE
+
+
+@pytest.mark.asyncio
+async def test_no_msg_id_means_no_stamp(routed):
+    """``route_event`` is also called straight from tests and tooling
+    with no row behind it — that must not synthesise an UPDATE."""
+    store = await routed(user_id=uuid4())
+
+    assert store.marked == []
+    assert "mark_done" not in store.events
+
+
+# --------------------------------------------------------------------------
+# _inbound_moment — the window is anchored to Zalo's clock, not ours (#3)
+# --------------------------------------------------------------------------
+
+
+class _Stamped:
+    """Just enough of :class:`ZaloEvent` for the timestamp helper."""
+
+    def __init__(self, timestamp) -> None:
+        self.timestamp = timestamp
+
+
+def test_a_plausible_timestamp_is_honoured():
+    moment = zalo_worker._inbound_moment(_Stamped(TIMESTAMP))
+
+    assert moment is not None
+    assert moment.tzinfo is not None
+    assert int(moment.timestamp() * 1000) == int(TIMESTAMP)
+
+
+def test_a_stale_timestamp_is_honoured_not_refreshed():
+    """The 48h window runs from the *message*, not from our recovery pass.
+
+    Orphan recovery can replay an event hours later. Substituting now()
+    would hand us free-message slots Zalo has already stopped honouring:
+    every send would then fail with a quota error against a window we
+    believed was open.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    stale = datetime.now(timezone.utc) - timedelta(hours=6)
+    epoch_ms = str(int(stale.timestamp() * 1000))
+
+    moment = zalo_worker._inbound_moment(_Stamped(epoch_ms))
+
+    assert moment is not None
+    assert abs((moment - stale).total_seconds()) < 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        None,
+        "not-a-number",
+        "0",
+        "1754092800",  # seconds, not milliseconds — a classic mix-up
+        "99999999999999999999",  # far future
+    ],
+)
+def test_an_implausible_timestamp_falls_back_to_the_server_clock(raw):
+    """``None`` tells ``record_inbound`` to use its own clock.
+
+    Degrading to "treat it as now" is the safe direction: the alternative
+    is opening a window in 2087, or in 1970, off a value we already know
+    we can't trust.
+    """
+    assert zalo_worker._inbound_moment(_Stamped(raw)) is None
+
+
+def test_a_future_timestamp_beyond_skew_is_rejected():
+    from datetime import datetime, timedelta, timezone
+
+    ahead = datetime.now(timezone.utc) + timedelta(hours=2)
+    epoch_ms = str(int(ahead.timestamp() * 1000))
+
+    assert zalo_worker._inbound_moment(_Stamped(epoch_ms)) is None
+
+
+def test_small_clock_skew_is_tolerated():
+    """Two NTP-disciplined clocks still disagree by seconds. Rejecting
+    that would push every message onto the server clock and quietly
+    defeat the anchoring above."""
+    from datetime import datetime, timedelta, timezone
+
+    ahead = datetime.now(timezone.utc) + timedelta(seconds=30)
+    epoch_ms = str(int(ahead.timestamp() * 1000))
+
+    assert zalo_worker._inbound_moment(_Stamped(epoch_ms)) is not None
+
+
+@pytest.mark.asyncio
+async def test_the_window_opens_on_the_events_own_timestamp(routed):
+    """End-to-end: the value Zalo sent reaches the stored window."""
+    from datetime import datetime, timedelta, timezone
+
+    from backend.services.zalo_window_service import WINDOW_HOURS
+
+    store = await routed()
+
+    expected = datetime.fromtimestamp(int(TIMESTAMP) / 1000, tz=timezone.utc)
+    stored = store.rows[SENDER_ID]
+    assert stored.last_inbound_at == expected
+    assert stored.window_expires_at == expected + timedelta(hours=WINDOW_HOURS)
