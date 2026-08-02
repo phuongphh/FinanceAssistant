@@ -217,6 +217,35 @@ async def redeem_link_token(
     )
 
 
+async def get_linked_user(db: AsyncSession, zalo_user_id: str) -> User | None:
+    """Return the user bound to ``zalo_user_id``, or ``None`` if unlinked.
+
+    Lives here rather than in the handler so the "who is this Zalo
+    sender?" question has one implementation — the handler must not
+    issue raw queries (layer contract), and the inbound path asks this
+    on every non-token message.
+    """
+    if not zalo_user_id:
+        return None
+    result = await db.execute(
+        select(User).where(User.zalo_user_id == zalo_user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
+    """Load a user by primary key.
+
+    Needed by the inbound handler to reach the Telegram side of a fresh
+    link (the redemption result carries only the id). Kept next to
+    :func:`get_linked_user` for the same reason: handlers don't query.
+    """
+    if user_id is None:
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
 async def unlink_user(db: AsyncSession, user: User) -> bool:
     """Clear the Zalo binding. Returns True if the user was linked
     before this call (so the handler can show a different message for

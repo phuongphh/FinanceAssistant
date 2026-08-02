@@ -16,13 +16,14 @@ whole platform.
 This module sits in ``services/`` (not ``ports/``) because resolving
 the list is product logic; the port stays a single-channel transport.
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-from backend.adapters.zalo_notifier import ZaloNotifier
 from backend.adapters.zalo_oa import get_zalo_oa_client
+from backend.adapters.zalo_window_notifier import build_zalo_notifier
 from backend.models.user import User
 from backend.ports.notifier import Notifier, get_notifier
 
@@ -51,6 +52,14 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
     Zalo is appended when the user has linked their Zalo account AND
     the OA access token is configured on the server (so we don't
     enqueue sends that will immediately fail).
+
+    The Zalo notifier comes from :func:`build_zalo_notifier`, so it
+    carries the 48h-window / 8-message ceiling with it. Resolution stays
+    synchronous on purpose: the quota is claimed at send time, inside
+    the notifier, not here. Deciding here would put an ``await`` between
+    the check and the send — the exact race the phase doc rules out —
+    and would make one channel's storage cost the other channel's
+    latency.
     """
     targets: list[ChannelTarget] = [
         ChannelTarget(
@@ -66,9 +75,7 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
             targets.append(
                 ChannelTarget(
                     channel="zalo",
-                    notifier=ZaloNotifier(
-                        client=zalo_client, zalo_user_id=user.zalo_user_id
-                    ),
+                    notifier=build_zalo_notifier(user.zalo_user_id, client=zalo_client),
                     target_id=user.zalo_user_id,
                 )
             )
