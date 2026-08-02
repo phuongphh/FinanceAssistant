@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Guardian Layer** (current) — [detail](docs/current/phase-4.7/phase-4.7-detailed.md)
+🚀 **Zalo Channel Launch** (current) — [detail](docs/current/phase-5.0/phase-5.0-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
@@ -34,8 +34,8 @@
 - ✅ Phase 4.4: First-5-Minutes WOW
 - ✅ Phase 4.5: Decision Engine Foundation
 - ✅ Phase 4.6: Onboarding Reset
-- 🚀 Phase 4.7: Guardian Layer ← **current**
-- 🔮 Phase 5.0: Zalo Channel Launch
+- 📋 Phase 4.7: Guardian Layer
+- 🚀 Phase 5.0: Zalo Channel Launch ← **current**
 - 🔮 Phase 5.1: Zalo Core Product Parity
 - 🔮 Phase 5.2: Zalo Mini App
 - 🔮 Phase 5.3: Encryption End-to-End
