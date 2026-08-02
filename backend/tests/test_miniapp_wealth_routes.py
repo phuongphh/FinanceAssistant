@@ -412,18 +412,13 @@ class TestWealthDashboardPage:
         assert f"'{miniapp_routes._STATIC_VERSION}'" in body
         assert "fa.app.build" in body
 
-    def test_dashboard_renders_visible_build_marker(self):
-        """User-facing footer prints git SHA + asset hash so a glance at the
-        Mini App reveals which build the VPS is running. Indispensable when
-        debugging "I pushed but UI didn't change" — without this the only
-        way to verify the deploy is to ssh into the VPS."""
+    def test_dashboard_hides_internal_build_marker(self):
+        """Build diagnostics must not leak into the customer-facing UI."""
         resp = client.get("/miniapp/wealth")
         body = resp.text
-        assert miniapp_routes._STATIC_VERSION in body
-        # Footer copy must contain the literal "build" prefix so users can
-        # search/screenshot it unambiguously.
-        assert "build " in body
-        assert f"assets {miniapp_routes._STATIC_VERSION}" in body
+        assert "Application build" not in body
+        assert "build unknown" not in body
+        assert f"assets {miniapp_routes._STATIC_VERSION}" not in body
 
 
 class TestMiniAppStaticCacheBehavior:
