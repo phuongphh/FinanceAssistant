@@ -9,16 +9,17 @@
 | E1 | Media URL Infrastructure ⭐ | 4 | P0 (chặn mọi surface có ảnh) | ~3-4 ngày |
 | E2 | `ZaloContentRenderer` Đầy Đủ | 4 | P0 (bỏ `NotImplementedError`) | ~4 ngày |
 | E3 | Rich Message & Button Mapping | 3 | P0 (không nút nào mất im lặng) | ~2-3 ngày |
-| E4 | Intent Parity + Onboarding từ Zalo | 4 | P0 (định nghĩa "parity") | ~4-5 ngày |
-| E5 | ZNS cho tin ngoài cửa sổ 48h | 3 | P2 (có điều kiện — owner ký) | ~2-3 ngày |
+| E4 | Intent Parity + Onboarding từ Zalo | 5 | P0 (định nghĩa "parity") | ~5-6 ngày |
 
-**Tổng:** 5 Epics / 18 issues. Thứ tự build: E1 → E3 → E2 → E4; E5 song song sau khi owner ký + template nộp duyệt sớm.
+**Tổng:** 4 Epics / 16 issues. Thứ tự build: E1 → E3 → E2 → E4.
 
-**Phụ thuộc cứng:** Phase 5.0 done (token refresh, dedup, `zalo_message_window`) **và** OA đã xác thực (điều kiện của ZNS ở E5).
+> ✅ **Chốt 02/08/2026 — Epic E5 (ZNS) đã loại.** Owner chốt không chi tiền cho ZNS và không nhận ràng buộc template duyệt trước. **Zalo là kênh reactive-first**: chỉ nói khi user vừa nói, trong cửa sổ 48h; toàn bộ proactive (briefing, empathy, cảnh báo) giữ trên **Telegram**. 3 issue #5.1-#5.3 bị huỷ. Phần bù duy nhất là **#4.5** (kể lại phần bỏ lỡ khi user chỉ-Zalo quay lại), nằm trong E4.
+
+**Phụ thuộc cứng:** Phase 5.0 done (token refresh, dedup, `zalo_message_window`). Xác thực OA **không còn** là phụ thuộc của 5.1 (nó chỉ chặn Mini App 5.2).
 
 ## 🏷️ Label Conventions
-- `phase-5.1`, `epic-1`/`epic-2`/`epic-3`/`epic-4`/`epic-5`
-- `media-url` / `zalo-render` / `zalo-buttons` / `zalo-parity` / `zns`
+- `phase-5.1`, `epic-1`/`epic-2`/`epic-3`/`epic-4`
+- `media-url` / `zalo-render` / `zalo-buttons` / `zalo-parity`
 - `persona-critical` (mọi issue chạm copy Bé Tiền — bắt buộc prompt-tester / vi-localization-checker)
 - `privacy-critical` (mọi issue chạm URL ảnh public — bắt buộc test hết hạn + không đoán được)
 - `platform-verify` (fact về Zalo phải đối chiếu docs chính chủ trước khi code)
@@ -122,6 +123,7 @@ Telegram `Button(text, callback_data, web_app_url)` có `callback_data` đi ngư
 ### Success criteria (Epic-level)
 - Cùng input trên Telegram và Zalo → cùng con số, cùng kết luận (chữ có thể khác).
 - User mới đăng ký từ Zalo đi hết onboarding, không cần Telegram.
+- User chỉ-Zalo quay lại sau khi cửa sổ đóng → nhận **một** dòng catch-up, không bị dội tin cũ.
 - `grep -r 'channel == "zalo"' backend/services/` trả 0 kết quả.
 
 ### Child issues
@@ -137,36 +139,30 @@ Telegram `Button(text, callback_data, web_app_url)` có `callback_data` đi ngư
 
 #### Issue #4.3 — Onboarding bắt đầu từ Zalo `persona-critical`
 - `backend/services/zalo_linking_service.py`: tạo user mới từ `zalo_user_id` khi chưa có link và tin đến không phải token `BT-XXXXXX`. Chạy đúng flow onboarding hiện tại (salutation → goal → asset → Twin) qua renderer Zalo. Giữ nguyên luồng redeem token cho user Telegram sẵn có — **không được regress**.
-- **DoD:** integration test user mới từ Zalo đi hết onboarding ra Twin; test regression luồng token `BT-XXXXXX` vẫn nguyên; service flush-only; copy onboarding Zalo qua prompt-tester × 3 xưng hô.
+- **Mời link Telegram đúng một lần:** vì Zalo là reactive-first (chốt 02/08/2026), user chỉ-Zalo sẽ không nhận briefing/cảnh báo khi im lặng >48h. Cuối onboarding Zalo, mời link Telegram **một lần**, nói thật lý do bằng giọng Bé Tiền ("để em nhắc anh/chị được cả khi mình bận"), có đường từ chối rõ ràng và **không hỏi lại**. Ghi lựa chọn để không nhắc lần hai.
+- **DoD:** integration test user mới từ Zalo đi hết onboarding ra Twin; test regression luồng token `BT-XXXXXX` vẫn nguyên; service flush-only; copy onboarding Zalo qua prompt-tester × 3 xưng hô; **test khẳng định lời mời link Telegram xuất hiện tối đa 1 lần/user** và từ chối rồi thì không bao giờ hiện lại; copy lời mời không mang giọng nài ép/hù doạ (vi-localization-checker + prompt-tester).
 
 #### Issue #4.4 — Parity test suite (chạy trong CI)
 - Bộ test bảng: cùng input → chạy qua đường Telegram và đường Zalo → khẳng định **cùng con số và cùng kết luận**, chỉ khác trình bày. Phủ tối thiểu: capture, report, twin view, decision query, advisory, milestone. Thêm assertion CI: 0 file trong `backend/services/` chứa nhánh theo kênh.
 - **DoD:** suite xanh trong CI; thất bại khi cố tình đổi một con số ở một kênh (test tự kiểm chứng); assertion "no channel branching in services" chạy như một test, không phải checklist thủ công.
 
+#### Issue #4.5 — Catch-up cho user chỉ-Zalo `persona-critical`
+- Hệ quả trực tiếp của chốt reactive-first: proactive rơi ngoài cửa sổ 48h **bị bỏ**, và user chỉ-Zalo không có Telegram để gánh. `backend/services/zalo_catchup_service.py`: khi user chỉ-Zalo nhắn lại sau khoảng im lặng, gom những gì đã bỏ lỡ (briefing/cảnh báo trong N ngày gần nhất, đề xuất N=3) thành **đúng một dòng ngắn** kèm vào phản hồi đầu tiên — không phát lại từng tin, không mở màn bằng catch-up nếu user đang hỏi việc khác gấp. Copy ở `content/zalo.yaml` section `catchup`, 3 xưng hô. Flush-only, không env.
+- **Trạng thái:** ưu tiên dựng lại nội dung bỏ lỡ **từ dữ liệu sẵn có** (briefing sinh theo ngày). Chỉ thêm bảng `zalo_missed_notice` (`user_id` NOT NULL indexed) nếu không dựng lại được — chốt trong PR, không thêm bảng theo quán tính.
+- **DoD:** integration test user chỉ-Zalo im lặng 5 ngày → nhắn lại → nhận **tối đa 1** dòng catch-up; test user có Telegram **không** nhận catch-up (đã nhận qua Telegram rồi); test không có gì bỏ lỡ → không có dòng thừa; copy qua prompt-tester × 3 xưng hô, **0 giọng trách móc** ("mấy hôm nay anh/chị đi đâu mất tiêu" ❌); tổng tin vẫn ≤300 ký tự.
+
 ---
 
-## 🅴 Epic #E5 — ZNS cho tin ngoài cửa sổ 48h `zns` `blocked-owner`
+## ~~🅴 Epic #E5 — ZNS cho tin ngoài cửa sổ 48h~~ — **ĐÃ LOẠI 02/08/2026**
 
-### Description
-Ngoài cửa sổ 48h không được gửi `/message/cs`. ZNS là đường hợp lệ duy nhất: **template phải được Zalo duyệt trước**, giới hạn ~400 ký tự, tính phí theo tin gửi thành công (OA đã xác thực có hạn mức miễn phí hằng tháng). Epic này **chỉ build sau khi owner ký** Decision #1 trong phase doc. Template nên nộp duyệt sớm vì thời gian xét duyệt tính bằng ngày.
+Owner chốt: **không làm ZNS** (tốn tiền, template cứng phải duyệt trước). Zalo là kênh **reactive-first** — chỉ nói khi user vừa nói, trong cửa sổ 48h/8 tin; toàn bộ proactive giữ trên **Telegram**.
 
-### Success criteria (Epic-level)
-- Briefing/cảnh báo ngoài cửa sổ gửi được qua ZNS, hoặc bỏ kênh Zalo **có log lý do** — không bao giờ gọi `/message/cs` ngoài cửa sổ.
-- Hạn mức được đếm; hết hạn mức → dừng gửi, không đốt ngân sách ngoài dự tính.
+**Huỷ:** #5.1 (đối chiếu docs ZNS + nộp template), #5.2 (`zalo_zns` + `zns_service`), #5.3 (nối vào đường proactive + đếm hạn mức). Không tạo `backend/adapters/zalo_zns.py`, `backend/services/zns_service.py`, `content/zns_templates.yaml`, bảng `zns_send_log`.
 
-### Child issues
-
-#### Issue #5.1 — Đối chiếu docs ZNS + nộp template duyệt `platform-verify` `blocked-owner`
-- Xác nhận với docs chính chủ: endpoint gửi ZNS, cấu trúc `template_id` + `template_data`, giới hạn ký tự thực tế, quy trình + thời gian duyệt, cách tra hạn mức còn lại, bảng giá hiện hành. Soạn 2 template tối thiểu (briefing rút gọn, cảnh báo cashflow) và nộp duyệt. Ghi fact + `template_id` vào `docs/conventions/zalo-operations.md`.
-- **DoD:** bảng fact ZNS trong runbook kèm link + ngày kiểm; 2 template đã nộp, trạng thái duyệt ghi lại; ước tính chi phí/tháng theo số user dự kiến trình owner.
-
-#### Issue #5.2 — `zalo_zns` adapter + `zns_service` `persona-critical`
-- `backend/adapters/zalo_zns.py`: gửi theo `template_id` + params, retry/backoff + fail-open như `zalo_oa`. `backend/services/zns_service.py`: chọn template theo loại nội dung, đếm hạn mức, quyết định gửi hay bỏ — flush-only, không env. `content/zns_templates.yaml`: map nội dung ↔ `template_id` đã duyệt + tên tham số.
-- **DoD:** unit test chọn template đúng; hết hạn mức → trả quyết định "bỏ" + lý do, không gọi API; adapter fail-open không ném lỗi lên job; params khớp schema template đã duyệt; copy trong template qua vi-localization-checker.
-
-#### Issue #5.3 — Nối vào đường proactive + đếm hạn mức
-- Job briefing/empathy: `zalo_message_window.can_send()` trả `window_closed` → hỏi `zns_service`; gửi được thì gửi, không thì bỏ kênh Zalo và log. Thêm `zns_send_log` (`user_id` NOT NULL) nếu cần audit + đếm hạn mức chính xác. Đếm hạn mức reset theo tháng.
-- **DoD:** integration test 3 nhánh (trong cửa sổ → `/message/cs`; ngoài cửa sổ + có template + còn hạn mức → ZNS; ngoài cửa sổ + hết hạn mức → bỏ có log); **test khẳng định không bao giờ gọi `/message/cs` khi `window_closed`**; metric hạn mức đã dùng/còn lại quan sát được.
+**Ràng buộc thay thế (áp vào E4 và mọi job proactive):**
+- `window_closed` → bỏ kênh Zalo + log lý do. Không có nhánh thứ hai. Test khẳng định repo **không** chứa đường gửi tin Zalo ngoài `/message/cs`.
+- Phần bù cho user chỉ-Zalo: **#4.5** (catch-up khi quay lại) + lời mời link Telegram một lần ở **#4.3**.
+- Mở lại quyết định này chỉ bằng **số liệu** (retention cohort chỉ-Zalo thấp hơn rõ rệt cohort có-Telegram), không bằng cảm tính.
 
 ---
 
@@ -180,7 +176,7 @@ E2 #2.1 → #2.2, #2.3                (copy trước, renderer sau)
 E2 ──────────────> E4 #4.1          (mở dispatcher khi renderer đã phục vụ được)
 E4 #4.2 ──> #4.3                    (nullable trước, onboarding-từ-Zalo sau)
 E4 #4.1 + #4.3 ──> #4.4             (parity suite chốt Epic)
-E5 #5.1 (nộp template — làm SỚM, song song) ──> #5.2 ──> #5.3
+E4 #4.3 ──> #4.5                    (biết ai là user chỉ-Zalo rồi mới catch-up được)
 ```
 
-E1 đi trước vì Twin và briefing đều có ảnh — làm renderer trước sẽ phải viết lại phần gửi. E3 #3.1 và E5 #5.1 là hai issue `platform-verify`/nộp duyệt, khởi động sớm nhất có thể vì phụ thuộc bên ngoài (docs Zalo, thời gian xét duyệt template) chứ không phụ thuộc code.
+E1 đi trước vì Twin và briefing đều có ảnh — làm renderer trước sẽ phải viết lại phần gửi. E3 #3.1 là issue `platform-verify`, khởi động sớm nhất có thể vì phụ thuộc bên ngoài (docs Zalo) chứ không phụ thuộc code.

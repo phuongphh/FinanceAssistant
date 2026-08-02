@@ -38,6 +38,7 @@ P1 + P2 là **blocking production**. P3-P5 là điều kiện để 5.1 chở s�
 1. **Zalo là transport, không phải sản phẩm thứ hai.** Không fork handler, không fork service. Inbound Zalo đi vào **đúng intent pipeline của Telegram**; khác biệt duy nhất nằm ở renderer + notifier. Fork logic = 2 sản phẩm lệch nhau sau 3 tháng.
 2. **Ràng buộc nền tảng là first-class citizen, không phải try/except.** Cửa sổ 48h, trần 8 tin, token 1h, refresh single-use — đều thành **state trong DB + guard ở service**, không phải "gửi thử rồi log warning".
 3. **Fail sang Telegram, đừng fail im.** Zalo không gửi được (ngoài cửa sổ / hết quota / token hỏng) → user đã link Telegram vẫn nhận. `notifier_resolver` đã fan-out; 5.0 thêm điều kiện *có nên gửi Zalo lúc này không*.
+   **Hệ quả của Decision #2 (chốt 02/08/2026): Zalo là kênh reactive-first.** Bé Tiền trả lời trên Zalo, không chủ động mở lời trên Zalo khi cửa sổ 48h đã đóng. Không ZNS, không tin trả phí. Briefing/empathy/cảnh báo chủ động là việc của Telegram. Trong code điều này *không* thêm nhánh mới — nó chỉ có nghĩa là `can_send()` trả `window_closed` thì dừng ở đó, không có đường dự phòng thứ hai.
 4. **Kỷ luật kênh giữ nguyên.** Toàn bộ sau `ZALO_CHANNEL_ENABLED`. Off → `main.py` không mount webhook, `notifier_resolver` không trả kênh zalo → byte-identical pre-5.0.
 5. **Thin slice trước, parity sau.** 5.0 mở đúng 3 luồng (link, capture chi tiêu, xem số dư/báo cáo ngắn) để *validate ràng buộc 300 ký tự + không Markdown trên flow thật*. Parity đầy đủ là 5.1 — mở hết ở 5.0 sẽ phát hiện lỗi format khi đã có user.
 
@@ -188,7 +189,7 @@ Biến ràng buộc nền tảng thành state có thể kiểm tra. `notifier_re
 
 - Twin view, comparison, milestone trên Zalo (renderer đầy đủ) → **5.1**.
 - Nút bấm / rich template (`oa.open.url`, `oa.query.show`) → **5.1**.
-- ZNS (tin ngoài cửa sổ 48h, template duyệt trước) → **5.1**.
+- ZNS (tin ngoài cửa sổ 48h, template duyệt trước) → **đã loại hẳn** (chốt 02/08/2026, xem Decision #2). Không phải hoãn sang 5.1 — không làm.
 - Mini App → **5.2**.
 - Ảnh/biểu đồ trên Zalo (cần URL public, không nhận bytes) → **5.1**.
 - Onboarding người dùng mới *bắt đầu từ* Zalo (5.0 vẫn yêu cầu link từ Telegram) → **5.1**.
@@ -223,6 +224,6 @@ Thông tin nền tảng dưới đây thu thập qua web search (docs chính ch�
 ## 🔓 Product Decisions Cần Owner Ký
 
 1. **Zalo là kênh phụ hay kênh ngang hàng?** 5.0 code theo hướng *ngang hàng nhưng ràng buộc nền tảng chặt hơn* (Telegram luôn là fallback). Nếu owner muốn Zalo thành kênh chính cho user mới → cần đổi thiết kế onboarding ở 5.1. *Đề xuất: kênh ngang hàng, Telegram fallback.*
-2. **Ngân sách tin ngoài cửa sổ 48h.** Ngoài cửa sổ phải trả phí hoặc dùng ZNS (1000 tin miễn phí/tháng cho OA đã xác thực). Có chấp nhận chi phí không, trần bao nhiêu/tháng? *Đề xuất 5.0: không gửi ngoài cửa sổ, để dành quyết định cho 5.1 khi có số liệu thật.*
-3. **Xác thực OA (verified).** Bắt buộc cho ZNS và **bắt buộc cho Mini App (5.2)**. Cần hồ sơ doanh nghiệp. *Đề xuất: nộp ngay ngày 1.*
+2. ✅ **CHỐT 02/08/2026 — Ngân sách tin ngoài cửa sổ 48h: KHÔNG.** Không dùng ZNS (tốn tiền, template cứng, phải duyệt trước), không trả phí gửi ngoài cửa sổ. **Zalo là kênh reactive-first**: Bé Tiền chỉ nói trên Zalo khi user vừa nói trước — trong cửa sổ 48h và trong trần 8 tin. Mọi thứ *chủ động* (briefing hằng ngày, empathy, cảnh báo drift/cashflow khi user im lặng) ở lại **Telegram**. Ngoài cửa sổ → bỏ kênh Zalo, log lý do, không có đường vòng nào khác. Ràng buộc này áp cho cả 5.1.
+3. **Xác thực OA (verified).** Bắt buộc cho **Mini App (5.2)** (ZNS đã loại ở #2 nên không còn là lý do). Cần hồ sơ doanh nghiệp. *Đề xuất: nộp ngay ngày 1 — vẫn giữ, vì thời gian duyệt 3-7 ngày và nó chặn 5.2.*
 4. **Thin slice gồm những intent nào?** *Đề xuất: link account, capture chi tiêu, báo cáo ngắn (số dư + chi tháng này). Chốt ở #4.1.*
