@@ -78,6 +78,49 @@ def _normalize_header(signature_header: str) -> str:
     return received
 
 
+def describe_header(signature_header: str | None) -> str:
+    """Describe the *shape* of the received header, never its value.
+
+    Two rows of the ``ASSUMED`` facts table — "the header value is
+    ``mac=<hex>``" and "the digest is lowercase hex" — cannot be settled
+    by a ``valid=true`` verdict: :func:`_normalize_header` accepts a bare
+    digest as readily as ``mac=`` or ``sha256=``, and the comparison
+    lowercases before matching. Both assumptions would therefore survive
+    a clean 24h soak while still being wrong.
+
+    This returns just enough to decide them — which prefix arrived, how
+    the hex was cased, how long it was — and nothing an attacker could
+    replay. The digest itself is never part of the output.
+    """
+    if signature_header is None:
+        return "absent"
+    received = signature_header.strip()
+    if not received:
+        return "empty"
+
+    prefix = "none"
+    for candidate in (_MAC_PREFIX, _LEGACY_PREFIX):
+        if received.lower().startswith(candidate):
+            prefix = candidate.rstrip("=")
+            break
+    digest = _normalize_header(signature_header)
+
+    if not digest:
+        case = "empty"
+    elif not all(c in "0123456789abcdefABCDEF" for c in digest):
+        case = "non_hex"
+    elif digest.islower():
+        case = "lower"
+    elif digest.isupper():
+        case = "upper"
+    else:
+        # All-digit digests have no case at all; anything else here is a
+        # genuine mix. Both are worth telling apart from "lower".
+        case = "caseless" if digest.isdigit() else "mixed"
+
+    return f"prefix={prefix},hex={case},len={len(digest)}"
+
+
 def extract_timestamp(raw_body: bytes) -> str:
     """Pull the ``timestamp`` field out of the raw body.
 
