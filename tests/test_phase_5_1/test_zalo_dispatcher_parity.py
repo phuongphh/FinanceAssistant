@@ -179,6 +179,25 @@ def _onboarding_declines(monkeypatch):
     monkeypatch.setattr(zalo_inbound.zalo_onboarding, "handle_text", _handle_text)
 
 
+@pytest.fixture(autouse=True)
+def _no_catchup(monkeypatch):
+    """Catch-up stays out of this module's way (#4.5).
+
+    ``handle_inbound_event`` now asks ``zalo_catchup_service`` whether a
+    returning Zalo-only user missed anything, which is a database read.
+    The handler swallows failures on purpose — an answer must not be lost
+    because the catch-up line could not be built — so without this stub
+    ``_SpySession.execute``'s deliberate "no test here should reach the
+    database" would be caught and discarded, and the guard would stop
+    guarding. Catch-up is proved for real in ``test_zalo_catchup.py``.
+    """
+
+    async def _none(db, **kwargs):
+        return None
+
+    monkeypatch.setattr(zalo_inbound.zalo_catchup_service, "build_catchup_line", _none)
+
+
 @pytest.fixture()
 def real_dispatcher():
     """A genuine :class:`IntentDispatcher`, freshly built per test."""

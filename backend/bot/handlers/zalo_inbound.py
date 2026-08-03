@@ -77,7 +77,7 @@ from backend.bot.handlers import zalo_onboarding
 from backend.intent.dispatcher import WIZARD_LAUNCHING_INTENTS, persists_flow_state
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
-from backend.services import zalo_linking_service
+from backend.services import zalo_catchup_service, zalo_linking_service
 from backend.services.user_status import is_user_allowed
 from backend.utils.zalo_copy import linking as linking_copy, text as zalo_text
 from backend.utils.zalo_events import ZaloEvent
@@ -183,7 +183,17 @@ async def handle_inbound_event(db: AsyncSession, *, event: ZaloEvent) -> UUID | 
     ):
         return linked.id
 
+    # Phase 5.1 #4.5 — a Zalo-only user has no second channel to carry
+    # what the proactive jobs skipped. Computed *before* dispatch, because
+    # the silence is measured from their previous inbound row and dispatch
+    # may write rows of its own; sent *after* the answer, so an urgent
+    # question is never made to wait behind three days of news.
+    catchup = await _catchup_line(db, user=linked, msg_id=event.msg_id)
+
     await _dispatch_intent(db, notifier=notifier, user=linked, text=event.text)
+
+    if catchup:
+        await _send_catchup(notifier, user=linked, line=catchup)
     return linked.id
 
 
@@ -203,6 +213,46 @@ async def _reject_suspended(
     logger.info("zalo.inbound rejected: account suspended")
     await notifier.send_message(0, zalo_text("account", "suspended"))
     return user_id
+
+
+async def _catchup_line(db: AsyncSession, *, user: User, msg_id: str) -> str | None:
+    """Ask #4.5 what this user missed, and never let the answer cost them.
+
+    Catch-up is a courtesy on top of the reply the user actually asked
+    for. It runs *before* dispatch, so an exception here would sink the
+    whole handler and the user would get nothing at all — which is a far
+    worse trade than losing one line of news. Swallowed and logged.
+    """
+    try:
+        return await zalo_catchup_service.build_catchup_line(
+            db, user=user, exclude_msg_id=msg_id
+        )
+    except Exception:
+        logger.exception("zalo.catchup build failed — answering without it")
+        return None
+
+
+async def _send_catchup(
+    notifier: WindowedZaloNotifier, *, user: User, line: str
+) -> None:
+    """Send the catch-up as its own bubble, after the answer.
+
+    Its own message rather than a prefix on the reply: the reply is
+    already sized for one Zalo bubble, and prepending to it would push
+    the part the user asked for off the bottom. It does spend a second
+    slot of the 8-per-window quota, which is the honest cost of the
+    channel being the only one this user has.
+
+    ``send_message`` returning ``None`` means the window closed between
+    the reply and this line. That is a drop, not an error — the news is
+    still uncelebrated, so the next time they write it is still waiting.
+    """
+    sent = await notifier.send_message(0, line)
+    analytics.track(
+        "zalo_catchup",
+        user_id=user.id,
+        properties={"channel": CHANNEL_ZALO, "delivered": sent is not None},
+    )
 
 
 def _plain_body(text: str) -> str:

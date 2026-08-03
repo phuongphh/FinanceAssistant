@@ -248,3 +248,56 @@ onboarding:
   telegram_invite_accept_label: "Mở Telegram"
   telegram_invite_decline_label: "Thôi, cứ ở Zalo"
   telegram_invite_declined: "Dạ được ạ, mình cứ ở Zalo. Bé Tiền không nhắc lại nữa đâu."
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #4.5 — catch-up cho user chỉ có Zalo.
+#
+# Zalo reactive-first: mọi tin chủ động rơi ngoài cửa sổ 48h đều bị bỏ, và
+# user không có Telegram thì không có kênh nào gánh hộ. Khi họ quay lại sau
+# vài ngày im lặng, Bé Tiền nói đúng MỘT dòng về những gì đã đổi.
+#
+# Luật giọng — quan trọng hơn chữ:
+#   - Bé Tiền kể việc CỦA MÌNH đã làm, không hỏi user đã đi đâu.
+#     ❌ "Mấy hôm nay anh đi đâu mất tiêu" — trách móc, cấm tuyệt đối.
+#     ❌ "Lâu rồi chị không ghi chép gì" — vẫn là trách, chỉ vòng hơn.
+#   - Không giục, không nhắc nợ, không so sánh với lần trước.
+#   - Tin xấu nói bình thản, không kịch tính hoá. Riêng chuyện tụt hạng tài
+#     sản thì service loại hẳn khỏi catch-up, không có chữ nào ở đây cả.
+#
+# "{summary}" là các mệnh đề ngắn dưới đây nối bằng "joiner". Service bỏ bớt
+# mệnh đề cuối nếu tràn 300 ký tự, nên mỗi mệnh đề phải đứng một mình được.
+# ---------------------------------------------------------------------------
+catchup:
+  lead: "Mấy hôm {salutation} bận, Bé Tiền vẫn theo giúp: {summary}."
+  joiner: " · "
+  money_up: "tài sản nhích lên {amount}"
+  money_down: "tài sản lùi {amount}"
+  milestone: "{salutation} chạm mốc {title}"
+  # Dùng khi có mốc mới nhưng chưa kịp đặt tên ngắn cho nó ở dưới.
+  milestone_generic: "{salutation} vừa chạm một mốc mới"
+  # Tên ngắn của từng mốc, khoá đúng bằng MilestoneType. Đây là bản ngắn
+  # riêng cho catch-up: bản ăn mừng đầy đủ ở content/milestone_messages.yaml
+  # dài nhiều dòng, không nhét vào một mệnh đề được.
+  milestones:
+    first_transaction: "khoản ghi đầu tiên"
+    days_7: "7 ngày đồng hành"
+    days_30: "30 ngày đồng hành"
+    days_100: "100 ngày đồng hành"
+    days_365: "1 năm đồng hành"
+    first_budget_set: "ngân sách đầu tiên"
+    first_category_change: "lần sửa phân loại đầu tiên"
+    first_voice_input: "lần ghi bằng giọng nói đầu tiên"
+    first_photo_input: "lần ghi bằng ảnh đầu tiên"
+    save_10_percent_monthly: "để dành 10% tháng này"
+    save_20_percent_monthly: "để dành 20% tháng này"
+    savings_1m: "tích luỹ 1 triệu"
+    savings_5m: "tích luỹ 5 triệu"
+    savings_10m: "tích luỹ 10 triệu"
+    savings_50m: "tích luỹ 50 triệu"
+    streak_7: "chuỗi 7 ngày liền"
+    streak_30: "chuỗi 30 ngày liền"
+    streak_100: "chuỗi 100 ngày liền"
+    wealth_level_up_young_prof: "bậc tài sản mới"
+    wealth_level_up_mass_affluent: "bậc tài sản mới"
+    wealth_level_up_hnw: "bậc tài sản mới"
+    wealth_level_up_vip: "bậc tài sản mới"

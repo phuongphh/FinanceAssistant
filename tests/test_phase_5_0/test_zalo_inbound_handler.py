@@ -170,6 +170,25 @@ def onboarding(monkeypatch):
     return spy
 
 
+@pytest.fixture(autouse=True)
+def _no_catchup(monkeypatch):
+    """Catch-up stays out of this module's way (#4.5).
+
+    ``handle_inbound_event`` asks ``zalo_catchup_service`` whether a
+    returning Zalo-only user missed anything, and that is a database
+    read. ``_SpySession`` has no ``execute`` at all, by design — but the
+    handler swallows catch-up failures so an answer is never lost to
+    them, which would turn that missing method into a silent no-op
+    instead of the loud one it is meant to be. Catch-up gets its own
+    subject in ``tests/test_phase_5_1/test_zalo_catchup.py``.
+    """
+
+    async def _none(db, **kwargs):
+        return None
+
+    monkeypatch.setattr(zalo_inbound.zalo_catchup_service, "build_catchup_line", _none)
+
+
 @pytest.fixture()
 def zalo_out(_isolate_channel):
     return _isolate_channel[0]
