@@ -126,6 +126,31 @@ class Settings(BaseSettings):
     # start of Phase 5.0 (Zalo rollout).
     zalo_channel_enabled: bool = False
 
+    # Media URLs (Phase 5.1 #1.2–#1.4). Channel-independent infrastructure:
+    # Zalo fetches images by URL instead of accepting bytes, and the Mini
+    # App (5.2) will want the same thing. Kept separate from
+    # ``zalo_channel_enabled`` so the serving endpoint can be switched off
+    # on its own without taking the whole channel down.
+    media_url_enabled: bool = False
+    # Public HTTPS origin that terminates in front of this app, e.g.
+    # "https://api.example.com". Empty means no URL can be built, which
+    # the notifier treats as "send text only". No trailing slash needed.
+    media_public_base_url: str = ""
+    # Directory holding the bytes. Must be writable by the service user
+    # and must NOT be inside the repo — nothing here is ever committed.
+    media_storage_path: str = "/tmp/betien-media"
+    # How long a minted URL stays good. Short by design: the URL is the
+    # credential (see backend/services/media_url_service.py).
+    media_url_ttl_seconds: int = 900
+    # Per-IP ceiling on the public serving endpoint. Generous enough for a
+    # chat client that prefetches, tight enough that the endpoint isn't a
+    # free bandwidth relay.
+    media_rate_limit_per_minute: int = 120
+    # How long an orphaned file must sit untouched before the sweep may
+    # delete it. Must comfortably exceed the longest publish→commit gap,
+    # or the sweep will delete bytes belonging to an in-flight request.
+    media_orphan_grace_seconds: int = 3600
+
     # Market data
     redis_url: str = "redis://localhost:6379/0"
     market_data_timeout_seconds: float = 3.0

@@ -102,6 +102,7 @@ from backend.models.decision_query_log import (
     VALID_QUERY_TYPES,
     DecisionQueryLog,
 )
+from backend.models.media_object import TOKEN_HASH_LENGTH, MediaObject
 
 __all__ = [
     "User",
@@ -201,4 +202,7 @@ __all__ = [
     "QUERY_TYPE_SHOCK",
     "QUERY_TYPE_FEASIBILITY",
     "VALID_QUERY_TYPES",
+    # Phase 5.1
+    "MediaObject",
+    "TOKEN_HASH_LENGTH",
 ]
