@@ -145,3 +145,77 @@ window_closed:
 buttons:
   query_line: '- Nhắn "{title}" nhé'
   url_line: "- {title}: {url}"
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #2.1 — copy cho các surface parity.
+#
+# Đây KHÔNG phải bản cắt của Telegram. Telegram có biểu đồ, nút bấm và
+# chỗ để đọc dài; Zalo có một bong bóng 300 ký tự. Nên copy dưới đây
+# viết ngắn từ đầu: mỗi dòng nói trọn một ý, renderer ghép các dòng lại
+# theo thứ tự ưu tiên và bỏ bớt dòng cuối nếu tràn — không cắt giữa câu.
+#
+# Xưng hô: dùng "{salutation}" (anh/chị/bạn, lấy từ users.salutation qua
+# onboarding_service.salutation_of) và "{Salutation}" khi đứng đầu câu.
+# Không viết 3 bản copy riêng cho 3 xưng hô: cả ba đều là đại từ ngôi
+# thứ hai nên thay thẳng vào chỗ trống là đúng ngữ pháp, và 3 bản rời
+# sẽ lệch nhau ngay lần sửa chữ đầu tiên.
+#
+# Ràng buộc chữ (test tự động duyệt): ≤ 300 ký tự, ≤ 2 emoji, không ký
+# tự Markdown và không dùng ngoặc đơn — Zalo hiển thị nguyên xi.
+# ---------------------------------------------------------------------------
+
+# Twin view. Con số đã format sẵn qua format_money_short trước khi vào đây.
+twin:
+  headline: "🔮 Tới {target_year}, tài sản của {salutation} có thể nằm quanh khoảng này:"
+  range_line: "Khiêm tốn {p10} · Bình thường {p50} · Lạc quan {p90}"
+  stale_note: "Số liệu hơi cũ rồi, {salutation} cập nhật tài sản để Bé Tiền vẽ lại nhé."
+  note: "Đây là dự phóng xác suất từ số hiện có, không phải lời hứa."
+
+# So sánh lộ trình hiện tại với lộ trình tối ưu.
+twin_comparison:
+  headline: "Nếu đổi cách phân bổ, tới {target_year} lộ trình của {salutation} có thể khác:"
+  delta_line: "Hiện tại {current} · Tối ưu {optimal} · chênh {delta}"
+  actions_lead: "Việc nên làm: {actions}"
+  note: "Con số là dự phóng tham khảo, chọn thế nào vẫn là của {salutation} nhé."
+
+# Mốc đạt được. Ăn mừng thật nhưng không tung hô, và tuyệt đối không so
+# sánh với người khác hay nhắc lại chuyện chậm trễ trước đó.
+milestone:
+  headline: "🎉 {Salutation} vừa chạm mốc: {title}"
+  twin_effect: "Twin đổi theo: {effect}"
+  closing: "Bé Tiền ghi lại rồi, mình đi tiếp nhé."
+
+# Tư vấn ngắn khi user hỏi "nên làm gì bây giờ".
+advisory:
+  lead: "Bé Tiền nhìn số của {salutation} thì thấy thế này:"
+  point: "- {point}"
+  suggestion: "Gợi ý: {suggestion}"
+  disclaimer: "Đây là góc nhìn tham khảo, quyết định vẫn là của {salutation} nhé."
+
+# Một quyết định cụ thể: mua, vay, đổi việc, rút tiền.
+decision:
+  lead: "{Salutation} hỏi về {topic}, Bé Tiền tính thử nhé:"
+  impact: "Nếu làm, tới {target_year} tài sản có thể còn quanh {p50}, chênh {delta}."
+  affordable: "Với dòng tiền hiện tại, khoản này nằm trong tầm của {salutation}."
+  tight: "Khoản này hơi căng với dòng tiền hiện tại, {salutation} cân nhắc thêm nhé."
+  disclaimer: "Bé Tiền đưa số, chọn vẫn là {salutation} nhé."
+
+# Ghi hoặc sửa một tài sản từ Zalo.
+asset_entry:
+  saved: "✅ Đã ghi tài sản {name} {amount}"
+  updated: "✅ Đã cập nhật {name} thành {amount}"
+  net_worth_line: "Tổng tài sản giờ là {net_worth}."
+  ask_amount: "{Salutation} cho Bé Tiền biết khoản này đang khoảng bao nhiêu nhé."
+  edit_hint: "Muốn sửa thì nhắn lại tên tài sản kèm số mới là được."
+
+# Onboarding cho người vào thẳng từ Zalo, chưa từng có Telegram. E4 #4.3
+# nối dây; copy để sẵn ở đây để chỉ có một chỗ giữ chữ.
+onboarding:
+  welcome: "Chào {salutation} 👋 Bé Tiền là người đồng hành quản lý tài sản, nhắn gì Bé Tiền cũng ghi được."
+  ask_name: "Bé Tiền gọi {salutation} là gì cho thân nhé?"
+  ask_salutation: "Bé Tiền nên xưng hô thế nào ạ? Nhắn anh, chị hoặc bạn là được."
+  ask_goal: "{Salutation} đang muốn tiền của mình phục vụ điều gì trước nhất?"
+  ask_asset: "Giờ {salutation} cho Bé Tiền biết đang có khoảng bao nhiêu tài sản nhé."
+  done: "Xong rồi ạ. Từ giờ {salutation} nhắn thu chi là Bé Tiền ghi ngay."
+  # Lời mời sang Telegram chỉ gửi đúng một lần, không nhắc lại.
+  telegram_invite: "Bé Tiền còn biểu đồ và báo cáo đầy đủ bên Telegram: {url}. Bé Tiền nhắn một lần thôi, không nhắc lại đâu ạ."
