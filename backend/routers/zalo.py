@@ -70,12 +70,17 @@ def _verify_zalo_signature(body: bytes, signature_header: str | None) -> bool:
 
     # Structured, PII-free: the soak counts valid=true over 24h before the
     # operator flips enforce on. Never log the body, the sender, or the MAC.
+    # ``shape`` carries only the header's prefix/casing/length so the soak
+    # can settle the "mac=<hex>" and "lowercase hex" rows of the facts
+    # table, which a valid=true verdict alone cannot prove — the verifier
+    # accepts a bare digest and lowercases before comparing.
     logger.info(
-        "zalo.signature valid=%s reason=%s bypassed=%s enforced=%s",
+        "zalo.signature valid=%s reason=%s bypassed=%s enforced=%s shape=%s",
         verdict.valid,
         verdict.reason,
         verdict.bypassed,
         current.zalo_signature_enforce,
+        zalo_signature.describe_header(signature_header),
     )
 
     if verdict.valid:

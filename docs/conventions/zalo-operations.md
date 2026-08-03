@@ -147,7 +147,16 @@ Sequence instead:
 3. Set `ZALO_SIGNATURE_ENFORCE=true`.
 
 Any `valid=false` during the soak stops the rollout — do not enforce
-until it's explained.
+until it's explained. Count only records produced by real deliveries:
+an unsigned probe (a `curl` against the webhook, a console URL check)
+logs a deterministic `valid=false reason=missing_header`, so an
+unbounded `grep` over the whole file can never reach 100%.
+
+The same record carries `shape=prefix=…,hex=…,len=…`, describing the
+received header without echoing the MAC. That is what settles the
+*header format* and *lowercase hex* rows: `verify()` accepts a bare
+digest as readily as `mac=`/`sha256=` and lowercases before comparing,
+so `valid=true` proves neither on its own.
 
 ---
 
@@ -448,6 +457,21 @@ incident.
 
 Turning it back on is the same flag plus the [signature soak](#signature-soak-rollout)
 if the credentials changed while it was off.
+
+**What "retries into the void" costs on the way back up.** A 404'd delivery
+never reached `_claim_update`, so no `zalo_updates` row exists for it and
+`msg_id` dedup will not suppress it. Whatever Zalo is still holding gets
+delivered the moment the route mounts again, and the worker treats it as
+fresh: the bot answers a question from hours ago, or the send fails because
+the 48h CS window on that conversation has since closed. How long Zalo keeps
+retrying is `ASSUMED` — undocumented and unmeasured.
+
+So for a short flag-off (a restart, a deploy) this is nothing. For a long
+one, or one where the cause is still unknown, **disable the webhook in the
+Developer Console as well** — that is the only thing that actually stops the
+source. Re-enable it in console *after* the flag is back on and the service
+has booted, so the first redelivery lands on a live route rather than
+another 404.
 
 ---
 

@@ -332,3 +332,62 @@ def test_startup_invariant_error_never_leaks_the_secret(caplog):
             )
     assert "super-secret-app-id" not in str(exc.value)
     assert "super-secret-app-secret" not in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# describe_header — makes two ASSUMED rows observable without leaking the MAC
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "header,expected",
+    [
+        (None, "absent"),
+        ("", "empty"),
+        ("   ", "empty"),
+        ("mac=" + "ab" * 32, "prefix=mac,hex=lower,len=64"),
+        ("MAC=" + "AB" * 32, "prefix=mac,hex=upper,len=64"),
+        ("sha256=" + "ab" * 32, "prefix=sha256,hex=lower,len=64"),
+        ("ab" * 32, "prefix=none,hex=lower,len=64"),
+        ("aB" * 32, "prefix=none,hex=mixed,len=64"),
+        ("1" * 64, "prefix=none,hex=caseless,len=64"),
+        ("mac=", "prefix=mac,hex=empty,len=0"),
+        ("mac=not-a-digest", "prefix=mac,hex=non_hex,len=12"),
+        ("mac=" + "ab" * 16, "prefix=mac,hex=lower,len=32"),
+    ],
+)
+def test_describe_header_reports_shape(header, expected):
+    """Prefix, casing and length — the three things the soak needs."""
+    assert zalo_signature.describe_header(header) == expected
+
+
+def test_describe_header_never_echoes_the_digest():
+    """The shape string must be safe to sit in a log line forever."""
+    digest = "deadbeef" * 8
+    described = zalo_signature.describe_header(f"mac={digest}")
+    assert digest not in described
+    assert "deadbeef" not in described
+
+
+def test_describe_header_agrees_with_what_verify_accepts():
+    """A header verify() calls valid can still be shaped unexpectedly.
+
+    This is the whole point: the same digest passes verification whether
+    it arrives bare, prefixed, upper or lower — so only the shape string
+    can tell the operator which form Zalo actually sends.
+    """
+    body = json.dumps({"timestamp": "1700000000000"}).encode()
+    mac = zalo_signature.compute_mac(
+        app_id=APP_ID, raw_body=body, timestamp="1700000000000", oa_secret_key=SECRET
+    )
+    shapes = set()
+    for header in (mac, f"mac={mac}", f"sha256={mac}", mac.upper()):
+        verdict = zalo_signature.verify(
+            raw_body=body,
+            signature_header=header,
+            app_id=APP_ID,
+            oa_secret_key=SECRET,
+        )
+        assert verdict.valid, header
+        shapes.add(zalo_signature.describe_header(header))
+    assert len(shapes) == 4
