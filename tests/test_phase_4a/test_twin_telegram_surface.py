@@ -25,6 +25,12 @@ class FakeNotifier:
 class FakeUser:
     id = uuid.uuid4()
     display_name = "An"
+    # Nullable on the real model, and the handler now reads it to fill
+    # ``TwinViewSnapshot.salutation`` for channels that open with a pronoun
+    # instead of a name. None is the honest default: it exercises
+    # ``salutation_of``'s fallback to "bạn", which is what a pre-4.4 user
+    # gets in production.
+    salutation = None
 
     def get_greeting_name(self):
         return "An"

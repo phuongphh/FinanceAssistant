@@ -23,6 +23,7 @@ from backend.ports.content_renderer import (
 from backend.ports.notifier import Notifier, get_notifier
 from backend.adapters.telegram_content_renderer import TelegramContentRenderer
 from backend.models.user import User
+from backend.services.onboarding.onboarding_service import salutation_of
 from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
     top_rebalance_deltas,
@@ -301,6 +302,7 @@ async def send_twin_current(
             scenario_cards=scenario_cards,
             is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)
@@ -602,6 +604,7 @@ async def send_twin_compare_optimal(
             current_cone=current.cone_data,
             optimal_cone=optimal.cone_data,
             filename="be-tien-twin-optimal.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)

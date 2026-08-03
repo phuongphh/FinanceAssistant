@@ -3,10 +3,12 @@
 Three claims are worth pinning here, and they are what the sections below
 are organised around:
 
-1. **Only briefings render.** Twin, comparison and milestone raise, loudly,
-   because on Zalo they would arrive as a caption for an invisible chart or
-   as a proactive send the 48h window cannot carry. A stub that returned
-   empty content would look like a Twin with nothing in it.
+1. **Briefings render.** Phase 5.0 shipped this one method; Twin, comparison
+   and milestone raised until Phase 5.1 #2.2/#2.3 gave them a chart URL and
+   a button mapping to render *into*. Their behaviour is now pinned in
+   ``tests/test_phase_5_1/test_zalo_content_renderer_parity.py`` — this file
+   keeps only the check that they stopped raising, so the removal of the
+   guard is a visible event rather than a silently deleted test.
 2. **What arrives is plain.** No Markdown markers, no HTML, no bracketed
    pseudo-buttons — Zalo renders none of it, so the user would read the
    markup itself.
@@ -19,6 +21,7 @@ are organised around:
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 import pytest
 
@@ -26,8 +29,37 @@ from backend.adapters.zalo_content_renderer import (
     ZaloContentRenderer,
     fit_briefing_text,
 )
-from backend.ports.content_renderer import BriefingSnapshot, Button, MilestoneSnapshot
+from backend.ports.content_renderer import (
+    BriefingSnapshot,
+    Button,
+    MilestoneSnapshot,
+    TwinComparisonSnapshot,
+    TwinViewSnapshot,
+)
 from backend.utils.zalo_limits import ZALO_MESSAGE_MAX_CHARS
+
+# Empty cones on purpose: this file is about the briefing path, and an
+# empty cone means the renderer never reaches the chart, so the fixture
+# below stays pure without having to inject a fake renderer.
+_TWIN_KWARGS = dict(
+    user_name="Phương",
+    target_year=2045,
+    p10=Decimal("1000000000"),
+    p50=Decimal("2000000000"),
+    p90=Decimal("3000000000"),
+    age_text="45 tuổi",
+    cone=[],
+)
+_COMPARISON_KWARGS = dict(
+    target_year=2045,
+    current_p50=Decimal("2000000000"),
+    optimal_p50=Decimal("3000000000"),
+    delta_pct="+42%",
+    actions="Tăng tiết kiệm 2tr/tháng",
+    disclaimer="Tham khảo.",
+    current_cone=[],
+    optimal_cone=[],
+)
 
 
 @pytest.fixture()
@@ -36,26 +68,26 @@ def renderer() -> ZaloContentRenderer:
 
 
 # ---------------------------------------------------------------------------
-# What Phase 5.0 deliberately does not render
+# What Phase 5.0 deferred, and 5.1 delivered
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["render_twin_view", "render_twin_comparison", "render_milestone"],
-)
-def test_the_surfaces_zalo_cannot_carry_refuse_rather_than_degrade(renderer, method):
-    # Passing None is safe precisely because the guard is unconditional:
-    # nothing touches the snapshot before the raise.
-    with pytest.raises(NotImplementedError) as exc:
-        getattr(renderer, method)(None)
+def test_the_deferred_surfaces_no_longer_refuse(renderer):
+    # 5.0 raised NotImplementedError from all three on purpose — a stub
+    # returning empty content would have looked like a Twin with nothing in
+    # it. The inverse assertion is what remains: if any of them starts
+    # raising again, that is a regression of #2.2/#2.3, not a rediscovered
+    # decision. What they *say* is pinned in the 5.1 parity suite; all this
+    # one claims is that they answer at all.
+    for content in (
+        renderer.render_twin_view(TwinViewSnapshot(**_TWIN_KWARGS)),
+        renderer.render_twin_comparison(TwinComparisonSnapshot(**_COMPARISON_KWARGS)),
+        renderer.render_milestone(MilestoneSnapshot(text="Chúc mừng!")),
+    ):
+        assert content.text
 
-    # The message names where the work went, so the next person doesn't
-    # have to guess whether this is a gap or a decision.
-    assert "5.1" in str(exc.value)
 
-
-def test_briefings_are_the_one_surface_that_does_render(renderer):
+def test_briefings_are_the_surface_5_0_shipped_first(renderer):
     content = renderer.render_briefing(BriefingSnapshot(text="Tháng này bạn chi 3tr."))
 
     assert content.text == "Tháng này bạn chi 3tr."
@@ -268,8 +300,12 @@ def test_the_renderer_returns_the_shape_the_port_promises(renderer):
     assert content.filename is None
 
 
-def test_milestone_refuses_even_with_a_perfectly_renderable_body(renderer):
-    # Milestone bodies are plain text too — the refusal is about the
-    # channel being reactive-first, not about the payload being hard.
-    with pytest.raises(NotImplementedError):
-        renderer.render_milestone(MilestoneSnapshot(text="Chúc mừng!"))
+def test_a_milestone_with_only_a_body_still_renders_that_body(renderer):
+    # 5.0 refused this outright. 5.1 renders it through the *fallback*
+    # path — no ``title``, so there is nothing to compose from, and the
+    # pre-written body is fitted as-is. Pinned here rather than in the
+    # parity suite because it is the shape 5.0's callers still construct.
+    content = renderer.render_milestone(MilestoneSnapshot(text="Chúc mừng!"))
+
+    assert content.text == "Chúc mừng!"
+    assert content.buttons == ()
