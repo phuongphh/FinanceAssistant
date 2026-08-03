@@ -34,7 +34,11 @@ STATUSES = set(_SHARED_STATUSES)
 
 class AdminUserListItem(BaseModel):
     user_id: str
-    telegram_id: int
+    # Phase 5.1 #4.2 — NULL for Zalo-only accounts. This has to stay
+    # optional: one such row in the page would otherwise raise a
+    # ValidationError at serialisation time and 500 the whole list, not
+    # just that row.
+    telegram_id: int | None = None
     telegram_username: str | None = None
     display_name: str
     tier: str
@@ -80,7 +84,8 @@ class LicenseInfo(BaseModel):
 
 class AdminUserDetailResponse(BaseModel):
     user_id: str
-    telegram_id: int
+    # Phase 5.1 #4.2 — NULL for Zalo-only accounts (see AdminUserListItem).
+    telegram_id: int | None = None
     telegram_username: str | None = None
     display_name: str
     joined_at: str

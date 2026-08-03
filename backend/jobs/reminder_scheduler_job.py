@@ -70,6 +70,10 @@ async def run_reminder_scheduler(*, now: datetime | None = None) -> None:
                 user = await user_db.get(User, user_id)
                 if user is None or user.deleted_at is not None:
                     continue
+                # Phase 5.1 #4.2 — Zalo-only accounts have no chat to
+                # remind on, and Zalo itself is reactive-first.
+                if user.telegram_id is None:
+                    continue
                 profile = await user_db.get(UserProfile, user_id)
                 if not _should_send_reminders_now(profile, now=now):
                     continue

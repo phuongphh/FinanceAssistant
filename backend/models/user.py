@@ -16,7 +16,17 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    # Phase 5.1 #4.2 — nullable since Zalo became a signup channel. A
+    # user who arrived through the OA has no Telegram side at all, and
+    # forcing a placeholder id here would be worse than NULL: it would
+    # collide with the unique index the moment a second Zalo-only user
+    # signed up, and every ``send_message(chat_id=...)`` would deliver
+    # to a chat that doesn't exist.
+    #
+    # ``unique=True`` stays and needs no partial predicate: Postgres
+    # treats NULLs as distinct in a unique index, so any number of
+    # Zalo-only rows coexist while two real Telegram ids still can't.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     tenant_id: Mapped[int] = mapped_column(
         Integer, default=1, nullable=False, index=True
     )
