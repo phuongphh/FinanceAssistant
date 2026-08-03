@@ -131,3 +131,17 @@ window_closed:
   body: |-
     Bé Tiền có vài điều muốn báo mà Zalo chỉ cho nhắn trong 48h nên chưa gửi kịp.
     Bạn nhắn "báo cáo" là mình kể ngay nhé.
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #3.2 — nút bấm.
+#
+# Zalo chỉ cho tối đa vài nút một tin. Nút nào không lên được thành nút
+# thật thì tụt xuống thành một dòng gợi ý ở cuối tin — user vẫn làm được,
+# chỉ là gõ thay vì bấm. Không nút nào biến mất im lặng.
+#
+# "{title}" là chữ trên nút, "{url}" là link. Giữ dòng thật ngắn: chúng
+# nối vào cuối tin và vẫn phải lọt 300 ký tự.
+# ---------------------------------------------------------------------------
+buttons:
+  query_line: '- Nhắn "{title}" nhé'
+  url_line: "- {title}: {url}"

@@ -168,8 +168,8 @@ class ZaloNotifier:
         text: str,
         *,
         parse_mode: str | None = None,  # noqa: ARG002 — Zalo ignores parse_mode
-        reply_markup: dict | None = None,  # noqa: ARG002 — Zalo has no inline keyboards
-        **kwargs: Any,  # noqa: ARG002 — swallow extra Telegram-specific kwargs
+        reply_markup: dict | None = None,  # noqa: ARG002 — Telegram wire format; see `buttons`
+        **kwargs: Any,
     ) -> dict | None:
         """Send a plain-text message to the bound Zalo user.
 
@@ -186,13 +186,39 @@ class ZaloNotifier:
         holds for callers, because :func:`~backend.adapters.
         zalo_window_notifier.build_zalo_notifier` is the only sanctioned
         way to construct a Zalo notifier and it always wraps.
+
+        ``buttons`` (Phase 5.1 #3.3) is a channel-neutral
+        ``tuple[tuple[Button, ...], ...]`` straight off
+        :class:`~backend.ports.content_renderer.ChannelContent` — not
+        Telegram's ``reply_markup`` wire format, which this adapter must
+        never have to parse. Buttons that cannot become Zalo buttons come
+        back as text lines and are appended *before* the character check,
+        so the 300-char ceiling is applied to what the user actually
+        sees.
         """
+        # Imported inside the method: zalo_button_mapper reaches back
+        # into this module for strip_markdown/unwrap_button_spans, so a
+        # module-scope import here would close the cycle.
+        from backend.adapters.zalo_button_mapper import load_button_copy, map_buttons
+
+        rows = kwargs.get("buttons") or ()
+        zalo_buttons, suggestion_lines = (
+            map_buttons(rows, copy=load_button_copy()) if rows else ([], [])
+        )
+
         plain = strip_markdown(text)
+        if suggestion_lines:
+            plain = "\n".join([plain, *suggestion_lines]) if plain else "\n".join(suggestion_lines)
         body = truncate_for_zalo(plain)
         if not body:
             return None
 
-        ok = await self._client.send_message(self._zalo_user_id, body)
+        if zalo_buttons:
+            ok = await self._client.send_message_with_buttons(
+                self._zalo_user_id, body, zalo_buttons
+            )
+        else:
+            ok = await self._client.send_message(self._zalo_user_id, body)
         if not ok:
             return None
         return {"ok": True, "channel": self.channel}
@@ -223,6 +249,18 @@ class ZaloNotifier:
             if caption:
                 return await self.send_message(0, caption)
             return None
+
+        if kwargs.get("buttons"):
+            # Zalo puts an image and a button stack in the same
+            # ``message.attachment`` slot, so one send cannot carry both
+            # (runbook → Buttons and rich templates). Splitting it into
+            # two sends costs a second slot out of the 48h window's
+            # eight, which is a product call E2 owns, not one this
+            # adapter should make on its own. Loud, not silent.
+            logger.warning(
+                "ZaloNotifier.send_photo received buttons — dropped: "
+                "Zalo cannot render an image and a button template in one message"
+            )
 
         plain_caption = truncate_for_zalo(strip_markdown(caption), limit=100)
         ok = await self._client.send_image_message(

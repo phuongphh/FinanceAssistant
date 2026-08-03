@@ -97,17 +97,27 @@ async def _send_channel_content(
     notifier: Notifier, chat_id: int, content: ChannelContent
 ) -> None:
     reply_markup = _telegram_reply_markup(content.buttons)
+    # ``buttons`` rides alongside ``reply_markup`` (Phase 5.1 #3.3): the
+    # latter is Telegram's wire format, and a non-Telegram notifier would
+    # have to reverse-engineer it to render anything. Passing the neutral
+    # tuples too keeps the channel difference inside the adapter, which is
+    # 5.1's governing rule. ``TelegramNotifier`` swallows the extra kwarg.
     if content.images:
         await notifier.send_photo(
             chat_id,
             content.images[0],
             caption=content.text,
             reply_markup=reply_markup,
+            buttons=content.buttons,
             filename=content.filename or "be-tien-content.png",
         )
         return
     await notifier.send_message(
-        chat_id, content.text, parse_mode=None, reply_markup=reply_markup
+        chat_id,
+        content.text,
+        parse_mode=None,
+        reply_markup=reply_markup,
+        buttons=content.buttons,
     )
 
 

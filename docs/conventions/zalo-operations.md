@@ -90,11 +90,50 @@ the way it does. See [Token refresh protocol](#token-refresh-protocol).
 | Display length | ~300 characters | `DOC` (4B) |
 | Markdown | not supported — plain text only | `DOC` (4B) |
 | Images | require a public URL; raw bytes are not accepted | `DOC` (4B) |
-| Inline keyboards | not used in 5.0 | product decision |
+| Inline keyboards | not used in 5.0 — see [Buttons and rich templates](#buttons-and-rich-templates-51-e3) for 5.1 | product decision |
 
 Because app-level errors arrive as HTTP 200, `ZaloOAClient._post` must
 inspect the body on every response. A bare `resp.raise_for_status()` is
 a bug in this adapter.
+
+### Buttons and rich templates (5.1 E3)
+
+> **BLOCKED — every row below is `ASSUMED`.** `developers.zalo.me` is
+> unreachable from the build environment: the outbound proxy answers
+> `CONNECT tunnel failed, response 403` (re-probed 03/08/2026). Issue
+> `#3.1`'s DoD asks for a docs link **and** a check date on every row;
+> neither can be produced from here. The table ships with a *how to
+> close* column instead, so an operator with a browser can walk it in one
+> sitting. **`#3.1` stays open until that column is empty.**
+
+Until then the code is written to survive being wrong: over-long titles
+are clipped by us rather than by Zalo, buttons past the cap degrade to
+text lines, and a rejected send raises `ZaloSendRejected` through the
+existing `_post` path rather than silently dropping the message.
+
+| Fact | Value we coded to | Provenance | Docs anchor / how to close |
+|---|---|---|---|
+| Button attachment shape | `message.attachment = {"type": "template", "payload": {"template_type": "button", "text": ..., "buttons": [...]}}` | `ASSUMED` | *Tin nhắn tư vấn → gửi tin có nút*. Send one to a staging OA; a `-201` (invalid payload) means the shape is wrong. |
+| Open-a-link button | `{"title": ..., "type": "oa.open.url", "payload": {"url": ...}}` | `ASSUMED` | Same page. Confirm the key is `url` and not `link`. |
+| Send-text-as-user button | `{"title": ..., "type": "oa.query.show", "payload": {"content": ...}}` | `ASSUMED` | Same page. Confirm the key is `content`; confirm the tapped text arrives as an ordinary `user_send_text` webhook event (E4 depends on this). |
+| Max buttons per message | **5** | `ASSUMED` | If the real cap is lower, sends with more buttons are rejected outright. Lower `ZALO_MAX_BUTTONS` the moment staging says so. |
+| Max button title length | **50 chars** (our budget) | `ASSUMED` — platform limit believed to be 100 | Deliberately half the assumed platform figure. Over-clipping only shortens a label; under-clipping gets the whole message rejected. |
+| Buttons + image in one message | **mutually exclusive** — both occupy `message.attachment` | `ASSUMED` | Structural, not a documented limit. Consequence: a Twin card with an image *and* buttons must be two sends, or the image URL becomes a button. E2 owns that choice. |
+| Text carrying the buttons | `payload.text`, not the top-level `message.text` | `ASSUMED` | Confirm which field renders above the button stack; if it is the outer one, only `send_message_with_buttons` changes. |
+| Does a button send count against the 8-message quota | assumed **yes**, same as any CS message | `ASSUMED` | Read `data.remain` from the quota endpoint before and after one button send. See [quota drift](#runbook-quota-drift-internal-count-vs-zalos-count). |
+
+Every constant in `backend/adapters/zalo_button_mapper.py` traces to a
+row in this table. If you change a constant there without changing a row
+here, the next person cannot tell what you learned.
+
+**Design consequence — no button is ever lost silently.** `map_buttons`
+returns two things: the Zalo button payloads and a list of plain-text
+suggestion lines for everything that would not fit. `ZaloNotifier`
+appends those lines to the message body *before* the 300-character
+check, so an unmapped button becomes copy the user can act on rather
+than an action that quietly disappears. The single exception — a button
+with neither a title nor a URL, which carries nothing renderable on any
+channel — is dropped with a `logger.warning`, never in silence.
 
 ---
 
