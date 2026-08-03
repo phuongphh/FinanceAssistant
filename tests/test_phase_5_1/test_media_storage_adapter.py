@@ -11,12 +11,19 @@ it is tested against the paths an attacker would try.
 **What ``list_keys`` refuses to see.** The cleanup job *deletes what
 this method lists*. Listing a half-written temp file, or a file an
 operator dropped in the directory, would mean deleting it.
+
+That refusal is why ``purge_stale_temp_files`` exists, and it is the
+third thing worth testing: a temp file nothing else can see is a temp
+file nothing else can reclaim, so this method's boundary — our prefix,
+past the grace period, files only — is the boundary between "reclaims
+private bytes" and "deletes an operator's data".
 """
 
 from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -209,3 +216,111 @@ async def test_list_keys_skips_files_that_are_not_ours(tmp_path):
     storage = FilesystemMediaStorage(root)
 
     assert [obj.key for obj in await storage.list_keys()] == [mine]
+
+
+# ---------------------------------------------------------------------
+# purge_stale_temp_files — the only thing that reclaims a killed write
+# ---------------------------------------------------------------------
+
+
+def _abandoned(root: Path, name: str = "betien-media-abcd1234.part") -> Path:
+    """A ``.part`` file shaped like one ``_write_sync`` would leave if the
+    process died between ``mkstemp`` and ``os.replace``."""
+    path = root / name
+    path.write_bytes(b"half a chart")
+    return path
+
+
+def _backdate(path: Path, seconds: int) -> None:
+    stat = path.stat()
+    os.utime(path, (stat.st_atime - seconds, stat.st_mtime - seconds))
+
+
+@pytest.mark.asyncio
+async def test_purge_removes_our_abandoned_temp_files(tmp_path):
+    """``_write_sync`` unlinks its temp file on any exception, so the only
+    survivor is a SIGKILL — and those bytes are a real chart nobody will
+    ever reclaim otherwise."""
+    root = tmp_path / "media"
+    root.mkdir()
+    stale = _abandoned(root)
+    _backdate(stale, 7200)
+
+    storage = FilesystemMediaStorage(root)
+
+    assert await storage.purge_stale_temp_files(3600) == 1
+    assert not stale.exists()
+
+
+@pytest.mark.asyncio
+async def test_purge_respects_the_grace_period(tmp_path):
+    """A ``.part`` written seconds ago is a write still in flight on
+    another thread, not litter."""
+    root = tmp_path / "media"
+    root.mkdir()
+    fresh = _abandoned(root)
+
+    storage = FilesystemMediaStorage(root)
+
+    assert await storage.purge_stale_temp_files(3600) == 0
+    assert fresh.exists()
+
+
+@pytest.mark.asyncio
+async def test_purge_only_claims_files_with_our_prefix(tmp_path):
+    """The suffix alone is not enough. Matching every ``*.part`` would
+    make this a delete-anything sweep over a directory an operator can
+    reach."""
+    root = tmp_path / "media"
+    root.mkdir()
+    mine = _abandoned(root)
+    _backdate(mine, 7200)
+    for name in ("tmp1234.part", "notes.part", "notes.txt"):
+        theirs = root / name
+        theirs.write_bytes(b"not ours")
+        _backdate(theirs, 7200)
+    key = _key()
+    (root / key).write_bytes(b"a live object")
+    _backdate(root / key, 7200)
+
+    storage = FilesystemMediaStorage(root)
+
+    assert await storage.purge_stale_temp_files(3600) == 1
+    assert not mine.exists()
+    assert sorted(p.name for p in root.iterdir()) == sorted(
+        ["tmp1234.part", "notes.part", "notes.txt", key]
+    )
+
+
+@pytest.mark.asyncio
+async def test_purge_on_a_missing_root_is_zero(tmp_path):
+    """The hourly job runs on Telegram-only deployments, where nothing
+    has ever written to storage."""
+    storage = FilesystemMediaStorage(tmp_path / "never-created")
+
+    assert await storage.purge_stale_temp_files(3600) == 0
+
+
+@pytest.mark.asyncio
+async def test_purge_ignores_a_directory_named_like_a_temp_file(tmp_path):
+    root = tmp_path / "media"
+    root.mkdir()
+    os.mkdir(root / "betien-media-deadbeef.part")
+
+    storage = FilesystemMediaStorage(root)
+
+    assert await storage.purge_stale_temp_files(0) == 0
+    assert (root / "betien-media-deadbeef.part").is_dir()
+
+
+@pytest.mark.asyncio
+async def test_a_normal_write_survives_a_purge_with_no_grace(tmp_path):
+    """The prefix is what makes the two sweeps disjoint: pass 3 can run
+    with any grace period and still never touch a finished object."""
+    root = tmp_path / "media"
+    storage = FilesystemMediaStorage(root)
+    key = _key()
+    await storage.write(key, b"x" * 1024)
+
+    assert await storage.purge_stale_temp_files(0) == 0
+    assert await storage.read(key) == b"x" * 1024

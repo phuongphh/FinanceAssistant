@@ -60,6 +60,62 @@ _NOT_FOUND_DETAIL = "not found"
 
 _rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
+# The windows above are process-local state keyed by client IP, and this
+# is a public route whose key is partly caller-supplied — anyone can send
+# a fresh ``X-Forwarded-For`` on every request. Without eviction the dict
+# only ever grows, which turns a rate limiter into a memory leak with a
+# free trigger. Two bounds, in order:
+#
+#   * a window whose newest hit is older than the 60s sliding window can
+#     never affect a decision again, so it is dropped;
+#   * if that still leaves more than ``_MAX_TRACKED_IPS`` distinct
+#     clients inside one minute, the least recently active are dropped
+#     too. That hands a few callers a fresh allowance, which is the
+#     right trade: at that volume the real enforcement point is Caddy in
+#     front of us, and this backstop's job is to not fall over.
+_WINDOW_SECONDS = 60
+_MAX_TRACKED_IPS = 10_000
+_EVICT_INTERVAL_SECONDS = 5.0
+_last_evict = float("-inf")
+
+
+def _now() -> float:
+    """Indirection so tests can drive the clock without patching the
+    ``time`` module out from under the event loop."""
+    return time.monotonic()
+
+
+def _evict_stale(now: float) -> None:
+    """Drop windows that can no longer affect a decision.
+
+    Rate limited itself: sweeping the dict on every request would make
+    each request O(tracked IPs). Runs at most every
+    ``_EVICT_INTERVAL_SECONDS``, or immediately once the map is over its
+    cap — a flood must not be able to outrun the sweep by arriving
+    faster than the interval.
+    """
+    global _last_evict
+
+    over_cap = len(_rate_windows) > _MAX_TRACKED_IPS
+    if not over_cap and now - _last_evict < _EVICT_INTERVAL_SECONDS:
+        return
+    _last_evict = now
+
+    cutoff = now - _WINDOW_SECONDS
+    for ip in [
+        ip
+        for ip, window in _rate_windows.items()
+        if not window or window[-1] <= cutoff
+    ]:
+        del _rate_windows[ip]
+
+    overflow = len(_rate_windows) - _MAX_TRACKED_IPS
+    if overflow <= 0:
+        return
+    oldest = sorted(_rate_windows.items(), key=lambda item: item[1][-1])
+    for ip, _ in oldest[:overflow]:
+        del _rate_windows[ip]
+
 
 def _client_ip(request: Request) -> str:
     """Same derivation as the admin limiter in :mod:`backend.main` —
@@ -79,9 +135,10 @@ def _rate_limited(ip: str, limit_per_minute: int) -> bool:
     enforcement point; this is the backstop that holds in dev and during
     a proxy misconfiguration.
     """
-    now = time.monotonic()
+    now = _now()
+    _evict_stale(now)
     window = _rate_windows[ip]
-    cutoff = now - 60
+    cutoff = now - _WINDOW_SECONDS
     while window and window[0] <= cutoff:
         window.popleft()
     if len(window) >= limit_per_minute:

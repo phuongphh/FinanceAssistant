@@ -240,6 +240,102 @@ def test_rate_limit_response_says_nothing_about_the_token(wired):
 
 
 # ---------------------------------------------------------------------
+# Rate-limit bookkeeping — a public route may not grow a dict forever
+# ---------------------------------------------------------------------
+#
+# The window map is process-local state keyed by client IP, and the key
+# is partly caller-supplied: anyone can send a fresh ``X-Forwarded-For``
+# on every request. Without eviction the limiter is a memory leak with a
+# free trigger, so the eviction is tested directly rather than through
+# the endpoint — the endpoint cannot make a minute pass.
+
+
+@pytest.fixture()
+def clock(monkeypatch):
+    """Drive ``_now`` by hand.
+
+    A seam in the module rather than a patch of ``time.monotonic``:
+    replacing the real clock underneath a running event loop breaks
+    things that have nothing to do with this test.
+    """
+    now = {"t": 1000.0}
+    media_router._rate_windows.clear()
+    monkeypatch.setattr(media_router, "_now", lambda: now["t"])
+    monkeypatch.setattr(media_router, "_last_evict", float("-inf"))
+    yield now
+    media_router._rate_windows.clear()
+
+
+def test_idle_windows_are_dropped(clock):
+    """A window whose newest hit predates the sliding window can never
+    affect a decision again, so keeping it is pure leak."""
+    media_router._rate_limited("1.1.1.1", 100)
+    assert "1.1.1.1" in media_router._rate_windows
+
+    clock["t"] += media_router._WINDOW_SECONDS + 1
+    media_router._rate_limited("2.2.2.2", 100)
+
+    assert set(media_router._rate_windows) == {"2.2.2.2"}
+
+
+def test_eviction_never_forgets_an_active_limiter(clock):
+    """The leak fix must not become a way around the limit: a sweep that
+    dropped a window still inside its minute would hand the caller a
+    fresh allowance on demand."""
+    assert media_router._rate_limited("1.1.1.1", 2) is False
+    clock["t"] += 1
+    assert media_router._rate_limited("1.1.1.1", 2) is False
+
+    # Past the eviction interval, well inside the 60s window.
+    clock["t"] += media_router._EVICT_INTERVAL_SECONDS + 1
+
+    assert media_router._rate_limited("1.1.1.1", 2) is True
+
+
+def test_the_caller_being_counted_is_not_evicted_first(clock):
+    """Eviction runs before the caller's own window is fetched. The other
+    order would create the entry, sweep it away in the same call, and
+    silently stop counting anyone."""
+    for _ in range(3):
+        media_router._rate_limited("1.1.1.1", 100)
+        clock["t"] += media_router._EVICT_INTERVAL_SECONDS + 1
+
+    assert len(media_router._rate_windows["1.1.1.1"]) == 3
+
+
+def test_a_flood_of_distinct_ips_stays_bounded(clock, monkeypatch):
+    """Idle-dropping alone does not help when every window is fresh —
+    one client per forged header, all within the same minute. The cap is
+    what holds, and it must apply even faster than the sweep interval.
+    """
+    monkeypatch.setattr(media_router, "_MAX_TRACKED_IPS", 5)
+
+    for i in range(50):
+        media_router._rate_limited(f"10.0.0.{i}", 100)
+
+    # +1: eviction runs before the current caller's window is created.
+    assert len(media_router._rate_windows) <= media_router._MAX_TRACKED_IPS + 1
+
+
+def test_sweeping_is_not_run_on_every_request(clock):
+    """Sweeping per request would make each request O(tracked IPs) —
+    an unauthenticated route is the wrong place for that."""
+    media_router._rate_limited("1.1.1.1", 100)
+    clock["t"] += media_router._WINDOW_SECONDS + 1
+    media_router._rate_limited("2.2.2.2", 100)  # sweeps, drops 1.1.1.1
+
+    # A window can only go stale after a full minute, which is longer
+    # than the interval — so the interval is pinned here rather than
+    # waited out. 2.2.2.2 is now past its window and still survives,
+    # because no sweep ran.
+    clock["t"] += media_router._WINDOW_SECONDS + 1
+    media_router._last_evict = clock["t"]
+    media_router._rate_limited("3.3.3.3", 100)
+
+    assert set(media_router._rate_windows) == {"2.2.2.2", "3.3.3.3"}
+
+
+# ---------------------------------------------------------------------
 # Off by default
 # ---------------------------------------------------------------------
 

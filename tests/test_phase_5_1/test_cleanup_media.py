@@ -1,19 +1,24 @@
-"""Phase 5.1 #1.4 — the two-pass media sweep.
+"""Phase 5.1 #1.4 — the three-pass media sweep.
 
 The DoD lines under test: *"job xoá row hết hạn + file tương ứng; chạy
 hai lần liên tiếp không đổi gì; orphan sweep dọn file của một publish đã
 rollback; đếm row-driven và orphan riêng."*
 
-Two invariants carry the design and both are asserted rather than
+Three invariants carry the design and all three are asserted rather than
 described:
 
 * **Rows are committed before files are deleted.** The reverse ordering
   turns a failed commit into live rows pointing at nothing — a broken
   image for anyone still holding the URL. The current ordering fails the
   other way, and pass 2 self-heals that.
-* **Pass 2 only deletes what no row claims, and only after the grace
-  period.** A file written seconds ago may belong to a transaction that
-  has not committed yet; deleting it would break a request in flight.
+* **Pass 2 only deletes what no *live* row claims, and only after the
+  grace period.** A file written seconds ago may belong to a transaction
+  that has not committed yet; deleting it would break a request in
+  flight. A soft-deleted row does not protect its file — pass 1 will
+  never look at that row again, so pass 2 is the only thing that can
+  finish the job.
+* **Pass 3 reclaims half-written temp files**, which are invisible to
+  both passes above by construction.
 """
 
 from __future__ import annotations
@@ -197,20 +202,38 @@ async def test_orphan_sweep_respects_the_grace_period():
 
 
 @pytest.mark.asyncio
-async def test_orphan_sweep_leaves_files_a_row_claims():
-    """Including soft-deleted rows: pass 1 owns those files, and a
-    delete here would double-count them."""
+async def test_orphan_sweep_leaves_files_a_live_row_claims():
+    """A live row's file is off limits: its URL still works, and pass 1
+    will take the file when the row expires."""
     live = _row(expires_in=timedelta(minutes=10))
-    swept = _row(expires_in=timedelta(minutes=-30))
-    swept.deleted_at = datetime.now(timezone.utc)
-    db, storage = FakeMediaSession([live, swept]), InMemoryStorage()
-    await _seed(storage, live, swept)
-    old = datetime.now(timezone.utc) - timedelta(hours=2)
-    storage.age(live.storage_key, old)
-    storage.age(swept.storage_key, old)
+    db, storage = FakeMediaSession([live]), InMemoryStorage()
+    await _seed(storage, live)
+    storage.age(live.storage_key, datetime.now(timezone.utc) - timedelta(hours=2))
 
     assert await job._sweep_orphans(db, storage, grace_seconds=3600) == 0
-    assert len(storage.objects) == 2
+    assert live.storage_key in storage.objects
+
+
+@pytest.mark.asyncio
+async def test_orphan_sweep_collects_a_file_pass_1_failed_to_unlink():
+    """The self-healing case, and the reason pass 2 asks about live rows
+    only.
+
+    Pass 1 soft-deletes the row, commits, then unlinks — and its query
+    excludes soft-deleted rows forever after. So a ``storage.delete``
+    that failed (transient EIO, full disk, container killed between the
+    commit and the unlink) is never retried by pass 1. If a soft-deleted
+    row still counted as a claim, those private bytes would sit on disk
+    for good.
+    """
+    swept = _row(expires_in=timedelta(minutes=-30))
+    swept.deleted_at = datetime.now(timezone.utc)
+    db, storage = FakeMediaSession([swept]), InMemoryStorage()
+    await _seed(storage, swept)
+    storage.age(swept.storage_key, datetime.now(timezone.utc) - timedelta(hours=2))
+
+    assert await job._sweep_orphans(db, storage, grace_seconds=3600) == 1
+    assert storage.objects == {}
 
 
 @pytest.mark.asyncio
@@ -231,6 +254,44 @@ async def test_orphan_sweep_is_idempotent():
 
     assert await job._sweep_orphans(db, storage, grace_seconds=3600) == 1
     assert await job._sweep_orphans(db, storage, grace_seconds=3600) == 0
+
+
+# ---------------------------------------------------------------------
+# Pass 3 — half-written temp files
+# ---------------------------------------------------------------------
+
+
+class _PurgingStorage(InMemoryStorage):
+    """A backend that knows about its own temp files."""
+
+    def __init__(self, purged: int = 0) -> None:
+        super().__init__()
+        self.purged = purged
+        self.calls: list[int] = []
+
+    async def purge_stale_temp_files(self, older_than_seconds: int) -> int:
+        self.calls.append(older_than_seconds)
+        return self.purged
+
+
+@pytest.mark.asyncio
+async def test_temp_sweep_delegates_to_the_storage_backend():
+    storage = _PurgingStorage(purged=2)
+
+    assert await job._sweep_temp_files(storage, grace_seconds=3600) == 2
+    # Same grace period as the orphan sweep, for the same reason: a
+    # ``.part`` written seconds ago is a live write, not litter.
+    assert storage.calls == [3600]
+
+
+@pytest.mark.asyncio
+async def test_temp_sweep_is_a_no_op_on_a_backend_without_temp_files():
+    """Duck-typed rather than in the port: object storage has no
+    equivalent of a half-written file, and must not have to pretend."""
+    storage = InMemoryStorage()
+    assert not hasattr(storage, "purge_stale_temp_files")
+
+    assert await job._sweep_temp_files(storage, grace_seconds=3600) == 0
 
 
 # ---------------------------------------------------------------------
@@ -265,15 +326,16 @@ def _wire(monkeypatch, db, storage, *, grace_seconds=3600):
 
 
 @pytest.mark.asyncio
-async def test_cleanup_media_counts_the_two_passes_separately(monkeypatch):
+async def test_cleanup_media_counts_the_three_passes_separately(monkeypatch):
     """Summing them would hide the signal.
 
     ``expired_rows`` rising with traffic is healthy; ``orphan_files``
-    above zero means transactions are rolling back after publish, which
-    is a statement about upstream code, not about media.
+    above zero means transactions are rolling back after publish, and
+    ``temp_files`` above zero means a process is dying mid-write. All
+    three are statements about upstream code, not about media.
     """
     expired = _row(expires_in=timedelta(minutes=-1))
-    db, storage = FakeMediaSession([expired]), InMemoryStorage()
+    db, storage = FakeMediaSession([expired]), _PurgingStorage(purged=3)
     await _seed(storage, expired)
     orphan = uuid4().hex
     await storage.write(orphan, b"png")
@@ -285,6 +347,7 @@ async def test_cleanup_media_counts_the_two_passes_separately(monkeypatch):
     assert result.expired_rows == 1
     assert result.expired_files_deleted == 1
     assert result.orphan_files_deleted == 1
+    assert result.temp_files_deleted == 3
     assert storage.objects == {}
 
 
@@ -320,4 +383,5 @@ async def test_cleanup_media_on_a_quiet_system_is_two_empty_queries(
         result.expired_rows,
         result.expired_files_deleted,
         result.orphan_files_deleted,
-    ) == (0, 0, 0)
+        result.temp_files_deleted,
+    ) == (0, 0, 0, 0)

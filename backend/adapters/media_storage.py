@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,6 +36,15 @@ logger = logging.getLogger(__name__)
 
 # uuid4().hex — exactly what backend.services.media_url_service generates.
 _KEY_RE = re.compile(r"^[0-9a-f]{32}$")
+
+# Temp files carry our own prefix, not tempfile's default "tmp", so
+# ``purge_stale_temp_files`` can recognise a write *we* started and
+# abandoned without also claiming anything else in the directory that
+# happens to end in .part. mkstemp fills the middle with characters from
+# [A-Za-z0-9_].
+_TMP_PREFIX = "betien-media-"
+_TMP_SUFFIX = ".part"
+_TMP_RE = re.compile(r"^betien-media-[A-Za-z0-9_]+\.part$")
 
 
 class InvalidStorageKey(ValueError):
@@ -83,7 +93,9 @@ class FilesystemMediaStorage:
         # reader either sees no file or sees the whole thing — never the
         # first half of a chart. The rename is atomic because both paths
         # are on the same filesystem.
-        fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".part")
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(path.parent), prefix=_TMP_PREFIX, suffix=_TMP_SUFFIX
+        )
         try:
             with os.fdopen(fd, "wb") as fh:
                 fh.write(data)
@@ -91,7 +103,9 @@ class FilesystemMediaStorage:
         except BaseException:
             # Best effort: a stray .part file is invisible to list_keys
             # (it fails key validation) so it can't be mistaken for an
-            # orphaned object, but leaving it is still litter.
+            # orphaned object. This handles the raising case; a SIGKILL
+            # between mkstemp and os.replace runs nothing at all, and
+            # ``purge_stale_temp_files`` is what collects that one.
             try:
                 os.unlink(tmp_name)
             except OSError:
@@ -155,3 +169,57 @@ class FilesystemMediaStorage:
                 )
             )
         return found
+
+    # ------------------------------------------------------------------
+    # Filesystem-only maintenance — not part of the MediaStorage port
+    # ------------------------------------------------------------------
+
+    async def purge_stale_temp_files(self, older_than_seconds: int) -> int:
+        """Remove abandoned ``.part`` files older than the grace period.
+
+        ``_write_sync`` unlinks its temp file on any exception, so the
+        only way one survives is a process that stopped running between
+        ``mkstemp`` and ``os.replace`` — a SIGKILL, an OOM kill, a
+        container torn down mid-request. Those files hold real image
+        bytes, and nothing else reclaims them: no row ever pointed at
+        one, and ``list_keys`` deliberately refuses to report them so the
+        orphan sweep can't delete a write that is still in flight.
+
+        The same grace period as the orphan sweep, for the same reason —
+        a ``.part`` written seconds ago is a live write, not litter.
+
+        Deliberately absent from
+        :class:`~backend.ports.media_storage.MediaStorage`: temp files
+        exist because this backend writes to a filesystem. The cleanup
+        job duck-types the call so an object-storage backend simply has
+        nothing to purge.
+        """
+        return await asyncio.to_thread(
+            self._purge_temp_sync, self._root, older_than_seconds
+        )
+
+    @staticmethod
+    def _purge_temp_sync(root: Path, older_than_seconds: int) -> int:
+        if not root.is_dir():
+            return 0
+        cutoff = time.time() - older_than_seconds
+        removed = 0
+        for entry in root.iterdir():
+            # Our prefix, not just the suffix: a file an operator dropped
+            # here called "notes.part" is not ours to delete.
+            if not entry.is_file() or not _TMP_RE.match(entry.name):
+                continue
+            try:
+                if entry.stat().st_mtime > cutoff:
+                    continue
+                entry.unlink()
+            except OSError:
+                # Raced with another sweep, or the mount went away. The
+                # next hourly run tries again.
+                continue
+            removed += 1
+        if removed:
+            logger.warning(
+                "media-storage: removed %d abandoned temp file(s)", removed
+            )
+        return removed

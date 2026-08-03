@@ -156,8 +156,20 @@ class FakeMediaSession:
         if "media_objects.storage_key IN" in text:
             # cleanup_media._sweep_orphans — selects storage_key only, and
             # reads it through .scalars(), so the scalar list is strings.
+            # The ``deleted_at IS NULL`` filter is read off the compiled
+            # statement rather than applied unconditionally. Applying it
+            # regardless would make the fake enforce the semantics the
+            # production query is supposed to enforce — the test would
+            # then pass just as happily against a query missing the
+            # clause, which is the bug it exists to catch.
             wanted = set(params["storage_key_1"])
-            hits = [row for row in self.rows if row.storage_key in wanted]
+            live_only = "media_objects.deleted_at IS NULL" in text
+            hits = [
+                row
+                for row in self.rows
+                if row.storage_key in wanted
+                and (row.deleted_at is None or not live_only)
+            ]
             return _FakeResult(
                 rows=hits, scalars=[row.storage_key for row in hits]
             )
