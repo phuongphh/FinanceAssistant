@@ -27,6 +27,7 @@ from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import (
     admin_agent_metrics,
+    admin_zalo_quota,
     cashflow as cashflow_router,
     expenses,
     goals,
@@ -43,8 +44,12 @@ from backend.routers import (
 from backend.bot.setup_commands import setup_bot_commands
 from backend.bot.setup_menu_button import setup_chat_menu_button
 from backend.adapters.zalo_oa import close_client as close_zalo_client
+from backend.services.zalo_token_service import (
+    close_http_client as close_zalo_token_client,
+)
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
+from backend.workers import zalo_worker
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -108,6 +113,20 @@ async def lifespan(app: FastAPI):
     except Exception:
         # Sentry init failure must never block boot — log and proceed.
         logger.exception("Sentry init failed; continuing without telemetry")
+
+    # Phase 5.0 #1.2 — fail closed, deliberately NOT wrapped in try/except.
+    # An enabled Zalo channel with no secret to verify against means anyone
+    # who finds the webhook URL can write into a messaging channel. Refusing
+    # to boot is the only safe response; a degraded mode here is a silent
+    # auth bypass. Placed after Sentry init so the refusal is reported.
+    from backend.utils.zalo_signature import assert_startup_invariant
+
+    assert_startup_invariant(
+        channel_enabled=settings.zalo_channel_enabled,
+        oa_secret_key=settings.zalo_oa_secret_key,
+        app_id=settings.zalo_app_id,
+        app_secret=settings.zalo_app_secret,
+    )
 
     # Block until PostgreSQL is reachable. This prevents the race where
     # launchd boots the backend before Docker containers finish starting.
@@ -178,14 +197,32 @@ async def lifespan(app: FastAPI):
     # multiple uvicorn workers are safe to run it concurrently.
     recovery_task = asyncio.create_task(run_recovery_loop())
 
+    # Phase 5.0 #2.2 — the same story for zalo_updates. Gated on the
+    # channel flag: with Zalo off there is nothing writing to the table,
+    # so a loop querying it every 2 minutes would be pure noise. Kept as
+    # a separate task rather than folded into the Telegram loop so one
+    # channel's recovery stalling can never starve the other's.
+    zalo_recovery_task: asyncio.Task | None = None
+    if settings.zalo_channel_enabled:
+        try:
+            recovered = await zalo_worker.recover_orphaned_events()
+            if recovered:
+                logger.info("Re-enqueued %d orphaned Zalo events", recovered)
+        except Exception:
+            logger.exception("Zalo orphan recovery failed at startup; continuing")
+        zalo_recovery_task = asyncio.create_task(zalo_worker.run_recovery_loop())
+
     try:
         yield
     finally:
-        recovery_task.cancel()
-        try:
-            await recovery_task
-        except asyncio.CancelledError:
-            pass
+        for task in (recovery_task, zalo_recovery_task):
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     # Graceful shutdown: give in-flight background tasks a bounded window
     # to finish so we don't leave updates half-processed when uvicorn
@@ -213,6 +250,7 @@ async def lifespan(app: FastAPI):
 
     await close_telegram_client()
     await close_zalo_client()
+    await close_zalo_token_client()
 
     logger.info("Finance Assistant API shutting down")
 
@@ -319,6 +357,12 @@ app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")
 app.include_router(admin_agent_metrics.router, prefix="/api/v1")
+# Phase 5.0 #3.3 — mounted unconditionally, unlike the webhook above. It
+# sends nothing and reads no user surface; it is the instrument an
+# operator uses to decide whether to flip ZALO_CHANNEL_ENABLED, and to
+# read the aftermath once they have flipped it back off. See the module
+# docstring.
+app.include_router(admin_zalo_quota.router, prefix="/api/v1")
 app.include_router(admin_auth.router, prefix="/api/admin")
 app.include_router(admin_analytics.router, prefix="/api/admin")
 app.include_router(admin_audit.router, prefix="/api/admin")

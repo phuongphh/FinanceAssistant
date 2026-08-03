@@ -75,3 +75,59 @@ cashflow_alert:
 profile_status:
   linked: "🔗 Zalo: đã liên kết"
   not_linked: "🔗 Zalo: chưa liên kết (dùng /link_zalo)"
+
+# ---------------------------------------------------------------------------
+# Phase 5.0 #4.1 — thin slice trên Zalo.
+#
+# Zalo là kênh reactive-first: user nhắn trước, Bé Tiền trả lời. Ba việc
+# làm được ở 5.0: ghi thu chi, xem báo cáo ngắn, liên kết tài khoản.
+# Mọi thứ khác → fallback (lịch sự, không phải lỗi).
+#
+# Ràng buộc chữ: KHÔNG Markdown, không dùng * _ ~ [ ] ( ), ≤ 300 ký tự,
+# ≤ 2 emoji. Dấu phân cách dùng "·" hoặc "-".
+# ---------------------------------------------------------------------------
+
+# Thẻ xác nhận sau khi ghi một giao dịch. Bản Zalo của thẻ Telegram:
+# giữ nguyên con số, bỏ thanh tiến độ và nút bấm.
+capture:
+  expense: "✅ Đã ghi {merchant} {amount} · {category}"
+  money_in: "✅ Đã nhận {merchant} {amount} · {category}"
+  date_line: "Ngày giao dịch: {date}"
+  source_line: "Từ: {source}"
+  batch_header: "✅ Đã ghi {count} khoản · tổng {total}"
+  batch_item: "- {merchant} {amount}"
+  batch_more: "- và {count} khoản nữa"
+  edit_hint: "Muốn sửa hay xoá thì mở Bé Tiền trên Telegram nhé."
+
+# Báo cáo nhanh khi user hỏi "tháng này tiêu bao nhiêu".
+report_short:
+  spending: "Tháng {month} bạn đã chi {spent}."
+  spending_with_budget: "Tháng {month} bạn đã chi {spent} trên {budget}."
+  net_worth: "Tổng tài sản của bạn đang là {net_worth}."
+  empty: "Tháng này chưa có khoản chi nào được ghi. Nhắn cho Bé Tiền là xong nhé."
+
+# Intent nằm ngoài thin slice. Là lời mời, không phải báo lỗi.
+# Nested dưới "body" cho đồng bộ với cashflow_alert — loader chỉ đọc
+# section → key, không đọc string ở cấp cao nhất.
+fallback:
+  body: |-
+    Trên Zalo, Bé Tiền ghi thu chi và báo cáo nhanh thôi.
+    Việc khác bạn mở Bé Tiền trên Telegram giúp mình nhé 🙏
+  # Người chưa liên kết mà gõ linh tinh vẫn cần biết đường đi tiếp —
+  # dùng lại linking.token_invalid, không thêm copy mới.
+
+# Tài khoản bị admin tạm khoá (users.manual_status = suspended). Cùng
+# một hàng rào như bên Telegram, nhưng copy ở đây chứ không hardcode
+# trong code. Giọng Bé Tiền: nói rõ tình trạng, chỉ đường liên hệ,
+# không trách móc và không giải thích lý do khoá (Bé Tiền không biết).
+account:
+  suspended: |-
+    Tài khoản của bạn đang tạm khoá nên Bé Tiền chưa ghi nhận được.
+    Bạn nhắn admin@nuitruc.ai để mở lại giúp mình nhé 🙏
+
+# Zalo chỉ cho phép trả lời trong 48h sau tin nhắn cuối của user.
+# Dùng khi user quay lại sau khi Bé Tiền phải nuốt một tin nhắn chủ động.
+window_closed:
+  body: |-
+    Bé Tiền có vài điều muốn báo mà Zalo chỉ cho nhắn trong 48h nên chưa gửi kịp.
+    Bạn nhắn "báo cáo" là mình kể ngay nhé.

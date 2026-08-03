@@ -16,13 +16,14 @@ whole platform.
 This module sits in ``services/`` (not ``ports/``) because resolving
 the list is product logic; the port stays a single-channel transport.
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-from backend.adapters.zalo_notifier import ZaloNotifier
 from backend.adapters.zalo_oa import get_zalo_oa_client
+from backend.adapters.zalo_window_notifier import build_zalo_notifier
 from backend.models.user import User
 from backend.ports.notifier import Notifier, get_notifier
 
@@ -51,6 +52,14 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
     Zalo is appended when the user has linked their Zalo account AND
     the OA access token is configured on the server (so we don't
     enqueue sends that will immediately fail).
+
+    The Zalo notifier comes from :func:`build_zalo_notifier`, so it
+    carries the 48h-window / 8-message ceiling with it. Resolution stays
+    synchronous on purpose: the quota is claimed at send time, inside
+    the notifier, not here. Deciding here would put an ``await`` between
+    the check and the send — the exact race the phase doc rules out —
+    and would make one channel's storage cost the other channel's
+    latency.
     """
     targets: list[ChannelTarget] = [
         ChannelTarget(
@@ -62,20 +71,30 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
 
     if user.zalo_user_id:
         zalo_client = get_zalo_oa_client()
-        if zalo_client.is_configured:
+        if not zalo_client.is_send_enabled:
+            # The documented rollback is "flip ZALO_CHANNEL_ENABLED=false
+            # and restart". Credentials survive that flip on purpose (the
+            # admin quota diagnostics need them), so the flag has to be
+            # read here as well — otherwise a leftover legacy
+            # ZALO_OA_ACCESS_TOKEN keeps proactive fan-outs delivering to
+            # a channel the operator believes is off.
+            logger.debug(
+                "User %s has zalo_user_id but ZALO_CHANNEL_ENABLED is false — "
+                "skipping Zalo channel",
+                user.id,
+            )
+        elif zalo_client.is_configured:
             targets.append(
                 ChannelTarget(
                     channel="zalo",
-                    notifier=ZaloNotifier(
-                        client=zalo_client, zalo_user_id=user.zalo_user_id
-                    ),
+                    notifier=build_zalo_notifier(user.zalo_user_id, client=zalo_client),
                     target_id=user.zalo_user_id,
                 )
             )
         else:
             logger.warning(
-                "User %s has zalo_user_id but ZALO_OA_ACCESS_TOKEN not set — "
-                "skipping Zalo channel",
+                "User %s has zalo_user_id but no Zalo OA credential is "
+                "available — skipping Zalo channel",
                 user.id,
             )
 

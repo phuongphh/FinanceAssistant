@@ -105,13 +105,25 @@ class Settings(BaseSettings):
     # Provisioned manually by ops; empty in dev/CI degrades gracefully — the
     # adapter returns False on send and linking flows surface a friendly
     # "not configured" message instead of raising.
+    # Legacy static token (Phase 4B). Phase 5.0 stores the live token in
+    # ``zalo_oa_credentials`` and refreshes it hourly; this is only the
+    # fallback used when no credential row has been seeded yet.
     zalo_oa_access_token: str = ""
-    zalo_oa_secret_key: str = ""  # Used to verify webhook X-ZEvent-Signature
+    zalo_oa_secret_key: str = ""  # Trailing component of the webhook MAC
     zalo_app_id: str = ""
+    # App secret — sent as the ``secret_key`` header on token refresh.
+    # Distinct from ``zalo_oa_secret_key`` (webhook MAC); Zalo issues two.
+    zalo_app_secret: str = ""
+    # Phase 5.0 #1.2 — signature soak switch. False verifies and logs the
+    # verdict WITHOUT rejecting, so the MAC formula can be confirmed
+    # against live traffic before it starts 403-ing real users. Never
+    # leave this false past the soak; see
+    # docs/conventions/zalo-operations.md#signature-soak-rollout
+    zalo_signature_enforce: bool = True
     # Phase 4.1 channel-discipline gate. The Zalo OA adapter is fully wired
     # (Phase 4B) but DISABLED for the 50-user Telegram-only soft launch so
     # we measure one channel cleanly. Operator flips this to True at the
-    # start of Phase 5.1 (Zalo rollout).
+    # start of Phase 5.0 (Zalo rollout).
     zalo_channel_enabled: bool = False
 
     # Market data

@@ -21,11 +21,21 @@ import re
 from typing import Any
 
 from backend.adapters.zalo_oa import ZaloOAClient
+from backend.utils.zalo_limits import ZALO_MESSAGE_MAX_CHARS
 
 logger = logging.getLogger(__name__)
 
-# Practical display limit. Spec: 300 chars (Story #439).
-ZALO_MESSAGE_MAX_CHARS = 300
+# Practical display limit. Spec: 300 chars (Story #439). Defined in
+# ``backend.utils.zalo_limits`` and re-exported here: this module
+# *enforces* it, but the Zalo formatters need the same number to compose
+# within it, and they must not import this adapter (see that module).
+__all__ = [
+    "ZALO_MESSAGE_MAX_CHARS",
+    "ZaloNotifier",
+    "strip_markdown",
+    "truncate_for_zalo",
+    "unwrap_button_spans",
+]
 
 # Markdown/HTML strippers — order matters: HTML tags first so we don't
 # leave dangling angle-brackets; then markdown emphasis; then collapse
@@ -43,6 +53,11 @@ _MD_EMPHASIS_RE = re.compile(r"(\*\*|__|\*|_|~~)")
 _TG_ESCAPE_RE = re.compile(r"\\([_*\[\]\(\)~`>#+\-=|{}.!])")
 # Repeated whitespace.
 _WS_RE = re.compile(r"[ \t]{2,}")
+# A bare ``[Xem chi tiết]`` span — how the shared Telegram copy marks up an
+# inline button. Deliberately *not* folded into ``strip_markdown``: that
+# function is the Markdown/HTML translator, and a bare bracket span is not
+# markup, it is a Telegram affordance that Zalo has no equivalent for.
+_BUTTON_SPAN_RE = re.compile(r"\[([^\[\]\n]+)\]")
 
 
 def strip_markdown(text: str) -> str:
@@ -76,6 +91,40 @@ def strip_markdown(text: str) -> str:
     return cleaned.strip()
 
 
+def unwrap_button_spans(text: str) -> str:
+    """Turn ``[Label]`` inline-button markup into plain words.
+
+    Zalo OA has no inline keyboard in 5.0, so a surviving bracket span
+    reads as a control the user will try to tap and nothing will happen.
+    Unwrap rather than delete: the label often carries the only verb in
+    the sentence (``[Xem báo cáo]`` → ``Xem báo cáo``), so removing the
+    span outright can leave a dangling line.
+
+    **Run this after :func:`strip_markdown`, never before.** A Markdown
+    link is ``[label](url)`` — unwrapping its brackets first destroys the
+    shape ``strip_markdown`` matches on, and the URL then survives into
+    the bubble as ``label(https://…)``.
+
+    Whitespace policy is left to the caller: the inbound handler collapses
+    the gap two adjacent buttons leave behind, while a briefing keeps its
+    paragraph breaks.
+    """
+    if not text:
+        return ""
+    # Repeat to a fixed point. One pass turns "[[A]]" into "[A]" — the
+    # inner span matches, the outer pair is left orphaned — and shipping a
+    # bracket is the exact thing this function exists to prevent. Each
+    # pass removes at least two characters, so this terminates; in the
+    # ordinary no-nesting case it costs one extra regex scan and makes the
+    # function idempotent, which both callers rely on since the notifier
+    # sanitises again downstream.
+    while True:
+        unwrapped = _BUTTON_SPAN_RE.sub(r"\1", text)
+        if unwrapped == text:
+            return text
+        text = unwrapped
+
+
 def truncate_for_zalo(text: str, limit: int = ZALO_MESSAGE_MAX_CHARS) -> str:
     """Cap message length at ``limit`` chars. Adds an ellipsis when
     truncation happens so the user knows the message was clipped."""
@@ -101,6 +150,18 @@ class ZaloNotifier:
         self._client = client
         self._zalo_user_id = zalo_user_id
 
+    @property
+    def is_configured(self) -> bool:
+        """Whether this server has any credential to send with.
+
+        Forwarded from the client so callers holding only a notifier —
+        :class:`~backend.adapters.zalo_window_notifier.WindowedZaloNotifier`
+        does — can skip work that is certain to fail. Optimistic, like the
+        client's own: it says a token *can be obtained*, not that Zalo will
+        accept it.
+        """
+        return self._client.is_configured
+
     async def send_message(
         self,
         chat_id: int,  # noqa: ARG002 — Notifier port signature
@@ -113,7 +174,18 @@ class ZaloNotifier:
         """Send a plain-text message to the bound Zalo user.
 
         Returns a minimal dict on success (so callers can branch on
-        truthiness like the Telegram path) or ``None`` on failure.
+        truthiness like the Telegram path) or ``None`` when the request
+        never reached Zalo.
+
+        :class:`~backend.adapters.zalo_oa.ZaloSendRejected` is allowed to
+        propagate rather than being collapsed into ``None``: only the
+        window notifier that wraps this one can act on the distinction
+        (refund the reserved slot vs. keep it), and swallowing it here
+        would throw that information away one layer too early. The
+        ``Notifier`` port's "implementations do not raise" contract still
+        holds for callers, because :func:`~backend.adapters.
+        zalo_window_notifier.build_zalo_notifier` is the only sanctioned
+        way to construct a Zalo notifier and it always wraps.
         """
         plain = strip_markdown(text)
         body = truncate_for_zalo(plain)
