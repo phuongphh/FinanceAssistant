@@ -70,7 +70,13 @@ WRITE_INTENTS = frozenset(
 # Wizard-launching action intents and navigation intents send their own
 # Telegram messages (rich keyboards, WebApp buttons). Returning "" tells
 # the dispatcher to skip the personality wrap + duplicate send.
-_WIZARD_LAUNCHING_INTENTS = frozenset(
+#
+# Public since Phase 5.1 #4.1: "sends its own Telegram message" is exactly
+# the property a non-Telegram channel needs to test for before routing an
+# intent here, and re-listing these six by hand elsewhere would rot the
+# moment a seventh is added. The set itself stays channel-neutral — it
+# describes the handlers, not who is asking.
+WIZARD_LAUNCHING_INTENTS = frozenset(
     {
         IntentType.ACTION_ADD_ASSET,
         IntentType.ACTION_EDIT_ASSET,
@@ -109,6 +115,45 @@ _SKIP_PERSONALITY_INTENTS = frozenset(
         IntentType.NAV_EXPENSE_DASHBOARD,
     }
 )
+
+
+def persists_flow_state(result: IntentResult) -> bool:
+    """Would dispatching ``result`` write multi-turn flow state to the DB?
+
+    Two branches of :meth:`IntentDispatcher.dispatch` persist state that
+    only ``free_form_text`` knows how to consume — ``set_pending_action``
+    (the confirm branch) and ``set_awaiting_clarification`` (the clarify
+    branch). A caller that cannot complete that follow-up turn needs to
+    know *before* dispatching, because after the write it is too late.
+
+    Deliberately channel-neutral: it answers a question about the
+    dispatcher's own policy, and mirrors the branch conditions in
+    ``dispatch`` line for line rather than restating them loosely. Keep
+    the two in sync — the parity suite asserts they agree.
+    """
+    # Meta intents short-circuit the confidence policy entirely.
+    if result.intent == IntentType.OUT_OF_SCOPE:
+        return False
+    if result.intent in (IntentType.GREETING, IntentType.HELP):
+        return False
+
+    if result.confidence < CONFIRM_THRESHOLD or result.intent == IntentType.UNCLEAR:
+        # ``_build_clarification`` answers from a static template — and
+        # persists nothing — only for genuinely unparsed input.
+        return not (result.intent == IntentType.UNCLEAR or result.confidence == 0.0)
+
+    if result.confidence < EXECUTE_THRESHOLD:
+        # The confirm branch. ``ACTION_RECORD_SAVING`` without an amount is
+        # re-routed to ``_build_clarification``, but at this confidence that
+        # path persists too — so the answer is the same either way.
+        return (
+            result.intent in WRITE_INTENTS
+            and result.intent != IntentType.ACTION_QUICK_TRANSACTION
+            and result.intent not in WIZARD_LAUNCHING_INTENTS
+        )
+
+    # Execute — handlers act now and answer now.
+    return False
 
 
 # Outcome kinds — string constants so analytics + tests stay decoupled
@@ -189,7 +234,7 @@ class IntentDispatcher:
             if (
                 result.intent in WRITE_INTENTS
                 and result.intent != IntentType.ACTION_QUICK_TRANSACTION
-                and result.intent not in _WIZARD_LAUNCHING_INTENTS
+                and result.intent not in WIZARD_LAUNCHING_INTENTS
             ):
                 return await self._build_confirmation(result, user, db)
             # Read intents, ACTION_QUICK_TRANSACTION, and wizard-launching
@@ -524,5 +569,7 @@ __all__ = [
     "OUTCOME_OUT_OF_SCOPE",
     "OUTCOME_UNCLEAR",
     "READ_INTENTS",
+    "WIZARD_LAUNCHING_INTENTS",
     "WRITE_INTENTS",
+    "persists_flow_state",
 ]

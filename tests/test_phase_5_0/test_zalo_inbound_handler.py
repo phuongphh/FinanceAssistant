@@ -5,13 +5,19 @@ One branch per message, and each branch has a user-visible consequence:
 * a pasted ``BT-XXXXXX`` code links the account and confirms on *both*
   channels (the code was issued in Telegram — the loop closes where the
   user started it);
-* a linked sender gets their message classified and answered — inside the
-  thin slice for real, outside it with an invitation to Telegram;
+* a linked sender gets their message classified and answered — dispatched
+  for real, or answered with the fallback that names *why* not;
 * an unlinked sender gets the linking nudge rather than a dead end.
 
 Also pins the things that must never happen: no ``db.commit()`` from the
 handler (the worker owns the boundary), no token, sender id or message
-text in the logs, and no dispatch of an intent the thin slice excludes.
+text in the logs, and no dispatch of an intent that would leave Telegram
+flow state armed behind it.
+
+Phase 5.1 #4.1 replaced the seven-intent whitelist these tests were
+written against with a two-class blocklist. The routing assertions moved
+with it; everything else (linking, suspension, markup flattening,
+telemetry hygiene) is unchanged and still lives here.
 """
 
 from __future__ import annotations
@@ -25,11 +31,11 @@ from backend.bot.handlers import zalo_inbound
 from backend.intent.dispatcher import (
     CONFIRM_THRESHOLD,
     OUTCOME_EXECUTED,
+    WIZARD_LAUNCHING_INTENTS,
     WRITE_INTENTS,
     DispatchOutcome,
-    _WIZARD_LAUNCHING_INTENTS,
 )
-from backend.intent.intents import IntentType
+from backend.intent.intents import CLASSIFIER_RULE, IntentResult, IntentType
 from backend.services.user_status import STATUS_ACTIVE, STATUS_SUSPENDED
 from backend.services.zalo_linking_service import LinkRedemption
 from backend.utils import zalo_copy
@@ -37,6 +43,17 @@ from backend.utils.zalo_events import ZaloEvent
 
 SENDER_ID = "zalo-sender-should-never-be-logged"
 TOKEN = "BT-ABC234"
+
+
+def _result(intent: IntentType, confidence: float) -> IntentResult:
+    """A classification result, for the checks that call the routing
+    predicate directly instead of driving a whole message through."""
+    return IntentResult(
+        intent=intent,
+        confidence=confidence,
+        raw_text="",
+        classifier_used=CLASSIFIER_RULE,
+    )
 
 
 def _event(
@@ -397,7 +414,7 @@ async def test_suspension_notice_never_names_the_sender_or_the_reason(
 
 
 # --------------------------------------------------------------------------
-# Thin-slice dispatch (#2.3)
+# Dispatch (#2.3, widened to every intent in #4.1)
 # --------------------------------------------------------------------------
 
 
@@ -410,7 +427,7 @@ async def _dispatch(monkeypatch, text: str = "ăn trưa 50k"):
 
 
 @pytest.mark.asyncio
-async def test_in_slice_message_is_dispatched_and_its_answer_sent(
+async def test_a_served_message_is_dispatched_and_its_answer_sent(
     monkeypatch, zalo_out, install_intent_stack
 ):
     pipeline, dispatcher = install_intent_stack(
@@ -456,12 +473,17 @@ async def test_self_sending_handler_is_not_echoed(
 
 
 @pytest.mark.asyncio
-async def test_out_of_slice_intent_never_reaches_the_dispatcher(
+async def test_a_wizard_intent_never_reaches_the_dispatcher(
     monkeypatch, zalo_out, install_intent_stack
 ):
-    """The whitelist is checked *before* dispatch, so an out-of-slice
-    intent costs no handler run and — the point — can have no side
-    effects."""
+    """A wizard handler pushes a Telegram keyboard and returns ``""``.
+    Run from Zalo it would answer the wrong channel — or, for a Zalo-only
+    account since #4.2, send to ``chat_id=None``. The check runs *before*
+    dispatch, so it costs no handler run and can have no side effects.
+
+    High confidence on purpose: this is the wizard rule firing on its own,
+    not the flow-state rule catching it on the way past.
+    """
     _, dispatcher = install_intent_stack(
         intent=IntentType.ACTION_ADD_ASSET, confidence=0.99
     )
@@ -469,7 +491,7 @@ async def test_out_of_slice_intent_never_reaches_the_dispatcher(
     await _dispatch(monkeypatch, "thêm tài sản nhà 3 tỷ")
 
     assert dispatcher.calls == []
-    assert zalo_out.sent == [(0, zalo_copy.text("fallback", "body"))]
+    assert zalo_out.sent == [(0, zalo_copy.text("fallback", "unsupported"))]
 
 
 @pytest.mark.asyncio
@@ -478,7 +500,8 @@ async def test_low_confidence_short_circuits_before_the_dispatcher(
 ):
     """Below ``CONFIRM_THRESHOLD`` the dispatcher would persist Telegram
     flow state that only ``free_form_text`` can consume — a Zalo message
-    must never arm it."""
+    must never arm it, or the user gets ambushed by a reply to a question
+    they were asked on another channel."""
     _, dispatcher = install_intent_stack(
         intent=IntentType.QUERY_EXPENSES, confidence=CONFIRM_THRESHOLD - 0.01
     )
@@ -486,16 +509,34 @@ async def test_low_confidence_short_circuits_before_the_dispatcher(
     await _dispatch(monkeypatch, "ừm")
 
     assert dispatcher.calls == []
-    assert zalo_out.sent == [(0, zalo_copy.text("fallback", "body"))]
+    assert zalo_out.sent == [(0, zalo_copy.text("fallback", "unclear"))]
+
+
+@pytest.mark.asyncio
+async def test_a_medium_confidence_write_intent_is_held_back(
+    monkeypatch, zalo_out, install_intent_stack
+):
+    """The other half of the flow-state rule, and the one a threshold
+    check alone would miss: above ``CONFIRM_THRESHOLD`` but below execute,
+    a write intent takes the dispatcher's *confirm* branch, which calls
+    ``set_pending_action``. Also on Zalo's side of the wall."""
+    _, dispatcher = install_intent_stack(
+        intent=IntentType.ACTION_RECORD_SAVING, confidence=CONFIRM_THRESHOLD + 0.01
+    )
+
+    await _dispatch(monkeypatch, "để dành 2 triệu")
+
+    assert dispatcher.calls == []
+    assert zalo_out.sent == [(0, zalo_copy.text("fallback", "unclear"))]
 
 
 @pytest.mark.asyncio
 async def test_exactly_at_the_threshold_still_dispatches(
     monkeypatch, zalo_out, install_intent_stack
 ):
-    """Boundary pinned explicitly: ``>=``, not ``>``. The dispatcher's own
-    confirm branch uses the same comparison, so an off-by-one here would
-    silently shrink the slice."""
+    """Boundary pinned explicitly: ``>=``, not ``>``. A read intent at
+    exactly ``CONFIRM_THRESHOLD`` executes rather than clarifying, so it
+    persists nothing and Zalo can serve it."""
     _, dispatcher = install_intent_stack(
         intent=IntentType.QUERY_EXPENSES, confidence=CONFIRM_THRESHOLD
     )
@@ -604,27 +645,53 @@ async def test_dispatch_telemetry_never_carries_the_message_or_sender(
     assert SENDER_ID not in str(properties)
 
 
-def test_the_whitelist_cannot_arm_telegram_flow_state():
-    """The invariant behind the whitelist, asserted against the
-    dispatcher's own tables rather than restated by hand.
+def test_nothing_that_arms_telegram_flow_state_is_served():
+    """The invariant the whitelist used to enforce, now asserted directly
+    against the blocklist for *every* intent rather than for the seven
+    that happened to be listed.
 
-    Every whitelisted intent must be one the dispatcher *executes* at
-    ``CONFIRM_THRESHOLD``: no confirm branch (which persists a pending
-    action), no wizard (which persists a multi-step Telegram state).
-    Adding an intent that breaks either property fails here.
+    The two dangerous classes are the confirm branch (``set_pending_action``)
+    and the clarify branch (``set_awaiting_clarification``). Both are
+    ``free_form_text``'s to consume, so both must come back unserved.
     """
     confirm_requiring = (
         WRITE_INTENTS
         - {IntentType.ACTION_QUICK_TRANSACTION}
-        - set(_WIZARD_LAUNCHING_INTENTS)
+        - set(WIZARD_LAUNCHING_INTENTS)
     )
-    offenders = zalo_inbound.ZALO_SUPPORTED_INTENTS & confirm_requiring
-    assert not offenders, f"would persist a pending action on Zalo: {offenders}"
+    for intent in confirm_requiring:
+        result = _result(intent, CONFIRM_THRESHOLD + 0.01)
+        assert zalo_inbound._unserved_reason(result) is not None, (
+            f"would persist a pending action on Zalo: {intent}"
+        )
 
-    wizards = zalo_inbound.ZALO_SUPPORTED_INTENTS & set(_WIZARD_LAUNCHING_INTENTS)
-    assert not wizards, f"would launch a Telegram-only wizard on Zalo: {wizards}"
+    for intent in WIZARD_LAUNCHING_INTENTS:
+        result = _result(intent, 0.99)
+        assert zalo_inbound._unserved_reason(result) == zalo_inbound.REASON_WIZARD, (
+            f"would launch a Telegram-only wizard on Zalo: {intent}"
+        )
 
-    assert IntentType.UNCLEAR not in zalo_inbound.ZALO_SUPPORTED_INTENTS
+    # The one low-confidence case that *is* served, and deliberately so:
+    # ``UNCLEAR`` has no original intent to come back to, so the dispatcher
+    # answers from a static template and persists nothing. Holding it back
+    # would swap Bé Tiền's own "chưa hiểu ý bạn" for the generic fallback
+    # — strictly worse copy for no safety gained.
+    unclear = _result(IntentType.UNCLEAR, 0.99)
+    assert zalo_inbound._unserved_reason(unclear) is None
+
+
+def test_every_unserved_reason_has_its_own_copy():
+    """A reason with no entry in the map would raise ``KeyError`` mid-send
+    and leave the user with silence — the one outcome the fallback exists
+    to prevent. Copy itself is checked by the zalo.yaml scanners."""
+    reasons = {
+        zalo_inbound.REASON_WIZARD,
+        zalo_inbound.REASON_FLOW_STATE,
+        zalo_inbound.REASON_ERROR,
+    }
+    assert set(zalo_inbound._REASON_COPY) == reasons
+    for key in zalo_inbound._REASON_COPY.values():
+        assert zalo_copy.text("fallback", key).strip()
 
 
 # --------------------------------------------------------------------------
