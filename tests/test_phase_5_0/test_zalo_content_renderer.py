@@ -274,7 +274,9 @@ def test_the_budget_is_measured_after_markup_is_stripped():
 
 
 def test_the_limit_is_a_parameter_so_callers_with_less_room_can_say_so():
-    # The image-caption path on Zalo is capped at 100, not 300.
+    # No caller enforces 100 any more — the image caption rides in
+    # ``message.text`` and gets the full 300 (Phase 5.1 #2.4). The point
+    # here is only that ``limit`` is honoured when a caller passes one.
     fitted = fit_briefing_text("Tháng 8 bạn chi 3tr. " * 20, limit=100)
 
     assert len(fitted) <= 100

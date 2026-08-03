@@ -87,7 +87,9 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
             targets.append(
                 ChannelTarget(
                     channel="zalo",
-                    notifier=build_zalo_notifier(user.zalo_user_id, client=zalo_client),
+                    notifier=build_zalo_notifier(
+                        user.zalo_user_id, client=zalo_client, user_id=user.id
+                    ),
                     target_id=user.zalo_user_id,
                 )
             )
