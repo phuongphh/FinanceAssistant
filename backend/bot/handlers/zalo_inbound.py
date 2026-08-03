@@ -11,9 +11,12 @@ Exactly one branch per inbound message:
 
 * the text carries a ``BT-XXXXXX`` code → redeem it and confirm on both
   channels (Phase 4B behaviour, moved here unchanged);
-* the sender is already linked → classify the message and dispatch it
+* the sender is already linked → let onboarding answer first if it is
+  still running (#4.3), otherwise classify the message and dispatch it
   through the shared intent stack (#2.3);
-* otherwise → the linking nudge.
+* otherwise → the sender is new: mint the account and start onboarding
+  right here (#4.3). The OA is a signup channel now, so "no link and no
+  token" means *starting*, not *failing*.
 
 From whitelist to blocklist (#4.1)
 ----------------------------------
@@ -70,6 +73,7 @@ from backend.adapters.zalo_window_notifier import (
     build_zalo_notifier,
 )
 from backend.bot.channel_context import CHANNEL_ZALO
+from backend.bot.handlers import zalo_onboarding
 from backend.intent.dispatcher import WIZARD_LAUNCHING_INTENTS, persists_flow_state
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
@@ -162,12 +166,25 @@ async def handle_inbound_event(db: AsyncSession, *, event: ZaloEvent) -> UUID | 
             fallback_user_id=linked.id if linked else None,
         )
 
-    if linked is not None:
-        await _dispatch_intent(db, notifier=notifier, user=linked, text=event.text)
+    if linked is None:
+        # Phase 5.1 #4.3 — the OA is a signup channel now. A stranger who
+        # isn't holding a token is starting, not failing: mint the account
+        # and greet them instead of answering "mã không hợp lệ" to someone
+        # who never typed a code.
+        created = await zalo_onboarding.start_new_user(
+            db, notifier=notifier, zalo_user_id=event.sender_id
+        )
+        return created.id if created is not None else None
+
+    # Onboarding gets first refusal on the text; it returns False the
+    # moment the user has finished, and dispatch proceeds as before.
+    if await zalo_onboarding.handle_text(
+        db, notifier=notifier, user=linked, text=event.text
+    ):
         return linked.id
 
-    await notifier.send_message(0, linking_copy("token_invalid"))
-    return None
+    await _dispatch_intent(db, notifier=notifier, user=linked, text=event.text)
+    return linked.id
 
 
 async def _reject_suspended(

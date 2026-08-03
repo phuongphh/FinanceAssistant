@@ -224,9 +224,27 @@ asset_entry:
 onboarding:
   welcome: "Chào {salutation} 👋 Bé Tiền là người đồng hành quản lý tài sản, nhắn gì Bé Tiền cũng ghi được."
   ask_name: "Bé Tiền gọi {salutation} là gì cho thân nhé?"
+  name_invalid: "Tên hơi dài hoặc Bé Tiền chưa đọc được. {Salutation} nhắn lại tên ngắn thôi nhé."
   ask_salutation: "Bé Tiền nên xưng hô thế nào ạ? Nhắn anh, chị hoặc bạn là được."
+  salutation_invalid: "Bé Tiền chưa rõ ạ. {Salutation} nhắn anh, chị hoặc bạn giúp Bé Tiền nhé."
   ask_goal: "{Salutation} đang muốn tiền của mình phục vụ điều gì trước nhất?"
+  goal_invalid: "Bé Tiền chưa rõ ạ. {Salutation} nhắn lại đúng một trong các lựa chọn trên nhé."
+  # Nhãn nút xác nhận thẻ cam kết riêng tư (nội dung lấy từ
+  # content/onboarding/trust_card.yaml để hai kênh không lệch lời hứa).
+  trust_ok_label: "OK, Bé Tiền đi tiếp"
   ask_asset: "Giờ {salutation} cho Bé Tiền biết đang có khoảng bao nhiêu tài sản nhé."
+  asset_invalid: "Bé Tiền chưa hiểu con số đó. {Salutation} nhắn kiểu 200tr hoặc 1.5 tỷ giúp Bé Tiền nhé."
+  asset_too_small: "Số này nhỏ hơn 1 triệu, chắc {salutation} gõ nhầm rồi. Nhắn lại giúp Bé Tiền nhé."
+  asset_too_large: "Số này lớn quá, {salutation} kiểm tra lại giúp Bé Tiền nhé."
+  asset_ack: "Bé Tiền ghi rồi ạ. Để Bé Tiền vẽ Twin cho {salutation} xem nhé."
+  # Lối thoát khi user chưa muốn nói số thật — dùng số mẫu để xem trước.
+  asset_demo_label: "Để Bé Tiền dùng số mẫu trước"
+  asset_demo_note: "Đây là Twin mẫu với số giả định, không phải tài sản thật của {salutation} đâu ạ."
+  twin_failed: "Bé Tiền chưa vẽ được Twin lúc này. {Salutation} nhắn 'xem twin' sau ít phút nhé."
   done: "Xong rồi ạ. Từ giờ {salutation} nhắn thu chi là Bé Tiền ghi ngay."
-  # Lời mời sang Telegram chỉ gửi đúng một lần, không nhắc lại.
-  telegram_invite: "Bé Tiền còn biểu đồ và báo cáo đầy đủ bên Telegram: {url}. Bé Tiền nhắn một lần thôi, không nhắc lại đâu ạ."
+  # Lời mời sang Telegram chỉ gửi đúng một lần, không nhắc lại. Nói thật lý
+  # do: Zalo chỉ cho Bé Tiền nhắn lại khi user vừa nhắn trước.
+  telegram_invite: "Bé Tiền chỉ nhắn lại được khi {salutation} nhắn trước, nên lúc {salutation} bận Bé Tiền không nhắc được. Bên Telegram thì Bé Tiền nhắc được ạ. Bé Tiền hỏi một lần thôi."
+  telegram_invite_accept_label: "Mở Telegram"
+  telegram_invite_decline_label: "Thôi, cứ ở Zalo"
+  telegram_invite_declined: "Dạ được ạ, mình cứ ở Zalo. Bé Tiền không nhắc lại nữa đâu."

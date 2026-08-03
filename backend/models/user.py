@@ -119,6 +119,27 @@ class User(Base):
         DateTime(timezone=True)
     )
 
+    # Phase 5.1 E4 #4.3 — the one-time "come to Telegram too" invitation a
+    # Zalo-first user is shown at the end of onboarding. Two columns rather
+    # than one because they answer different questions and only one of them
+    # gates the send:
+    #
+    #   ``_at``       NULL → never invited. This alone is the "at most once"
+    #                 gate, so an invitation the user ignored is still never
+    #                 repeated — silence is an answer.
+    #   ``_response`` what they chose ("declined"), or NULL while unanswered.
+    #                 Recorded because the spec asks us to remember the
+    #                 choice, and because "declined" and "ignored" mean
+    #                 different things to anyone reading this row later.
+    #
+    # Accepting leaves no mark here: the accept path is a URL button that
+    # opens Telegram, so the acceptance shows up as a Telegram id, not as a
+    # message coming back to Zalo.
+    zalo_telegram_invite_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    zalo_telegram_invite_response: Mapped[str | None] = mapped_column(String(20))
+
     @property
     def is_onboarded(self) -> bool:
         """True once the user has either finished or explicitly skipped."""

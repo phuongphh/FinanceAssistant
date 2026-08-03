@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     owner_telegram_id: str = ""
     # Optional Telegram custom emoji id for the animated sunrise in morning briefings.
     telegram_morning_custom_emoji_id: str = ""
+    # Phase 5.1 #4.3 — public deep link to the bot ("https://t.me/<bot>"),
+    # used for the one-time invitation a Zalo-first user gets at the end of
+    # onboarding. Empty in dev/CI, and empty means *skip the invitation*:
+    # a broken link would spend the once-only chance on nothing.
+    telegram_bot_url: str = ""
 
     # Zalo Official Account (Phase 4B Epic 4)
     # Provisioned manually by ops; empty in dev/CI degrades gracefully — the

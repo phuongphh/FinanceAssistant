@@ -164,6 +164,21 @@ def linked_user(monkeypatch):
     return user
 
 
+@pytest.fixture(autouse=True)
+def _onboarding_declines(monkeypatch):
+    """Onboarding gets first refusal on every inbound text (#4.3).
+
+    This module is about what happens *after* it declines, so it always
+    declines here. The step machine itself is exercised for real in
+    ``test_zalo_onboarding.py``.
+    """
+
+    async def _handle_text(db, *, notifier, user, text):
+        return False
+
+    monkeypatch.setattr(zalo_inbound.zalo_onboarding, "handle_text", _handle_text)
+
+
 @pytest.fixture()
 def real_dispatcher():
     """A genuine :class:`IntentDispatcher`, freshly built per test."""

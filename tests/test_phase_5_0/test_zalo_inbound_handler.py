@@ -7,7 +7,8 @@ One branch per message, and each branch has a user-visible consequence:
   user started it);
 * a linked sender gets their message classified and answered — dispatched
   for real, or answered with the fallback that names *why* not;
-* an unlinked sender gets the linking nudge rather than a dead end.
+* an unlinked sender is signed up on the spot rather than told to go
+  find a code somewhere else.
 
 Also pins the things that must never happen: no ``db.commit()`` from the
 handler (the worker owns the boundary), no token, sender id or message
@@ -15,9 +16,10 @@ text in the logs, and no dispatch of an intent that would leave Telegram
 flow state armed behind it.
 
 Phase 5.1 #4.1 replaced the seven-intent whitelist these tests were
-written against with a two-class blocklist. The routing assertions moved
-with it; everything else (linking, suspension, markup flattening,
-telemetry hygiene) is unchanged and still lives here.
+written against with a two-class blocklist, and #4.3 replaced the
+"/link_zalo" nudge with a signup. The routing assertions moved with them;
+everything else (linking, suspension, markup flattening, telemetry
+hygiene) is unchanged and still lives here.
 """
 
 from __future__ import annotations
@@ -130,6 +132,42 @@ def _isolate_channel(monkeypatch):
     )
     monkeypatch.setattr(zalo_inbound, "get_notifier", lambda: telegram)
     return zalo, telegram
+
+
+class _OnboardingSpy:
+    """Stands in for ``zalo_onboarding`` so this module keeps its subject.
+
+    Phase 5.1 #4.3 put onboarding in front of dispatch: a stranger is
+    signed up, and a known sender's text is offered to the step machine
+    before the intent stack sees it. What that machine *says* is tested
+    against the real services in ``tests/test_phase_5_1``; what this
+    module still owns is which branch of the handler fires, so both
+    entry points are stubbed to the quiet answer — "signed them up" and
+    "not mine, carry on".
+    """
+
+    def __init__(self) -> None:
+        self.signed_up: list[str] = []
+        self.offered: list[str] = []
+        self.new_user = _FakeUser(telegram_id=None)
+        self.claims_text = False
+
+    async def start_new_user(self, db, *, notifier, zalo_user_id):
+        self.signed_up.append(zalo_user_id)
+        return self.new_user
+
+    async def handle_text(self, db, *, notifier, user, text):
+        self.offered.append(text)
+        return self.claims_text
+
+
+@pytest.fixture(autouse=True)
+def onboarding(monkeypatch):
+    spy = _OnboardingSpy()
+    module = zalo_inbound.zalo_onboarding
+    monkeypatch.setattr(module, "start_new_user", spy.start_new_user)
+    monkeypatch.setattr(module, "handle_text", spy.handle_text)
+    return spy
 
 
 @pytest.fixture()
@@ -290,15 +328,56 @@ async def test_linked_sender_is_never_left_without_an_answer(
 
 
 @pytest.mark.asyncio
-async def test_unlinked_sender_gets_the_linking_nudge(monkeypatch, zalo_out):
+async def test_an_unlinked_sender_is_signed_up_rather_than_nudged(
+    monkeypatch, onboarding
+):
+    """#4.3 replaced the "/link_zalo" nudge with a signup.
+
+    Answering "go fetch a code from Telegram" to someone whose only
+    channel is Zalo was a dead end, so the branch now mints an account
+    and hands the sender to onboarding. The update row still gets a user
+    id — the new one.
+    """
     _stub_service(monkeypatch, linked=None)
 
     result = await zalo_inbound.handle_inbound_event(
         _SpySession(), event=_event("xin chào")
     )
 
-    assert result is None
-    assert "/link_zalo" in zalo_out.sent[0][1]
+    assert onboarding.signed_up == [SENDER_ID]
+    assert result == onboarding.new_user.id
+
+
+@pytest.mark.asyncio
+async def test_a_known_sender_is_offered_to_onboarding_before_dispatch(
+    monkeypatch, onboarding, install_intent_stack
+):
+    """Order matters: an answer to "Bé Tiền gọi anh là gì?" must not be
+    read as a transaction. Onboarding declines here, so dispatch runs."""
+    _stub_service(monkeypatch, linked=_FakeUser())
+    _, dispatcher = install_intent_stack()
+
+    await zalo_inbound.handle_inbound_event(_SpySession(), event=_event("ăn trưa 50k"))
+
+    assert onboarding.offered == ["ăn trưa 50k"]
+    assert dispatcher.calls
+
+
+@pytest.mark.asyncio
+async def test_text_onboarding_claims_never_reaches_the_intent_stack(
+    monkeypatch, onboarding, install_intent_stack
+):
+    linked = _FakeUser()
+    _stub_service(monkeypatch, linked=linked)
+    _, dispatcher = install_intent_stack()
+    onboarding.claims_text = True
+
+    result = await zalo_inbound.handle_inbound_event(
+        _SpySession(), event=_event("Phương")
+    )
+
+    assert result == linked.id
+    assert dispatcher.calls == []
 
 
 # --------------------------------------------------------------------------
@@ -357,19 +436,22 @@ async def test_suspended_account_cannot_relink_its_way_past_the_gate(
 
 
 @pytest.mark.asyncio
-async def test_an_unlinked_suspended_sender_still_gets_the_linking_nudge(
-    monkeypatch, zalo_out
-):
+async def test_an_unlinked_suspended_sender_is_still_signed_up(monkeypatch, onboarding):
     """Nobody to suspend yet: with no binding there is no account to look
-    up, so the gate must not fire — and must not cost a query either."""
+    up, so the gate must not fire — and must not cost a query either.
+
+    ``manual_status`` here belongs to whatever the fake session would
+    answer, not to this sender; #4.3 gives them a fresh account, and a
+    fresh account is never suspended.
+    """
     _stub_service(monkeypatch, linked=None)
     db = _SpySession(manual_status=STATUS_SUSPENDED)
 
     result = await zalo_inbound.handle_inbound_event(db, event=_event("xin chào"))
 
-    assert result is None
     assert db.scalars_read == 0
-    assert "/link_zalo" in zalo_out.sent[0][1]
+    assert onboarding.signed_up == [SENDER_ID]
+    assert result == onboarding.new_user.id
 
 
 @pytest.mark.asyncio
