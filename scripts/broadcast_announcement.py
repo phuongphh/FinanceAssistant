@@ -135,7 +135,13 @@ async def collect_recipients(
         rows = (
             await db.execute(
                 select(User.telegram_id, User.display_name, User.id).where(
-                    User.is_active.is_(True)
+                    User.is_active.is_(True),
+                    # Phase 5.1 #4.2 — ``telegram_id`` is nullable now that
+                    # Zalo is a signup channel. Filtered in SQL rather than
+                    # skipped in the loop below because ``int(None)`` raises
+                    # while building the list: a single Zalo-only account
+                    # would abort the whole broadcast before the first send.
+                    User.telegram_id.is_not(None),
                 )
             )
         ).all()

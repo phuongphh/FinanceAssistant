@@ -379,6 +379,56 @@ async def test_feedback_prompt_scheduler_skips_zalo_only_user(monkeypatch):
     assert sent == []
 
 
+# ---------------------------------------------------------------------------
+# Broadcast scripts — one Zalo-only row must not abort the whole run
+# ---------------------------------------------------------------------------
+
+
+def test_reengagement_cohort_query_excludes_telegramless_users():
+    """The recipient query is the first line of defence.
+
+    ``select_dormant`` and the ``--only`` branch both build their list with
+    ``int(r.telegram_id)``, so a NULL reaching Python raises mid-comprehension
+    and no one receives the broadcast — not even the rows already iterated.
+    """
+    from scripts.send_reengagement_broadcast import _cohort_stmt
+
+    assert "users.telegram_id IS NOT NULL" in str(_cohort_stmt().compile())
+
+
+@pytest.mark.asyncio
+async def test_announcement_broadcast_query_excludes_telegramless_users(
+    monkeypatch,
+):
+    from scripts import broadcast_announcement
+
+    statements: list[str] = []
+
+    class _FactorySession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def execute(self, stmt):
+            statements.append(str(stmt.compile()))
+            return _EmptyResult()
+
+    monkeypatch.setattr(
+        broadcast_announcement,
+        "get_session_factory",
+        lambda: _FactorySession,
+    )
+
+    recipients = await broadcast_announcement.collect_recipients(
+        only=None, skip_engaged=False, launch_date=None
+    )
+
+    assert recipients == []
+    assert "users.telegram_id IS NOT NULL" in statements[0]
+
+
 def test_user_model_allows_null_telegram_id():
     from backend.models.user import User
 
