@@ -109,6 +109,7 @@ zalo_oa_credentials (1 row/OA) { access_token, refresh_token, expires_at }
 - `content/zalo.yaml` — thêm section `capture`, `report_short`, `fallback`, `window_closed`
 - `backend/adapters/zalo_content_renderer.py` — implement **tối thiểu** `render_briefing` dạng text ngắn (3 method còn lại vẫn raise → 5.1)
 - `docs/conventions/zalo-operations.md` *(mới)* — runbook: đăng ký webhook, xác thực OA, xoay token thủ công, đọc quota
+- `docs/conventions/zalo-console-setup.md` *(mới)* — checklist thao tác console một lần: lấy đúng 3 giá trị, trỏ webhook, authorise OAuth, nhật ký `ASSUMED` để đối chiếu lúc soak
 
 ---
 

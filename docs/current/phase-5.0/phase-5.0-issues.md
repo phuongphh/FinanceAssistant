@@ -139,7 +139,8 @@ Mở đúng 3 luồng thật trên Zalo để validate ràng buộc format (300 
 
 #### Issue #4.3 — Runbook `zalo-operations.md` + xác thực OA
 - `docs/conventions/zalo-operations.md`: đăng ký/đổi webhook URL, quy trình xác thực OA (nộp hồ sơ, 3-7 ngày, **chặn 5.2 Mini App**), xoay token thủ công khi refresh_token chết, đọc quota, checklist bật `ZALO_CHANNEL_ENABLED`, soak 48h signature log-only. Kèm bảng platform facts (#1.1).
-- **DoD:** runbook có mọi lệnh cần chạy (không nhắc secret cụ thể, chỉ tên biến); có mục "khi nào KHÔNG bật"; cập nhật `docs/current/phase-status.yaml` + chạy `scripts/sync_phase_status.py`.
+- `docs/conventions/zalo-console-setup.md`: checklist thao tác console một lần cho người vận hành — lấy đúng 3 giá trị (`app_id`, `app_secret`, OA secret key: hai cái sau cùng tên "Secret Key" ở hai console khác nhau, đảo nhau là lỗi cài đặt phổ biến nhất và không nổ lúc boot), trỏ webhook đúng thứ tự (flag on + restart *trước* khi bấm xác minh, soak `ZALO_SIGNATURE_ENFORCE=false` để ping xác minh không bị 403), authorise OAuth → seed cặp token. Kèm bảng chẩn đoán "triệu chứng nào tố cáo giá trị nào" và **nhật ký `ASSUMED`** (mỗi dòng có lệnh lấy bằng chứng cụ thể) để đối chiếu lúc soak.
+- **DoD:** runbook có mọi lệnh cần chạy (không nhắc secret cụ thể, chỉ tên biến); có mục "khi nào KHÔNG bật"; checklist console không chứa giá trị secret thật, mọi nhãn màn hình chưa đối chiếu được đều gắn `ASSUMED` + có ô ghi lại; cập nhật `docs/current/phase-status.yaml` + chạy `scripts/sync_phase_status.py`.
 
 ---
 

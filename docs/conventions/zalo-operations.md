@@ -9,6 +9,12 @@ back to a row in [Platform facts](#platform-facts) below.
 > assumed platform behaviour and was wrong both times (signature formula,
 > token lifetime). "Code first, verify later" is banned for this channel.
 
+**First-time console setup** — which screen each of the three secrets
+comes from, how to point the webhook, how to authorise the OA, and the
+log that records what the `ASSUMED` rows below actually turned out to be:
+[`zalo-console-setup.md`](zalo-console-setup.md). Do that once, then live
+here.
+
 ---
 
 ## Platform facts
@@ -210,7 +216,9 @@ a human looking at the response.
 
 1. Open the Zalo OA console → *Quản lý ứng dụng* → the Bé Tiền app.
 2. Run the OAuth consent flow for the OA; capture `access_token` and
-   `refresh_token` from the callback.
+   `refresh_token` from the callback. Step-by-step, with the exact URLs
+   and the `code`-exchange call:
+   [`zalo-console-setup.md`](zalo-console-setup.md#5-authorise-oauth--lấy-cặp-token-đầu-tiên).
 3. Seed them with `python -m scripts.seed_zalo_credentials` (above).
 4. Confirm recovery: one CS message to a staff Zalo account inside an
    open 48h window.
@@ -445,6 +453,8 @@ if the credentials changed while it was off.
 
 ## Rollout checklist
 
+- [ ] Console setup done and its observation log filled in:
+      [`zalo-console-setup.md`](zalo-console-setup.md) §8.
 - [ ] Every `ASSUMED` row above promoted to `DOC`/`STAGING`.
 - [ ] OA verified in the Zalo console (needed for Mini App in 5.2; not a
       5.0 blocker).
