@@ -51,6 +51,7 @@ from backend.services.zalo_token_service import (
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 from backend.workers import zalo_worker
+from backend.utils.client_ip import client_ip
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -275,10 +276,10 @@ _admin_rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Rate-limit key. ``X-Forwarded-For`` is believed only from a peer
+    inside ``TRUSTED_PROXY_CIDRS`` — otherwise the caller picks its own
+    key and the limiter never counts it twice."""
+    return client_ip(request)
 
 
 @app.middleware("http")

@@ -15,6 +15,13 @@ Deploy the Phase 4.2.5 Admin Observability Console to `https://admin.betien.vn` 
   - `ADMIN_ALLOWED_ORIGIN=https://admin.betien.vn`.
   - `ADMIN_API_RATE_LIMIT_PER_MINUTE=100`.
   - `ADMIN_REDIS_URL=redis://localhost:6379/1`.
+  - `TRUSTED_PROXY_CIDRS` — the address Caddy connects to the app from. The
+    rate limiters key on `X-Forwarded-For` only when the peer is inside this
+    range; from any other peer they key on the real socket address. The app
+    port is published, so leaving this wider than necessary lets a caller
+    that bypasses Caddy hand itself a fresh window per request. Default is
+    loopback plus the private ranges; narrow it once the proxy's address is
+    known.
   - `DATABASE_URL` for production Postgres.
 - One-time seed variables are available only during first deploy: `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`.
 
