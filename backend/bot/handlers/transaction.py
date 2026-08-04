@@ -98,7 +98,7 @@ async def _send_on_zalo(user: User, text: str) -> bool:
 
     # chat_id is unused by the Zalo notifier — the recipient is bound at
     # construction — but the Notifier port requires the positional arg.
-    notifier = build_zalo_notifier(user.zalo_user_id, client=client)
+    notifier = build_zalo_notifier(user.zalo_user_id, client=client, user_id=user.id)
     return await notifier.send_message(0, text) is not None
 
 

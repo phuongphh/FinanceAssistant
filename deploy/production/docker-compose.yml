@@ -65,6 +65,14 @@ services:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}"
       REDIS_URL: "redis://redis:6379/0"
       ADMIN_REDIS_URL: "redis://redis:6379/1"
+      # Hardcode (không đọc từ .env) vì đường dẫn này phải khớp đúng với
+      # mount point bên dưới — và phải giống hệt bên `scheduler`. Backend
+      # ghi bytes lúc publish, scheduler mới là process xoá chúng: hai
+      # container không thấy chung một thư mục thì row bị soft-delete
+      # nhưng file ảnh riêng tư nằm lại vĩnh viễn.
+      MEDIA_STORAGE_PATH: "/var/lib/betien/media"
+    volumes:
+      - media_data:/var/lib/betien/media
     ports:
       - "8002:8000"
     depends_on:
@@ -93,6 +101,10 @@ services:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-finance}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finance_db}"
       REDIS_URL: "redis://redis:6379/0"
       ADMIN_REDIS_URL: "redis://redis:6379/1"
+      # Phải trùng khít giá trị bên `backend` — xem comment ở đó.
+      MEDIA_STORAGE_PATH: "/var/lib/betien/media"
+    volumes:
+      - media_data:/var/lib/betien/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,3 +120,8 @@ volumes:
     name: financeassistant_postgres_data
   redis_data:
     name: financeassistant_redis_data
+  # Named volume chứ không phải bind mount hay tmpfs: file media sống lâu
+  # hơn một container (TTL 15 phút, sweep mỗi giờ), và cả backend lẫn
+  # scheduler đều phải nhìn thấy đúng cùng một thư mục.
+  media_data:
+    name: financeassistant_media_data

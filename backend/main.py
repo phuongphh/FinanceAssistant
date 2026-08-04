@@ -35,6 +35,7 @@ from backend.routers import (
     ingestion,
     life_events as life_events_router,
     market,
+    media as media_router,
     portfolio,
     reports,
     telegram,
@@ -353,6 +354,17 @@ else:
     logger.info(
         "Zalo channel disabled (ZALO_CHANNEL_ENABLED=false) — webhook not mounted"
     )
+# Phase 5.1 #1.3 — the only unauthenticated, non-webhook route we serve.
+# Gated on its own flag rather than ZALO_CHANNEL_ENABLED: media URLs are
+# channel-independent infrastructure (the Mini App wants them too), and
+# an incident on the serving endpoint should be switchable off without
+# taking the Zalo channel down with it. Unmounted means 404 for every
+# token, which is also the correct answer.
+if settings.media_url_enabled:
+    app.include_router(media_router.router, prefix="/api/v1")
+    logger.info("Media URLs ENABLED — serving at /api/v1/media/{token}")
+else:
+    logger.info("Media URLs disabled (MEDIA_URL_ENABLED=false) — not mounted")
 app.include_router(twin.router, prefix="/api")
 app.include_router(life_events_router.router, prefix="/api")
 app.include_router(cashflow_router.router, prefix="/api")

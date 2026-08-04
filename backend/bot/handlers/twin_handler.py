@@ -23,6 +23,7 @@ from backend.ports.content_renderer import (
 from backend.ports.notifier import Notifier, get_notifier
 from backend.adapters.telegram_content_renderer import TelegramContentRenderer
 from backend.models.user import User
+from backend.services.onboarding.onboarding_service import salutation_of
 from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
     top_rebalance_deltas,
@@ -97,17 +98,27 @@ async def _send_channel_content(
     notifier: Notifier, chat_id: int, content: ChannelContent
 ) -> None:
     reply_markup = _telegram_reply_markup(content.buttons)
+    # ``buttons`` rides alongside ``reply_markup`` (Phase 5.1 #3.3): the
+    # latter is Telegram's wire format, and a non-Telegram notifier would
+    # have to reverse-engineer it to render anything. Passing the neutral
+    # tuples too keeps the channel difference inside the adapter, which is
+    # 5.1's governing rule. ``TelegramNotifier`` swallows the extra kwarg.
     if content.images:
         await notifier.send_photo(
             chat_id,
             content.images[0],
             caption=content.text,
             reply_markup=reply_markup,
+            buttons=content.buttons,
             filename=content.filename or "be-tien-content.png",
         )
         return
     await notifier.send_message(
-        chat_id, content.text, parse_mode=None, reply_markup=reply_markup
+        chat_id,
+        content.text,
+        parse_mode=None,
+        reply_markup=reply_markup,
+        buttons=content.buttons,
     )
 
 
@@ -291,6 +302,7 @@ async def send_twin_current(
             scenario_cards=scenario_cards,
             is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)
@@ -592,6 +604,7 @@ async def send_twin_compare_optimal(
             current_cone=current.cone_data,
             optimal_cone=optimal.cone_data,
             filename="be-tien-twin-optimal.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)

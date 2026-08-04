@@ -291,6 +291,50 @@ class ZaloOAClient:
         }
         return await self._post("/message/cs", payload)
 
+    async def send_message_with_buttons(
+        self,
+        recipient_id: str,
+        text: str,
+        buttons: list[dict],
+    ) -> bool:
+        """Send a text message carrying a Zalo button template (#3.3).
+
+        ``buttons`` is what
+        :func:`backend.adapters.zalo_button_mapper.map_buttons` returned
+        — already clipped, already capped, already Zalo-shaped. This
+        method does not re-validate it; there is one place that knows the
+        button rules and it is the mapper.
+
+        An empty ``buttons`` list delegates to :meth:`send_message`, so a
+        caller never has to branch on "did anything survive the mapping".
+
+        Same return/raise contract as :meth:`send_message` — the send
+        goes through :meth:`_post`, so retry, backoff, token refresh and
+        fail-open behaviour are untouched.
+        """
+        if not buttons:
+            return await self.send_message(recipient_id, text)
+        if not self.is_configured:
+            logger.warning("ZaloOAClient: access token not configured — skipping button send")
+            return False
+        if not recipient_id or not text:
+            return False
+
+        payload: dict[str, Any] = {
+            "recipient": {"user_id": recipient_id},
+            "message": {
+                "attachment": {
+                    "type": "template",
+                    "payload": {
+                        "template_type": "button",
+                        "text": text,
+                        "buttons": buttons,
+                    },
+                },
+            },
+        }
+        return await self._post("/message/cs", payload)
+
     async def get_message_quota(self) -> dict[str, int] | None:
         """Read the OA's remaining message allowance from Zalo (#3.3).
 

@@ -106,13 +106,24 @@ report_short:
   net_worth: "Tổng tài sản của bạn đang là {net_worth}."
   empty: "Tháng này chưa có khoản chi nào được ghi. Nhắn cho Bé Tiền là xong nhé."
 
-# Intent nằm ngoài thin slice. Là lời mời, không phải báo lỗi.
-# Nested dưới "body" cho đồng bộ với cashflow_alert — loader chỉ đọc
+# Phase 5.1 #4.1 — thin slice đã gỡ, Zalo đi qua đúng dispatcher như
+# Telegram. Còn đúng ba trường hợp Bé Tiền không trả lời thẳng được, và
+# cả ba đều nói như lời mời chứ không phải báo lỗi kỹ thuật:
+#   unsupported — việc cần bảng nút nhiều bước, chỉ Telegram dựng được
+#   unclear     — chưa chắc hiểu ý; hỏi lại còn hơn đoán bừa rồi ghi sai
+#   body        — trục trặc bên trong; user không cần biết chi tiết
+# Nested dưới key con cho đồng bộ với cashflow_alert — loader chỉ đọc
 # section → key, không đọc string ở cấp cao nhất.
 fallback:
   body: |-
-    Trên Zalo, Bé Tiền ghi thu chi và báo cáo nhanh thôi.
-    Việc khác bạn mở Bé Tiền trên Telegram giúp mình nhé 🙏
+    Bé Tiền chưa xử lý được tin nhắn này rồi.
+    Bạn nhắn lại giúp mình một chút nhé 🙏
+  unsupported: |-
+    Việc này cần chọn qua lại vài bước nên Bé Tiền làm bên Telegram gọn hơn.
+    Bạn mở Bé Tiền trên Telegram giúp mình nhé 🙏
+  unclear: |-
+    Bé Tiền chưa chắc hiểu đúng ý bạn nên chưa dám làm liều.
+    Bạn nói rõ hơn một chút giúp mình nhé.
   # Người chưa liên kết mà gõ linh tinh vẫn cần biết đường đi tiếp —
   # dùng lại linking.token_invalid, không thêm copy mới.
 
@@ -131,3 +142,162 @@ window_closed:
   body: |-
     Bé Tiền có vài điều muốn báo mà Zalo chỉ cho nhắn trong 48h nên chưa gửi kịp.
     Bạn nhắn "báo cáo" là mình kể ngay nhé.
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #3.2 — nút bấm.
+#
+# Zalo chỉ cho tối đa vài nút một tin. Nút nào không lên được thành nút
+# thật thì tụt xuống thành một dòng gợi ý ở cuối tin — user vẫn làm được,
+# chỉ là gõ thay vì bấm. Không nút nào biến mất im lặng.
+#
+# "{title}" là chữ trên nút, "{url}" là link. Giữ dòng thật ngắn: chúng
+# nối vào cuối tin và vẫn phải lọt 300 ký tự.
+# ---------------------------------------------------------------------------
+buttons:
+  query_line: '- Nhắn "{title}" nhé'
+  url_line: "- {title}: {url}"
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #2.1 — copy cho các surface parity.
+#
+# Đây KHÔNG phải bản cắt của Telegram. Telegram có biểu đồ, nút bấm và
+# chỗ để đọc dài; Zalo có một bong bóng 300 ký tự. Nên copy dưới đây
+# viết ngắn từ đầu: mỗi dòng nói trọn một ý, renderer ghép các dòng lại
+# theo thứ tự ưu tiên và bỏ bớt dòng cuối nếu tràn — không cắt giữa câu.
+#
+# Xưng hô: dùng "{salutation}" (anh/chị/bạn, lấy từ users.salutation qua
+# onboarding_service.salutation_of) và "{Salutation}" khi đứng đầu câu.
+# Không viết 3 bản copy riêng cho 3 xưng hô: cả ba đều là đại từ ngôi
+# thứ hai nên thay thẳng vào chỗ trống là đúng ngữ pháp, và 3 bản rời
+# sẽ lệch nhau ngay lần sửa chữ đầu tiên.
+#
+# Ràng buộc chữ (test tự động duyệt): ≤ 300 ký tự, ≤ 2 emoji, không ký
+# tự Markdown và không dùng ngoặc đơn — Zalo hiển thị nguyên xi.
+# ---------------------------------------------------------------------------
+
+# Twin view. Con số đã format sẵn qua format_money_short trước khi vào đây.
+twin:
+  headline: "🔮 Tới {target_year}, tài sản của {salutation} có thể nằm quanh khoảng này:"
+  range_line: "Khiêm tốn {p10} · Bình thường {p50} · Lạc quan {p90}"
+  stale_note: "Số liệu hơi cũ rồi, {salutation} cập nhật tài sản để Bé Tiền vẽ lại nhé."
+  note: "Đây là dự phóng xác suất từ số hiện có, không phải lời hứa."
+
+# So sánh lộ trình hiện tại với lộ trình tối ưu.
+twin_comparison:
+  headline: "Nếu đổi cách phân bổ, tới {target_year} lộ trình của {salutation} có thể khác:"
+  delta_line: "Hiện tại {current} · Tối ưu {optimal} · chênh {delta}"
+  actions_lead: "Việc nên làm: {actions}"
+  note: "Con số là dự phóng tham khảo, chọn thế nào vẫn là của {salutation} nhé."
+
+# Mốc đạt được. Ăn mừng thật nhưng không tung hô, và tuyệt đối không so
+# sánh với người khác hay nhắc lại chuyện chậm trễ trước đó.
+milestone:
+  headline: "🎉 {Salutation} vừa chạm mốc: {title}"
+  twin_effect: "Twin đổi theo: {effect}"
+  closing: "Bé Tiền ghi lại rồi, mình đi tiếp nhé."
+
+# Tư vấn ngắn khi user hỏi "nên làm gì bây giờ".
+advisory:
+  lead: "Bé Tiền nhìn số của {salutation} thì thấy thế này:"
+  point: "- {point}"
+  suggestion: "Gợi ý: {suggestion}"
+  disclaimer: "Đây là góc nhìn tham khảo, quyết định vẫn là của {salutation} nhé."
+
+# Một quyết định cụ thể: mua, vay, đổi việc, rút tiền.
+decision:
+  lead: "{Salutation} hỏi về {topic}, Bé Tiền tính thử nhé:"
+  impact: "Nếu làm, tới {target_year} tài sản có thể còn quanh {p50}, chênh {delta}."
+  affordable: "Với dòng tiền hiện tại, khoản này nằm trong tầm của {salutation}."
+  tight: "Khoản này hơi căng với dòng tiền hiện tại, {salutation} cân nhắc thêm nhé."
+  disclaimer: "Bé Tiền đưa số, chọn vẫn là {salutation} nhé."
+
+# Ghi hoặc sửa một tài sản từ Zalo.
+asset_entry:
+  saved: "✅ Đã ghi tài sản {name} {amount}"
+  updated: "✅ Đã cập nhật {name} thành {amount}"
+  net_worth_line: "Tổng tài sản giờ là {net_worth}."
+  ask_amount: "{Salutation} cho Bé Tiền biết khoản này đang khoảng bao nhiêu nhé."
+  edit_hint: "Muốn sửa thì nhắn lại tên tài sản kèm số mới là được."
+
+# Onboarding cho người vào thẳng từ Zalo, chưa từng có Telegram. E4 #4.3
+# nối dây; copy để sẵn ở đây để chỉ có một chỗ giữ chữ.
+onboarding:
+  welcome: "Chào {salutation} 👋 Bé Tiền là người đồng hành quản lý tài sản, nhắn gì Bé Tiền cũng ghi được."
+  ask_name: "Bé Tiền gọi {salutation} là gì cho thân nhé?"
+  name_invalid: "Tên hơi dài hoặc Bé Tiền chưa đọc được. {Salutation} nhắn lại tên ngắn thôi nhé."
+  ask_salutation: "Bé Tiền nên xưng hô thế nào ạ? Nhắn anh, chị hoặc bạn là được."
+  salutation_invalid: "Bé Tiền chưa rõ ạ. {Salutation} nhắn anh, chị hoặc bạn giúp Bé Tiền nhé."
+  ask_goal: "{Salutation} đang muốn tiền của mình phục vụ điều gì trước nhất?"
+  goal_invalid: "Bé Tiền chưa rõ ạ. {Salutation} nhắn lại đúng một trong các lựa chọn trên nhé."
+  # Nhãn nút xác nhận thẻ cam kết riêng tư (nội dung lấy từ
+  # content/onboarding/trust_card.yaml để hai kênh không lệch lời hứa).
+  trust_ok_label: "OK, Bé Tiền đi tiếp"
+  ask_asset: "Giờ {salutation} cho Bé Tiền biết đang có khoảng bao nhiêu tài sản nhé."
+  asset_invalid: "Bé Tiền chưa hiểu con số đó. {Salutation} nhắn kiểu 200tr hoặc 1.5 tỷ giúp Bé Tiền nhé."
+  asset_too_small: "Số này nhỏ hơn 1 triệu, chắc {salutation} gõ nhầm rồi. Nhắn lại giúp Bé Tiền nhé."
+  asset_too_large: "Số này lớn quá, {salutation} kiểm tra lại giúp Bé Tiền nhé."
+  asset_ack: "Bé Tiền ghi rồi ạ. Để Bé Tiền vẽ Twin cho {salutation} xem nhé."
+  # Lối thoát khi user chưa muốn nói số thật — dùng số mẫu để xem trước.
+  asset_demo_label: "Để Bé Tiền dùng số mẫu trước"
+  asset_demo_note: "Đây là Twin mẫu với số giả định, không phải tài sản thật của {salutation} đâu ạ."
+  twin_failed: "Bé Tiền chưa vẽ được Twin lúc này. {Salutation} nhắn 'xem twin' sau ít phút nhé."
+  done: "Xong rồi ạ. Từ giờ {salutation} nhắn thu chi là Bé Tiền ghi ngay."
+  # Lời mời sang Telegram chỉ gửi đúng một lần, không nhắc lại. Nói thật lý
+  # do: Zalo chỉ cho Bé Tiền nhắn lại khi user vừa nhắn trước.
+  telegram_invite: "Bé Tiền chỉ nhắn lại được khi {salutation} nhắn trước, nên lúc {salutation} bận Bé Tiền không nhắc được. Bên Telegram thì Bé Tiền nhắc được ạ. Bé Tiền hỏi một lần thôi."
+  telegram_invite_accept_label: "Mở Telegram"
+  telegram_invite_decline_label: "Thôi, cứ ở Zalo"
+  telegram_invite_declined: "Dạ được ạ, mình cứ ở Zalo. Bé Tiền không nhắc lại nữa đâu."
+
+# ---------------------------------------------------------------------------
+# Phase 5.1 #4.5 — catch-up cho user chỉ có Zalo.
+#
+# Zalo reactive-first: mọi tin chủ động rơi ngoài cửa sổ 48h đều bị bỏ, và
+# user không có Telegram thì không có kênh nào gánh hộ. Khi họ quay lại sau
+# vài ngày im lặng, Bé Tiền nói đúng MỘT dòng về những gì đã đổi.
+#
+# Luật giọng — quan trọng hơn chữ:
+#   - Bé Tiền kể việc CỦA MÌNH đã làm, không hỏi user đã đi đâu.
+#     ❌ "Mấy hôm nay anh đi đâu mất tiêu" — trách móc, cấm tuyệt đối.
+#     ❌ "Lâu rồi chị không ghi chép gì" — vẫn là trách, chỉ vòng hơn.
+#   - Không giục, không nhắc nợ, không so sánh với lần trước.
+#   - Tin xấu nói bình thản, không kịch tính hoá. Riêng chuyện tụt hạng tài
+#     sản thì service loại hẳn khỏi catch-up, không có chữ nào ở đây cả.
+#
+# "{summary}" là các mệnh đề ngắn dưới đây nối bằng "joiner". Service bỏ bớt
+# mệnh đề cuối nếu tràn 300 ký tự, nên mỗi mệnh đề phải đứng một mình được.
+# ---------------------------------------------------------------------------
+catchup:
+  lead: "Mấy hôm {salutation} bận, Bé Tiền vẫn theo giúp: {summary}."
+  joiner: " · "
+  money_up: "tài sản nhích lên {amount}"
+  money_down: "tài sản lùi {amount}"
+  milestone: "{salutation} chạm mốc {title}"
+  # Dùng khi có mốc mới nhưng chưa kịp đặt tên ngắn cho nó ở dưới.
+  milestone_generic: "{salutation} vừa chạm một mốc mới"
+  # Tên ngắn của từng mốc, khoá đúng bằng MilestoneType. Đây là bản ngắn
+  # riêng cho catch-up: bản ăn mừng đầy đủ ở content/milestone_messages.yaml
+  # dài nhiều dòng, không nhét vào một mệnh đề được.
+  milestones:
+    first_transaction: "khoản ghi đầu tiên"
+    days_7: "7 ngày đồng hành"
+    days_30: "30 ngày đồng hành"
+    days_100: "100 ngày đồng hành"
+    days_365: "1 năm đồng hành"
+    first_budget_set: "ngân sách đầu tiên"
+    first_category_change: "lần sửa phân loại đầu tiên"
+    first_voice_input: "lần ghi bằng giọng nói đầu tiên"
+    first_photo_input: "lần ghi bằng ảnh đầu tiên"
+    save_10_percent_monthly: "để dành 10% tháng này"
+    save_20_percent_monthly: "để dành 20% tháng này"
+    savings_1m: "tích luỹ 1 triệu"
+    savings_5m: "tích luỹ 5 triệu"
+    savings_10m: "tích luỹ 10 triệu"
+    savings_50m: "tích luỹ 50 triệu"
+    streak_7: "chuỗi 7 ngày liền"
+    streak_30: "chuỗi 30 ngày liền"
+    streak_100: "chuỗi 100 ngày liền"
+    wealth_level_up_young_prof: "bậc tài sản mới"
+    wealth_level_up_mass_affluent: "bậc tài sản mới"
+    wealth_level_up_hnw: "bậc tài sản mới"
+    wealth_level_up_vip: "bậc tài sản mới"

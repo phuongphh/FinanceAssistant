@@ -162,15 +162,25 @@ async def reply(db: AsyncSession, feedback: Feedback, message_text: str) -> bool
     for target in targets:
         try:
             if target.channel == "telegram":
-                await target.notifier.send_message(
+                result = await target.notifier.send_message(
                     chat_id=int(target.target_id),
                     text=message_text,
                     parse_mode="HTML",
                 )
             else:
-                await target.notifier.send_message(
+                result = await target.notifier.send_message(
                     chat_id=target.target_id, text=message_text
                 )
+            if result is None:
+                # Declined without raising (Zalo window shut / quota
+                # spent). Stamping first_responded_at here would close the
+                # SLA on a reply the user never received.
+                logger.warning(
+                    "feedback_triage: reply declined user=%s channel=%s",
+                    user.id,
+                    target.channel,
+                )
+                continue
             sent_any = True
         except Exception:
             logger.exception(

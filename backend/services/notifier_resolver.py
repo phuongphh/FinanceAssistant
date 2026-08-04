@@ -48,10 +48,18 @@ class ChannelTarget:
 def resolve_targets(user: User) -> list[ChannelTarget]:
     """Return all opted-in channels for ``user``.
 
-    Telegram is always included (telegram_id is required at signup).
+    Telegram is included whenever the user has a ``telegram_id``. Since
+    Phase 5.1 #4.2 that is no longer guaranteed: a user who signed up
+    through the Zalo OA has none, and emitting a target anyway would
+    stringify ``None`` into ``"None"`` — a chat_id Telegram rejects, but
+    only after the send has already been attempted and dedup-keyed.
+
     Zalo is appended when the user has linked their Zalo account AND
     the OA access token is configured on the server (so we don't
     enqueue sends that will immediately fail).
+
+    Both channels can be absent, so the list may come back empty; every
+    caller already treats that as "nothing to deliver".
 
     The Zalo notifier comes from :func:`build_zalo_notifier`, so it
     carries the 48h-window / 8-message ceiling with it. Resolution stays
@@ -61,13 +69,16 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
     and would make one channel's storage cost the other channel's
     latency.
     """
-    targets: list[ChannelTarget] = [
-        ChannelTarget(
-            channel="telegram",
-            notifier=get_notifier(),
-            target_id=str(user.telegram_id),
+    targets: list[ChannelTarget] = []
+
+    if user.telegram_id is not None:
+        targets.append(
+            ChannelTarget(
+                channel="telegram",
+                notifier=get_notifier(),
+                target_id=str(user.telegram_id),
+            )
         )
-    ]
 
     if user.zalo_user_id:
         zalo_client = get_zalo_oa_client()
@@ -87,7 +98,9 @@ def resolve_targets(user: User) -> list[ChannelTarget]:
             targets.append(
                 ChannelTarget(
                     channel="zalo",
-                    notifier=build_zalo_notifier(user.zalo_user_id, client=zalo_client),
+                    notifier=build_zalo_notifier(
+                        user.zalo_user_id, client=zalo_client, user_id=user.id
+                    ),
                     target_id=user.zalo_user_id,
                 )
             )

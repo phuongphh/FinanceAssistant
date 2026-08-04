@@ -11,32 +11,46 @@ Exactly one branch per inbound message:
 
 * the text carries a ``BT-XXXXXX`` code → redeem it and confirm on both
   channels (Phase 4B behaviour, moved here unchanged);
-* the sender is already linked → classify the message and dispatch it
+* the sender is already linked → let onboarding answer first if it is
+  still running (#4.3), otherwise classify the message and dispatch it
   through the shared intent stack (#2.3);
-* otherwise → the linking nudge.
+* otherwise → the sender is new: mint the account and start onboarding
+  right here (#4.3). The OA is a signup channel now, so "no link and no
+  token" means *starting*, not *failing*.
 
-Why the thin slice is a whitelist (#2.3)
----------------------------------------
-Zalo in 5.0 answers three things: capture a transaction, read a short
-report, say hello. Everything else gets the ``fallback`` copy — an
-invitation to Telegram, not an error.
+From whitelist to blocklist (#4.1)
+----------------------------------
+5.0 shipped a seven-intent whitelist because the Zalo renderer could
+only shape a handful of answers. 5.1 finished the renderer (#2.1–#2.4)
+and the button mapper (#3.2–#3.3), so the whitelist had become the only
+thing keeping Zalo behind Telegram. It is gone: every intent now goes
+through the *same* dispatcher, and only two narrow classes are held
+back.
 
-The whitelist is checked on ``result.intent`` **before** dispatch, not
-on the outcome afterwards, and that ordering is the point: an
-out-of-slice intent then costs no handler execution, no second LLM
-call, and — crucially — can have no side effects. Zalo is a reactive
-channel where the user is sitting there waiting, so work we are going
-to throw away should never start.
+**Wizard-launching intents** (``WIZARD_LAUNCHING_INTENTS``). These
+handlers do not return an answer — they push a multi-step Telegram
+keyboard themselves and return ``""``. Two independent reasons they
+cannot run from here: Zalo has no such keyboard to push into, and since
+#4.2 made ``telegram_id`` nullable, a Zalo-only account would have them
+sending to ``chat_id=None``. That the set of intents Zalo cannot render
+is *exactly* the set that self-sends to Telegram is not a coincidence —
+both follow from "the handler owns its own UI" — so this reuses the
+dispatcher's own table instead of restating it.
 
-The whitelist also keeps a subtler invariant. Below
-``CONFIRM_THRESHOLD`` the dispatcher persists Telegram flow state
-(``set_awaiting_clarification`` / ``set_pending_action``) which only
-``free_form_text`` knows how to consume; a Zalo message that armed it
-would ambush the user on their *next Telegram message*. So low
-confidence short-circuits to the fallback copy before dispatch, and
-every intent left in the whitelist is one the dispatcher executes
-outright at ≥ 0.5 — no confirm branch, no clarify branch, no
-cross-channel state.
+**Anything that would persist flow state**
+(``persists_flow_state``). Below ``CONFIRM_THRESHOLD``, and on the
+medium-confidence write path, the dispatcher stores state
+(``set_awaiting_clarification`` / ``set_pending_action``) that only
+``free_form_text`` knows how to consume. Arming it from Zalo would
+ambush the user on their *next Telegram message* — a reply to a
+question they were asked on another channel hours ago. So we ask again
+here instead.
+
+Both are decided on ``result`` **before** dispatch, and that ordering
+is the point: the skipped path then costs no handler execution, no
+second LLM call, and — crucially — can have no side effects. Each
+class has its own ``fallback`` copy, phrased as an invitation rather
+than a failure, and the intent is logged so the gap is visible.
 
 Layer contract: this handler routes and formats. It owns no
 transaction (the worker commits once at the boundary), issues no raw
@@ -59,32 +73,36 @@ from backend.adapters.zalo_window_notifier import (
     build_zalo_notifier,
 )
 from backend.bot.channel_context import CHANNEL_ZALO
-from backend.intent.dispatcher import CONFIRM_THRESHOLD
-from backend.intent.intents import IntentType
+from backend.bot.handlers import zalo_onboarding
+from backend.intent.dispatcher import WIZARD_LAUNCHING_INTENTS, persists_flow_state
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
-from backend.services import zalo_linking_service
+from backend.services import zalo_catchup_service, zalo_linking_service
 from backend.services.user_status import is_user_allowed
 from backend.utils.zalo_copy import linking as linking_copy, text as zalo_text
 from backend.utils.zalo_events import ZaloEvent
 
 logger = logging.getLogger(__name__)
 
-# The 5.0 thin slice. Deliberately small: every member here is an
-# intent the dispatcher *executes* at medium confidence, so none of
-# them can arm the Telegram confirm/clarify state machine (see module
-# docstring). Widening this set means re-checking that property.
-ZALO_SUPPORTED_INTENTS = frozenset(
-    {
-        IntentType.ACTION_QUICK_TRANSACTION,
-        IntentType.QUERY_EXPENSES,
-        IntentType.QUERY_EXPENSES_BY_CATEGORY,
-        IntentType.QUERY_NET_WORTH,
-        IntentType.QUERY_ASSETS,
-        IntentType.GREETING,
-        IntentType.HELP,
-    }
-)
+# Why Zalo could not serve a message. Kept as plain strings because
+# they end up in two places that are not code — the log line an operator
+# greps and the analytics property that tells us *which* gap is costing
+# us answers. "wizard" and "flow_state" are the two blocklist classes
+# from the module docstring; "error" is the classifier or a handler
+# blowing up.
+REASON_WIZARD = "wizard"
+REASON_FLOW_STATE = "flow_state"
+REASON_ERROR = "error"
+
+# Reason → the ``fallback`` key we answer with. Three separate strings
+# rather than one generic apology: "this needs Telegram" and "say that
+# again please" ask the user for completely different next steps, and a
+# message that names the wrong one is worse than no message.
+_REASON_COPY = {
+    REASON_WIZARD: "unsupported",
+    REASON_FLOW_STATE: "unclear",
+    REASON_ERROR: "body",
+}
 
 # Redemption outcomes that mean the binding now exists.
 _LINKED_STATUSES = frozenset({"linked", "user_relinked"})
@@ -148,12 +166,35 @@ async def handle_inbound_event(db: AsyncSession, *, event: ZaloEvent) -> UUID | 
             fallback_user_id=linked.id if linked else None,
         )
 
-    if linked is not None:
-        await _dispatch_intent(db, notifier=notifier, user=linked, text=event.text)
+    if linked is None:
+        # Phase 5.1 #4.3 — the OA is a signup channel now. A stranger who
+        # isn't holding a token is starting, not failing: mint the account
+        # and greet them instead of answering "mã không hợp lệ" to someone
+        # who never typed a code.
+        created = await zalo_onboarding.start_new_user(
+            db, notifier=notifier, zalo_user_id=event.sender_id
+        )
+        return created.id if created is not None else None
+
+    # Onboarding gets first refusal on the text; it returns False the
+    # moment the user has finished, and dispatch proceeds as before.
+    if await zalo_onboarding.handle_text(
+        db, notifier=notifier, user=linked, text=event.text
+    ):
         return linked.id
 
-    await notifier.send_message(0, linking_copy("token_invalid"))
-    return None
+    # Phase 5.1 #4.5 — a Zalo-only user has no second channel to carry
+    # what the proactive jobs skipped. Computed *before* dispatch, because
+    # the silence is measured from their previous inbound row and dispatch
+    # may write rows of its own; sent *after* the answer, so an urgent
+    # question is never made to wait behind three days of news.
+    catchup = await _catchup_line(db, user=linked, msg_id=event.msg_id)
+
+    await _dispatch_intent(db, notifier=notifier, user=linked, text=event.text)
+
+    if catchup:
+        await _send_catchup(notifier, user=linked, line=catchup)
+    return linked.id
 
 
 async def _reject_suspended(
@@ -172,6 +213,46 @@ async def _reject_suspended(
     logger.info("zalo.inbound rejected: account suspended")
     await notifier.send_message(0, zalo_text("account", "suspended"))
     return user_id
+
+
+async def _catchup_line(db: AsyncSession, *, user: User, msg_id: str) -> str | None:
+    """Ask #4.5 what this user missed, and never let the answer cost them.
+
+    Catch-up is a courtesy on top of the reply the user actually asked
+    for. It runs *before* dispatch, so an exception here would sink the
+    whole handler and the user would get nothing at all — which is a far
+    worse trade than losing one line of news. Swallowed and logged.
+    """
+    try:
+        return await zalo_catchup_service.build_catchup_line(
+            db, user=user, exclude_msg_id=msg_id
+        )
+    except Exception:
+        logger.exception("zalo.catchup build failed — answering without it")
+        return None
+
+
+async def _send_catchup(
+    notifier: WindowedZaloNotifier, *, user: User, line: str
+) -> None:
+    """Send the catch-up as its own bubble, after the answer.
+
+    Its own message rather than a prefix on the reply: the reply is
+    already sized for one Zalo bubble, and prepending to it would push
+    the part the user asked for off the bottom. It does spend a second
+    slot of the 8-per-window quota, which is the honest cost of the
+    channel being the only one this user has.
+
+    ``send_message`` returning ``None`` means the window closed between
+    the reply and this line. That is a drop, not an error — the news is
+    still uncelebrated, so the next time they write it is still waiting.
+    """
+    sent = await notifier.send_message(0, line)
+    analytics.track(
+        "zalo_catchup",
+        user_id=user.id,
+        properties={"channel": CHANNEL_ZALO, "delivered": sent is not None},
+    )
 
 
 def _plain_body(text: str) -> str:
@@ -195,6 +276,26 @@ def _plain_body(text: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _unserved_reason(result) -> str | None:
+    """Why Zalo cannot serve ``result``, or ``None`` to dispatch it.
+
+    Both checks read the dispatcher's own tables rather than a local
+    copy, so a seventh wizard intent or a change to the confidence
+    policy lands here without an edit — which is the whole reason #4.1
+    made them public.
+
+    Wizard is tested first even though a low-confidence wizard intent
+    satisfies both: "open Bé Tiền on Telegram" is something the user can
+    act on, while "say that again" would send them round a loop that
+    ends at the same wall.
+    """
+    if result.intent in WIZARD_LAUNCHING_INTENTS:
+        return REASON_WIZARD
+    if persists_flow_state(result):
+        return REASON_FLOW_STATE
+    return None
+
+
 async def _dispatch_intent(
     db: AsyncSession,
     *,
@@ -206,13 +307,18 @@ async def _dispatch_intent(
 
     Sends at most one message. Three outcomes:
 
-    * in-slice and confident → dispatch, send the outcome text;
-    * in-slice but the handler already replied itself (empty outcome
+    * served → dispatch, send the outcome text;
+    * served but the handler already replied itself (empty outcome
       text — ``action_quick_transaction`` sends its own confirmation,
       which #2.4 made channel-aware) → send nothing more, or the user
       gets the same transaction twice;
-    * out of slice, low confidence, or a handler error → the fallback
-      copy, which is phrased as an invitation rather than a failure.
+    * unserved — a wizard intent, something that would persist flow
+      state, or an error → the matching ``fallback`` copy, phrased as an
+      invitation rather than a failure.
+
+    The reason is decided from ``result`` *before* dispatch, so an
+    unserved message costs no handler execution and can leave no trace
+    on the user's data.
 
     Errors are contained here rather than raised: a classifier timeout
     or a handler bug must not mark the ``zalo_updates`` row ``failed``
@@ -233,32 +339,35 @@ async def _dispatch_intent(
 
     result = None
     outcome = None
-    in_slice = False
+    reason = REASON_ERROR
     try:
         result = await get_pipeline().classify(text)
-        in_slice = (
-            result.intent in ZALO_SUPPORTED_INTENTS
-            and result.confidence >= CONFIRM_THRESHOLD
-        )
-        if in_slice:
+        reason = _unserved_reason(result)
+        if reason is None:
             outcome = await get_dispatcher().dispatch(result, user, db)
     except Exception:
-        # Never log ``text`` — it is the user's own message.
+        # Never log ``text`` — it is the user's own message. Note this
+        # resets ``reason`` to ``error`` even when the classifier had
+        # already cleared the message: a handler that raised is an
+        # error, not an unsupported intent.
+        reason = REASON_ERROR
         logger.exception("zalo.inbound intent dispatch failed; sending fallback")
 
     latency_ms = int((time.perf_counter() - started) * 1000)
     intent_name = result.intent.value if result is not None else "error"
     logger.info(
-        "zalo.inbound intent=%s confidence=%s in_slice=%s kind=%s latency_ms=%d",
+        "zalo.inbound intent=%s confidence=%s reason=%s kind=%s latency_ms=%d",
         intent_name,
         round(result.confidence, 2) if result is not None else "-",
-        in_slice,
+        reason or "-",
         outcome.kind if outcome is not None else "-",
         latency_ms,
     )
     # Same event name as the Telegram path so the funnel stays one
     # series; ``channel`` is what splits it. No message text — the
-    # intent label and the confidence are the whole payload.
+    # intent label and the confidence are the whole payload. ``reason``
+    # is null on the happy path precisely so "how often does Zalo fail
+    # to answer, and why" is one group-by rather than a subtraction.
     analytics.track(
         EVENT_INTENT_CLASSIFIED,
         user_id=user.id,
@@ -267,13 +376,19 @@ async def _dispatch_intent(
             "intent": intent_name,
             "confidence": round(result.confidence, 3) if result is not None else 0.0,
             "classifier": result.classifier_used if result is not None else "none",
-            "in_slice": in_slice,
+            "served": reason is None,
+            "unserved_reason": reason,
             "latency_ms": latency_ms,
         },
     )
 
     if outcome is None:
-        await notifier.send_message(0, zalo_text("fallback", "body"))
+        # ``reason`` is never None here: it is None only when dispatch
+        # ran, and dispatch either returns an outcome or raises — and
+        # the ``except`` puts ``error`` back.
+        await notifier.send_message(
+            0, zalo_text("fallback", _REASON_COPY[reason or REASON_ERROR])
+        )
         return
 
     body = _plain_body(outcome.text or "")

@@ -92,7 +92,10 @@ def test_top_rebalance_deltas_returns_largest_actionable_gaps():
 
 @pytest.mark.asyncio
 async def test_compare_optimal_handler_sends_dual_cone_caption_with_actions():
-    user = SimpleNamespace(id=uuid.uuid4(), display_name="An")
+    # salutation is explicit rather than absent: the compare caption now
+    # goes through salutation_of(), and a fake missing the attribute
+    # would fail on AttributeError instead of exercising the NULL path.
+    user = SimpleNamespace(id=uuid.uuid4(), display_name="An", salutation=None)
     current = ProjectionStub(
         scenario="current",
         monthly_savings=Decimal("15000000"),

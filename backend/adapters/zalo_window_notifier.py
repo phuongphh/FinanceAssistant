@@ -64,6 +64,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
+from uuid import UUID
 
 from backend import analytics
 from backend.adapters.zalo_notifier import (
@@ -188,8 +189,20 @@ class WindowedZaloNotifier:
         caption-only text send — still one CS message, still one slot.
         With neither a URL nor a caption it sends nothing, so neither do
         we reserve.
+
+        Raw ``photo`` bytes count as "something to send" only when the
+        inner notifier can actually publish them (Phase 5.1 #2.4). We ask
+        rather than assume: with the media flag off, bytes are unsendable
+        on this channel, and reserving a slot for a message that will
+        never leave is exactly the over-count this wrapper exists to
+        prevent.
         """
-        if not kwargs.get("image_url") and not strip_markdown(caption):
+        sendable_bytes = bool(photo) and self._inner.can_publish_images
+        if (
+            not kwargs.get("image_url")
+            and not sendable_bytes
+            and not strip_markdown(caption)
+        ):
             return None
 
         return await self._guarded(
@@ -382,6 +395,7 @@ def build_zalo_notifier(
     zalo_user_id: str,
     *,
     client: ZaloOAClient | None = None,
+    user_id: UUID | None = None,
     session_factory: Callable[[], Any] | None = None,
 ) -> WindowedZaloNotifier:
     """The only sanctioned way to construct a Zalo notifier.
@@ -396,10 +410,21 @@ def build_zalo_notifier(
     :func:`backend.services.notifier_resolver.resolve_targets`); making
     this return ``None`` would push an ``if`` onto callers that have no
     fallback anyway.
+
+    ``user_id`` is optional and only an optimisation: the inner notifier
+    needs an owner for any image it publishes (#2.4) and will look one up
+    itself if it isn't given. Pass it wherever the ``User`` is already
+    loaded, which is every call site except the inbound handler — that
+    one builds the notifier before it knows who is on the other end.
     """
     oa_client = client or get_zalo_oa_client()
     return WindowedZaloNotifier(
-        ZaloNotifier(client=oa_client, zalo_user_id=zalo_user_id),
+        ZaloNotifier(
+            client=oa_client,
+            zalo_user_id=zalo_user_id,
+            user_id=user_id,
+            session_factory=session_factory,
+        ),
         zalo_user_id,
         session_factory=session_factory,
     )

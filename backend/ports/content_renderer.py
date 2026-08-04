@@ -50,6 +50,11 @@ class TwinViewSnapshot:
     scenario_cards: list[dict[str, Any]] = field(default_factory=list)
     is_stale: bool = False
     filename: str = "be-tien-twin.png"
+    # How Bé Tiền addresses this user: anh / chị / bạn. Channel-neutral user
+    # data, not a Zalo concept — Telegram opens with ``user_name`` because it
+    # has room for a name, Zalo opens with the pronoun because it has room for
+    # one line. Defaulted so every existing construction site keeps working.
+    salutation: str = "bạn"
 
 
 @dataclass(frozen=True)
@@ -65,6 +70,7 @@ class TwinComparisonSnapshot:
     current_cone: list[dict[str, Any]]
     optimal_cone: list[dict[str, Any]]
     filename: str = "be-tien-twin-optimal.png"
+    salutation: str = "bạn"
 
 
 @dataclass(frozen=True)
@@ -77,10 +83,20 @@ class BriefingSnapshot:
 
 @dataclass(frozen=True)
 class MilestoneSnapshot:
-    """Minimal milestone render model for channel renderers."""
+    """Minimal milestone render model for channel renderers.
+
+    ``text`` is pre-composed for a channel with room to read. ``title`` and
+    ``effect`` are the same milestone as *parts* — what was reached, and what
+    it changed in the Twin — which is what a 300-character bubble needs in
+    order to say the important half. Both are optional: a caller that only
+    has ``text`` still renders, just less precisely.
+    """
 
     text: str
     buttons: tuple[tuple[Button, ...], ...] = field(default_factory=tuple)
+    title: str = ""
+    effect: str = ""
+    salutation: str = "bạn"
 
 
 class ContentRenderer(Protocol):

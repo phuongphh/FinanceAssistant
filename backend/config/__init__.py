@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     owner_telegram_id: str = ""
     # Optional Telegram custom emoji id for the animated sunrise in morning briefings.
     telegram_morning_custom_emoji_id: str = ""
+    # Phase 5.1 #4.3 — public deep link to the bot ("https://t.me/<bot>"),
+    # used for the one-time invitation a Zalo-first user gets at the end of
+    # onboarding. Empty in dev/CI, and empty means *skip the invitation*:
+    # a broken link would spend the once-only chance on nothing.
+    telegram_bot_url: str = ""
 
     # Zalo Official Account (Phase 4B Epic 4)
     # Provisioned manually by ops; empty in dev/CI degrades gracefully — the
@@ -125,6 +130,31 @@ class Settings(BaseSettings):
     # we measure one channel cleanly. Operator flips this to True at the
     # start of Phase 5.0 (Zalo rollout).
     zalo_channel_enabled: bool = False
+
+    # Media URLs (Phase 5.1 #1.2–#1.4). Channel-independent infrastructure:
+    # Zalo fetches images by URL instead of accepting bytes, and the Mini
+    # App (5.2) will want the same thing. Kept separate from
+    # ``zalo_channel_enabled`` so the serving endpoint can be switched off
+    # on its own without taking the whole channel down.
+    media_url_enabled: bool = False
+    # Public HTTPS origin that terminates in front of this app, e.g.
+    # "https://api.example.com". Empty means no URL can be built, which
+    # the notifier treats as "send text only". No trailing slash needed.
+    media_public_base_url: str = ""
+    # Directory holding the bytes. Must be writable by the service user
+    # and must NOT be inside the repo — nothing here is ever committed.
+    media_storage_path: str = "/tmp/betien-media"
+    # How long a minted URL stays good. Short by design: the URL is the
+    # credential (see backend/services/media_url_service.py).
+    media_url_ttl_seconds: int = 900
+    # Per-IP ceiling on the public serving endpoint. Generous enough for a
+    # chat client that prefetches, tight enough that the endpoint isn't a
+    # free bandwidth relay.
+    media_rate_limit_per_minute: int = 120
+    # How long an orphaned file must sit untouched before the sweep may
+    # delete it. Must comfortably exceed the longest publish→commit gap,
+    # or the sweep will delete bytes belonging to an in-flight request.
+    media_orphan_grace_seconds: int = 3600
 
     # Market data
     redis_url: str = "redis://localhost:6379/0"

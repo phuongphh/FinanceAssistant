@@ -65,7 +65,14 @@ async def _users_holding(db, symbol: str) -> list[tuple[User, bool]]:
         select(User, NotificationSettings.price_alerts_enabled, Asset.extra)
         .join(Asset, Asset.user_id == User.id)
         .outerjoin(NotificationSettings, NotificationSettings.user_id == User.id)
-        .where(Asset.asset_type == "stock", Asset.is_active.is_(True), Asset.extra.is_not(None))
+        .where(
+            Asset.asset_type == "stock",
+            Asset.is_active.is_(True),
+            Asset.extra.is_not(None),
+            # Phase 5.1 #4.2 — price alerts are Telegram-only and
+            # proactive; a Zalo-only holder has no chat_id to reach.
+            User.telegram_id.is_not(None),
+        )
     )
     rows: list[tuple[User, bool]] = []
     for user, enabled, extra in result.all():
