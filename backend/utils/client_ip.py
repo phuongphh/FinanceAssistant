@@ -28,6 +28,16 @@ Two deliberate choices:
   in one CIDR degrades that entry to "not trusted" — the safe
   direction — instead of taking the process down at import time.
 
+**This only works if the transport peer survives to us.** Uvicorn's
+``--proxy-headers`` is on by default and rewrites ``request.client``
+from ``X-Forwarded-For`` for any peer in ``--forwarded-allow-ips``
+(default ``127.0.0.1``) — which is exactly where Caddy sits. That
+rewrite happens before this module runs, so it would hand us a forged
+address as the "peer" and the check below would be inspecting the
+caller's own claim. Every launcher in this repo therefore passes
+``--no-proxy-headers``; the trust decision is made here, once, where it
+can be tested.
+
 This is edge code: it reads settings, so it belongs to routers and
 middleware. A service must not call it.
 """
@@ -99,12 +109,25 @@ def derive_client_ip(
         return UNKNOWN_IP
     if not forwarded_for or not is_trusted_proxy(peer, trusted_cidrs):
         return peer
-    # Left-most hop is the original client. Everything after it was
-    # appended by intermediaries and is equally unverifiable, so taking
-    # the first is neither better nor worse — it is the convention the
-    # proxy in front of us follows.
-    first_hop = forwarded_for.split(",", 1)[0].strip()
-    return first_hop or peer
+    hops = [hop.strip() for hop in forwarded_for.split(",") if hop.strip()]
+    if not hops:
+        return peer
+    # Walk right to left, not left to right. Caddy *appends* what it
+    # observed rather than replacing the header, so a caller that sends
+    # its own ``X-Forwarded-For`` keeps that value sitting in front of
+    # the address the proxy actually saw. Taking the left-most entry
+    # would therefore hand a remote caller the rate-limit key again,
+    # this time through a trusted proxy.
+    #
+    # Reading from the right, every entry we recognise as one of our own
+    # proxies is a hop we can account for; the first one we do not is the
+    # earliest address in the chain that something we run vouched for.
+    for hop in reversed(hops):
+        if not is_trusted_proxy(hop, trusted_cidrs):
+            return hop
+    # Every hop is ours, so the request originated inside our own
+    # network and the left-most entry is a genuine internal client.
+    return hops[0]
 
 
 def client_ip(request: Request) -> str:

@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.config import Settings  # noqa: E402
 from backend.database import get_db  # noqa: E402
 from backend.routers import media as media_router  # noqa: E402
+from backend.services import admin_audit  # noqa: E402
 from backend.utils import client_ip as mod  # noqa: E402
 
 PRIVATE = "10.0.0.7"  # where Caddy / the Docker bridge sit
@@ -88,11 +89,40 @@ def test_trusted_peer_speaks_for_the_original_client():
     assert mod.derive_client_ip(PRIVATE, "198.51.100.4", DEFAULT) == "198.51.100.4"
 
 
-def test_trusted_peer_uses_the_left_most_hop():
-    """Everything after the first hop was appended by intermediaries; the
-    original client is the left-most entry."""
+def test_trusted_peer_skips_past_our_own_hops():
+    """Reading from the right, our own proxies are hops we can account
+    for; the first address we cannot is the caller."""
     header = " 198.51.100.4 , 10.0.0.7 , 10.0.0.8 "
     assert mod.derive_client_ip(PRIVATE, header, DEFAULT) == "198.51.100.4"
+
+
+def test_a_caller_supplied_prefix_does_not_become_the_key():
+    """Caddy *appends* what it observed instead of replacing the header,
+    so a caller that sends its own ``X-Forwarded-For`` keeps that value
+    sitting in front of its real address. Reading left to right would
+    hand it a freely-chosen key again, this time laundered through a
+    trusted proxy."""
+    header = "198.51.100.250, 203.0.113.9"
+    assert mod.derive_client_ip(PRIVATE, header, DEFAULT) == "203.0.113.9"
+
+
+def test_a_caller_supplied_prefix_cannot_be_rotated():
+    """The same attack as ``test_untrusted_peer_cannot_mint_distinct_keys``
+    but through the proxy: every forged prefix must collapse onto the one
+    address Caddy actually saw."""
+    keys = {
+        mod.derive_client_ip(PRIVATE, f"198.51.100.{n}, {PUBLIC}", DEFAULT)
+        for n in range(1, 25)
+    }
+    assert keys == {PUBLIC}
+
+
+def test_an_all_internal_chain_keeps_its_first_entry():
+    """Nothing in the chain is external, so the request really did start
+    inside our own network and the left-most entry is a real client —
+    not something a stranger could have written."""
+    header = "10.1.2.3, 10.0.0.7, 10.0.0.8"
+    assert mod.derive_client_ip(PRIVATE, header, DEFAULT) == "10.1.2.3"
 
 
 def test_untrusted_peer_header_is_ignored():
@@ -237,3 +267,55 @@ def test_a_real_proxy_still_gets_per_client_windows(limited, settings_cidrs):
             for n in range(1, 6)
         ]
     assert codes == [404] * 5
+
+
+# -- what the audit trail records ------------------------------------------
+#
+# The limiter only loses accuracy when it is fooled. The audit trail loses
+# something worse: a record naming an address the subject picked points the
+# investigation at whoever the attacker chose.
+
+
+def _request(
+    peer: str | None, *, stamp: str | None = None, header: str | None = None
+) -> Request:
+    headers = [(b"x-forwarded-for", header.encode())] if header is not None else []
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": headers,
+            "client": (peer, 51234) if peer else None,
+            "state": {},
+        }
+    )
+    if stamp is not None:
+        request.state.client_ip = stamp
+    return request
+
+
+def test_audit_records_the_trust_checked_stamp():
+    """Edge middleware already applied the trust rule; the service reuses
+    that answer rather than re-deriving one it is not allowed to."""
+    request = _request(PRIVATE, stamp="198.51.100.4", header="198.51.100.4")
+    assert admin_audit._client_ip(request) == "198.51.100.4"
+
+
+def test_audit_ignores_a_forged_header_without_a_stamp():
+    """The finding, stated directly: with no stamp the record must name
+    the address the caller actually connected from, never its claim."""
+    request = _request(PUBLIC, header="198.51.100.4")
+    assert admin_audit._client_ip(request) == PUBLIC
+
+
+def test_audit_drops_a_value_that_is_not_an_address():
+    """``ip_address`` is an INET column. The "unknown" sentinel, or a test
+    transport's hostname, would fail the insert and take the audited
+    action down with it."""
+    assert admin_audit._client_ip(_request(None, stamp=mod.UNKNOWN_IP)) is None
+    assert admin_audit._client_ip(_request("testclient")) is None
+
+
+def test_audit_without_a_request_records_nothing():
+    assert admin_audit._client_ip(None) is None

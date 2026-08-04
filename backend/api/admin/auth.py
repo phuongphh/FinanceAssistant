@@ -21,13 +21,14 @@ router = APIRouter(prefix="/auth", tags=["admin-auth"])
 
 
 def _request_ip(request: Request) -> str:
-    """Key for the login rate limiter and the audit trail.
+    """Key for the login rate limiter.
 
     Same trust rule as everywhere else: a forged ``X-Forwarded-For``
     from an untrusted peer would hand a password-guesser a fresh
-    allowance on every attempt.
+    allowance on every attempt. (The audit trail reads the same value,
+    but off ``request.state`` — see ``backend/services/admin_audit.py``.)
     """
-    return client_ip(request)
+    return getattr(request.state, "client_ip", None) or client_ip(request)
 
 
 @router.post("/login", response_model=LoginResponse)
