@@ -84,7 +84,7 @@ services:
     # Migration chạy trước uvicorn. Nếu migration fail → container restart loop → deploy.sh catch ở health check.
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers"
 
   scheduler:
     build:

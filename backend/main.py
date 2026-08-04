@@ -51,6 +51,7 @@ from backend.services.zalo_token_service import (
 from backend.services.telegram_service import close_client as close_telegram_client
 from backend.workers.telegram_worker import recover_orphaned_updates, run_recovery_loop
 from backend.workers import zalo_worker
+from backend.utils.client_ip import client_ip
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -275,10 +276,10 @@ _admin_rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Rate-limit key. ``X-Forwarded-For`` is believed only from a peer
+    inside ``TRUSTED_PROXY_CIDRS`` — otherwise the caller picks its own
+    key and the limiter never counts it twice."""
+    return getattr(request.state, "client_ip", None) or client_ip(request)
 
 
 @app.middleware("http")
@@ -323,6 +324,22 @@ async def force_fresh_miniapp_static_assets(request: Request, call_next):
             for (k, v) in raw_headers
             if k.lower() not in {b"if-none-match", b"if-modified-since"}
         ]
+    return await call_next(request)
+
+
+# Registered last, so Starlette runs it first: everything below — the admin
+# limiter included — sees the stamp already in place.
+@app.middleware("http")
+async def stamp_client_ip(request: Request, call_next):
+    """Resolve the caller's address once, at the edge, for everything after.
+
+    The trust rule needs ``TRUSTED_PROXY_CIDRS``, and only edge code may read
+    settings — so a service that wants a caller address (the admin audit
+    trail, for one) cannot work it out for itself. Stamping it on
+    ``request.state`` hands every layer below a value that is already
+    trust-checked, without changing a signature at nineteen call sites.
+    """
+    request.state.client_ip = client_ip(request)
     return await call_next(request)
 
 

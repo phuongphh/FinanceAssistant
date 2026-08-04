@@ -89,6 +89,10 @@ write_backend_plist() {
     <key>Label</key>
     <string>com.financeassistant.backend</string>
 
+    <!-- --no-proxy-headers: uvicorn mặc định ghi đè request.client bằng
+         X-Forwarded-For cho peer loopback — chính là chỗ Caddy đứng. Backend
+         (backend/utils/client_ip.py) cần địa chỉ TCP thật của peer để quyết
+         định có tin header hay không, nên tắt phần rewrite của uvicorn. -->
     <key>ProgramArguments</key>
     <array>
         <string>${VENV_PYTHON}</string>
@@ -99,6 +103,7 @@ write_backend_plist() {
         <string>0.0.0.0</string>
         <string>--port</string>
         <string>${PORT}</string>
+        <string>--no-proxy-headers</string>
     </array>
 
     <key>WorkingDirectory</key>

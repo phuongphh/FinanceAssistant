@@ -28,6 +28,17 @@ class Settings(BaseSettings):
     admin_allowed_origin: str = "https://admin.betien.vn"
     admin_api_rate_limit_per_minute: int = 100
 
+    # Which connecting peers may speak for someone else via
+    # ``X-Forwarded-For`` — see backend/utils/client_ip.py. Comma-separated
+    # CIDRs. The default covers loopback plus the private ranges, i.e. where
+    # Caddy and the Docker bridge live, so existing deploys keep working
+    # unchanged; a peer arriving from the public internet on the published
+    # port is not trusted and gets rate-limited by the address it actually
+    # connected from. Narrow this to the proxy's real address when known.
+    trusted_proxy_cidrs: str = (
+        "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
+    )
+
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
 

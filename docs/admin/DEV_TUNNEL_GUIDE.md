@@ -87,8 +87,13 @@ server: {
 **Terminal 1 — FastAPI:**
 
 ```bash
-uv run uvicorn backend.main:app --reload --port 8000
+uv run uvicorn backend.main:app --reload --port 8000 --no-proxy-headers
 ```
+
+> `--no-proxy-headers` giống hệt prod (xem `launchd/*.plist.template`, `backend/Dockerfile`).
+> Uvicorn mặc định ghi đè `request.client` bằng `X-Forwarded-For` khi peer là loopback —
+> mà cloudflared cũng nối vào loopback. Backend cần peer TCP thật để quyết định có tin
+> header hay không (`backend/utils/client_ip.py`); bật rewrite của uvicorn là bỏ qua bước đó.
 
 **Terminal 2 — Vite dev:**
 
@@ -130,7 +135,7 @@ Mở link `https://xxxx.trycloudflare.com` trên trình duyệt:
 - Để khỏi mở 3 terminal mỗi lần: viết 1 `Makefile` hoặc dùng `tmux` / `overmind` với Procfile:
 
   ```
-  api: uv run uvicorn backend.main:app --reload --port 8000
+  api: uv run uvicorn backend.main:app --reload --port 8000 --no-proxy-headers
   web: npm --prefix betien-admin run dev
   tunnel: cloudflared tunnel --url http://localhost:5173
   ```

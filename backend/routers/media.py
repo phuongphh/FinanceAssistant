@@ -48,6 +48,7 @@ from backend.config import get_settings
 from backend.database import get_db
 from backend.ports.media_storage import MediaStorage
 from backend.services import media_url_service
+from backend.utils.client_ip import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +62,10 @@ _NOT_FOUND_DETAIL = "not found"
 _rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
 # The windows above are process-local state keyed by client IP, and this
-# is a public route whose key is partly caller-supplied — anyone can send
-# a fresh ``X-Forwarded-For`` on every request. Without eviction the dict
-# only ever grows, which turns a rate limiter into a memory leak with a
-# free trigger. Two bounds, in order:
+# is a public route. The key is no longer freely caller-supplied — the
+# forwarded header is only believed from a trusted proxy peer — but a
+# real proxy still forwards an unbounded number of distinct clients, so
+# without eviction the dict only ever grows. Two bounds, in order:
 #
 #   * a window whose newest hit is older than the 60s sliding window can
 #     never affect a decision again, so it is dropped;
@@ -118,13 +119,15 @@ def _evict_stale(now: float) -> None:
 
 
 def _client_ip(request: Request) -> str:
-    """Same derivation as the admin limiter in :mod:`backend.main` —
-    trust the first ``X-Forwarded-For`` hop because a reverse proxy
-    terminates TLS in front of us."""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Same derivation as the admin limiter in :mod:`backend.main`.
+
+    ``X-Forwarded-For`` is only believed from a peer inside
+    ``TRUSTED_PROXY_CIDRS``. This route is the one that needs it most:
+    it is public and unauthenticated, so before that rule a direct
+    caller could hand itself a fresh window per request by rotating the
+    header — see :mod:`backend.utils.client_ip`.
+    """
+    return client_ip(request)
 
 
 def _rate_limited(ip: str, limit_per_minute: int) -> bool:

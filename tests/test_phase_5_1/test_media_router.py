@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.database import get_db  # noqa: E402
 from backend.routers import media as media_router  # noqa: E402
 from backend.services import media_url_service as svc  # noqa: E402
+from backend.utils import client_ip as client_ip_mod  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"chart" * 20
 
@@ -34,6 +35,18 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"chart" * 20
 class _Settings:
     media_rate_limit_per_minute = 120
     media_storage_path = "/unused"
+
+
+# The peer these requests appear to come from. A private address because
+# ``X-Forwarded-For`` is only believed from a peer inside
+# ``TRUSTED_PROXY_CIDRS`` — the default of ``TestClient`` is the
+# hostname ``testclient``, which is deliberately *not* trusted, so a
+# per-IP test has to arrive the way a request through Caddy does.
+_PROXY = "10.0.0.7"
+
+
+class _TrustSettings:
+    trusted_proxy_cidrs = "10.0.0.0/8"
 
 
 @pytest.fixture()
@@ -47,6 +60,11 @@ def wired(monkeypatch):
     media_router._rate_windows.clear()
     settings = _Settings()
     monkeypatch.setattr(media_router, "get_settings", lambda: settings)
+    # Patched on the helper's own module: it reads ``backend.config``
+    # directly, so the router-level patch above never reaches it. Pinned
+    # rather than left to the shipped default so a stray env var in a
+    # dev shell can't change what these tests mean.
+    monkeypatch.setattr(client_ip_mod, "get_settings", lambda: _TrustSettings())
 
     db, storage = FakeMediaSession(), InMemoryStorage()
 
@@ -59,7 +77,7 @@ def wired(monkeypatch):
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[media_router.get_media_storage] = lambda: storage
 
-    with TestClient(app) as client:
+    with TestClient(app, client=(_PROXY, 51234)) as client:
         yield client, db, storage, settings
 
     media_router._rate_windows.clear()
@@ -203,7 +221,13 @@ def test_requests_past_the_limit_are_refused(wired):
 def test_the_limit_is_per_ip(wired):
     """Keyed on the first ``X-Forwarded-For`` hop, matching the admin
     limiter — production terminates TLS at a reverse proxy, so the
-    socket address is the proxy's for everyone."""
+    socket address is the proxy's for everyone.
+
+    The header only counts because these requests arrive from
+    ``_PROXY``, which the fixture puts inside the trusted range. From an
+    untrusted peer the same two headers collapse to one key; that half is
+    covered in ``test_client_ip_trust.py``.
+    """
     client, _, _, settings = wired
     settings.media_rate_limit_per_minute = 2
 
