@@ -40,7 +40,9 @@ def _rows(*buttons: Button) -> tuple[tuple[Button, ...], ...]:
 
 
 def test_callback_button_becomes_query_show_saying_its_own_label():
-    buttons, lines = map_buttons(_rows(Button(text="Xem Twin", callback_data="twin:open")))
+    buttons, lines = map_buttons(
+        _rows(Button(text="Xem Twin", callback_data="twin:open"))
+    )
 
     assert lines == []
     assert buttons == [
@@ -73,7 +75,9 @@ def test_url_wins_when_a_button_carries_both():
     # Telegram renders web_app buttons as a link too — following it is
     # the closer match to what the user would have got.
     buttons, _ = map_buttons(
-        _rows(Button(text="Mở", callback_data="twin:open", web_app_url="https://x.test/t"))
+        _rows(
+            Button(text="Mở", callback_data="twin:open", web_app_url="https://x.test/t")
+        )
     )
 
     assert buttons[0]["type"] == BUTTON_TYPE_OPEN_URL
@@ -98,7 +102,9 @@ def test_rows_are_flattened_in_reading_order():
 
 def test_buttons_past_the_cap_become_text_lines():
     extras = ZALO_MAX_BUTTONS + 2
-    rows = _rows(*(Button(text=f"Nút {i}", callback_data=f"c{i}") for i in range(extras)))
+    rows = _rows(
+        *(Button(text=f"Nút {i}", callback_data=f"c{i}") for i in range(extras))
+    )
 
     buttons, lines = map_buttons(rows, copy=ButtonCopy(query_line="say:{title}"))
 
@@ -110,7 +116,10 @@ def test_buttons_past_the_cap_become_text_lines():
 
 def test_overflowing_url_button_keeps_its_link_in_the_text_line():
     rows = _rows(
-        *(Button(text=f"Nút {i}", callback_data=f"c{i}") for i in range(ZALO_MAX_BUTTONS)),
+        *(
+            Button(text=f"Nút {i}", callback_data=f"c{i}")
+            for i in range(ZALO_MAX_BUTTONS)
+        ),
         Button(text="Mở app", web_app_url="https://x.test/app"),
     )
 
@@ -178,7 +187,12 @@ def test_long_title_is_clipped_by_us_rather_than_rejected_by_zalo():
 
 
 def test_a_broken_copy_template_falls_back_to_the_title():
-    rows = _rows(*(Button(text=f"N{i}", callback_data=f"c{i}") for i in range(ZALO_MAX_BUTTONS + 1)))
+    rows = _rows(
+        *(
+            Button(text=f"N{i}", callback_data=f"c{i}")
+            for i in range(ZALO_MAX_BUTTONS + 1)
+        )
+    )
 
     _, lines = map_buttons(rows, copy=ButtonCopy(query_line="{nope}"))
 
@@ -222,7 +236,9 @@ class _FakeClient:
         self.with_buttons.append((recipient_id, text, buttons))
         return True
 
-    async def send_image_message(self, recipient_id: str, image_url: str, caption: str) -> bool:
+    async def send_image_message(
+        self, recipient_id: str, image_url: str, caption: str
+    ) -> bool:
         return True
 
 
@@ -254,20 +270,59 @@ async def test_send_message_with_buttons_uses_the_button_endpoint():
 async def test_suggestion_lines_are_appended_before_the_character_limit_applies():
     # #3.3 is explicit that the lines join the body *before* truncation,
     # so the 300-char ceiling is measured on what the user actually sees.
+    # The body is what gets clipped, not the lines: they are the fallback
+    # for a button Zalo refused, so losing them to the cap would leave the
+    # user with no way at all to reach that action.
     client = _FakeClient()
-    rows = _rows(*(Button(text=f"Nút {i}", callback_data=f"c{i}") for i in range(ZALO_MAX_BUTTONS + 1)))
+    rows = _rows(
+        *(
+            Button(text=f"Nút {i}", callback_data=f"c{i}")
+            for i in range(ZALO_MAX_BUTTONS + 1)
+        )
+    )
 
     await ZaloNotifier(client, "u1").send_message(0, "x" * 295, buttons=rows)
 
     _, text, _ = client.with_buttons[0]
-    assert len(text) == 300
-    assert text.endswith("…")
+    assert len(text) <= 300
+    head, _, tail = text.partition("\n")
+    assert head.endswith("…")
+    assert f"Nút {ZALO_MAX_BUTTONS}" in tail
+
+
+@pytest.mark.asyncio
+async def test_an_oversized_suggestion_tail_never_starves_the_body():
+    # The other direction: if the demoted lines alone would eat the whole
+    # budget, the body still keeps its floor and the tail is what loses
+    # characters — an answer with a clipped hint beats a hint with no answer.
+    client = _FakeClient()
+    rows = _rows(
+        *(
+            Button(
+                text=f"Nút rất là dài dòng số {i} " + "y" * 40, callback_data=f"c{i}"
+            )
+            for i in range(ZALO_MAX_BUTTONS + 4)
+        )
+    )
+
+    await ZaloNotifier(client, "u1").send_message(0, "z" * 200, buttons=rows)
+
+    _, text, _ = client.with_buttons[0]
+    assert len(text) <= 300
+    # 150 = the floor; the last of those chars is the ellipsis marking
+    # that the body was clipped, so 149 z's survive.
+    assert text.startswith("z" * 149 + "…")
 
 
 @pytest.mark.asyncio
 async def test_a_short_message_keeps_its_suggestion_lines_intact():
     client = _FakeClient()
-    rows = _rows(*(Button(text=f"Nút {i}", callback_data=f"c{i}") for i in range(ZALO_MAX_BUTTONS + 1)))
+    rows = _rows(
+        *(
+            Button(text=f"Nút {i}", callback_data=f"c{i}")
+            for i in range(ZALO_MAX_BUTTONS + 1)
+        )
+    )
 
     await ZaloNotifier(client, "u1").send_message(0, "Đầu tin", buttons=rows)
 

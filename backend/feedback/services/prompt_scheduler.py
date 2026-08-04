@@ -59,6 +59,11 @@ class PromptScheduler:
         user = await db.get(User, user_id)
         if user is None or not user.is_active:
             return []
+        # Phase 5.1 #4.2 — delivery below is Telegram-only. Bail before
+        # the cooldown/rate-limit rows are written so a Zalo-only user
+        # doesn't burn their prompt quota on a message nobody receives.
+        if user.telegram_id is None:
+            return []
         current_time = now or datetime.now(timezone.utc)
         metrics = await self._metrics(db, user, now=current_time)
         sent: list[str] = []
@@ -87,6 +92,8 @@ class PromptScheduler:
     ) -> bool:
         prompt = next((item for item in self.prompts if item.id == prompt_id), None)
         if prompt is None:
+            return False
+        if user.telegram_id is None:  # Phase 5.1 #4.2 — no Telegram chat
             return False
         current_time = now or datetime.now(timezone.utc)
         if await self._within_prompt_cooldown(db, user.id, prompt, now=current_time):

@@ -211,6 +211,17 @@ async def send_morning_report(
     Returns True if dispatched (actual delivery status is the
     adapter's responsibility — we trust it has logged any failure).
     """
+    if user.telegram_id is None:
+        # Phase 5.1 #4.2 — the caller job already filters these out;
+        # this is the belt to that braces. A Zalo-only user has no
+        # Telegram chat, and Zalo is reactive-first so the briefing
+        # simply doesn't apply — building the chart first would spend
+        # real work on a message with nowhere to go.
+        logger.debug(
+            "morning_report: skipping user %s (no telegram_id)", user.id
+        )
+        return False
+
     notifier = get_notifier()
     chat_id = user.telegram_id
 

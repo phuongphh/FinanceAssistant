@@ -74,6 +74,25 @@ def test_select_dormant_empty_when_none_eligible():
     assert select_dormant(rows, now=NOW) == []
 
 
+def test_select_dormant_drops_a_row_with_no_telegram_id():
+    """Phase 5.1 #4.2 — ``telegram_id`` is nullable now that Zalo can be the
+    signup channel. ``select_dormant`` converts with ``int(...)`` inside a
+    comprehension, so an unfiltered Zalo-only row raised ``TypeError`` and
+    took the entire broadcast down before the first send — not just its own.
+
+    Built by hand rather than via ``_row(telegram_id=None)``: the helper
+    substitutes a default when the argument is None, so it cannot express
+    this row.
+    """
+    telegramless = _row(last_active_days=30)
+    telegramless.telegram_id = None
+    dormant = _row(last_active_days=30)
+
+    picked = select_dormant([telegramless, dormant], now=NOW)
+
+    assert [r.telegram_id for r in picked] == [dormant.telegram_id]
+
+
 def test_already_broadcast_dormant_is_excluded_idempotency():
     # The core idempotency guarantee: a dormant user who already received the
     # nudge is never picked again, so a second run is a no-op for them.

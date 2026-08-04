@@ -309,10 +309,10 @@ class FakePipeline:
 class FakeDispatcher:
     """Stands in for :class:`IntentDispatcher`.
 
-    ``calls`` is the assertion that matters most: an intent outside the
-    thin slice must leave this list empty, because dispatching one could
-    have side effects (a wizard, a persisted pending action) that Zalo
-    has no way to finish.
+    ``calls`` is the assertion that matters most: an intent the Zalo
+    blocklist holds back must leave this list empty, because dispatching
+    one could have side effects (a wizard, a persisted pending action)
+    that Zalo has no way to finish.
     """
 
     def __init__(self, outcome=None, error: Exception | None = None) -> None:

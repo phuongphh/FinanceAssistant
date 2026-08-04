@@ -111,7 +111,7 @@ async def _send_nudge(session: OnboardingSession, user: User) -> bool:
                 # zalo_user_id stringified — Notifier.send_message
                 # accepts an int for Telegram, str via kwargs for Zalo.
                 if target.channel == "telegram":
-                    await target.notifier.send_message(
+                    result = await target.notifier.send_message(
                         chat_id=int(target.target_id),
                         text=text,
                         parse_mode="HTML",
@@ -120,10 +120,24 @@ async def _send_nudge(session: OnboardingSession, user: User) -> bool:
                 else:
                     # Zalo does not support inline keyboards; degrade
                     # gracefully by sending text only.
-                    await target.notifier.send_message(
+                    result = await target.notifier.send_message(
                         chat_id=target.target_id,
                         text=text,
                     )
+                if result is None:
+                    # A notifier that declined without raising — the Zalo
+                    # 48h window is shut or the 8-message quota is spent.
+                    # A nudge goes to someone who has gone quiet, so that
+                    # is the *expected* state, not the exception: counting
+                    # it as sent would stamp the cooldown and the user
+                    # would never be nudged again.
+                    logger.warning(
+                        "resume_nudge: send declined user=%s channel=%s — "
+                        "will retry on next run",
+                        user.id,
+                        target.channel,
+                    )
+                    continue
                 sent = True
             except Exception:
                 logger.exception(

@@ -102,6 +102,12 @@ def _eligible_dormant(row, now: datetime) -> bool:
     classifies as ``dormant`` right now."""
     if row.reengagement_broadcast_at is not None:
         return False
+    # Phase 5.1 #4.2 — the cohort query already excludes these, but this
+    # filter is the pure, separately-tested half of the pair and callers
+    # may hand it rows from anywhere. ``int(None)`` below would raise
+    # mid-comprehension and take the whole broadcast down with it.
+    if row.telegram_id is None:
+        return False
     return (
         classify_status(
             row.created_at, row.last_active_at, row.manual_status, now=now
@@ -142,7 +148,18 @@ def _cohort_stmt():
             last_active_sq.c.last_active_at,
         )
         .outerjoin(last_active_sq, last_active_sq.c.user_id == User.id)
-        .where(User.is_active.is_(True), User.deleted_at.is_(None))
+        .where(
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+            # Phase 5.1 #4.2 — ``telegram_id`` is nullable now that Zalo is
+            # a signup channel, and this broadcast is Telegram-only (Zalo is
+            # reactive-first: no unprompted sends). Excluded in SQL rather
+            # than in the comprehensions below because both of them call
+            # ``int(r.telegram_id)`` while building the list — one Zalo-only
+            # row would raise ``TypeError`` and abort the whole run before
+            # the first send, including on the ``--only`` test path.
+            User.telegram_id.is_not(None),
+        )
     )
 
 

@@ -14,6 +14,7 @@ Differences from :class:`TelegramNotifier`:
 Notifier port contract: never raise from public methods, return
 ``None`` on failure so the caller can choose retry policy.
 """
+
 from __future__ import annotations
 
 import logging
@@ -249,7 +250,16 @@ class ZaloNotifier:
 
         plain = strip_markdown(text)
         if suggestion_lines:
-            plain = "\n".join([plain, *suggestion_lines]) if plain else "\n".join(suggestion_lines)
+            # The demoted lines are the *fallback* for buttons Zalo
+            # refused, so appending them and then truncating from the end
+            # leaves the user with neither the button nor its replacement.
+            # Reserve their length up front — but never starve the answer
+            # itself: below the floor the tail is what gets clipped.
+            tail = "\n".join(suggestion_lines)
+            floor = ZALO_MESSAGE_MAX_CHARS // 2
+            room = max(ZALO_MESSAGE_MAX_CHARS - len(tail) - 1, floor)
+            head = truncate_for_zalo(plain, room)
+            plain = "\n".join([head, tail]) if head else tail
         body = truncate_for_zalo(plain)
         if not body:
             return None
