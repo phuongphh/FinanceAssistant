@@ -13,6 +13,8 @@ from backend.wealth.models.asset import Asset
 
 logger = logging.getLogger(__name__)
 
+DAILY_MARKET_SYMBOLS = ("VNINDEX",)
+
 
 async def _held_stock_symbols(db) -> list[str]:
     """Return distinct stock tickers from active assets."""
@@ -29,10 +31,8 @@ async def update_all_held_stocks() -> dict[str, int]:
     """Fetch all held stock symbols and write regular + last-known cache entries."""
     started = time.perf_counter()
     async with get_session_factory()() as db:
-        symbols = await _held_stock_symbols(db)
-    if not symbols:
-        logger.info("Stock updater no-op: symbols_attempted=0 symbols_succeeded=0 duration_ms=0")
-        return {"symbols_attempted": 0, "symbols_succeeded": 0, "duration_ms": 0}
+        held_symbols = await _held_stock_symbols(db)
+    symbols = sorted({*DAILY_MARKET_SYMBOLS, *held_symbols})
 
     provider = get_stock_provider()
     cache = get_price_cache()

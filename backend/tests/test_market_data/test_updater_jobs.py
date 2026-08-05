@@ -51,12 +51,18 @@ def _quote(symbol: str, asset_type: str) -> PriceQuote:
 
 
 @pytest.mark.asyncio
-async def test_stock_updater_noops_when_no_symbols():
-    with patch.object(stock_updater, "get_session_factory", return_value=_session_factory([])):
+async def test_stock_updater_always_refreshes_vnindex_without_held_symbols():
+    redis = FakeAsyncRedis()
+    provider = MagicMock()
+    provider.fetch_batch = AsyncMock(return_value=[_quote("VNINDEX", "stock")])
+    with patch.object(stock_updater, "get_session_factory", return_value=_session_factory([])), patch.object(stock_updater, "get_stock_provider", return_value=provider), patch.object(stock_updater, "get_price_cache", return_value=PriceCache(redis)):
         metrics = await stock_updater.update_all_held_stocks()
 
-    assert metrics["symbols_attempted"] == 0
-    assert metrics["symbols_succeeded"] == 0
+    provider.fetch_batch.assert_awaited_once_with(["VNINDEX"])
+    assert metrics["symbols_attempted"] == 1
+    assert metrics["symbols_succeeded"] == 1
+    assert await redis.get("market_data:stock:VNINDEX") is not None
+    assert await redis.get("market_data:stock:VNINDEX:last_known") is not None
 
 
 @pytest.mark.asyncio
@@ -67,8 +73,8 @@ async def test_stock_updater_fetches_distinct_symbols_and_writes_cache():
     with patch.object(stock_updater, "get_session_factory", return_value=_session_factory([{"ticker": "VNM"}, {"ticker": "vnm"}])), patch.object(stock_updater, "get_stock_provider", return_value=provider), patch.object(stock_updater, "get_price_cache", return_value=PriceCache(redis)):
         metrics = await stock_updater.update_all_held_stocks()
 
-    provider.fetch_batch.assert_awaited_once_with(["VNM"])
-    assert metrics["symbols_attempted"] == 1
+    provider.fetch_batch.assert_awaited_once_with(["VNINDEX", "VNM"])
+    assert metrics["symbols_attempted"] == 2
     assert metrics["symbols_succeeded"] == 1
     assert await redis.get("market_data:stock:VNM") is not None
     assert await redis.get("market_data:stock:VNM:last_known") is not None
