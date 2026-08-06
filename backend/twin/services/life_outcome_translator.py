@@ -66,6 +66,7 @@ async def translate(
             use_cache=True,
             shared_cache=True,
             cache_ttl_days=TTL_DAYS,
+            timeout=1.5,
         )
     except (LLMError, Exception):
         return fallback

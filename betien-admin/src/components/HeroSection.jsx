@@ -1,4 +1,4 @@
-import { Activity, Database, Users } from 'lucide-react';
+import { Activity, Target, Users } from 'lucide-react';
 import { useDateRange } from '../context/DateRangeContext';
 
 export default function HeroSection() {
@@ -7,18 +7,18 @@ export default function HeroSection() {
   return (
     <section className="grid gap-6 rounded-[2rem] border border-hairline bg-porcelain p-6 md:grid-cols-[1.5fr_1fr] md:p-8">
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-gold">Phase 4.2.5 · Admin Observability</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-gold">Post soft-launch · Growth Ops</p>
         <h1 className="font-display text-4xl font-semibold leading-tight text-ink-900 md:text-5xl">
-          Soft-launch health dashboard
+          Founder growth dashboard
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-ink-500 md:text-base">
-          Theo dõi acquisition, retention, friction và unit economics trong {selectedRange.label.toLowerCase()} gần nhất để phát hiện sớm vấn đề trước cohort founding member.
+          Tập trung vào activation, Twin engagement và retention trong {selectedRange.label.toLowerCase()} gần nhất; bỏ các tín hiệu vanity để operator xử lý đúng nút thắt sau soft launch.
         </p>
       </div>
       <div className="grid grid-cols-3 gap-3 md:grid-cols-1">
-        <HeroStat icon={Users} label="Cohort" value="50" suffix="founders" />
-        <HeroStat icon={Activity} label="Refresh" value="Manual" suffix="v1.0" />
-        <HeroStat icon={Database} label="Scope" value="Tenant" suffix="safe" />
+        <HeroStat icon={Users} label="Focus" value="D7" suffix="activation" />
+        <HeroStat icon={Activity} label="Loop" value="Twin" suffix="habit" />
+        <HeroStat icon={Target} label="Next" value="D28" suffix="retention" />
       </div>
     </section>
   );
