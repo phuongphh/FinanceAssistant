@@ -136,6 +136,7 @@ async def _keep_typing_alive(chat_id: int) -> None:
     except Exception:
         logger.debug("twin_handler: typing indicator failed", exc_info=True)
 
+
 def _miniapp_url() -> str | None:
     # Delegate to the shared helper so the ``?b=<build_hash>`` cache-bust
     # query stays consistent across every Mini App entry point.

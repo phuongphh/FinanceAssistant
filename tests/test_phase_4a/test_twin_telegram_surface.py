@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
 from decimal import Decimal
 from types import SimpleNamespace
@@ -34,6 +36,80 @@ class FakeUser:
 
     def get_greeting_name(self):
         return "An"
+
+
+@pytest.mark.asyncio
+async def test_keep_typing_alive_repeats_until_cancelled(monkeypatch):
+    repeated = asyncio.Event()
+    calls = []
+
+    async def fake_send_chat_action(chat_id, action):
+        calls.append((chat_id, action))
+        if len(calls) == 2:
+            repeated.set()
+
+    async def fast_first_sleep(_seconds):
+        if len(calls) > 1:
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr(twin_handler, "send_chat_action", fake_send_chat_action)
+    monkeypatch.setattr(twin_handler.asyncio, "sleep", fast_first_sleep)
+
+    task = asyncio.create_task(twin_handler._keep_typing_alive(123))
+    await repeated.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert calls == [(123, "typing"), (123, "typing")]
+
+
+@pytest.mark.asyncio
+async def test_keep_typing_alive_swallows_telegram_errors(monkeypatch, caplog):
+    async def failing_send_chat_action(_chat_id, _action):
+        raise RuntimeError("Telegram unavailable")
+
+    monkeypatch.setattr(twin_handler, "send_chat_action", failing_send_chat_action)
+
+    with caplog.at_level(logging.DEBUG, logger=twin_handler.__name__):
+        await twin_handler._keep_typing_alive(123)
+
+    assert "typing indicator failed" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("inner_fails", [False, True])
+async def test_send_twin_current_always_cancels_typing_task(monkeypatch, inner_fails):
+    typing_started = asyncio.Event()
+    typing_cancelled = asyncio.Event()
+
+    async def fake_keep_typing_alive(chat_id):
+        assert chat_id == 123
+        typing_started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            typing_cancelled.set()
+
+    async def fake_inner(*args, **kwargs):
+        await typing_started.wait()
+        if inner_fails:
+            raise RuntimeError("render failed")
+
+    monkeypatch.setattr(twin_handler, "_keep_typing_alive", fake_keep_typing_alive)
+    monkeypatch.setattr(twin_handler, "_send_twin_current_inner", fake_inner)
+
+    if inner_fails:
+        with pytest.raises(RuntimeError, match="render failed"):
+            await twin_handler.send_twin_current(
+                object(), chat_id=123, user=FakeUser(), notifier=FakeNotifier()
+            )
+    else:
+        await twin_handler.send_twin_current(
+            object(), chat_id=123, user=FakeUser(), notifier=FakeNotifier()
+        )
+
+    assert typing_cancelled.is_set()
 
 
 @pytest.mark.asyncio
