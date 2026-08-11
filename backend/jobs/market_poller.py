@@ -2,7 +2,6 @@ import logging
 
 from backend.database import get_session_factory
 from backend.services.market_service import fetch_daily_snapshot, save_snapshots
-from backend.services.notion_sync import sync_market_snapshot_to_notion
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +17,6 @@ async def poll_market():
 
             saved = await save_snapshots(db, raw_snapshots)
             logger.info("Market poller: saved %d snapshots", len(saved))
-
-            # Sync to Notion
-            for snapshot in saved:
-                await sync_market_snapshot_to_notion(snapshot)
 
             await db.commit()
         except Exception as e:

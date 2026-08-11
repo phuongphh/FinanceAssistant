@@ -1,5 +1,4 @@
 import logging
-from datetime import date
 
 from backend.config import get_settings
 
@@ -111,24 +110,3 @@ async def sync_report_to_notion(report) -> None:
         logger.info("Synced report %s to Notion", report.month_key)
     except Exception as e:
         logger.error("Failed to sync report to Notion: %s", e)
-
-
-async def sync_market_snapshot_to_notion(snapshot) -> None:
-    """Sync market snapshot to Notion Market database."""
-    if not settings.notion_market_db_id:
-        return
-
-    try:
-        client = _get_client()
-        client.pages.create(
-            parent={"database_id": settings.notion_market_db_id},
-            properties={
-                "Asset": {"title": [{"text": {"content": snapshot.asset_code}}]},
-                "Date": {"date": {"start": snapshot.snapshot_date.isoformat()}},
-                "Type": {"select": {"name": snapshot.asset_type}},
-                "Price": {"number": float(snapshot.price)} if snapshot.price else {"number": 0},
-                "Change 1D": {"number": float(snapshot.change_1d_pct)} if snapshot.change_1d_pct else {"number": 0},
-            },
-        )
-    except Exception as e:
-        logger.error("Failed to sync market snapshot to Notion: %s", e)

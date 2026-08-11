@@ -80,10 +80,24 @@ async def _fetch_vn30_snapshots(today: date) -> list[dict]:
                 continue
             sym = str(sym).upper().strip()
             price = pick("match_price", "Giá khớp", "matchPrice", "close", "match_match_price")
-            if price is None:
-                continue
             try:
-                price = float(price)
+                price = float(price) if price is not None else 0.0
+                # At 08:00 the exchange is not matching orders yet and VCI
+                # reports match_price=0.  Use the board's reference/prior-close
+                # price instead of persisting a misleading zero.
+                if price <= 0:
+                    reference = pick(
+                        "reference_price",
+                        "match_reference_price",
+                        "Giá TC",
+                        "ref_price",
+                        "match_ref_price",
+                        "basic_price",
+                        "listing_ref_price",
+                    )
+                    price = float(reference) if reference is not None else 0.0
+                if price <= 0:
+                    continue
                 # vnstock VCI returns prices in thousands of VND (matches SSI iBoard).
                 if price < 1000:
                     price *= 1000.0
