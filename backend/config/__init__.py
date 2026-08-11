@@ -102,7 +102,6 @@ class Settings(BaseSettings):
     notion_expenses_db_id: str = ""
     notion_goals_db_id: str = ""
     notion_reports_db_id: str = ""
-    notion_market_db_id: str = ""
     notion_investment_log_db_id: str = ""
 
     # Telegram
