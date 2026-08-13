@@ -433,6 +433,14 @@ def test_heuristic_parses_unambiguous_single_expenses(
         "cà phê 45k đắt nhỉ",
         "ăn trưa hết bao nhiêu tiền",
         "50k mua được gì?",
+        # Commentary needs no question mark to still be commentary. None of
+        # these carries "?", "không" or "bao nhiêu", so the question guard
+        # alone waved them into the ledger.
+        "giá này 180k mắc quá",
+        "cà phê 45k đắt thế",
+        "180k mắc quá",
+        "cái áo 300k rẻ vậy",
+        "giá này 180k",
     ],
 )
 def test_heuristic_declines_rather_than_guessing(raw_text):
