@@ -31,13 +31,25 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.elements import (
+    BinaryExpression,
+    BindParameter,
+    BooleanClauseList,
+    Null,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.adapters.zalo_content_renderer import ZaloContentRenderer  # noqa: E402
-from backend.bot.handlers import zalo_inbound, zalo_onboarding  # noqa: E402
+from backend.bot.handlers import (  # noqa: E402
+    zalo_adoption,
+    zalo_inbound,
+    zalo_onboarding,
+)
 from backend.models.onboarding_session import (  # noqa: E402
     STEP_COMPLETED,
     STEP_FIRST_ASSET,
@@ -46,7 +58,8 @@ from backend.models.onboarding_session import (  # noqa: E402
     OnboardingSession,
 )
 from backend.models.user import User  # noqa: E402
-from backend.services import zalo_linking_service  # noqa: E402
+from backend.models.zalo_link_token import ZaloLinkToken  # noqa: E402
+from backend.services import dashboard_service, zalo_linking_service  # noqa: E402
 from backend.services.onboarding import onboarding_service  # noqa: E402
 from backend.utils.zalo_copy import text as zalo_text  # noqa: E402
 
@@ -85,22 +98,105 @@ class _Result:
         return _Scalars(self._rows)
 
 
+_OPS = {
+    operators.eq: lambda a, b: a == b,
+    operators.ne: lambda a, b: a != b,
+    operators.gt: lambda a, b: a > b,
+    operators.lt: lambda a, b: a < b,
+    operators.ge: lambda a, b: a >= b,
+    operators.le: lambda a, b: a <= b,
+    operators.is_: lambda a, b: a is b,
+    operators.is_not: lambda a, b: a is not b,
+}
+
+
+def _literal(node):
+    """Right-hand side of a comparison, as a plain Python value."""
+    if isinstance(node, Null):
+        return None
+    if isinstance(node, BindParameter):
+        return node.value
+    raise AssertionError(f"unsupported literal in WHERE: {node!r}")
+
+
+def _predicate(clause):
+    """Compile a SQLAlchemy WHERE clause into a callable over ORM objects.
+
+    Evaluating the real clause — rather than sniffing bind parameters —
+    is what keeps this fake honest. Rename a column or add a predicate to
+    a query and the fake follows automatically; use an operator it does
+    not model and it says so instead of quietly answering the wrong rows.
+    """
+    if clause is None:
+        return lambda _obj: True
+    if isinstance(clause, BooleanClauseList):
+        parts = [_predicate(c) for c in clause.clauses]
+        if clause.operator is operators.or_:
+            return lambda obj: any(p(obj) for p in parts)
+        return lambda obj: all(p(obj) for p in parts)
+    if isinstance(clause, BinaryExpression):
+        op = _OPS.get(clause.operator)
+        if op is None:  # pragma: no cover — teach the fake when it fires
+            raise AssertionError(f"unsupported operator in WHERE: {clause.operator!r}")
+        key = clause.left.key
+        wanted = _literal(clause.right)
+        return lambda obj: op(getattr(obj, key), wanted)
+    raise AssertionError(f"unsupported WHERE clause: {clause!r}")  # pragma: no cover
+
+
+class _Savepoint:
+    """``db.begin_nested()`` — undoes only the inserts made inside it."""
+
+    def __init__(self, session: "_FakeSession") -> None:
+        self._session = session
+
+    async def __aenter__(self) -> "_Savepoint":
+        self._session._savepoints.append([])
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        undo = self._session._savepoints.pop()
+        if exc_type is not None:
+            for store, key in undo:
+                store.pop(key, None)
+        return False
+
+
 class _FakeSession:
     """In-memory stand-in for ``AsyncSession``.
 
-    CI has no Postgres and no aiosqlite, but the onboarding services only
-    ever ask a session for four things, so honouring those four is enough
-    to run them for real. ``commit`` fails loudly — nothing below the
-    worker may own the transaction.
+    CI has no Postgres and no aiosqlite, but the services under test only
+    ever ask a session for a handful of things, so honouring those is
+    enough to run them for real. ``commit`` fails loudly — nothing below
+    the worker may own the transaction.
+
+    Three behaviours matter beyond plain storage, because production bugs
+    hid in exactly those gaps: savepoints roll back only their own
+    inserts, ``flush`` enforces the unique index on ``users.zalo_user_id``
+    (see :meth:`stage_concurrent_zalo_signup`), and ``execute`` evaluates
+    the real WHERE clause instead of guessing from bind parameters.
     """
 
     def __init__(self, *, status: str = "active") -> None:
         self.users: dict = {}
         self.sessions: dict = {}
+        self.tokens: dict = {}
         self.status = status
         self.flushes = 0
+        self.info: dict = {}
+        self._savepoints: list[list] = []
+        self._racing_zalo_user_id: str | None = None
 
     # -- reads ----------------------------------------------------------
+    def _store_for(self, entity):
+        if entity is User:
+            return self.users
+        if entity is OnboardingSession:
+            return self.sessions
+        if entity is ZaloLinkToken:
+            return self.tokens
+        raise AssertionError(f"unexpected entity in query: {entity!r}")
+
     async def get(self, model, pk):
         if model is User:
             return self.users.get(pk)
@@ -109,15 +205,19 @@ class _FakeSession:
         raise AssertionError(f"unexpected model in db.get: {model!r}")
 
     async def execute(self, stmt):
-        # The only query that reaches here is "which user owns this Zalo
-        # id?". Matching on the compiled bind parameters keeps the fake
-        # honest: rename the column and the lookup stops matching.
-        wanted = set(stmt.compile().params.values())
-        rows = [
-            user
-            for user in self.users.values()
-            if user.zalo_user_id is not None and user.zalo_user_id in wanted
-        ]
+        desc = stmt.column_descriptions[0]
+        entity = desc["entity"]
+        matches = _predicate(stmt.whereclause)
+        rows = [obj for obj in self._store_for(entity).values() if matches(obj)]
+
+        for clause in reversed(stmt._order_by_clauses):
+            descending = getattr(clause, "modifier", None) is operators.desc_op
+            column = getattr(clause, "element", clause)
+            rows.sort(key=lambda obj: getattr(obj, column.key), reverse=descending)
+
+        expr = desc["expr"]
+        if expr is not entity:  # select(User.id) & friends — a column, not a row
+            rows = [getattr(obj, expr.key) for obj in rows]
         return _Result(rows)
 
     async def scalar(self, _stmt):
@@ -125,18 +225,61 @@ class _FakeSession:
         return self.status
 
     # -- writes ---------------------------------------------------------
+    def _remember(self, store, key) -> None:
+        if self._savepoints:
+            self._savepoints[-1].append((store, key))
+
     def add(self, obj) -> None:
         if isinstance(obj, User):
             if obj.id is None:
                 obj.id = uuid4()
             self.users[obj.id] = obj
+            self._remember(self.users, obj.id)
         elif isinstance(obj, OnboardingSession):
             self.sessions[obj.user_id] = obj
+            self._remember(self.sessions, obj.user_id)
+        elif isinstance(obj, ZaloLinkToken):
+            self.tokens[obj.token] = obj
+            self._remember(self.tokens, obj.token)
         else:  # pragma: no cover — nothing else is created in this flow
             raise AssertionError(f"unexpected insert: {obj!r}")
 
+    async def delete(self, obj) -> None:
+        if isinstance(obj, ZaloLinkToken):
+            self.tokens.pop(obj.token, None)
+        elif isinstance(obj, User):  # pragma: no cover — never in this flow
+            self.users.pop(obj.id, None)
+        else:  # pragma: no cover
+            raise AssertionError(f"unexpected delete: {obj!r}")
+
+    def begin_nested(self) -> _Savepoint:
+        return _Savepoint(self)
+
+    def stage_concurrent_zalo_signup(self, zalo_user_id: str) -> None:
+        """Model another worker committing this signup mid-flight.
+
+        The row appears between our SELECT and our INSERT, so the flush
+        that follows hits ``idx_users_zalo_user_id`` — exactly the race
+        #1029 describes. The winner is written outside the savepoint, so
+        it survives the loser's rollback the way a committed row would.
+        """
+        self._racing_zalo_user_id = zalo_user_id
+
+    def _enforce_unique_zalo_user_id(self) -> None:
+        racing = self._racing_zalo_user_id
+        if racing is None:
+            return
+        if not any(user.zalo_user_id == racing for user in self.users.values()):
+            return
+        self._racing_zalo_user_id = None
+        winner = User(zalo_user_id=racing)
+        winner.id = uuid4()
+        self.users[winner.id] = winner
+        raise IntegrityError("INSERT INTO users", {}, Exception("duplicate key"))
+
     async def flush(self) -> None:
         self.flushes += 1
+        self._enforce_unique_zalo_user_id()
 
     async def refresh(self, _obj) -> None:
         return None
@@ -322,6 +465,28 @@ def _trust_label() -> str:
 
 def _decline_label() -> str:
     return zalo_text("onboarding", "telegram_invite_decline_label")
+
+
+async def _noop_send(chat_id, text, **kwargs):
+    """Stand-in for the Telegram greeting when its content isn't the point."""
+    return {"ok": True}
+
+
+def _invite_token(zalo_out) -> str:
+    """Pull the adoption token back out of the accept button's deep link.
+
+    The link is what carries identity across the channel boundary (#1028),
+    so the tests read it the way Telegram will: parse the ``start=``
+    payload with the same helper the ``/start`` handler uses.
+    """
+    buttons = zalo_out.buttons_for("Bé Tiền hỏi một lần thôi")
+    urls = [b.web_app_url for row in buttons for b in row if b.web_app_url]
+    assert len(urls) == 1, f"expected exactly one deep link, got {urls}"
+    prefix = f"{BOT_URL}?start="
+    assert urls[0].startswith(prefix), urls[0]
+    token = zalo_adoption.adoption_token(urls[0][len(prefix) :])
+    assert token, f"the invite carries no adoption token: {urls[0]}"
+    return token
 
 
 async def _say(db, text: str):
@@ -557,9 +722,9 @@ async def test_the_invitation_is_offered_exactly_once(db, zalo_out):
     assert zalo_linking_service.telegram_invite_pending(user) is False
 
     # The accept button carries the deep link; the body never does.
-    buttons = zalo_out.buttons_for("Bé Tiền hỏi một lần thôi")
-    urls = [b.web_app_url for row in buttons for b in row if b.web_app_url]
-    assert urls == [BOT_URL]
+    token = _invite_token(zalo_out)
+    assert db.tokens[token].purpose == zalo_linking_service.PURPOSE_TELEGRAM_ADOPT
+    assert db.tokens[token].used_at is None, "the token is spent on tap, not on send"
     assert BOT_URL not in "".join(zalo_out.texts)
 
     # Nothing later re-opens the offer.
@@ -628,6 +793,87 @@ async def test_the_decline_answer_is_consumed_only_once(db, zalo_out):
 
     # Second time it is just a sentence; dispatch should get it.
     assert consumed is False
+
+
+@pytest.mark.asyncio
+async def test_accepting_the_invite_lands_on_one_account_not_two(
+    db, zalo_out, monkeypatch, analytics_events
+):
+    """#1028 end to end: Zalo-first → invite → ``/start`` → one ``User``.
+
+    The bug this pins down is silent: the tap arrived at Telegram with no
+    identity on it, ``get_or_create_user`` saw a telegram_id it had never
+    met, and one person walked away with two accounts holding half a
+    financial history each.
+    """
+    greetings: list[tuple[int, str]] = []
+
+    async def _greet(chat_id, text, **kwargs):
+        greetings.append((chat_id, text))
+        return {"ok": True}
+
+    monkeypatch.setattr(zalo_adoption, "send_message", _greet)
+
+    user = await _walk_to_asset_step(db)
+    await _say(db, "200tr")
+    token = _invite_token(zalo_out)
+
+    # What Telegram does before ``/start``: the suspension check looks the
+    # tapper up and caches the miss. Adoption has to survive that.
+    assert await dashboard_service.get_user_by_telegram_id(db, 4242) is None
+
+    adopted = await zalo_adoption.try_adopt(
+        db,
+        4242,
+        payload=zalo_adoption.build_payload(token),
+        telegram_id=4242,
+        from_user={"username": "phuong", "first_name": "Phương"},
+    )
+
+    assert adopted is user, "the tap must land on the Zalo row, not a new one"
+    assert await dashboard_service.get_or_create_user(db, 4242) == (user, False)
+    assert len(db.users) == 1, "one person, one account"
+    assert user.zalo_user_id == SENDER_ID
+    assert user.telegram_id == 4242
+    assert user.telegram_handle == "phuong"
+    assert db.tokens[token].used_at is not None, "the invite is single use"
+
+    assert greetings and greetings[0][0] == 4242
+    assert "{" not in greetings[0][1], "a missing format key leaks the template"
+    assert "zalo_telegram_adopted" in [e[0] for e in analytics_events]
+
+
+@pytest.mark.asyncio
+async def test_a_stale_invite_is_refused_rather_than_re_pointed(
+    db, zalo_out, monkeypatch
+):
+    """A spent token must never move a telegram_id onto another account."""
+    monkeypatch.setattr(zalo_adoption, "send_message", _noop_send)
+
+    user = await _walk_to_asset_step(db)
+    await _say(db, "200tr")
+    token = _invite_token(zalo_out)
+    await zalo_adoption.try_adopt(
+        db, 4242, payload=zalo_adoption.build_payload(token), telegram_id=4242
+    )
+
+    # Someone else opens the same link.
+    intruder = await zalo_adoption.try_adopt(
+        db, 777, payload=zalo_adoption.build_payload(token), telegram_id=777
+    )
+
+    assert intruder is None, "refusing is the only safe answer"
+    assert user.telegram_id == 4242
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_start_is_not_mistaken_for_an_adoption(db):
+    """``/start`` with no payload, or another namespace, is not ours."""
+    for payload in (None, "", "invite_ABC123", "src_facebook"):
+        assert await zalo_adoption.try_adopt(
+            db, 4242, payload=payload, telegram_id=4242
+        ) is None
+    assert db.users == {}
 
 
 @pytest.mark.asyncio
@@ -702,6 +948,60 @@ async def test_a_suspended_zalo_first_account_is_still_stopped(db, zalo_out):
 
     assert db.only_user().display_name is None
     assert len(zalo_out.sent) == before + 1  # the refusal, nothing else
+
+
+@pytest.mark.asyncio
+async def test_two_workers_on_one_first_message_make_one_account(db):
+    """#1029: the loser of the signup race joins the winner, it doesn't insert.
+
+    Zalo delivers retries, and two webhook deliveries of a stranger's first
+    message used to race between the "is there a user?" SELECT and the
+    INSERT. The savepoint is what makes the loser recoverable.
+    """
+    db.stage_concurrent_zalo_signup(SENDER_ID)
+
+    user, created = await zalo_linking_service.get_or_create_zalo_user(
+        db, SENDER_ID, display_name=None
+    )
+
+    assert created is False, "the loser must adopt the winner's row"
+    assert len(db.users) == 1, "the loser's INSERT must be rolled back"
+    assert user is db.only_user()
+    assert user.zalo_user_id == SENDER_ID
+
+
+@pytest.mark.asyncio
+async def test_a_trust_card_that_never_arrived_is_sent_again(db, zalo_out):
+    """#1029: a promise nobody received cannot be accepted on their behalf."""
+    header = zalo_onboarding._trust_card_lines()[0]
+    zalo_out.fail_containing = header
+
+    await _say(db, "chào Bé Tiền")
+    await _say(db, "Phương")
+    await _say(db, _salutation_label())
+    await _say(db, _goal_label())
+
+    user = db.only_user()
+    session = db.session_of(user)
+    assert session.current_step == STEP_TRUST_PRIVACY
+    assert session.trust_shown_at is None, "a failed send leaves no receipt"
+
+    # Whatever they type next is about something else entirely.
+    await _say(db, "alo?")
+
+    assert session.current_step == STEP_TRUST_PRIVACY
+    assert session.trust_shown_at is None
+    assert len([t for t in zalo_out.texts if header in t]) == 2, "card re-sent"
+
+    # Once the window reopens the card lands, and only then does a reply
+    # count as acceptance.
+    zalo_out.fail_containing = None
+    await _say(db, "alo?")
+    assert session.trust_shown_at is not None
+    assert session.current_step == STEP_TRUST_PRIVACY
+
+    await _say(db, _trust_label())
+    assert session.current_step == STEP_FIRST_ASSET
 
 
 @pytest.mark.asyncio

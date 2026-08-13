@@ -389,6 +389,7 @@ async def test_issue_link_token_reuses_active_token():
     existing = ZaloLinkToken(
         token="BT-ABC234",
         user_id=user.id,
+        purpose=zalo_linking_service.PURPOSE_ZALO_LINK,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         created_at=datetime.now(timezone.utc),
     )
@@ -425,6 +426,7 @@ async def test_redeem_link_token_success():
     row = ZaloLinkToken(
         token="BT-AAAAAA",
         user_id=user.id,
+        purpose=zalo_linking_service.PURPOSE_ZALO_LINK,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         used_at=None,
         created_at=datetime.now(timezone.utc),
@@ -450,6 +452,7 @@ async def test_redeem_link_token_expired():
     row = ZaloLinkToken(
         token="BT-AAAAAA",
         user_id=user.id,
+        purpose=zalo_linking_service.PURPOSE_ZALO_LINK,
         expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
         used_at=None,
         created_at=datetime.now(timezone.utc),
@@ -471,6 +474,7 @@ async def test_redeem_link_token_already_used():
     row = ZaloLinkToken(
         token="BT-AAAAAA",
         user_id=user.id,
+        purpose=zalo_linking_service.PURPOSE_ZALO_LINK,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         used_at=datetime.now(timezone.utc) - timedelta(minutes=1),
         created_at=datetime.now(timezone.utc),
@@ -504,6 +508,7 @@ async def test_redeem_link_token_conflict_blocks_steal():
     row = ZaloLinkToken(
         token="BT-AAAAAA",
         user_id=user.id,
+        purpose=zalo_linking_service.PURPOSE_ZALO_LINK,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         used_at=None,
         created_at=datetime.now(timezone.utc),

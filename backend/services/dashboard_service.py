@@ -90,6 +90,21 @@ async def get_user_by_telegram_id(db: AsyncSession, telegram_id: int) -> User | 
     return user
 
 
+def remember_user(db: AsyncSession, user: User) -> None:
+    """Point the request-scoped cache at ``user`` for its telegram_id.
+
+    Needed whenever a ``telegram_id`` binding changes mid-request. The
+    Zalo→Telegram adoption flow (#1028) is the case that matters: the
+    suspension check runs first and caches ``None`` for a telegram_id
+    nobody owns yet, then adoption writes that id onto an existing row.
+    Without this the very next lookup would still answer ``None`` and
+    ``get_or_create_user`` would mint the duplicate account adoption
+    exists to prevent.
+    """
+    if user.telegram_id is not None:
+        _get_or_init_user_cache(db)[user.telegram_id] = user
+
+
 async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     """Look up a user by primary key, honouring soft-delete.
 
