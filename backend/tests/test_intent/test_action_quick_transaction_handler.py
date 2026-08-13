@@ -167,7 +167,7 @@ async def test_returns_friendly_text_when_no_amount_can_be_parsed():
     ids=["llm_error", "unparseable", "poisoned_cache"],
 )
 async def test_records_description_led_expense_when_llm_gives_nothing(llm_behaviour):
-    """#1026 — "Ăn trưa 180k" must be captured without any working LLM.
+    """"Ăn trưa 180k" must be captured without any working LLM.
 
     Amount-led text ("180k ăn trưa") is caught by the Tier-1 regex in
     ``bot/handlers/message.py`` and never reaches an LLM, which is why it
@@ -275,6 +275,109 @@ async def test_cache_eviction_failure_does_not_sink_the_capture():
     mock_create.assert_awaited_once()
 
 
+@pytest.mark.asyncio
+async def test_non_json_reply_is_also_evicted_from_cache():
+    """A reply that isn't JSON is cached before anyone can decode it.
+
+    ``call_llm`` writes to ``llm_cache`` the moment the provider answers,
+    so a malformed response is pinned for the full TTL. Only decoded-but-
+    unusable replies used to be evicted; garbage text slipped past
+    because the decode error short-circuited the eviction.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={},
+        raw_text="Ăn trưa 180k",
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(return_value="sorry, I can't help with that"),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.invalidate_cache",
+        AsyncMock(),
+    ) as mock_invalidate, patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=MagicMock(user_id="user-1")),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ):
+        await handler.handle(result, _user(), db)
+
+    mock_invalidate.assert_awaited_once()
+    assert mock_invalidate.await_args.kwargs["task_type"] == "parse_manual"
+
+
+@pytest.mark.asyncio
+async def test_llm_outage_never_evicts_anything():
+    """Nothing came back, so nothing was cached — there is no entry to drop."""
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={},
+        raw_text="Ăn trưa 180k",
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(side_effect=LLMError("GROQ_API_KEY not configured")),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.invalidate_cache",
+        AsyncMock(),
+    ) as mock_invalidate, patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=MagicMock(user_id="user-1")),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ):
+        await handler.handle(result, _user(), db)
+
+    mock_invalidate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_question_about_a_price_is_never_recorded_as_an_expense():
+    """The dispatcher runs medium-confidence quick transactions WITHOUT a
+    confirmation step, so this handler is the last gate before a write.
+
+    "ăn trưa 50k có đắt không?" carries a perfectly parseable amount. The
+    heuristic must still decline: the user is asking about money, not
+    reporting having spent it, and a wrong "yes" here lands silently in
+    their ledger.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.7,
+        parameters={},
+        raw_text="ăn trưa 50k có đắt không?",
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(return_value='{"amount": 0, "merchant": "", "is_expense": false}'),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ) as mock_send:
+        text = await handler.handle(result, _user(), db)
+
+    mock_create.assert_not_called()
+    mock_send.assert_not_called()
+    assert "chưa nhận ra số tiền" in text
+
+
 @pytest.mark.parametrize(
     "raw_text,expected_amount,expected_merchant",
     [
@@ -286,6 +389,13 @@ async def test_cache_eviction_failure_does_not_sink_the_capture():
         ("trưa nay ăn phở 65k", 65_000.0, "ăn phở"),
         # A bare count next to the real amount: the đơn vị decides.
         ("2 ly trà sữa 90k", 90_000.0, "2 ly trà sữa"),
+        # Thousands grouping must be resolved BEFORE the unit multiplier —
+        # read as a decimal, "1.500k" books 1.500đ for a 1,5-triệu rent.
+        ("tiền nhà 1.500k", 1_500_000.0, "tiền nhà"),
+        ("tiền nhà 1,500k", 1_500_000.0, "tiền nhà"),
+        ("mua vàng 2.5tr", 2_500_000.0, "mua vàng"),
+        # A large bare number beside a count is still unambiguous.
+        ("mua 2 áo 300000", 300_000.0, "mua 2 áo"),
     ],
 )
 def test_heuristic_parses_unambiguous_single_expenses(
@@ -307,6 +417,22 @@ def test_heuristic_parses_unambiguous_single_expenses(
         "mua vàng 1tr rưỡi",  # ditto
         "tiền xăng 50k, ăn trưa 50k",  # genuine multi-item — batch path owns it
         "180k",  # amount with no description
+        # Two real amounts, only one carrying a đơn vị. Keeping just the
+        # suffixed one books 200k and silently drops the 300k purchase —
+        # partial capture is worse than none.
+        "mua áo 300000 quần 200k",
+        # ``_AMOUNT_RE`` reads "1.500.000" as "1.500" + ".000"; booking
+        # 1.500đ for 1,5 triệu is exactly the error this parser must not
+        # make, so a partial capture is a decline.
+        "tiền nhà 1.500.000",
+        # Asking about a price is not reporting a spend. The dispatcher
+        # writes medium-confidence quick transactions without asking, so
+        # these must never reach the create path.
+        "ăn trưa 50k có đắt không?",
+        "ăn trưa 50k có đắt không",
+        "cà phê 45k đắt nhỉ",
+        "ăn trưa hết bao nhiêu tiền",
+        "50k mua được gì?",
     ],
 )
 def test_heuristic_declines_rather_than_guessing(raw_text):
