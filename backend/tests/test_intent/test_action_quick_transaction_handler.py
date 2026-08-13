@@ -14,8 +14,10 @@ import pytest
 
 from backend.intent.handlers.action_quick_transaction import (
     ActionQuickTransactionHandler,
+    _parse_single_item_heuristically,
 )
 from backend.intent.intents import IntentResult, IntentType
+from backend.services.llm_service import LLMError
 
 
 def _user() -> MagicMock:
@@ -147,6 +149,170 @@ async def test_returns_friendly_text_when_no_amount_can_be_parsed():
     assert text  # non-empty hint to the user
     mock_create.assert_not_called()
     mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "llm_behaviour",
+    [
+        # Groq down / key missing / budget cap / timeout.
+        {"side_effect": LLMError("GROQ_API_KEY not configured")},
+        # Garbage that never parses as JSON.
+        {"return_value": "sorry, I can't help with that"},
+        # The nastiest one: a *cached* dud. One bad reply used to pin
+        # itself in llm_cache for 30 days, so the user retyping the same
+        # sentence replayed the same failure forever.
+        {"return_value": '{"amount": 0, "merchant": "", "is_expense": false}'},
+    ],
+    ids=["llm_error", "unparseable", "poisoned_cache"],
+)
+async def test_records_description_led_expense_when_llm_gives_nothing(llm_behaviour):
+    """#1026 — "Ăn trưa 180k" must be captured without any working LLM.
+
+    Amount-led text ("180k ăn trưa") is caught by the Tier-1 regex in
+    ``bot/handlers/message.py`` and never reaches an LLM, which is why it
+    kept working in prod while the description-led twin returned the
+    "mình chưa nhận ra số tiền" apology on every retry. Both shapes are
+    unambiguous; both must record deterministically.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={},  # classifier tagged the intent but extracted no amount
+        raw_text="Ăn trưa 180k",
+    )
+    db = _fake_db()
+    fake_expense = MagicMock(user_id="user-1")
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(**llm_behaviour),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=fake_expense),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ) as mock_send:
+        text = await handler.handle(result, _user(), db)
+
+    assert text == ""  # rich card delivered by the handler itself
+    mock_create.assert_awaited_once()
+    mock_send.assert_awaited_once()
+    expense_data = mock_create.call_args.args[2]
+    assert expense_data.amount == 180_000.0
+    assert expense_data.merchant == "Ăn trưa"
+    assert expense_data.category == "food"
+
+
+@pytest.mark.asyncio
+async def test_unusable_llm_parse_is_evicted_from_cache():
+    """A reply we can't use must not stay cached for the full TTL.
+
+    ``call_llm`` caches at the transport layer and can't tell a good
+    answer from a useless one, so without eviction the next identical
+    message replays the dud instead of re-asking the model.
+    """
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={},
+        raw_text="Ăn trưa 180k",
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(return_value='{"amount": 0, "merchant": "", "is_expense": false}'),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.invalidate_cache",
+        AsyncMock(),
+    ) as mock_invalidate, patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=MagicMock(user_id="user-1")),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ):
+        await handler.handle(result, _user(), db)
+
+    mock_invalidate.assert_awaited_once()
+    assert mock_invalidate.await_args.kwargs["task_type"] == "parse_manual"
+    assert mock_invalidate.await_args.kwargs["shared_cache"] is False
+
+
+@pytest.mark.asyncio
+async def test_cache_eviction_failure_does_not_sink_the_capture():
+    """Cache bookkeeping is best-effort — it must never cost the user
+    their transaction."""
+    handler = ActionQuickTransactionHandler()
+    result = IntentResult(
+        intent=IntentType.ACTION_QUICK_TRANSACTION,
+        confidence=0.9,
+        parameters={},
+        raw_text="Ăn trưa 180k",
+    )
+    db = _fake_db()
+
+    with patch(
+        "backend.intent.handlers.action_quick_transaction.call_llm",
+        AsyncMock(return_value='{"amount": 0, "is_expense": false}'),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.invalidate_cache",
+        AsyncMock(side_effect=RuntimeError("db gone")),
+    ), patch(
+        "backend.intent.handlers.action_quick_transaction.expense_service.create_expense",
+        AsyncMock(return_value=MagicMock(user_id="user-1")),
+    ) as mock_create, patch(
+        "backend.intent.handlers.action_quick_transaction.send_transaction_confirmation",
+        AsyncMock(),
+    ):
+        text = await handler.handle(result, _user(), db)
+
+    assert text == ""
+    mock_create.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "raw_text,expected_amount,expected_merchant",
+    [
+        ("Ăn trưa 180k", 180_000.0, "Ăn trưa"),
+        ("ăn trưa 50.000", 50_000.0, "ăn trưa"),
+        ("đi chợ 200 ngàn", 200_000.0, "đi chợ"),
+        ("mua sách 1tr", 1_000_000.0, "mua sách"),
+        # Leading time words are stripped from the merchant.
+        ("trưa nay ăn phở 65k", 65_000.0, "ăn phở"),
+        # A bare count next to the real amount: the đơn vị decides.
+        ("2 ly trà sữa 90k", 90_000.0, "2 ly trà sữa"),
+    ],
+)
+def test_heuristic_parses_unambiguous_single_expenses(
+    raw_text, expected_amount, expected_merchant
+):
+    item = _parse_single_item_heuristically(raw_text)
+    assert item is not None, raw_text
+    assert item.amount == expected_amount
+    assert item.merchant == expected_merchant
+
+
+@pytest.mark.parametrize(
+    "raw_text",
+    [
+        "hôm nay tôi mệt",  # no number at all
+        "cà phê 45",  # bare number too small to be VND — likely a count
+        "lãi suất 6%",  # a ratio, not money
+        "đổ xăng 1tr2",  # compound amount the regex only half-reads
+        "mua vàng 1tr rưỡi",  # ditto
+        "tiền xăng 50k, ăn trưa 50k",  # genuine multi-item — batch path owns it
+        "180k",  # amount with no description
+    ],
+)
+def test_heuristic_declines_rather_than_guessing(raw_text):
+    """Declining leaves the honest "chưa nhận ra số tiền" reply. Guessing
+    books a number the user never typed — strictly worse."""
+    assert _parse_single_item_heuristically(raw_text) is None
 
 
 @pytest.mark.asyncio
