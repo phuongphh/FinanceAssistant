@@ -2,7 +2,7 @@
 
 > **Ngày deploy:** 2026-08-13
 > **Branch:** `claude/merge-prod-release-11-h0tfix` → `prod` (qua PR)
-> **Diff:** `origin/prod..HEAD` (45 commits — 35 substantive, còn lại `docs(issues): sync …`; 144 files, +27.510 −434)
+> **Diff:** `origin/prod..HEAD` (49 commits — 43 substantive, còn lại `docs(issues): sync …`; 145 files, +27.992 −440)
 > **Commit prod trước release:** `8b8e5c4 Merge pull request #1009 from phuongphh/claude/phase-4-7-prod-deploy-u77gl7`
 > **APP_VERSION:** `1.4.7.0.1` → `1.5.1.0` (hiển thị ở `/about`, đồng thời bust cache miniapp qua `APP_VERSION_MARKER`)
 
@@ -72,6 +72,20 @@ luôn chạy trên prod. Đó là lý do hai dạng câu hành xử khác nhau t
 
 LLM vẫn giữ phần fuzzy (số viết bằng chữ, câu phức, nhiều khoản); regex chỉ nhận phần
 digits + đơn vị.
+
+**Follow-up sau review (commit `dfaa5f9`, cùng PR #1025) — 4 lỗ do review Codex chỉ ra:**
+
+| # | Vấn đề | Hệ quả nếu để nguyên | Fix |
+|---|---|---|---|
+| 1 | `1.500k` bị đọc như decimal `1.5` rồi mới nhân `k` | Ghi **1.500đ** thay vì **1.500.000đ** — sai 1000× trên một khoản tiền nhà thật | `_read_number()` phân giải dấu phân cách nghìn **trước** khi nhân đơn vị; `_is_partial_number()` từ chối khi `_AMOUNT_RE` chỉ bắt được một lát của số dài (`1.500.000` → `1.500`) |
+| 2 | Reply non-JSON của LLM **không** bị đuổi khỏi cache | Chính là kịch bản gốc: rác pin trong `llm_cache` 30 ngày, user gõ lại vẫn fail | Tách `call_llm` khỏi `_load_json_response`; decode fail → `_forget_cached_parse()`. LLM outage (không có gì được cache) thì **không** evict |
+| 3 | Nhiều candidate → lọc theo đơn vị | `mua áo 300000 quần 200k` lặng lẽ ghi 200k và **vứt** khoản 300k | Lọc theo `_MIN_PLAIN_AMOUNT` (bỏ số trần < 1.000 = số lượng), còn ≠ 1 candidate thì từ chối hẳn |
+| 4 | Câu **hỏi** về giá cũng bị parse | `ăn trưa 50k có đắt không?` → ghi thành khoản chi. Nặng vì `dispatcher.py:227-232` execute quick transaction medium-confidence **không hỏi xác nhận** | `_QUESTION_RE` chặn ngay đầu heuristic (`?`, đuôi `không/nhỉ/hả`, `bao nhiêu`) |
+
+Riêng #4: guard đặt **trong heuristic**, không dựa vào verdict `is_expense: false` của LLM.
+Heuristic tồn tại chính là cho lúc LLM im lặng — tin mỗi LLM thì câu hỏi vẫn bị ghi mỗi khi
+Groq down; mà tin mù `is_expense: false` thì mở lại đúng sự cố ban đầu (một negative sai bị
+pin trong cache 30 ngày). Nên `is_expense: false` vẫn bị evict như cũ.
 
 **Cố ý KHÔNG làm trong release này:** thêm pattern `<description> <amount>` vào
 `content/intent_patterns.yaml` (rủi ro cướp "mục tiêu 500tr" / "tiết kiệm 10tr");
@@ -163,8 +177,12 @@ launchd plist template) vẫn như release 10 — `.env` **không** đủ.
 - `invalidate_cache()` trong `llm_service.py` — parse không dùng được bị đuổi khỏi
   `llm_cache` thay vì phục vụ tiếp 30 ngày. Flush-only, router/worker vẫn giữ transaction
   boundary.
-- 5 test mới cho handler (3 kịch bản LLM: error / unparseable / poisoned cache) + 3 test
-  key-parity cho `invalidate_cache`.
+- **Guard sau review (`dfaa5f9`)**: chuẩn hoá dấu phân cách nghìn trước khi nhân đơn vị
+  (`1.500k` = 1.500.000đ, không phải 1.500đ); từ chối khi chỉ bắt được một lát của số dài
+  (`1.500.000`); câu hỏi về giá không bao giờ thành khoản chi; nhiều khoản cạnh tranh thì
+  từ chối thay vì ghi một khoản rồi vứt khoản kia; reply non-JSON cũng bị đuổi khỏi cache.
+- Handler test suite: **51 test** (3 kịch bản LLM: error / unparseable / poisoned cache;
+  10 câu parse được, 13 câu phải từ chối) + 3 test key-parity cho `invalidate_cache`.
 
 ### Phase 5.0 — Zalo OA channel, flag OFF (#1010, #1012, #1013, #1017)
 
@@ -231,8 +249,9 @@ Commit prod trước release này: `8b8e5c4 Merge pull request #1009 from phuong
 > không thể phát sinh, nên ở release này an toàn.
 
 **Rollback riêng hotfix capture:** không có flag. Nếu safety net regex đọc sai một dạng câu
-nào đó ngoài dự tính, cách nhanh nhất là revert đúng commit `f325f48` rồi deploy lại —
-phần còn lại của release không phụ thuộc nó.
+nào đó ngoài dự tính, cách nhanh nhất là revert **hai** commit — `dfaa5f9` trước rồi
+`f325f48` (theo đúng thứ tự ngược) — rồi deploy lại; phần còn lại của release không phụ
+thuộc nó. Revert mỗi `f325f48` sẽ conflict vì `dfaa5f9` sửa trên cùng vùng code.
 
 ---
 
@@ -246,6 +265,11 @@ phần còn lại của release không phụ thuộc nó.
       "chưa nhận ra số tiền")
 - [ ] **Hotfix:** gõ `180k ăn trưa` (số trước) → vẫn ghi nhận như cũ, không regression
 - [ ] **Hotfix — không ghi bừa:** `lãi suất 6%` và `cà phê 45` **không** tạo transaction
+- [ ] **Hotfix — câu hỏi:** `ăn trưa 50k có đắt không?` **không** tạo transaction
+- [ ] **Hotfix — dấu phân cách:** `tiền nhà 1.500k` ghi **1.500.000đ** (không phải 1.500đ);
+      `tiền nhà 1.500.000` **không** tạo transaction (từ chối, không ghi nhầm 1.500đ)
+- [ ] **Hotfix — nhiều khoản:** `mua áo 300000 quần 200k` **không** tạo transaction
+      (từ chối, không ghi mỗi 200k)
 - [ ] Gửi 1 ảnh receipt → OCR trả kết quả < 15s
 - [ ] Menu → Twin trả về bubble, ảnh Twin render đúng
 - [ ] Miniapp dashboard load không lỗi, không phục vụ HTML cache cũ sau deploy
