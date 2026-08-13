@@ -513,7 +513,8 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1019 | Pre-Phase | Bug: Twin first open takes ~25s on cache miss | [pre-phase/issue-1019.md](by-phase/pre-phase/issue-1019.md) |
 | #1021 | Pre-Phase | Bug: VNINDEX stock quote live cache is missing while providers fail | [pre-phase/issue-1021.md](by-phase/pre-phase/issue-1021.md) |
 | #1023 | Pre-Phase | FinanceAssistant: market snapshot sync fails after VNINDEX DB save | [pre-phase/issue-1023.md](by-phase/pre-phase/issue-1023.md) |
+| #1027 | Pre-Phase | [Bug] stock_updater: snapshot fallback ghi đè baseline live → cảnh báo "biến động 15 phút" sai | [pre-phase/issue-1027.md](by-phase/pre-phase/issue-1027.md) |
 | #1029 | Phase 5 | [Phase 5.0 — chặn gate] 4 lỗ robustness Zalo cần đóng trước khi bật ZALO_CHANNEL_ENABLED | [phase-5/issue-1029.md](by-phase/phase-5/issue-1029.md) |
 
-**Total:** 510 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 1 Phase 5, 464 Pre-Phase)
+**Total:** 511 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 1 Phase 5, 465 Pre-Phase)

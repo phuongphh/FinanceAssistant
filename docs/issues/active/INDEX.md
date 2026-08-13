@@ -17,7 +17,6 @@ GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue
 | #961 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [issue-961.md](issue-961.md) |
 | #962 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [issue-962.md](issue-962.md) |
 | #963 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [issue-963.md](issue-963.md) |
-| #1027 | [Bug] stock_updater: snapshot fallback ghi đè baseline live → cảnh báo "biến động 15 phút" sai | [issue-1027.md](issue-1027.md) |
 | #1028 | [Phase 5.0 — chặn gate] Lời mời Telegram từ Zalo không mang danh tính → tạo user thứ hai, tách đôi dữ liệu tài chính | [issue-1028.md](issue-1028.md) |
 
-**Total active:** 15
+**Total active:** 14
