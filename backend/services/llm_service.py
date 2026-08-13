@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from openai import AsyncOpenAI
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -147,6 +147,38 @@ async def _set_cache(
     )
     await db.execute(stmt)
     await db.flush()
+
+
+async def invalidate_cache(
+    db: AsyncSession | None,
+    *,
+    task_type: str,
+    prompt: str,
+    user_id: uuid.UUID | None = None,
+    shared_cache: bool = False,
+) -> None:
+    """Evict one cached response so the next identical call re-asks the model.
+
+    ``call_llm`` caches at the transport layer: it stores whatever the
+    provider returned without any idea whether the answer was useful.
+    A single malformed or semantically-wrong reply therefore sticks for
+    the full TTL (30 days by default), and every retry of the exact same
+    user message replays it instead of giving the model another chance.
+    That turns one bad roll of the dice into a permanent, perfectly
+    reproducible failure for that user — which is precisely how a
+    parseable "ăn trưa 180k" kept coming back as "mình chưa nhận ra số
+    tiền" no matter how many times it was retyped.
+
+    Callers that CAN judge the response semantically (structured parsers
+    validating their own JSON) use this to drop the bad entry. Flush
+    only — the router/worker still owns the transaction boundary.
+    """
+    if db is None:
+        return
+    cache_key = _build_cache_key(task_type, _hash_prompt(prompt), user_id, shared_cache)
+    await db.execute(delete(LLMCache).where(LLMCache.cache_key == cache_key))
+    await db.flush()
+    logger.info("Invalidated LLM cache entry: %s", cache_key)
 
 
 async def call_llm(

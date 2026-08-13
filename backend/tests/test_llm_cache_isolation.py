@@ -10,6 +10,11 @@ Two guarantees:
 Plus a lint test that grep-audits every ``call_llm(`` in the codebase
 for at least one of ``user_id=`` / ``shared_cache=True`` so the
 convention can't silently regress in a future PR.
+
+``invalidate_cache`` is tested here too, for the same reason: it has to
+target the byte-identical key ``call_llm`` writes under, and a key that
+drifts by one character fails silently — the DELETE matches nothing and
+the bad entry keeps serving for the rest of its TTL.
 """
 from __future__ import annotations
 
@@ -17,7 +22,14 @@ import re
 import uuid
 from pathlib import Path
 
-from backend.services.llm_service import _build_cache_key, _hash_prompt
+import pytest
+from sqlalchemy.dialects import postgresql
+
+from backend.services.llm_service import (
+    _build_cache_key,
+    _hash_prompt,
+    invalidate_cache,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +82,97 @@ class TestCacheKeyIsolation:
         k_shared = _build_cache_key("t", h, None, shared_cache=True)
         k_anon = _build_cache_key("t", h, None, shared_cache=False)
         assert k_shared != k_anon
+
+
+# ---------------------------------------------------------------------------
+# invalidate_cache — must delete exactly the row call_llm would have
+# written, and must never reach for the transaction boundary itself.
+# ---------------------------------------------------------------------------
+
+class _RecordingSession:
+    """Minimal AsyncSession stand-in that records what was executed.
+
+    Deliberately has no ``commit`` — services flush only, so a future
+    edit that reaches for the transaction boundary here fails loudly
+    with AttributeError instead of quietly breaking the layer contract.
+    """
+
+    def __init__(self) -> None:
+        self.statements: list[object] = []
+        self.flushed = 0
+
+    async def execute(self, statement):
+        self.statements.append(statement)
+
+    async def flush(self) -> None:
+        self.flushed += 1
+
+
+def _compiled(statement) -> str:
+    return str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+
+class TestInvalidateCache:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("shared_cache", [False, True])
+    async def test_deletes_the_key_call_llm_would_write(self, shared_cache):
+        """Key parity is the whole contract.
+
+        ``call_llm`` derives its key from ``_build_cache_key(task_type,
+        _hash_prompt(prompt), user_id, shared_cache)``. Invalidation
+        takes the raw prompt and must land on that same string —
+        otherwise the DELETE is a no-op and the poisoned entry keeps
+        being served, which is the exact failure this function exists
+        to end.
+        """
+        db = _RecordingSession()
+        user_id = uuid.uuid4()
+        prompt = "Trích xuất khoản chi: Ăn trưa 180k"
+
+        await invalidate_cache(
+            db,
+            task_type="parse_manual",
+            prompt=prompt,
+            user_id=user_id,
+            shared_cache=shared_cache,
+        )
+
+        expected_key = _build_cache_key(
+            "parse_manual", _hash_prompt(prompt), user_id, shared_cache
+        )
+        assert len(db.statements) == 1
+        assert expected_key in _compiled(db.statements[0])
+        assert db.flushed == 1
+
+    @pytest.mark.asyncio
+    async def test_no_db_is_a_no_op(self):
+        """``call_llm`` tolerates ``db=None`` (cache disabled), so the
+        eviction path must too rather than exploding on the caller."""
+        await invalidate_cache(
+            None, task_type="parse_manual", prompt="x", user_id=uuid.uuid4()
+        )
+
+    @pytest.mark.asyncio
+    async def test_only_the_target_users_entry_is_removed(self):
+        """Eviction must stay tenant-scoped: one user's unusable parse
+        cannot take another user's cached answer down with it."""
+        db = _RecordingSession()
+        victim = uuid.uuid4()
+        bystander = uuid.uuid4()
+        prompt = "same prompt text"
+
+        await invalidate_cache(
+            db, task_type="parse_manual", prompt=prompt, user_id=victim
+        )
+
+        rendered = _compiled(db.statements[0])
+        assert str(victim) in rendered
+        assert str(bystander) not in rendered
 
 
 # ---------------------------------------------------------------------------
