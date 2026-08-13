@@ -288,12 +288,10 @@ def _render_html_with_version(html_path: Path) -> str:
             bumped,
             count=1,
         )
-    if _VERSION_MARKER_PATTERN.search(bumped):
-        marker = (
-            '<p class="app-build" aria-label="Application build">'
-            f'build {_GIT_SHA} · assets {_STATIC_VERSION}</p>'
-        )
-        bumped = _VERSION_MARKER_PATTERN.sub(marker, bumped, count=1)
+    # Build metadata remains available from ``/miniapp/api/version`` for
+    # support diagnostics, but it is implementation detail and must not be
+    # visible in the customer-facing dashboard.
+    bumped = _VERSION_MARKER_PATTERN.sub("", bumped, count=1)
     return bumped
 
 

@@ -348,7 +348,17 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     # Keep AsyncSession reads sequential (SQLAlchemy sessions are not safe for
     # concurrent DB use), while external provider/RSS calls run in parallel.
     breakdown = await net_worth_calculator.calculate(db, user.id)
-    change = await net_worth_calculator.calculate_change(db, user.id, net_worth_calculator.PERIOD_DAY)
+    # Reuse the exact live valuation shown in the headline.  Calling
+    # ``calculate_change`` here used to fetch market quotes a second time, so
+    # the comparison could be calculated from a different total than the one
+    # displayed directly above it (most visible with volatile gold/crypto
+    # quotes).  The historical side still comes from yesterday's snapshots.
+    change = await net_worth_calculator.calculate_change_from_current(
+        db,
+        user.id,
+        breakdown.total,
+        net_worth_calculator.PERIOD_DAY,
+    )
     movers = await net_worth_calculator.get_daily_movers(db, user.id)
     vnindex = await _latest_market_snapshot(db, "VNINDEX")
     assets = await _portfolio_assets(db, user.id)
@@ -437,4 +447,3 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
         render_ms=int((time.perf_counter() - started) * 1000),
         sections=sections,
     )
-

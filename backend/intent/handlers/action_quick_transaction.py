@@ -53,7 +53,7 @@ from backend.models.user import User
 from backend.schemas.expense import ExpenseCreate
 from backend.services import expense_service
 from backend.services.expense_source_resolver import apply_default_source
-from backend.services.llm_service import call_llm
+from backend.services.llm_service import call_llm, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +266,35 @@ class ActionQuickTransactionHandler(IntentHandler):
             ]
 
         single_item = await self._extract_single_item_with_llm(text, db, user)
-        return [single_item] if single_item else []
+        if single_item:
+            return [single_item]
+
+        # Safety net. Until now the LLM was the ONLY thing
+        # standing between a perfectly parseable "ăn trưa 180k" and the
+        # "mình chưa nhận ra số tiền" apology: the classifier hands us
+        # ``amount`` only when it feels like it, and the fallback
+        # ``parse_manual`` call can fail for reasons that have nothing to
+        # do with the message — Groq blip, 5s timeout, GROQ_API_KEY
+        # missing on that box, budget cap, or one bad JSON reply pinned
+        # in ``llm_cache`` for 30 days. Any of those turned capture into
+        # a *reproducible* dead end for that exact sentence.
+        #
+        # Amount-led text ("180k ăn trưa") never hit this because the
+        # Tier-1 regex in bot/handlers/message.py catches it before the
+        # intent layer, which is why the two shapes behaved so
+        # differently in the same deploy. Description-led text deserves
+        # the same deterministic floor: capture is the core loop and must
+        # not depend on a network round-trip when the text is
+        # unambiguous. Regex owns digits + đơn vị; the LLM still owns the
+        # fuzzy cases (số viết bằng chữ, câu phức, nhiều khoản).
+        heuristic_item = _parse_single_item_heuristically(text)
+        if heuristic_item is not None:
+            logger.info(
+                "Quick-transaction rescued by heuristic parse (LLM gave nothing): %r",
+                text,
+            )
+            return [heuristic_item]
+        return []
 
     async def _extract_items_with_llm(
         self,
@@ -313,9 +341,10 @@ class ActionQuickTransactionHandler(IntentHandler):
         # legacy parser. Cached by raw text, so retries are free.
         # Groq (same rationale as the multi-item variant): sub-second
         # vs DeepSeek's 4-12s tail.
+        prompt = _SINGLE_PARSE_PROMPT.format(text=text)
         try:
             raw = await call_llm(
-                _SINGLE_PARSE_PROMPT.format(text=text),
+                prompt,
                 task_type="parse_manual",
                 db=db,
                 user_id=user.id,
@@ -324,25 +353,62 @@ class ActionQuickTransactionHandler(IntentHandler):
                 provider="groq",
                 timeout=5.0,
             )
-            parsed = _load_json_response(raw)
         except Exception:
+            # Nothing came back, so nothing was cached — no entry to evict.
             logger.exception("Quick-transaction LLM parse failed for %r", text)
             return None
 
-        if not parsed.get("is_expense"):
-            return None
+        # Split from the call on purpose. ``call_llm`` writes the response to
+        # ``llm_cache`` the moment the provider answers, *before* anyone can
+        # judge whether the answer is JSON at all — so a decode failure here
+        # means a malformed reply is already pinned for the full TTL. Folding
+        # this into the try above (as the first cut did) skipped straight past
+        # the eviction below and left the user replaying that same garbage on
+        # every retry.
         try:
-            parsed_amount = float(parsed.get("amount", 0))
-        except (TypeError, ValueError):
-            parsed_amount = 0.0
-        if parsed_amount <= 0:
+            parsed = _load_json_response(raw)
+        except Exception:
+            logger.warning(
+                "Quick-transaction LLM returned non-JSON for %r", text, exc_info=True
+            )
+            await self._forget_cached_parse(prompt, db, user, text)
             return None
-        parsed_merchant = parsed.get("merchant") or text
-        return ParsedExpenseItem(
-            amount=parsed_amount,
-            merchant=parsed_merchant,
-            category_hint=_guess_category(parsed_merchant),
-        )
+
+        item = _single_item_from_parsed(parsed, fallback_text=text)
+        if item is None:
+            # "Free retries" cut both ways: a reply we can't use is
+            # cached just as eagerly as a good one, so the user retyping
+            # the same sentence replays the same dud for the whole TTL
+            # instead of re-asking the model. Drop it.
+            await self._forget_cached_parse(prompt, db, user, text)
+        return item
+
+    async def _forget_cached_parse(
+        self,
+        prompt: str,
+        db: AsyncSession,
+        user: User,
+        text: str,
+    ) -> None:
+        """Evict one unusable ``parse_manual`` reply, best effort.
+
+        Never let cache bookkeeping sink the capture — the heuristic
+        fallback upstream still has a shot at this message.
+        """
+        try:
+            await invalidate_cache(
+                db,
+                task_type="parse_manual",
+                prompt=prompt,
+                user_id=user.id,
+                shared_cache=False,
+            )
+        except Exception:
+            logger.warning(
+                "Could not invalidate parse_manual cache for %r",
+                text,
+                exc_info=True,
+            )
 
 
 def _load_json_response(raw: str) -> dict:
@@ -382,22 +448,211 @@ def _parse_items_heuristically(text: str) -> list[ParsedExpenseItem]:
     return parsed if len(parsed) > 1 else []
 
 
+# Smallest bare (unsuffixed) number we will read as VND. "cà phê 45" is
+# far more likely a quantity, a table number or a typo than 45 đồng,
+# whereas any number carrying a unit ("45k", "1tr") is unambiguous and
+# always accepted. 50.000 / 50,000 also clear the bar once
+# ``_parse_amount_match`` expands the thousands separators.
+_MIN_PLAIN_AMOUNT = 1_000
+
+
+# "1tr2" and "1tr rưỡi" mean 1.200.000 / 1.500.000, but ``_AMOUNT_RE``
+# only sees the "1tr" half. Reading that as a flat 1.000.000 would book a
+# confidently wrong number, so the heuristic bails and lets the LLM —
+# which understands the idiom — take the message.
+_COMPOUND_TAIL_RE = re.compile(r"\s*(?:\d|rưỡi|ruoi)", re.IGNORECASE)
+
+# A separator glued to more digits means ``_AMOUNT_RE`` only captured a
+# slice of a longer number: in "tiền nhà 1.500.000" it stops after
+# "1.500". Booking 1.500đ for a 1,5-triệu rent is the exact failure mode
+# this parser exists to avoid, so a partial capture is a decline.
+_GROUPED_TAIL_RE = re.compile(r"[.,]\d")
+
+# The user asking *about* an amount is not the user spending it. The LLM
+# gets this right (``is_expense: false``), but the heuristic runs
+# precisely when the LLM said nothing usable — and the dispatcher
+# executes medium-confidence quick transactions without a confirmation
+# step (backend/intent/dispatcher.py), so a wrong "yes" here is a silent
+# write into the user's ledger. "ăn trưa 50k có đắt không?" must reach
+# the fallback reply, never the create path.
+_QUESTION_RE = re.compile(
+    r"\?"                                          # "… 50k?"
+    r"|\b(?:không|khong|ko|hông)\s*[?!.…]*$"       # "… có đắt không"
+    r"|\b(?:nhỉ|nhi|hả|hử)\s*[?!.…]*$"             # "… đắt nhỉ"
+    r"|\bbao nhiêu\b|\bbao nhieu\b",               # "ăn trưa bao nhiêu"
+    re.IGNORECASE,
+)
+
+# Commenting on a price is not paying it either, and commentary does not
+# have to be phrased as a question: "giá này 180k mắc quá" carries no "?",
+# no "không", no "bao nhiêu", so ``_QUESTION_RE`` waves it straight through
+# into the ledger. Judgement words about cost, and the intensifier tail
+# Vietnamese hangs off them, are the tell that the sentence evaluates an
+# amount rather than reporting one.
+_COMMENTARY_RE = re.compile(
+    r"\b(?:mắc|mac|đắt|dat|rẻ|re|chát|chat|hời|hoi)\b"  # "… 180k mắc quá"
+    r"|\bgiá\s+(?:này|đó|kia)\b|\bgia\s+(?:nay|do|kia)\b"  # "giá này 180k"
+    r"|\b(?:quá|qua|thế|the|vậy|vay|ghê|ghe)\s*[!.…]*$",  # "… 180k quá"
+    re.IGNORECASE,
+)
+
+
+def _is_ratio_token(text: str, match: re.Match[str]) -> bool:
+    """True when the number is a percentage, not money.
+
+    "lãi suất 6%" reaching this handler must not become a 6đ expense.
+    """
+    return text[match.end():].lstrip().startswith("%")
+
+
+def _has_compound_tail(text: str, match: re.Match[str]) -> bool:
+    """True when a second half follows the amount ("1tr2", "1tr rưỡi")."""
+    return bool(_COMPOUND_TAIL_RE.match(text[match.end():]))
+
+
+def _is_partial_number(text: str, match: re.Match[str]) -> bool:
+    """True when the match is a slice of a longer numeric run.
+
+    "1.500.000" reaches ``_AMOUNT_RE`` as "1.500" followed by ".000".
+    """
+    before = text[:match.start()]
+    if before and before[-1] in ".,":
+        return True
+    return bool(_GROUPED_TAIL_RE.match(text[match.end():]))
+
+
+def _looks_like_a_question(text: str) -> bool:
+    """True when the message asks about money rather than reporting it."""
+    return bool(_QUESTION_RE.search(text))
+
+
+def _looks_like_price_commentary(text: str) -> bool:
+    """True when the message judges an amount instead of reporting a spend.
+
+    Declining costs the user one fallback message; guessing wrong writes a
+    transaction they never made, unconfirmed. Decline is the cheap side.
+    """
+    return bool(_COMMENTARY_RE.search(text))
+
+
+def _parse_single_item_heuristically(text: str) -> ParsedExpenseItem | None:
+    """Deterministic single-expense parse — no LLM, no network.
+
+    Deliberately conservative: the message has already been classified
+    as a quick transaction and cleared the income guard, so the only job
+    left is reading one unambiguous amount. One money-looking token plus
+    a non-empty description, or we decline and let the caller keep the
+    honest "chưa nhận ra số tiền" reply. Declining is cheap; booking an
+    expense the user never made is not — every rule below exists to make
+    the wrong-amount outcome impossible rather than merely unlikely.
+    """
+    cleaned = (text or "").strip()
+    if _looks_like_a_question(cleaned) or _looks_like_price_commentary(cleaned):
+        return None
+
+    candidates = [
+        match
+        for match in _AMOUNT_RE.finditer(cleaned)
+        if not _is_ratio_token(cleaned, match)
+    ]
+    if not candidates:
+        return None
+    if any(_has_compound_tail(cleaned, match) for match in candidates):
+        return None
+    if any(_is_partial_number(cleaned, match) for match in candidates):
+        return None
+
+    if len(candidates) > 1:
+        # Bare counts sit next to the real amount all the time — "2 ly
+        # trà sữa 90k", "mua 2 áo 300k". A count is small, so dropping
+        # sub-1k bare numbers separates quantity from money without
+        # touching either candidate in "mua áo 300000 quần 200k" — that
+        # one keeps both and is declined below. Filtering on the đơn vị
+        # alone (the first cut) silently booked the 200k and threw the
+        # 300k purchase away, which is worse than not capturing at all.
+        candidates = [
+            match
+            for match in candidates
+            if match.group(2) or _parse_amount_match(match) >= _MIN_PLAIN_AMOUNT
+        ]
+    if len(candidates) != 1:
+        # Either nothing survived, or several real amounts compete — a
+        # genuine multi-item message ("tiền xăng 50k, ăn trưa 50k"),
+        # which is the batch path's job, not ours.
+        return None
+
+    match = candidates[0]
+    amount = _parse_amount_match(match)
+    if amount <= 0:
+        return None
+    has_unit = bool(match.group(2))
+    if not has_unit and amount < _MIN_PLAIN_AMOUNT:
+        return None
+
+    merchant = _clean_merchant(f"{cleaned[:match.start()]} {cleaned[match.end():]}")
+    if not merchant:
+        return None
+
+    return ParsedExpenseItem(
+        amount=amount,
+        merchant=merchant,
+        category_hint=_guess_category(merchant),
+    )
+
+
+def _single_item_from_parsed(
+    parsed: dict,
+    *,
+    fallback_text: str,
+) -> ParsedExpenseItem | None:
+    """Validate one ``parse_manual`` JSON reply into an item, or None."""
+    if not parsed.get("is_expense"):
+        return None
+    try:
+        amount = float(parsed.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0.0
+    if amount <= 0:
+        return None
+    merchant = parsed.get("merchant") or fallback_text
+    return ParsedExpenseItem(
+        amount=amount,
+        merchant=merchant,
+        category_hint=_guess_category(merchant),
+    )
+
+
+# "50.000" / "50,000" is Vietnamese thousands grouping, not a decimal —
+# exactly three digits behind the separator is the tell. "1,5" and "1.5"
+# are decimals ("1,5tr").
+_GROUPED_NUMBER_RE = re.compile(r"\d{1,3}[.,]\d{3}")
+
+
+def _read_number(raw_number: str) -> float:
+    """Read one captured number, resolving the ``.``/``,`` ambiguity."""
+    if _GROUPED_NUMBER_RE.fullmatch(raw_number):
+        return float(raw_number.replace(",", "").replace(".", ""))
+    return float(raw_number.replace(",", "."))
+
+
 def _parse_amount_match(match: re.Match[str]) -> float:
     raw_number = match.group(1)
     suffix = (match.group(2) or "").lower()
 
+    # Resolve the grouping BEFORE the multiplier, not after. Reading
+    # "1.500k" as the decimal 1.5 made it 1.500đ instead of 1.500.000đ —
+    # a 1000× error on a real rent payment — even though the very same
+    # digits without the "k" were already handled correctly below.
+    number = _read_number(raw_number)
+
     if suffix:
-        number = float(raw_number.replace(",", "."))
         if suffix == "k" or suffix in {"ngàn", "nghìn", "ngan", "nghin"}:
             return number * 1_000
         if suffix in {"tr", "triệu", "trieu"}:
             return number * 1_000_000
 
-    # No suffix: treat 50,000 / 50.000 as thousands separators; keep
-    # small plain numbers as-is for rare exact-VND entries.
-    if re.fullmatch(r"\d{1,3}([.,])\d{3}", raw_number):
-        return float(raw_number.replace(",", "").replace(".", ""))
-    return float(raw_number.replace(",", "."))
+    # No suffix: small plain numbers stay as-is for rare exact-VND entries.
+    return number
 
 
 def _clean_merchant(text: str) -> str:

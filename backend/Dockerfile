@@ -50,4 +50,7 @@ COPY --from=admin-build /admin/dist /app/backend/static/admin
 ENV PYTHONPATH=/app
 
 # Mặc định chạy API (sẽ được override bởi command trong docker-compose nếu cần)
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-proxy-headers: giữ nguyên địa chỉ TCP thật của peer. Uvicorn mặc định
+# ghi đè request.client bằng X-Forwarded-For, mà backend/utils/client_ip.py
+# cần chính peer thật đó để quyết định có tin header hay không.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

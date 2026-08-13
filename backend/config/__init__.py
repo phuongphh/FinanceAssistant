@@ -12,7 +12,7 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
-APP_VERSION = "1.4.7.0.1"
+APP_VERSION = "1.5.1.0"
 
 
 class Settings(BaseSettings):
@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     admin_redis_url: str = "redis://localhost:6379/1"
     admin_allowed_origin: str = "https://admin.betien.vn"
     admin_api_rate_limit_per_minute: int = 100
+
+    # Which connecting peers may speak for someone else via
+    # ``X-Forwarded-For`` — see backend/utils/client_ip.py. Comma-separated
+    # CIDRs. The default covers loopback plus the private ranges, i.e. where
+    # Caddy and the Docker bridge live, so existing deploys keep working
+    # unchanged; a peer arriving from the public internet on the published
+    # port is not trusted and gets rate-limited by the address it actually
+    # connected from. Narrow this to the proxy's real address when known.
+    trusted_proxy_cidrs: str = (
+        "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
+    )
 
     # Database
     database_url: str = ""  # Set via DATABASE_URL env var
@@ -91,7 +102,6 @@ class Settings(BaseSettings):
     notion_expenses_db_id: str = ""
     notion_goals_db_id: str = ""
     notion_reports_db_id: str = ""
-    notion_market_db_id: str = ""
     notion_investment_log_db_id: str = ""
 
     # Telegram
@@ -100,19 +110,61 @@ class Settings(BaseSettings):
     owner_telegram_id: str = ""
     # Optional Telegram custom emoji id for the animated sunrise in morning briefings.
     telegram_morning_custom_emoji_id: str = ""
+    # Phase 5.1 #4.3 — public deep link to the bot ("https://t.me/<bot>"),
+    # used for the one-time invitation a Zalo-first user gets at the end of
+    # onboarding. Empty in dev/CI, and empty means *skip the invitation*:
+    # a broken link would spend the once-only chance on nothing.
+    telegram_bot_url: str = ""
 
     # Zalo Official Account (Phase 4B Epic 4)
     # Provisioned manually by ops; empty in dev/CI degrades gracefully — the
     # adapter returns False on send and linking flows surface a friendly
     # "not configured" message instead of raising.
+    # Legacy static token (Phase 4B). Phase 5.0 stores the live token in
+    # ``zalo_oa_credentials`` and refreshes it hourly; this is only the
+    # fallback used when no credential row has been seeded yet.
     zalo_oa_access_token: str = ""
-    zalo_oa_secret_key: str = ""  # Used to verify webhook X-ZEvent-Signature
+    zalo_oa_secret_key: str = ""  # Trailing component of the webhook MAC
     zalo_app_id: str = ""
+    # App secret — sent as the ``secret_key`` header on token refresh.
+    # Distinct from ``zalo_oa_secret_key`` (webhook MAC); Zalo issues two.
+    zalo_app_secret: str = ""
+    # Phase 5.0 #1.2 — signature soak switch. False verifies and logs the
+    # verdict WITHOUT rejecting, so the MAC formula can be confirmed
+    # against live traffic before it starts 403-ing real users. Never
+    # leave this false past the soak; see
+    # docs/conventions/zalo-operations.md#signature-soak-rollout
+    zalo_signature_enforce: bool = True
     # Phase 4.1 channel-discipline gate. The Zalo OA adapter is fully wired
     # (Phase 4B) but DISABLED for the 50-user Telegram-only soft launch so
     # we measure one channel cleanly. Operator flips this to True at the
-    # start of Phase 5.1 (Zalo rollout).
+    # start of Phase 5.0 (Zalo rollout).
     zalo_channel_enabled: bool = False
+
+    # Media URLs (Phase 5.1 #1.2–#1.4). Channel-independent infrastructure:
+    # Zalo fetches images by URL instead of accepting bytes, and the Mini
+    # App (5.2) will want the same thing. Kept separate from
+    # ``zalo_channel_enabled`` so the serving endpoint can be switched off
+    # on its own without taking the whole channel down.
+    media_url_enabled: bool = False
+    # Public HTTPS origin that terminates in front of this app, e.g.
+    # "https://api.example.com". Empty means no URL can be built, which
+    # the notifier treats as "send text only". No trailing slash needed.
+    media_public_base_url: str = ""
+    # Directory holding the bytes. Must be writable by the service user
+    # and must NOT be inside the repo — nothing here is ever committed.
+    media_storage_path: str = "/tmp/betien-media"
+    # How long a minted URL stays good. Short by design: the URL is the
+    # credential (see backend/services/media_url_service.py).
+    media_url_ttl_seconds: int = 900
+    # Per-IP ceiling on the public serving endpoint. Generous enough for a
+    # chat client that prefetches, tight enough that the endpoint isn't a
+    # free bandwidth relay.
+    media_rate_limit_per_minute: int = 120
+    # How long an orphaned file must sit untouched before the sweep may
+    # delete it. Must comfortably exceed the longest publish→commit gap,
+    # or the sweep will delete bytes belonging to an in-flight request.
+    media_orphan_grace_seconds: int = 3600
 
     # Market data
     redis_url: str = "redis://localhost:6379/0"

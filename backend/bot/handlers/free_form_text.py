@@ -101,6 +101,24 @@ def set_dispatcher(dispatcher: IntentDispatcher) -> None:
     _dispatcher = dispatcher
 
 
+def get_pipeline() -> IntentPipeline:
+    """The process-wide classifier pipeline.
+
+    Exposed for the Zalo handler (Phase 5.0 #2.3), which must classify
+    with the *same* instance rather than building its own: constructing
+    an :class:`IntentPipeline` re-reads ``content/intent_patterns.yaml``
+    and compiles every rule, which is per-process work we already paid
+    for at import time. Sharing it also means a test that swaps the
+    pipeline via :func:`set_pipeline` covers both channels at once.
+    """
+    return _pipeline
+
+
+def get_dispatcher() -> IntentDispatcher:
+    """The process-wide intent dispatcher — see :func:`get_pipeline`."""
+    return _dispatcher
+
+
 def _build_inline_keyboard(
     labels: list[str] | None,
     *,

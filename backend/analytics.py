@@ -92,6 +92,20 @@ class EventType:
     ACTIVATION_NUDGE_SENT = "activation_nudge_sent"
     ACTIVATION_FIRST_REPLY = "activation_first_reply"
 
+    # Phase 5.0 Epic 3 — Zalo outbound discipline (48h window + 8 free
+    # consulting messages). One row per attempted send at the notifier
+    # seam: ``ZALO_SEND_BLOCKED`` when no slot was granted,
+    # ``ZALO_SEND_DELIVERED`` when the OA call went out. The ``reason``
+    # property is the counter label and is always one of the stable
+    # strings in ``zalo_window_service`` — never free prose, or the
+    # grouping in ``zalo_quota_metrics`` fragments.
+    #
+    # These two carry no identifier at all: no Zalo id, no message text,
+    # no recipient. The masked sender lives in the log line next to them,
+    # which is where an operator correlates a single conversation.
+    ZALO_SEND_BLOCKED = "zalo_send_blocked"
+    ZALO_SEND_DELIVERED = "zalo_send_delivered"
+
 
 @dataclass
 class Event_:  # noqa: N801 — underscore suffix avoids clash with ORM `Event`

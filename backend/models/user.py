@@ -16,7 +16,17 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    # Phase 5.1 #4.2 — nullable since Zalo became a signup channel. A
+    # user who arrived through the OA has no Telegram side at all, and
+    # forcing a placeholder id here would be worse than NULL: it would
+    # collide with the unique index the moment a second Zalo-only user
+    # signed up, and every ``send_message(chat_id=...)`` would deliver
+    # to a chat that doesn't exist.
+    #
+    # ``unique=True`` stays and needs no partial predicate: Postgres
+    # treats NULLs as distinct in a unique index, so any number of
+    # Zalo-only rows coexist while two real Telegram ids still can't.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     tenant_id: Mapped[int] = mapped_column(
         Integer, default=1, nullable=False, index=True
     )
@@ -108,6 +118,27 @@ class User(Base):
     reengagement_broadcast_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+
+    # Phase 5.1 E4 #4.3 — the one-time "come to Telegram too" invitation a
+    # Zalo-first user is shown at the end of onboarding. Two columns rather
+    # than one because they answer different questions and only one of them
+    # gates the send:
+    #
+    #   ``_at``       NULL → never invited. This alone is the "at most once"
+    #                 gate, so an invitation the user ignored is still never
+    #                 repeated — silence is an answer.
+    #   ``_response`` what they chose ("declined"), or NULL while unanswered.
+    #                 Recorded because the spec asks us to remember the
+    #                 choice, and because "declined" and "ignored" mean
+    #                 different things to anyone reading this row later.
+    #
+    # Accepting leaves no mark here: the accept path is a URL button that
+    # opens Telegram, so the acceptance shows up as a Telegram id, not as a
+    # message coming back to Zalo.
+    zalo_telegram_invite_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    zalo_telegram_invite_response: Mapped[str | None] = mapped_column(String(20))
 
     @property
     def is_onboarded(self) -> bool:

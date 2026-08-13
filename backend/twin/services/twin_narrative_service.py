@@ -162,6 +162,7 @@ async def build_twin_narrative(
             user_id=user.id,
             use_cache=True,
             cache_ttl_days=7,
+            timeout=2.5,
         )
         return _clean_output(text, p50_str, target_year)
     except (LLMError, Exception):

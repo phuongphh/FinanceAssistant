@@ -16,11 +16,18 @@ code can't grant indefinite linking access. ``BT-`` prefix + base32
 alphabet (no I/O/0/1) gives ~33^6 = 1.3B codes — collision risk in a
 10-minute window is negligible.
 
+Phase 5.1 #4.3 adds the other direction: a person can now arrive from
+the Zalo OA having never touched Telegram, so this module also owns
+:func:`get_or_create_zalo_user` (the account that pairing used to
+assume already existed) and the markers for the one-time "come to
+Telegram too" invitation shown at the end of Zalo onboarding.
+
 Layer contract:
 - Service NEVER calls ``db.commit()``. Caller (router/handler) owns
   the transaction boundary.
 - All DB writes are ``flush``-only.
 """
+
 from __future__ import annotations
 
 import logging
@@ -64,9 +71,7 @@ class LinkRedemption:
 
 
 def _generate_token_body() -> str:
-    return "".join(
-        secrets.choice(_TOKEN_ALPHABET) for _ in range(_TOKEN_BODY_LENGTH)
-    )
+    return "".join(secrets.choice(_TOKEN_ALPHABET) for _ in range(_TOKEN_BODY_LENGTH))
 
 
 def _now() -> datetime:
@@ -164,9 +169,7 @@ async def redeem_link_token(
     if not token or not zalo_user_id:
         return LinkRedemption(status="invalid")
 
-    row_q = await db.execute(
-        select(ZaloLinkToken).where(ZaloLinkToken.token == token)
-    )
+    row_q = await db.execute(select(ZaloLinkToken).where(ZaloLinkToken.token == token))
     row: ZaloLinkToken | None = row_q.scalar_one_or_none()
     if row is None:
         return LinkRedemption(status="invalid")
@@ -215,6 +218,115 @@ async def redeem_link_token(
         user_id=user.id,
         previous_zalo_user_id=previous,
     )
+
+
+async def get_linked_user(db: AsyncSession, zalo_user_id: str) -> User | None:
+    """Return the user bound to ``zalo_user_id``, or ``None`` if unlinked.
+
+    Lives here rather than in the handler so the "who is this Zalo
+    sender?" question has one implementation — the handler must not
+    issue raw queries (layer contract), and the inbound path asks this
+    on every non-token message.
+    """
+    if not zalo_user_id:
+        return None
+    result = await db.execute(select(User).where(User.zalo_user_id == zalo_user_id))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
+    """Load a user by primary key.
+
+    Needed by the inbound handler to reach the Telegram side of a fresh
+    link (the redemption result carries only the id). Kept next to
+    :func:`get_linked_user` for the same reason: handlers don't query.
+    """
+    if user_id is None:
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def get_or_create_zalo_user(
+    db: AsyncSession, zalo_user_id: str, *, display_name: str | None = None
+) -> tuple[User, bool]:
+    """Return ``(user, created)`` for a Zalo sender with no link yet.
+
+    Until 5.1 every account started on Telegram and the Zalo side only
+    ever *found* users. #4.3 makes the OA a signup channel, so somebody
+    has to mint the row — and it belongs here rather than in the handler
+    because handlers don't write to the database.
+
+    The created user has ``telegram_id`` NULL (see the #4.2 migration:
+    there is no honest placeholder) and no ``display_name`` unless the
+    caller passes one — onboarding asks for the name in its first step,
+    and a name we made up would be worse than the "bạn" fallback.
+    """
+    if not zalo_user_id:
+        raise ValueError("zalo_user_id is required to create a Zalo-first user")
+
+    existing = await get_linked_user(db, zalo_user_id)
+    if existing is not None:
+        return existing, False
+
+    user = User(zalo_user_id=zalo_user_id, display_name=display_name)
+    db.add(user)
+    # TRANSACTION_OWNED_BY_CALLER — the worker commits at the boundary.
+    # flush() populates user.id from the DB default without ending the tx,
+    # which onboarding needs immediately to open its session row.
+    await db.flush()
+    await db.refresh(user)
+    logger.info("Created Zalo-first user %s from zalo_user_id", user.id)
+    return user, True
+
+
+# Recorded in ``users.zalo_telegram_invite_response``. Only the refusal
+# has a value: accepting happens by opening a Telegram link, which never
+# comes back to Zalo, and ignoring is represented by NULL. See the model.
+INVITE_RESPONSE_DECLINED: Final[str] = "declined"
+
+
+def telegram_invite_pending(user: User) -> bool:
+    """True when the one-time Telegram invitation still owes a send.
+
+    Pure predicate so the handler can ask without touching the DB, and
+    so the "at most once" rule has exactly one definition. The gate is
+    the timestamp alone: an invitation the user simply ignored has still
+    been *shown*, and #4.3 says we do not ask twice.
+
+    A user who already has a Telegram id has nothing to be invited to.
+    """
+    if user is None:
+        return False
+    if user.telegram_id is not None:
+        return False
+    return user.zalo_telegram_invite_at is None
+
+
+async def mark_telegram_invite_shown(db: AsyncSession, user: User) -> None:
+    """Stamp the invitation as sent. Idempotent — a second call is a no-op
+    so a retried send can never reset the once-only gate."""
+    if user.zalo_telegram_invite_at is not None:
+        return
+    user.zalo_telegram_invite_at = _now()
+    await db.flush()
+
+
+async def record_telegram_invite_response(
+    db: AsyncSession, user: User, response: str
+) -> None:
+    """Remember what the user answered ("declined").
+
+    Kept separate from :func:`mark_telegram_invite_shown` because the
+    answer is optional: silence is a valid outcome and must not look
+    like a decline to whoever reads this row later.
+    """
+    user.zalo_telegram_invite_response = response
+    if user.zalo_telegram_invite_at is None:
+        # Defensive: an answer implies the invite went out. Without this
+        # a mis-ordered call would leave the gate open and re-invite.
+        user.zalo_telegram_invite_at = _now()
+    await db.flush()
 
 
 async def unlink_user(db: AsyncSession, user: User) -> bool:

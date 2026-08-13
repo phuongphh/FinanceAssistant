@@ -20,6 +20,7 @@ from backend.jobs.cashflow_forecast_job import run_cashflow_forecast_job
 from backend.jobs.daily_kpi_digest_job import run_daily_kpi_digest_job
 from backend.jobs.feedback_sla_job import run_feedback_sla_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
+from backend.jobs.cleanup_media import cleanup_media
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
 from backend.jobs.daily_transaction_summary_job import run_daily_transaction_summary
@@ -239,6 +240,17 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         run_admin_cache_warmer, "interval",
         minutes=10, timezone="Asia/Ho_Chi_Minh",
         id="admin_twin_cache_warmer",
+    )
+
+    # Phase 5.1 #1.4 — expire short-lived media URLs and their bytes.
+    # Registered unconditionally, NOT behind MEDIA_URL_ENABLED: turning
+    # the feature off must not strand whatever it already published, and
+    # with no media the run is two empty queries. Minute 20 keeps it off
+    # the top of the hour, where the empathy and SLA jobs already sit.
+    scheduler.add_job(
+        cleanup_media, "cron",
+        minute=20, timezone="Asia/Ho_Chi_Minh",
+        id="media_cleanup",
     )
 
 

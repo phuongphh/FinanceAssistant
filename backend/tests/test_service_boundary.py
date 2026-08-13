@@ -29,6 +29,16 @@ LEGACY_ALLOWLIST: set[str] = {
     # business transaction lifecycle.
     "admin_audit.py",
     "feature_events.py",
+    # Phase 5.0 #1.3 — the OAuth refresh protocol. Zalo's refresh_token is
+    # single-use and rotates on every refresh, so the write-ahead marker
+    # ("a refresh for this app_id started") MUST be durable *before* the
+    # HTTP call, and the rotated pair durable immediately after it. Two
+    # commits, by construction: folding them into the caller's transaction
+    # would mean a crash mid-refresh leaves no marker, and the next boot
+    # blind-retries a token Zalo may already have burned — costing a manual
+    # OA re-authorisation. This service opens its own session for the same
+    # reason and never joins a business transaction.
+    "zalo_token_service.py",
 }
 
 # Match ``db.commit()`` or ``self.commit()`` etc. Stricter than a

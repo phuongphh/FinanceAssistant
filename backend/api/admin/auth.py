@@ -14,16 +14,21 @@ from backend.schemas.admin import AdminUserOut, ChangePasswordRequest, LoginRequ
 from backend.services.admin_audit import log_action
 from backend.services.admin_auth import blacklist_token, check_login_rate_limit, record_login_attempt
 from backend.utils.admin_security import create_admin_token, decode_admin_token, hash_password, verify_password
+from backend.utils.client_ip import client_ip
 from backend.utils.pii import mask_email
 
 router = APIRouter(prefix="/auth", tags=["admin-auth"])
 
 
 def _request_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Key for the login rate limiter.
+
+    Same trust rule as everywhere else: a forged ``X-Forwarded-For``
+    from an untrusted peer would hand a password-guesser a fresh
+    allowance on every attempt. (The audit trail reads the same value,
+    but off ``request.state`` — see ``backend/services/admin_audit.py``.)
+    """
+    return getattr(request.state, "client_ip", None) or client_ip(request)
 
 
 @router.post("/login", response_model=LoginResponse)

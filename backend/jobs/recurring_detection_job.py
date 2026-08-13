@@ -58,13 +58,19 @@ async def run_recurring_detection() -> None:
 
 async def _eligible_users(db) -> list[User]:
     """Active users (not deleted) with at least 90 days since
-    creation. Brand-new users have no history to mine yet."""
+    creation. Brand-new users have no history to mine yet.
+
+    Zalo-only users (no ``telegram_id`` since Phase 5.1 #4.2) are
+    excluded: the delivery below is Telegram-only, and Zalo is
+    reactive-first — it may not open a proactive conversation.
+    """
     cutoff = datetime.utcnow() - timedelta(days=MIN_HISTORY_DAYS)
     stmt = (
         select(User)
         .where(
             User.created_at <= cutoff,
             User.deleted_at.is_(None),
+            User.telegram_id.isnot(None),
         )
     )
     return list((await db.execute(stmt)).scalars().all())

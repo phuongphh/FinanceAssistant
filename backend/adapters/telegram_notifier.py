@@ -12,6 +12,21 @@ from typing import Any
 
 from backend.services import telegram_service
 
+# Channel-neutral kwargs a caller may pass to any notifier, which
+# ``telegram_service`` has no parameter for. They are dropped rather
+# than forwarded: ``telegram_service`` takes explicit keyword arguments,
+# so leaking one through is a ``TypeError`` on a live send path.
+#
+# ``buttons`` (Phase 5.1 #3.3) is the neutral
+# ``tuple[tuple[Button, ...], ...]``; Telegram has already received the
+# same buttons as ``reply_markup``, so there is nothing left to do with
+# it here.
+_NON_TELEGRAM_KWARGS = frozenset({"buttons", "image_url"})
+
+
+def _telegram_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in kwargs.items() if k not in _NON_TELEGRAM_KWARGS}
+
 
 class TelegramNotifier:
     """Default :class:`Notifier` implementation for Phase 0/1.
@@ -30,7 +45,7 @@ class TelegramNotifier:
         reply_markup: dict | None = None,
         **kwargs: Any,
     ) -> dict | None:
-        call_kwargs: dict[str, Any] = dict(kwargs)
+        call_kwargs: dict[str, Any] = _telegram_kwargs(kwargs)
         if parse_mode is not None:
             call_kwargs["parse_mode"] = parse_mode
         if reply_markup is not None:
@@ -46,7 +61,7 @@ class TelegramNotifier:
         reply_markup: dict | None = None,
         **kwargs: Any,
     ) -> dict | None:
-        call_kwargs: dict[str, Any] = dict(kwargs)
+        call_kwargs: dict[str, Any] = _telegram_kwargs(kwargs)
         if reply_markup is not None:
             call_kwargs["reply_markup"] = reply_markup
         return await telegram_service.send_photo(
@@ -67,7 +82,7 @@ class TelegramNotifier:
         reply_markup: dict | None = None,
         **kwargs: Any,
     ) -> dict | None:
-        call_kwargs: dict[str, Any] = dict(kwargs)
+        call_kwargs: dict[str, Any] = _telegram_kwargs(kwargs)
         if reply_markup is not None:
             call_kwargs["reply_markup"] = reply_markup
         return await telegram_service.send_document(

@@ -510,6 +510,9 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1001 | Phase 4 | [Phase 4.7][E1 #1.4] spending_drift copy + persona QA | [phase-4/issue-1001.md](by-phase/phase-4/issue-1001.md) |
 | #1002 | Phase 4 | [Phase 4.7][E3 #3.1] Kill switch + flag infra (DRIFT_WARNING / SCAM_CHECK) | [phase-4/issue-1002.md](by-phase/phase-4/issue-1002.md) |
 | #1003 | Phase 4 | [Phase 4.7][E3 #3.2] QUERY_TYPE_SCAM_CHECK constant (drift stays off decision_query_log) | [phase-4/issue-1003.md](by-phase/phase-4/issue-1003.md) |
+| #1019 | Pre-Phase | Bug: Twin first open takes ~25s on cache miss | [pre-phase/issue-1019.md](by-phase/pre-phase/issue-1019.md) |
+| #1021 | Pre-Phase | Bug: VNINDEX stock quote live cache is missing while providers fail | [pre-phase/issue-1021.md](by-phase/pre-phase/issue-1021.md) |
+| #1023 | Pre-Phase | FinanceAssistant: market snapshot sync fails after VNINDEX DB save | [pre-phase/issue-1023.md](by-phase/pre-phase/issue-1023.md) |
 
-**Total:** 506 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 461 Pre-Phase)
+**Total:** 509 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 464 Pre-Phase)

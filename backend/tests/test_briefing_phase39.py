@@ -46,14 +46,19 @@ async def test_enriched_briefing_renders_five_sections_and_stale_footer():
     breakdown = NetWorthBreakdown(total=Decimal("100000000"), by_type={"stock": Decimal("60000000"), "cash": Decimal("40000000")}, asset_count=2)
     change = NetWorthChange(Decimal("100000000"), Decimal("99000000"), Decimal("1000000"), 1.0, "hôm qua")
 
+    db = _DB()
     with patch("backend.briefing.morning_briefing.net_worth_calculator.calculate", AsyncMock(return_value=breakdown)), \
-         patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change", AsyncMock(return_value=change)), \
+         patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change_from_current", AsyncMock(return_value=change)) as change_mock, \
          patch("backend.briefing.morning_briefing.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
          patch("backend.briefing.morning_briefing.get_crypto_quote", AsyncMock(return_value=_quote("BTC", "100", "crypto", stale=True))), \
          patch("backend.briefing.morning_briefing.get_gold_quote", AsyncMock(return_value=_quote("SJC_GOLD", "90000000", "gold"))), \
          patch("backend.briefing.morning_briefing.get_relevant_news", AsyncMock(return_value=[])), \
          patch("backend.briefing.morning_briefing.get_best_worst_from_assets", AsyncMock(return_value=(None, None))):
-        result = await render_enriched_morning_briefing(_DB(), user)
+        result = await render_enriched_morning_briefing(db, user)
+
+    change_mock.assert_awaited_once_with(
+        db, user.id, breakdown.total, "day"
+    )
 
     assert "Chào buổi sáng, Minh!" in result.text
     assert "Tổng tài sản" in result.text
@@ -105,7 +110,7 @@ async def _render_with_performers(performers, breakdown=None, change=None):
         )
 
     with patch("backend.briefing.morning_briefing.net_worth_calculator.calculate", AsyncMock(return_value=breakdown)), \
-         patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change", AsyncMock(return_value=change)), \
+         patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change_from_current", AsyncMock(return_value=change)), \
          patch("backend.briefing.morning_briefing.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
          patch("backend.briefing.morning_briefing.get_crypto_quote", AsyncMock(return_value=_quote("BTC", "100", "crypto"))), \
          patch("backend.briefing.morning_briefing.get_gold_quote", AsyncMock(return_value=_quote("SJC_GOLD", "90000000", "gold"))), \

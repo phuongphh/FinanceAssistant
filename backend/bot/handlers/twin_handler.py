@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from decimal import Decimal
 from functools import lru_cache
@@ -23,6 +25,8 @@ from backend.ports.content_renderer import (
 from backend.ports.notifier import Notifier, get_notifier
 from backend.adapters.telegram_content_renderer import TelegramContentRenderer
 from backend.models.user import User
+from backend.services.onboarding.onboarding_service import salutation_of
+from backend.services.telegram_service import send_chat_action
 from backend.twin.allocation.target_allocation import (
     get_allocation_disclaimer,
     top_rebalance_deltas,
@@ -97,18 +101,40 @@ async def _send_channel_content(
     notifier: Notifier, chat_id: int, content: ChannelContent
 ) -> None:
     reply_markup = _telegram_reply_markup(content.buttons)
+    # ``buttons`` rides alongside ``reply_markup`` (Phase 5.1 #3.3): the
+    # latter is Telegram's wire format, and a non-Telegram notifier would
+    # have to reverse-engineer it to render anything. Passing the neutral
+    # tuples too keeps the channel difference inside the adapter, which is
+    # 5.1's governing rule. ``TelegramNotifier`` swallows the extra kwarg.
     if content.images:
         await notifier.send_photo(
             chat_id,
             content.images[0],
             caption=content.text,
             reply_markup=reply_markup,
+            buttons=content.buttons,
             filename=content.filename or "be-tien-content.png",
         )
         return
     await notifier.send_message(
-        chat_id, content.text, parse_mode=None, reply_markup=reply_markup
+        chat_id,
+        content.text,
+        parse_mode=None,
+        reply_markup=reply_markup,
+        buttons=content.buttons,
     )
+
+
+async def _keep_typing_alive(chat_id: int) -> None:
+    """Keep Telegram's typing indicator visible during cold Twin renders."""
+    try:
+        while True:
+            await send_chat_action(chat_id, "typing")
+            await asyncio.sleep(4)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug("twin_handler: typing indicator failed", exc_info=True)
 
 
 def _miniapp_url() -> str | None:
@@ -132,6 +158,25 @@ async def send_twin_current(
     renderer = renderer or TelegramContentRenderer(
         chart_renderer=render_projection_chart
     )
+    typing_task = asyncio.create_task(_keep_typing_alive(chat_id))
+    try:
+        await _send_twin_current_inner(
+            db, chat_id=chat_id, user=user, notifier=notifier, renderer=renderer
+        )
+    finally:
+        typing_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await typing_task
+
+
+async def _send_twin_current_inner(
+    db: AsyncSession,
+    *,
+    chat_id: int,
+    user: User,
+    notifier: Notifier,
+    renderer: ContentRenderer,
+) -> None:
     copy = _copy()
     snapshot = await twin_query_service.get_twin_snapshot(db, user.id)
     if snapshot.actual_nw < _MIN_TWIN_NET_WORTH:
@@ -291,6 +336,7 @@ async def send_twin_current(
             scenario_cards=scenario_cards,
             is_stale=snapshot.is_stale or snapshot.is_value_stale,
             filename="be-tien-twin.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)
@@ -376,8 +422,6 @@ async def send_twin_share(
     only % growth + horizon. The caption nudges the user to share but
     Bé Tiền does NOT auto-post anywhere — user controls the share.
     """
-    import logging
-
     from backend.services.twin import twin_share_service
 
     notifier = notifier or get_notifier()
@@ -592,6 +636,7 @@ async def send_twin_compare_optimal(
             current_cone=current.cone_data,
             optimal_cone=optimal.cone_data,
             filename="be-tien-twin-optimal.png",
+            salutation=salutation_of(user),
         )
     )
     await _send_channel_content(notifier, chat_id, content)

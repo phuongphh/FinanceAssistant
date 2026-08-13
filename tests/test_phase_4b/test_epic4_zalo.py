@@ -110,14 +110,18 @@ async def test_zalo_oa_gives_up_after_3_retries(monkeypatch):
     monkeypatch.setattr(zalo_oa.asyncio, "sleep", AsyncMock())
 
     client = zalo_oa.ZaloOAClient(access_token="t")
-    ok = await client.send_message("u", "hi")
-    assert ok is False
+    # Phase 5.0: exhausting the budget against 429 means Zalo answered,
+    # repeatedly, and answered no. That outcome is raised rather than
+    # returned so the window ledger keeps the reserved slot — a 429 can
+    # still have been counted on Zalo's side.
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
     # 1 initial + 3 retries
     assert counter.count == 4
 
 
 @pytest.mark.asyncio
-async def test_zalo_oa_returns_false_on_500_no_retry(monkeypatch):
+async def test_zalo_oa_rejects_on_500_no_retry(monkeypatch):
     zalo_oa, _client, counter, fake = _make_client_with_responses(
         [httpx.Response(500, text="boom")]
     )
@@ -125,8 +129,8 @@ async def test_zalo_oa_returns_false_on_500_no_retry(monkeypatch):
     monkeypatch.setattr(zalo_oa.asyncio, "sleep", AsyncMock())
 
     client = zalo_oa.ZaloOAClient(access_token="t")
-    ok = await client.send_message("u", "hi")
-    assert ok is False
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
     # No retry on 500
     assert counter.count == 1
 
@@ -163,8 +167,8 @@ async def test_zalo_oa_treats_200_with_app_error_as_failure(monkeypatch):
     monkeypatch.setattr(zalo_oa.asyncio, "sleep", AsyncMock())
 
     client = zalo_oa.ZaloOAClient(access_token="t")
-    ok = await client.send_message("u", "hi")
-    assert ok is False
+    with pytest.raises(zalo_oa.ZaloSendRejected):
+        await client.send_message("u", "hi")
 
 
 # ---------------------------------------------------------------------------
@@ -559,6 +563,7 @@ def test_resolve_targets_appends_zalo_when_linked_and_configured(monkeypatch):
 
     class FakeOAClient:
         is_configured = True
+        is_send_enabled = True
 
     monkeypatch.setattr(zalo_oa, "get_zalo_oa_client", lambda: FakeOAClient())
     monkeypatch.setattr(
@@ -577,6 +582,7 @@ def test_resolve_targets_skips_zalo_when_oa_not_configured(monkeypatch):
 
     class FakeOAClient:
         is_configured = False
+        is_send_enabled = True
 
     monkeypatch.setattr(
         notifier_resolver, "get_zalo_oa_client", lambda: FakeOAClient()
