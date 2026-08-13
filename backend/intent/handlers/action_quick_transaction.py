@@ -483,6 +483,19 @@ _QUESTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Commenting on a price is not paying it either, and commentary does not
+# have to be phrased as a question: "giá này 180k mắc quá" carries no "?",
+# no "không", no "bao nhiêu", so ``_QUESTION_RE`` waves it straight through
+# into the ledger. Judgement words about cost, and the intensifier tail
+# Vietnamese hangs off them, are the tell that the sentence evaluates an
+# amount rather than reporting one.
+_COMMENTARY_RE = re.compile(
+    r"\b(?:mắc|mac|đắt|dat|rẻ|re|chát|chat|hời|hoi)\b"  # "… 180k mắc quá"
+    r"|\bgiá\s+(?:này|đó|kia)\b|\bgia\s+(?:nay|do|kia)\b"  # "giá này 180k"
+    r"|\b(?:quá|qua|thế|the|vậy|vay|ghê|ghe)\s*[!.…]*$",  # "… 180k quá"
+    re.IGNORECASE,
+)
+
 
 def _is_ratio_token(text: str, match: re.Match[str]) -> bool:
     """True when the number is a percentage, not money.
@@ -513,6 +526,15 @@ def _looks_like_a_question(text: str) -> bool:
     return bool(_QUESTION_RE.search(text))
 
 
+def _looks_like_price_commentary(text: str) -> bool:
+    """True when the message judges an amount instead of reporting a spend.
+
+    Declining costs the user one fallback message; guessing wrong writes a
+    transaction they never made, unconfirmed. Decline is the cheap side.
+    """
+    return bool(_COMMENTARY_RE.search(text))
+
+
 def _parse_single_item_heuristically(text: str) -> ParsedExpenseItem | None:
     """Deterministic single-expense parse — no LLM, no network.
 
@@ -525,7 +547,7 @@ def _parse_single_item_heuristically(text: str) -> ParsedExpenseItem | None:
     the wrong-amount outcome impossible rather than merely unlikely.
     """
     cleaned = (text or "").strip()
-    if _looks_like_a_question(cleaned):
+    if _looks_like_a_question(cleaned) or _looks_like_price_commentary(cleaned):
         return None
 
     candidates = [
