@@ -183,6 +183,19 @@ next_action:
     🧾 Gõ khoản chi đầu tiên, ví dụ: <code>ăn trưa 80k</code>
   default_prompt: "Gõ /menu để chọn bước tiếp theo nhé."
 
+# Zalo → Telegram adoption (#1028). Shown when someone who started on the
+# Zalo OA taps the invite link: their existing account is bound to this
+# Telegram chat, nothing is created. The copy must therefore NOT welcome
+# them as a newcomer or offer to start onboarding again — the one thing
+# they need to hear is that their data came with them.
+zalo_adopt:
+  greeting: |
+    👋 Bé Tiền đây, gặp lại {salutation} bên Telegram!
+
+    Bé Tiền đã nối tài khoản Zalo của {salutation} sang đây — tài sản và chi tiêu {salutation} đã ghi vẫn còn nguyên, không cần nhập lại.
+
+    Ở Telegram Bé Tiền chủ động nhắn được, nên có gì đáng chú ý là báo {salutation} ngay. Gõ /menu để xem tiếp nhé.
+
 # Resume helpers.
 resume:
   prompt: |

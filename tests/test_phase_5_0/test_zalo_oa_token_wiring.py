@@ -439,7 +439,7 @@ async def test_wired_provider_falls_back_to_static_when_nothing_is_seeded(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "exc_name",
-    ["ZaloTokenRefreshInFlight", "ZaloTokenRefreshStuck", "ZaloTokenRefreshFailed"],
+    ["ZaloTokenRefreshStuck", "ZaloTokenRefreshFailed"],
 )
 async def test_wired_provider_yields_nothing_on_a_live_token_incident(
     monkeypatch, exc_name
@@ -450,14 +450,120 @@ async def test_wired_provider_yields_nothing_on_a_live_token_incident(
     from backend.services import zalo_token_service as token_service
 
     exc_class = getattr(token_service, exc_name)
+    calls = []
 
     async def boom(app_id=None) -> str:
+        calls.append(1)
         raise exc_class("nope")
 
     monkeypatch.setattr(token_service, "get_access_token", boom)
 
     provider, _ = zalo_oa._make_token_callables(_settings())
     assert await provider() == ""
+    assert calls == [1], "nothing is coming — waiting only delays the incident"
+
+
+@pytest.mark.asyncio
+async def test_wired_provider_waits_out_a_refresh_another_worker_is_running(
+    monkeypatch,
+):
+    """#1029: in-flight is a wait, not a failure.
+
+    The hourly refresher commits its ``refresh_pending`` marker before it
+    calls Zalo. Every other worker that needs a token in that gap used to
+    get "" and silently drop its reply — while the inbound event was
+    already marked handled, so nothing retried it. The user simply never
+    heard back.
+    """
+    from backend.services import zalo_token_service as token_service
+
+    monkeypatch.setattr(zalo_oa, "_IN_FLIGHT_BACKOFF_SECONDS", (0.0, 0.0, 0.0))
+    attempts = []
+
+    async def mid_rotation(app_id=None) -> str:
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise token_service.ZaloTokenRefreshInFlight("peer is refreshing")
+        return FRESH
+
+    monkeypatch.setattr(token_service, "get_access_token", mid_rotation)
+
+    provider, _ = zalo_oa._make_token_callables(_settings())
+    assert await provider() == FRESH
+    assert len(attempts) == 3
+
+
+@pytest.mark.asyncio
+async def test_wired_provider_gives_up_on_a_refresh_that_never_lands(monkeypatch):
+    """The wait is bounded — a peer that never finishes must not hold a
+    worker forever."""
+    from backend.services import zalo_token_service as token_service
+
+    monkeypatch.setattr(zalo_oa, "_IN_FLIGHT_BACKOFF_SECONDS", (0.0, 0.0))
+    attempts = []
+
+    async def forever(app_id=None) -> str:
+        attempts.append(1)
+        raise token_service.ZaloTokenRefreshInFlight("still going")
+
+    monkeypatch.setattr(token_service, "get_access_token", forever)
+
+    provider, _ = zalo_oa._make_token_callables(_settings())
+    assert await provider() == ""
+    assert len(attempts) == 3, "one immediate try plus one per backoff step"
+
+
+@pytest.mark.asyncio
+async def test_the_in_flight_wait_stays_under_a_few_seconds():
+    """The shipped budget is latency on a live reply path, so it is
+    asserted rather than left to whoever edits the tuple next."""
+    assert sum(zalo_oa._IN_FLIGHT_BACKOFF_SECONDS) <= 5.0
+    assert all(d > 0 for d in zalo_oa._IN_FLIGHT_BACKOFF_SECONDS)
+
+
+@pytest.mark.asyncio
+async def test_a_seeded_credential_still_wins_over_the_static_token_mid_wait(
+    monkeypatch,
+):
+    """``ZaloTokenMissing`` keeps its documented static fallback even when
+    it surfaces only after a wait."""
+    from backend.services import zalo_token_service as token_service
+
+    monkeypatch.setattr(zalo_oa, "_IN_FLIGHT_BACKOFF_SECONDS", (0.0,))
+    attempts = []
+
+    async def then_missing(app_id=None) -> str:
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise token_service.ZaloTokenRefreshInFlight("peer is refreshing")
+        raise token_service.ZaloTokenMissing("no row")
+
+    monkeypatch.setattr(token_service, "get_access_token", then_missing)
+
+    provider, _ = zalo_oa._make_token_callables(_settings())
+    assert await provider() == STATIC
+
+
+@pytest.mark.asyncio
+async def test_wired_refresher_also_waits_out_a_peer_refresh(monkeypatch):
+    """A ``-216`` replay races the hourly rotation for the same reason the
+    provider does, and dropping it costs the same reply."""
+    from backend.services import zalo_token_service as token_service
+
+    monkeypatch.setattr(zalo_oa, "_IN_FLIGHT_BACKOFF_SECONDS", (0.0, 0.0))
+    attempts = []
+
+    async def mid_rotation(app_id=None, *, stale_token="") -> str:
+        attempts.append(stale_token)
+        if len(attempts) < 2:
+            raise token_service.ZaloTokenRefreshInFlight("peer is refreshing")
+        return FRESH
+
+    monkeypatch.setattr(token_service, "force_refresh", mid_rotation)
+
+    _, refresher = zalo_oa._make_token_callables(_settings())
+    assert await refresher("old-token") == FRESH
+    assert attempts == ["old-token", "old-token"], "the stale token survives the wait"
 
 
 @pytest.mark.asyncio

@@ -158,6 +158,56 @@ async def test_stock_updater_fills_partial_batch_without_overwriting_live_quote(
 
 
 @pytest.mark.asyncio
+async def test_stock_updater_snapshot_does_not_regress_a_live_alert_baseline():
+    # Regression: an end-of-day snapshot used to overwrite the live last-known
+    # entry, so the next live run measured an overnight move and announced it as
+    # a 15-minute swing.
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+    live = PriceQuote(
+        "VNINDEX",
+        Decimal("1760"),
+        "VND",
+        "stock",
+        datetime(2026, 8, 10, 7, 30, tzinfo=timezone.utc),
+        "ssi",
+    )
+    await cache.set_last_known(live)
+    fallback = PriceQuote(
+        "VNINDEX",
+        Decimal("1500"),
+        "VND",
+        "stock",
+        datetime(2026, 8, 9, 10, tzinfo=timezone.utc),
+        "market_snapshot",
+        is_stale=True,
+    )
+    provider = MagicMock()
+    provider.fetch_batch = AsyncMock(side_effect=RuntimeError("providers down"))
+
+    with (
+        patch.object(
+            stock_updater, "get_session_factory", return_value=_session_factory([])
+        ),
+        patch.object(stock_updater, "get_stock_provider", return_value=provider),
+        patch.object(stock_updater, "get_price_cache", return_value=cache),
+        patch.object(
+            stock_updater,
+            "_latest_snapshot_quotes",
+            AsyncMock(return_value={"VNINDEX": fallback}),
+        ),
+    ):
+        await stock_updater.update_all_held_stocks()
+
+    baseline = await cache.get_last_known("VNINDEX", "stock")
+    assert baseline is not None
+    assert baseline.price == Decimal("1760")
+    assert baseline.source == "ssi"
+    # The display cache still degrades to the snapshot so menus keep a price.
+    assert (await cache.get("market_data:stock:VNINDEX")).price == Decimal("1500")
+
+
+@pytest.mark.asyncio
 async def test_latest_snapshot_quotes_uses_newest_row_and_preserves_metadata():
     created_at = datetime(2026, 8, 7, 18, tzinfo=timezone.utc)
     newest = MagicMock(

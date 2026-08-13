@@ -614,6 +614,14 @@ def _coerce_int(value: Any) -> int | None:
     return None
 
 
+# Phase 5.0 #1029 — how long a caller waits out a refresh *another*
+# worker is running. Backoff steps in seconds; their sum (~3.25s) is the
+# worst-case latency this adds before giving up. Short on purpose: the
+# caller is a worker replying to an inbound message, and a reply three
+# seconds late still arrives, while a dropped one never does.
+_IN_FLIGHT_BACKOFF_SECONDS: tuple[float, ...] = (0.25, 0.5, 1.0, 1.5)
+
+
 def _make_token_callables(
     settings: Settings,
 ) -> tuple[TokenProvider | None, TokenRefresher | None]:
@@ -639,11 +647,12 @@ def _make_token_callables(
     * :class:`ZaloTokenMissing` — nothing seeded yet ⇒ fall back to the
       static token (exactly the fallback documented in
       ``docs/conventions/zalo-operations.md`` §Configuration).
-    * any other :class:`ZaloTokenError` — a refresh is in flight, stuck,
-      or failed. The static token is from a different era and would only
-      buy an opaque platform error, so yield "" and let the send
-      fail-open with an actionable log line already written by the
-      token service.
+    * :class:`ZaloTokenRefreshInFlight` — a peer is mid-rotation ⇒ wait
+      for it, see :func:`_resolve` below.
+    * any other :class:`ZaloTokenError` — the refresh is stuck or failed.
+      The static token is from a different era and would only buy an
+      opaque platform error, so yield "" and let the send fail-open with
+      an actionable log line already written by the token service.
     """
     if not settings.zalo_app_id:
         return None, None
@@ -652,21 +661,55 @@ def _make_token_callables(
 
     static_token = settings.zalo_oa_access_token
 
+    async def _resolve(fetch, *, on_missing: str, what: str) -> str:
+        """Resolve a token, waiting out a refresh *another* worker started.
+
+        ``ZaloTokenRefreshInFlight`` means a peer committed the
+        write-ahead marker and is between steps 3 and 5 of the refresh
+        protocol: the token we want is seconds away and this caller
+        merely arrived mid-rotation. Treating that like a dead refresh
+        (#1029) dropped the outbound reply while the inbound event was
+        already marked handled — the user got silence, and nothing
+        retried it.
+
+        So poll across :data:`_IN_FLIGHT_BACKOFF_SECONDS` instead, and
+        keep failing closed for ``Stuck`` and ``Failed``: there nothing
+        is coming, and sleeping would only delay an incident that
+        already needs a human.
+        """
+        in_flight: Exception | None = None
+        for delay in (0.0, *_IN_FLIGHT_BACKOFF_SECONDS):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                return await fetch()
+            except token_service.ZaloTokenMissing:
+                return on_missing
+            except token_service.ZaloTokenRefreshInFlight as exc:
+                in_flight = exc
+            except token_service.ZaloTokenError as exc:
+                logger.warning("Zalo OA %s unavailable: %s", what, exc)
+                return ""
+
+        logger.warning(
+            "Zalo OA %s still mid-refresh after %.2fs, giving up: %s",
+            what,
+            sum(_IN_FLIGHT_BACKOFF_SECONDS),
+            in_flight,
+        )
+        return ""
+
     async def provider() -> str:
-        try:
-            return await token_service.get_access_token()
-        except token_service.ZaloTokenMissing:
-            return static_token
-        except token_service.ZaloTokenError as exc:
-            logger.warning("Zalo OA token unavailable: %s", exc)
-            return ""
+        return await _resolve(
+            token_service.get_access_token, on_missing=static_token, what="token"
+        )
 
     async def refresher(stale: str) -> str:
-        try:
-            return await token_service.force_refresh(stale_token=stale)
-        except token_service.ZaloTokenError as exc:
-            logger.warning("Zalo OA forced token refresh failed: %s", exc)
-            return ""
+        return await _resolve(
+            lambda: token_service.force_refresh(stale_token=stale),
+            on_missing="",
+            what="forced token refresh",
+        )
 
     return provider, refresher
 

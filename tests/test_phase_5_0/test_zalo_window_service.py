@@ -452,17 +452,81 @@ async def test_release_returns_the_slot_after_a_transport_failure(window_store):
 
 
 @pytest.mark.asyncio
-async def test_release_refuses_to_refund_into_a_newer_window(window_store):
-    """A refund must not hand the user a ninth message.
+async def test_release_follows_its_reservation_across_a_rotation(window_store):
+    """A refund lands wherever the reservation ended up.
 
-    Sequence: reserve, send fails, and before the compensation lands the
-    user sends something that opens a fresh window. Refunding there
-    would subtract from an allowance the failed message never touched.
+    Sequence: reserve, the send fails, and before the compensation lands
+    the user messages us and opens a fresh window. The reservation was
+    still in flight, so the rotation carried it into that new window —
+    which is therefore exactly where the refund belongs. Guarding on the
+    window it was *born* in would strand the slot instead.
     """
     await _open_window(window_store)
     reservation = await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
 
-    later = T0 + timedelta(hours=1)
+    later = T0 + timedelta(minutes=1)
+    await _open_window(window_store, at=later)
+    assert window_store.rows[SENDER].free_msg_count == 1  # carried, not zeroed
+
+    released = await svc.release_send(
+        window_store,
+        zalo_user_id=SENDER,
+        window_expires_at=reservation.window_expires_at,
+        now=later,
+    )
+
+    assert released
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_release_of_a_written_off_reservation_manufactures_nothing(window_store):
+    """The other half of the same rule: a rotation past the grace ends it.
+
+    Once :data:`~backend.services.zalo_window_service.INFLIGHT_GRACE` has
+    passed, the reservation is presumed abandoned and the rotation writes
+    it off. A compensation arriving after that has already been accounted
+    for, so it must not hand the new window a ninth slot.
+    """
+    await _open_window(window_store)
+    reservation = await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    later = T0 + svc.INFLIGHT_GRACE + timedelta(seconds=1)
+    await _open_window(window_store, at=later)
+
+    released = await svc.release_send(
+        window_store,
+        zalo_user_id=SENDER,
+        window_expires_at=reservation.window_expires_at,
+        now=later,
+    )
+
+    assert not released
+    assert window_store.rows[SENDER].free_msg_count == 0
+
+
+@pytest.mark.asyncio
+async def test_a_written_off_reservation_can_still_refund_a_newer_one(window_store):
+    """The residual this design knowingly accepts, pinned so it stays small.
+
+    Reservations are counted, not named. If one is written off and *another*
+    send is in flight when the stale compensation finally lands, the refund
+    lands on that newer reservation — the counter cannot tell them apart.
+    Cost is one slot out of eight, and it takes a compensation arriving more
+    than :data:`~backend.services.zalo_window_service.INFLIGHT_GRACE` after
+    its own reservation, which is past the OA client's whole
+    timeout-and-retry budget. Naming reservations would need a row per send;
+    that is a lot of machinery for a window that holds eight.
+
+    This is the one place the ledger errs toward under-counting. It stays
+    survivable because Zalo enforces the same ceiling server-side: the worst
+    case is a refused ninth send, not a silently over-quota OA.
+    """
+    await _open_window(window_store)
+    reservation = await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    later = T0 + svc.INFLIGHT_GRACE + timedelta(seconds=1)
     await _open_window(window_store, at=later)
     await svc.reserve_send(window_store, zalo_user_id=SENDER, now=later)
 
@@ -473,8 +537,9 @@ async def test_release_refuses_to_refund_into_a_newer_window(window_store):
         now=later,
     )
 
-    assert not released
-    assert window_store.rows[SENDER].free_msg_count == 1
+    assert released
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (0, 0)
 
 
 @pytest.mark.asyncio
@@ -527,21 +592,214 @@ async def test_a_noop_release_is_logged_without_the_sender_id(window_store, capl
     assert SENDER not in caplog.text
 
 
-def test_release_sql_guards_on_window_identity_and_floor():
-    stmt = (
-        update(ZaloMessageWindow)
-        .where(
-            ZaloMessageWindow.zalo_user_id == SENDER,
-            ZaloMessageWindow.window_expires_at == T0,
-            ZaloMessageWindow.free_msg_count > 0,
-        )
-        .values(free_msg_count=ZaloMessageWindow.free_msg_count - 1)
-    )
-    sql = _sql(stmt)
+@pytest.mark.asyncio
+async def test_release_sql_guards_on_the_inflight_counter_and_the_floor(window_store):
+    """Asserted on the statement the service actually emitted.
 
-    assert "zalo_message_window.window_expires_at = " in sql
+    ``inflight_count > 0`` is the whole guard now: it is true exactly
+    while a reservation is open, in whichever window is holding it. The
+    ``free_msg_count > 0`` arm is redundant given the invariant and stays
+    as the cheap way to find out the invariant broke.
+    """
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+    window_store.statements.clear()
+
+    await svc.release_send(
+        window_store,
+        zalo_user_id=SENDER,
+        window_expires_at=T0 + timedelta(hours=WINDOW_HOURS),
+        now=T0,
+    )
+
+    (sql,) = window_store.statements
+    assert "zalo_message_window.inflight_count > " in sql
     assert "zalo_message_window.free_msg_count > " in sql
     assert "free_msg_count=(zalo_message_window.free_msg_count - " in sql
+    assert "inflight_count=(zalo_message_window.inflight_count - " in sql
+    # The window it was reserved in is no longer a predicate — see
+    # test_release_follows_its_reservation_across_a_rotation.
+    assert "zalo_message_window.window_expires_at" not in sql
+
+
+# ---------------------------------------------------------------------------
+# settle_send — closing out a reservation Zalo answered (#1029(4))
+# ---------------------------------------------------------------------------
+#
+# The bug this section pins: ``record_inbound`` used to zero
+# ``free_msg_count`` outright, which erased a slot whose OA request had
+# not come back yet. Zalo still charged that send — to the *new* window —
+# while the local row believed all eight were free, so the OA could push
+# nine or more consulting messages into one 48h window. ``inflight_count``
+# is what lets the rotation tell a live reservation from a spent one.
+
+
+@pytest.mark.asyncio
+async def test_reserve_marks_the_slot_in_flight(window_store):
+    await _open_window(window_store)
+
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 1)
+
+
+@pytest.mark.asyncio
+async def test_settle_keeps_the_slot_spent(window_store):
+    """Zalo has seen the message; the allowance is gone either way."""
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    assert await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
+
+
+@pytest.mark.asyncio
+async def test_settle_survives_the_rotation_that_carried_it(window_store):
+    """Not keyed on the window the reservation was born in.
+
+    By the time the OA answers, an inbound message may have rotated the
+    window and taken the reservation with it. A settle that insisted on
+    the original window would never match, ``inflight_count`` would only
+    ever climb, and the sender would eventually be muted for good.
+    """
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    later = T0 + timedelta(minutes=1)
+    await _open_window(window_store, at=later)
+
+    assert await svc.settle_send(window_store, zalo_user_id=SENDER, now=later)
+
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
+
+
+@pytest.mark.asyncio
+async def test_a_rotation_carries_the_send_that_is_still_on_the_wire(window_store):
+    """The regression test for #1029(4).
+
+    Seven sends have been delivered and settled; the eighth is still
+    waiting on the OA when a new inbound message rotates the window. The
+    seven are written off — that is what a new window means — but the
+    eighth is carried, because Zalo will charge it to the window it
+    lands in. Zeroing outright is what allowed a ninth message.
+    """
+    await _open_window(window_store)
+    for _ in range(FREE_MESSAGE_QUOTA):
+        assert (
+            await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+        ).granted
+    for _ in range(FREE_MESSAGE_QUOTA - 1):
+        assert await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    later = T0 + timedelta(minutes=1)
+    await _open_window(window_store, at=later)
+
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 1)
+    # And the new window is worth seven more, not eight: the send on the
+    # wire is Zalo's eighth for this window.
+    granted = [
+        (await svc.reserve_send(window_store, zalo_user_id=SENDER, now=later)).granted
+        for _ in range(FREE_MESSAGE_QUOTA)
+    ]
+    assert granted == [True] * (FREE_MESSAGE_QUOTA - 1) + [False]
+
+
+@pytest.mark.asyncio
+async def test_a_rotation_writes_off_a_reservation_nobody_settled(window_store):
+    """The carry-over is bounded, or a crash would mute the sender.
+
+    Every live reservation is settled within seconds of the OA
+    answering, so one older than the grace period belongs to a process
+    that died between the reserve and the send. Carrying those forever
+    would ratchet the floor up window after window.
+    """
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    later = T0 + svc.INFLIGHT_GRACE + timedelta(seconds=1)
+    await _open_window(window_store, at=later)
+
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_the_carried_count_never_exceeds_the_spent_count(window_store):
+    """``inflight_count <= free_msg_count`` holds across a whole lifecycle."""
+    await _open_window(window_store)
+    row = window_store.rows[SENDER]
+
+    async def _invariant():
+        assert 0 <= row.inflight_count <= row.free_msg_count <= FREE_MESSAGE_QUOTA
+
+    for _ in range(3):
+        await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+        await _invariant()
+    await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+    await _invariant()
+    await svc.release_send(
+        window_store,
+        zalo_user_id=SENDER,
+        window_expires_at=row.window_expires_at,
+        now=T0,
+    )
+    await _invariant()
+    await _open_window(window_store, at=T0 + timedelta(minutes=1))
+    await _invariant()
+    assert (row.free_msg_count, row.inflight_count) == (1, 1)
+
+
+@pytest.mark.asyncio
+async def test_a_replayed_settle_is_a_logged_noop(window_store):
+    """Nothing in flight means nothing to close out — and no negative."""
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+    await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    assert not await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
+
+
+@pytest.mark.asyncio
+async def test_a_noop_settle_is_logged_without_the_sender_id(window_store, caplog):
+    await _open_window(window_store)
+
+    with caplog.at_level("INFO", logger=svc.logger.name):
+        assert not await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    assert "zalo.window.settle_noop" in caplog.text
+    assert SENDER not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_settle_does_not_commit(window_store):
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+    await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    assert window_store.commits == 0
+
+
+@pytest.mark.asyncio
+async def test_settle_sql_touches_only_the_inflight_counter(window_store):
+    await _open_window(window_store)
+    await svc.reserve_send(window_store, zalo_user_id=SENDER, now=T0)
+    window_store.statements.clear()
+
+    await svc.settle_send(window_store, zalo_user_id=SENDER, now=T0)
+
+    (sql,) = window_store.statements
+    assert "inflight_count=(zalo_message_window.inflight_count - " in sql
+    assert "zalo_message_window.inflight_count > " in sql
+    # The slot stays spent, and the window it came from is irrelevant.
+    assert "free_msg_count" not in sql
+    assert "window_expires_at" not in sql
 
 
 # ---------------------------------------------------------------------------

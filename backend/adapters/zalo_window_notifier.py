@@ -35,10 +35,10 @@ user behind it.
 
 Ordering, and which way it errs
 -------------------------------
-reserve → commit → send → (release + commit only if the transport
-failed). A crash between the reservation and the send spends a slot on
-a message nobody received; the reverse ordering would let eight
-concurrent sends all read 7 and all deliver. *Thà đếm dư 1 khi crash
+reserve → commit → send → close out + commit (settle if Zalo answered,
+release if it never heard us). A crash between the reservation and the
+send spends a slot on a message nobody received; the reverse ordering
+would let eight concurrent sends all read 7 and all deliver. *Thà đếm dư 1 khi crash
 giữa chừng còn hơn vượt trần thật.*
 
 Release is deliberately narrow, and the line it draws is *"did the
@@ -54,9 +54,16 @@ slot spent. Refunding those would let a user whose sends Zalo is
 rejecting for quota reasons loop forever against our own counter,
 which is exactly the ceiling this file exists to hold.
 
-:func:`release_send` additionally guards on window identity, so even a
-sanctioned refund can never land in a window a newer inbound message
-has since opened.
+Closing the reservation out
+--------------------------
+Whichever way the OA answers, the reservation stops being *in flight*
+the moment we know: :func:`release_send` on the refund paths,
+:func:`settle_send` on the two where the message reached Zalo. Both are
+mandatory. A reservation left open is carried across window rotations
+by design (#1029(4) — a send Zalo is still processing gets charged to
+whatever window it lands in), so one that is never closed out would
+hold a slot hostage until :data:`~backend.services.zalo_window_service.INFLIGHT_GRACE`
+writes it off.
 """
 
 from __future__ import annotations
@@ -255,7 +262,10 @@ class WindowedZaloNotifier:
             # point of the exception is that it is *not* the fail-open
             # ``False`` case below. Not re-raised: this is an ordinary
             # delivery failure, not a bug, and the ``Notifier`` port owes
-            # its callers ``None`` for that.
+            # its callers ``None`` for that. The slot stays spent, but it
+            # stops being in flight: Zalo has finished with it, so a
+            # rotation has nothing left to protect.
+            await self._settle()
             logger.warning(
                 "zalo.send.rejected kind=%s zalo_user=%s used=%d remaining=%d: %s",
                 kind,
@@ -301,6 +311,10 @@ class WindowedZaloNotifier:
             )
             return None
 
+        # Delivered. The slot is spent for good, and no longer needs a
+        # window rotation to carry it — settle before anything that could
+        # plausibly fail, so the ledger is right even if metrics aren't.
+        await self._settle()
         logger.debug(
             "zalo.send.delivered kind=%s zalo_user=%s used=%d remaining=%d",
             kind,
@@ -367,13 +381,43 @@ class WindowedZaloNotifier:
             await db.commit()
         return reservation
 
+    async def _settle(self) -> None:
+        """Mark the reservation finished with, keeping its slot. Never raises.
+
+        Same self-effacing contract as :meth:`_release`, for the same
+        reason: this runs after the message has already been delivered (or
+        already been refused), and turning that into a stack trace would
+        misreport the send. The cost of losing it is bounded — the
+        reservation looks in-flight until :data:`~backend.services.zalo_window_service.INFLIGHT_GRACE`
+        elapses and a rotation writes it off — and it errs toward
+        over-counting, which is the direction this ledger is allowed to
+        be wrong in.
+
+        Takes no ``reservation``: the settle is deliberately not keyed on
+        the window the slot came from, because by now it may well live in
+        a newer one.
+        """
+        factory = self._session_factory or get_session_factory()
+        try:
+            async with factory() as db:
+                await zalo_window_service.settle_send(
+                    db, zalo_user_id=self._zalo_user_id
+                )
+                await db.commit()
+        except Exception:
+            logger.exception(
+                "zalo.window.settle_failed zalo_user=%s — slot stays in flight",
+                zalo_window_service.mask_zalo_id(self._zalo_user_id),
+            )
+
     async def _release(self, reservation: zalo_window_service.Reservation) -> None:
         """Hand back a slot whose send didn't happen. Never raises.
 
         We are already on a failure path; a compensation that blows up
         would replace a delivery failure with a stack trace and lose the
-        original reason. Worst case the counter stays one high until the
-        next inbound message resets it.
+        original reason. Worst case the slot stays spent and in flight
+        until a rotation past :data:`~backend.services.zalo_window_service.INFLIGHT_GRACE`
+        writes it off.
         """
         factory = self._session_factory or get_session_factory()
         try:

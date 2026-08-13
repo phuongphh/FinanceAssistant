@@ -34,6 +34,7 @@ import yaml
 
 from backend import analytics
 from backend.adapters.zalo_content_renderer import ZaloContentRenderer
+from backend.bot.handlers import zalo_adoption
 from backend.bot.handlers.onboarding_v2 import (
     is_onboarding_reset_enabled,
     is_trust_card_enabled,
@@ -172,7 +173,9 @@ async def handle_text(db, *, notifier, user: User, text: str) -> bool:
     if step == STEP_GOAL_QUESTION:
         return await _handle_identity_step(db, notifier=notifier, user=user, text=text)
     if step == STEP_TRUST_PRIVACY:
-        return await _handle_trust_step(db, notifier=notifier, user=user)
+        return await _handle_trust_step(
+            db, notifier=notifier, user=user, session=session
+        )
     if step == STEP_FIRST_ASSET:
         return await _handle_asset_step(db, notifier=notifier, user=user, text=text)
     if step == STEP_TWIN_SHOWN:
@@ -245,12 +248,20 @@ async def _handle_identity_step(db, *, notifier, user: User, text: str) -> bool:
     return True
 
 
-async def _handle_trust_step(db, *, notifier, user: User) -> bool:
-    """Any reply continues.
+async def _handle_trust_step(db, *, notifier, user: User, session) -> bool:
+    """Any reply continues — once the card has actually been delivered.
 
     The Telegram trust card has one button and no decline path — it is a
-    promise, not a consent gate — so there is nothing here to refuse.
+    promise, not a consent gate — so there is nothing here to refuse. But
+    a promise nobody received cannot be accepted on their behalf: when the
+    send failed, ``trust_shown_at`` is still NULL and whatever the user
+    typed is about something else entirely. Re-send the card instead of
+    recording a consent that never happened.
     """
+    if session.trust_shown_at is None and _trust_card_lines():
+        await _send_trust_card(db, notifier=notifier, user=user)
+        return True
+
     await onboarding_service.accept_trust(db, user.id)
     await _ask_asset(notifier, user)
     return True
@@ -347,7 +358,8 @@ def _load_trust_copy() -> dict[str, Any]:
         return {}
 
 
-async def _send_trust_card(db, *, notifier, user: User) -> None:
+def _trust_card_lines() -> list[str]:
+    """Render the trust card body, or an empty list if the copy is missing."""
     copy = _load_trust_copy()
     header = (copy.get("header") or "").strip()
     body = (copy.get("body") or "").strip()
@@ -362,16 +374,32 @@ async def _send_trust_card(db, *, notifier, user: User) -> None:
         cleaned = _LEADING_ORNAMENT_RE.sub("", str(bullet).strip()).strip()
         if cleaned:
             lines.append(f"- {cleaned}")
+    return lines
 
+
+async def _send_trust_card(db, *, notifier, user: User) -> None:
+    lines = _trust_card_lines()
     if not lines:
         # No card to show — don't strand the user on a step with no prompt.
         await _ask_asset(notifier, user)
         return
 
     label = zalo_text("onboarding", "trust_ok_label")
-    await notifier.send_message(
+    sent = await notifier.send_message(
         _ZALO_CHAT_ID, "\n".join(lines), buttons=_one_button(label)
     )
+    if sent is None:
+        # Closed window or transport failure. ``set_goal`` already moved
+        # the session to STEP_TRUST_PRIVACY, so the user is parked on a
+        # step whose handler reads any reply as acceptance — leaving
+        # ``trust_shown_at`` NULL is what tells that handler the promise
+        # was never actually delivered, so it re-sends instead.
+        logger.info(
+            "Zalo onboarding: trust card not delivered for %s, will re-send",
+            user.id,
+        )
+        return
+
     await onboarding_service.mark_trust_shown(db, user.id)
 
 
@@ -454,6 +482,18 @@ async def _send_content(notifier, content: ChannelContent) -> None:
 # --------------------------------------------------------------------------
 
 
+def _start_deep_link(bot_url: str, payload: str) -> str:
+    """Attach a ``/start`` payload to the bot URL.
+
+    Telegram turns ``?start=<payload>`` into ``/start <payload>`` as the
+    first message of the chat. The payload alphabet is ``[A-Za-z0-9_-]``,
+    which needs no percent-encoding, so the only thing to get right is
+    whether the configured URL already carries a query string.
+    """
+    separator = "&" if "?" in bot_url else "?"
+    return f"{bot_url}{separator}start={payload}"
+
+
 async def _maybe_invite_telegram(db, *, notifier, user: User) -> None:
     """Ask once whether they also want Bé Tiền on Telegram.
 
@@ -461,12 +501,18 @@ async def _maybe_invite_telegram(db, *, notifier, user: User) -> None:
     — the OA can only answer, never start — so a Zalo-only user gets no
     briefing and no nudge while they are quiet. That is the whole content
     of the ask; there is no urgency copy and no second chance.
+
+    The link carries a single-use adoption token (#1028). Without it the
+    tap lands on ``/start`` as an anonymous newcomer and Telegram mints a
+    *second* account for someone who already has one here — same person,
+    financial history split down the middle, and no way to tell from
+    either side that the other half exists.
     """
     if not zalo_linking_service.telegram_invite_pending(user):
         return
 
-    url = (get_settings().telegram_bot_url or "").strip()
-    if not url:
+    bot_url = (get_settings().telegram_bot_url or "").strip()
+    if not bot_url:
         # No link to offer. Staying silent keeps the one-time chance
         # unspent rather than burning it on a dead button.
         logger.info(
@@ -482,9 +528,18 @@ async def _maybe_invite_telegram(db, *, notifier, user: User) -> None:
         logger.warning("Zalo onboarding: telegram invite copy incomplete")
         return
 
+    # Minted before the send: issuance re-uses the user's active token, so
+    # a failed send leaves it unspent for the retry rather than stacking
+    # up a new credential every attempt.
+    token = await zalo_linking_service.issue_telegram_adoption_token(db, user)
     buttons = (
         (
-            Button(text=accept, web_app_url=url),
+            Button(
+                text=accept,
+                web_app_url=_start_deep_link(
+                    bot_url, zalo_adoption.build_payload(token)
+                ),
+            ),
             Button(text=decline),
         ),
     )

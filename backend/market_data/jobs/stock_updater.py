@@ -12,7 +12,7 @@ from sqlalchemy import desc, select
 from backend.database import get_session_factory
 from backend.market_data.analytics.alerts import check_movements
 from backend.market_data.client import get_price_cache, get_stock_provider
-from backend.market_data.normalizer import PriceQuote
+from backend.market_data.normalizer import SNAPSHOT_SOURCE, PriceQuote
 from backend.models.market_snapshot import MarketSnapshot
 from backend.wealth.models.asset import Asset
 
@@ -69,7 +69,7 @@ async def _latest_snapshot_quotes(db, symbols: list[str]) -> dict[str, PriceQuot
             currency="VND",
             asset_type="stock",
             fetched_at=fetched_at,
-            source="market_snapshot",
+            source=SNAPSHOT_SOURCE,
             metadata={
                 **extra,
                 "change_pct": snapshot.change_1d_pct,
