@@ -33,6 +33,10 @@ class FakeWindowRow:
         self.last_inbound_at = None
         self.window_expires_at = None
         self.free_msg_count = 0
+        # Of ``free_msg_count``, the reservations the OA hasn't answered
+        # yet. Never above it — the store asserts nothing, but every test
+        # that walks a lifecycle checks the pair.
+        self.inflight_count = 0
         self.last_sent_at = None
 
 
@@ -42,7 +46,7 @@ class FakeWindowStore:
     ``aiosqlite`` isn't installed and there is no Postgres in CI, so the
     window service is exercised against this rather than an ORM session.
 
-    The store re-implements the four statements by hand, which is only
+    The store re-implements each statement by hand, which is only
     trustworthy because ``test_zalo_window_service.py`` also compiles the
     real statements and asserts their WHERE/SET clauses verbatim. If the
     service's SQL and this simulation drift apart, those shape tests fail
@@ -95,8 +99,13 @@ class FakeWindowStore:
             self.events.append("reserve")
             return self._reserve(params)
         if "free_msg_count - " in sql:
+            # Checked before the settle branch: a release decrements both
+            # counters, so it matches that pattern too.
             self.events.append("release")
             return self._release(params)
+        if "inflight_count - " in sql:
+            self.events.append("settle")
+            return self._settle(params)
         if "SET user_id" in sql:
             self.events.append("bind_user")
             return self._bind(params)
@@ -125,7 +134,19 @@ class FakeWindowStore:
         if row.last_inbound_at is None or row.last_inbound_at < moment:
             row.last_inbound_at = moment
             row.window_expires_at = params["window_expires_at"]
-            row.free_msg_count = params["free_msg_count"]
+            # The inner CASE: a rotation carries reservations that are
+            # still plausibly on the wire and writes off the rest. Both
+            # counters land on the same value — every carried slot is
+            # spent *and* unsettled. ``last_sent_at_1`` is the compiled
+            # bind for ``moment - INFLIGHT_GRACE``.
+            carried = (
+                row.inflight_count
+                if row.last_sent_at is not None
+                and row.last_sent_at > params["last_sent_at_1"]
+                else params["free_msg_count"]
+            )
+            row.free_msg_count = carried
+            row.inflight_count = carried
         # coalesce(excluded.user_id, zalo_message_window.user_id) — set
         # outside the CASE, so a stale inbound can still teach us who the
         # sender is without reopening their window.
@@ -153,20 +174,37 @@ class FakeWindowStore:
         if row.free_msg_count >= params["free_msg_count_2"]:
             return _FakeResult(rows=[])
         row.free_msg_count += params["free_msg_count_1"]
+        row.inflight_count += params["inflight_count_1"]
         row.last_sent_at = params["last_sent_at"]
         return _FakeResult(
             rows=[_FakeRow(row.free_msg_count, row.window_expires_at)], rowcount=1
         )
 
     def _release(self, params):
+        # No window predicate any more: a reservation carried across a
+        # rotation belongs to whatever window is holding it now, so
+        # ``inflight_count`` is what says whether there is anything to
+        # give back.
         row = self.rows.get(params["zalo_user_id_1"])
         if row is None:
             return _FakeResult(rowcount=0)
-        if row.window_expires_at != params["window_expires_at_1"]:
+        if row.inflight_count <= params["inflight_count_2"]:
             return _FakeResult(rowcount=0)
         if row.free_msg_count <= params["free_msg_count_2"]:
             return _FakeResult(rowcount=0)
         row.free_msg_count -= params["free_msg_count_1"]
+        row.inflight_count -= params["inflight_count_1"]
+        return _FakeResult(rowcount=1)
+
+    def _settle(self, params):
+        row = self.rows.get(params["zalo_user_id_1"])
+        if row is None:
+            return _FakeResult(rowcount=0)
+        if row.inflight_count <= params["inflight_count_2"]:
+            return _FakeResult(rowcount=0)
+        # Only the in-flight counter moves: the slot stays spent because
+        # Zalo has seen the message either way.
+        row.inflight_count -= params["inflight_count_1"]
         return _FakeResult(rowcount=1)
 
     def _select(self, params):

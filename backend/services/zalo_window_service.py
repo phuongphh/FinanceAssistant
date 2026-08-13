@@ -50,7 +50,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -95,9 +95,25 @@ BLOCK_REASONS = (
     REASON_SEND_FAILED,
 )
 
+# How long a reservation may sit unsettled before a window rotation stops
+# carrying it and writes it off.
+#
+# Every reservation is settled — delivered, refused or refunded — as soon
+# as the OA call returns, so a live one is only ever seconds old. The
+# ones this bound exists for are the reservations nobody will ever settle:
+# the process died between the reserve and the send. Without a cut-off
+# those accumulate in ``inflight_count`` forever and eventually mute the
+# sender permanently, which is a worse failure than the over-send the
+# carry-over prevents.
+#
+# Five minutes is comfortably past the OA client's own timeout-plus-retry
+# budget, so it can only ever write off a send that is genuinely gone.
+INFLIGHT_GRACE = timedelta(minutes=5)
+
 __all__ = [
     "BLOCK_REASONS",
     "FREE_MESSAGE_QUOTA",
+    "INFLIGHT_GRACE",
     "REASON_NOT_CONFIGURED",
     "REASON_NO_WINDOW",
     "REASON_OK",
@@ -113,6 +129,7 @@ __all__ = [
     "record_inbound",
     "release_send",
     "reserve_send",
+    "settle_send",
 ]
 
 
@@ -137,9 +154,11 @@ class WindowState:
 class Reservation:
     """Outcome of claiming one slot in the current window.
 
-    ``window_expires_at`` identifies *which* window the slot came from,
-    so :func:`release_send` can refuse to refund into a window that has
-    since been replaced by a newer inbound message.
+    ``window_expires_at`` records *which* window the slot came from. It
+    no longer gates the refund — a slot still in flight is carried into
+    whatever window replaces it, so that is exactly where its refund
+    belongs — but it is what lets a release log line say which window it
+    was compensating.
     """
 
     granted: bool
@@ -175,9 +194,23 @@ async def record_inbound(
     """Open (or re-open) the 48h window for ``zalo_user_id``.
 
     Every inbound message restarts the clock *and* the allowance —
-    ``free_msg_count`` is reset to 0, not incremented. That is Zalo's
-    own semantics: the eight consulting messages are per window, and a
-    new user message starts a new window.
+    ``free_msg_count`` is reset, not incremented. That is Zalo's own
+    semantics: the eight consulting messages are per window, and a new
+    user message starts a new window.
+
+    **Reset to the sends still in flight, not to 0.** A send that has
+    claimed a slot but whose OA request has not come back yet can still
+    succeed, and Zalo will charge it to whichever window it lands in —
+    this one. Zeroing the counter under it hands the sender a full eight
+    on top of a message already on the wire, which is the one thing this
+    table exists to prevent. So the rotation carries ``inflight_count``
+    across into both counters and leaves the settled sends behind.
+
+    That carry-over is bounded by :data:`INFLIGHT_GRACE`: a reservation
+    older than the OA client could plausibly still be working on is one
+    whose process died before it could settle, and rotation is where it
+    gets written off. Without the bound a single crash would ratchet the
+    floor up and eventually mute the sender for good.
 
     ``user_id`` is coalesced rather than assigned so re-opening a window
     can never unlink an already-bound sender: an unlinked inbound
@@ -211,12 +244,28 @@ async def record_inbound(
         ZaloMessageWindow.last_inbound_at < moment,
     )
 
+    # What survives the reset: reservations recent enough that the OA
+    # call behind them could still be running. Anything older is a
+    # reservation nobody is coming back to settle, and rotation is the
+    # garbage collector for those.
+    carried = case(
+        (
+            and_(
+                ZaloMessageWindow.last_sent_at.is_not(None),
+                ZaloMessageWindow.last_sent_at > moment - INFLIGHT_GRACE,
+            ),
+            ZaloMessageWindow.inflight_count,
+        ),
+        else_=0,
+    )
+
     stmt = pg_insert(ZaloMessageWindow).values(
         zalo_user_id=zalo_user_id,
         user_id=user_id,
         last_inbound_at=moment,
         window_expires_at=expires_at,
         free_msg_count=0,
+        inflight_count=0,
         created_at=moment,
         updated_at=moment,
     )
@@ -230,8 +279,17 @@ async def record_inbound(
                 "window_expires_at": case(
                     (is_newer, expires_at), else_=ZaloMessageWindow.window_expires_at
                 ),
+                # Both counters land on the same carried value: after a
+                # rotation the only sends the new window knows about are
+                # the ones still on the wire, and every one of those is
+                # both spent and unsettled. The invariant
+                # ``inflight_count <= free_msg_count`` holds by
+                # construction from here on.
                 "free_msg_count": case(
-                    (is_newer, 0), else_=ZaloMessageWindow.free_msg_count
+                    (is_newer, carried), else_=ZaloMessageWindow.free_msg_count
+                ),
+                "inflight_count": case(
+                    (is_newer, carried), else_=ZaloMessageWindow.inflight_count
                 ),
                 # Bumped unconditionally: we did see this row, and an
                 # ``updated_at`` that lies about that makes a replay
@@ -308,6 +366,12 @@ async def reserve_send(
     The caller must commit before performing the send. An uncommitted
     reservation holds a row lock and is invisible to every other worker,
     which is exactly the over-send this function exists to prevent.
+
+    Every granted reservation must be closed out afterwards — by
+    :func:`settle_send` when the OA answered either way, or by
+    :func:`release_send` when the request never reached it. One that is
+    left open survives a window rotation (that is the point) until
+    :data:`INFLIGHT_GRACE` writes it off.
     """
     moment = now or _now()
 
@@ -320,6 +384,9 @@ async def reserve_send(
         )
         .values(
             free_msg_count=ZaloMessageWindow.free_msg_count + 1,
+            # The slot is spent *and* unsettled until the OA answers.
+            # ``last_sent_at`` is what dates it, so the two move together.
+            inflight_count=ZaloMessageWindow.inflight_count + 1,
             last_sent_at=moment,
             updated_at=moment,
         )
@@ -352,6 +419,56 @@ async def reserve_send(
     )
 
 
+async def settle_send(
+    db: AsyncSession,
+    *,
+    zalo_user_id: str,
+    now: datetime | None = None,
+) -> bool:
+    """Close out a reservation the OA has answered. Keeps the slot spent.
+
+    Called for both answers, because both mean the same thing to this
+    counter: the message reached Zalo, so it is charged to the window it
+    was reserved in and no longer needs protecting from a rotation.
+    A delivery keeps its slot because it was delivered; a rejection keeps
+    its slot because Zalo may well have counted the attempt (see
+    :mod:`backend.adapters.zalo_window_notifier` on why refunding those
+    would let a rejected sender loop against our own ceiling).
+
+    Deliberately **not** guarded on window identity. A reservation that
+    survived a rotation lives in the new window now; keying the settle on
+    the window it was born in would leave it unsettled forever, and an
+    ``inflight_count`` that only ever goes up eventually mutes the sender.
+    The ``> 0`` floor is what makes a replayed settle harmless instead.
+
+    Returns ``True`` when a reservation was actually closed out.
+    """
+    moment = now or _now()
+    result = await db.execute(
+        update(ZaloMessageWindow)
+        .where(
+            ZaloMessageWindow.zalo_user_id == zalo_user_id,
+            ZaloMessageWindow.inflight_count > 0,
+        )
+        .values(
+            inflight_count=ZaloMessageWindow.inflight_count - 1,
+            updated_at=moment,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await db.flush()
+    settled = bool(result.rowcount)
+    if not settled:
+        # Nothing left to settle: a rotation already wrote this
+        # reservation off as abandoned, or the settle was replayed. Both
+        # are benign, but only a log line tells them apart later.
+        logger.info(
+            "zalo.window.settle_noop zalo_user=%s",
+            mask_zalo_id(zalo_user_id),
+        )
+    return settled
+
+
 async def release_send(
     db: AsyncSession,
     *,
@@ -359,16 +476,27 @@ async def release_send(
     window_expires_at: datetime | None,
     now: datetime | None = None,
 ) -> bool:
-    """Give back a slot whose send failed for a non-quota reason.
+    """Give back a slot whose send never reached Zalo.
 
-    Only compensates a reservation from the *same* window: the
-    ``window_expires_at`` guard means a refund can never land in a
-    window opened by a message that arrived in the meantime, which would
-    hand the user a ninth message. ``free_msg_count > 0`` keeps the
-    counter from going negative if a release is somehow replayed.
+    Guarded on ``inflight_count > 0`` rather than on window identity.
+    The two used to be the same question — a rotation zeroed the counter,
+    so refunding into a newer window would have manufactured allowance
+    out of nothing. Now that a reservation is *carried* across the
+    rotation, the new window is precisely where its refund belongs, and
+    the identity guard would strand the slot instead. ``inflight_count``
+    is the honest test: it counts reservations that are still open, in
+    whichever window is holding them.
 
-    Not called when Zalo itself rejected the send for quota reasons —
-    that rejection means the slot really was consumed on their side.
+    ``free_msg_count > 0`` keeps the counter off negative if a release is
+    somehow replayed; the invariant ``inflight_count <= free_msg_count``
+    makes it redundant, and it stays as the cheaper of the two ways to
+    find out the invariant broke.
+
+    Not called when Zalo itself answered and refused — that is
+    :func:`settle_send`, and the slot stays spent.
+
+    ``window_expires_at`` is no longer a predicate; it identifies the
+    reservation in the log line when there is nothing to give back.
 
     Returns ``True`` when a slot was actually returned.
     """
@@ -380,11 +508,12 @@ async def release_send(
         update(ZaloMessageWindow)
         .where(
             ZaloMessageWindow.zalo_user_id == zalo_user_id,
-            ZaloMessageWindow.window_expires_at == window_expires_at,
+            ZaloMessageWindow.inflight_count > 0,
             ZaloMessageWindow.free_msg_count > 0,
         )
         .values(
             free_msg_count=ZaloMessageWindow.free_msg_count - 1,
+            inflight_count=ZaloMessageWindow.inflight_count - 1,
             updated_at=moment,
         )
         .execution_options(synchronize_session=False)
@@ -392,9 +521,9 @@ async def release_send(
     await db.flush()
     released = bool(result.rowcount)
     if not released:
-        # Expected when a newer inbound already rotated the window; worth
-        # a line because the alternative cause — a double release — is a
-        # bug and looks identical from here.
+        # Expected when a rotation already wrote the reservation off as
+        # abandoned; worth a line because the alternative cause — a double
+        # release — is a bug and looks identical from here.
         logger.info(
             "zalo.window.release_noop zalo_user=%s window=%s",
             mask_zalo_id(zalo_user_id),
