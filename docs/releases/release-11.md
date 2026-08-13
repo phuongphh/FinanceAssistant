@@ -87,6 +87,19 @@ Heuristic tồn tại chính là cho lúc LLM im lặng — tin mỗi LLM thì c
 Groq down; mà tin mù `is_expense: false` thì mở lại đúng sự cố ban đầu (một negative sai bị
 pin trong cache 30 ngày). Nên `is_expense: false` vẫn bị evict như cũ.
 
+**Follow-up thứ hai (commit `5f510bf`, cùng PR #1025) — lỗ còn lại của #4:**
+
+`_QUESTION_RE` chỉ bắt câu **hỏi**. Nhưng bình luận về giá không cần dấu hỏi:
+`giá này 180k mắc quá` không có `?`, không có đuôi `không/nhỉ/hả`, không có `bao nhiêu` —
+lọt qua guard và bị ghi thành khoản chi 180.000đ, vẫn không có bước xác nhận. Thêm
+`_COMMENTARY_RE` bắt ba dấu hiệu câu đang *đánh giá* số tiền chứ không *báo cáo* nó:
+
+| Dấu hiệu | Ví dụ lọt trước đây |
+|---|---|
+| Từ phán xét giá: `mắc/đắt/rẻ/chát/hời` | `180k mắc quá` |
+| Khung `giá này/đó/kia` | `giá này 180k` |
+| Đuôi nhấn mạnh: `quá/thế/vậy/ghê` cuối câu | `cà phê 45k đắt thế`, `cái áo 300k rẻ vậy` |
+
 **Cố ý KHÔNG làm trong release này:** thêm pattern `<description> <amount>` vào
 `content/intent_patterns.yaml` (rủi ro cướp "mục tiêu 500tr" / "tiết kiệm 10tr");
 gỡ mismatch `LLM_CLASSIFIER_TIMEOUT_SECONDS = 2.0` vs `timeout=3.0` (inner timeout là dead
@@ -181,8 +194,10 @@ launchd plist template) vẫn như release 10 — `.env` **không** đủ.
   (`1.500k` = 1.500.000đ, không phải 1.500đ); từ chối khi chỉ bắt được một lát của số dài
   (`1.500.000`); câu hỏi về giá không bao giờ thành khoản chi; nhiều khoản cạnh tranh thì
   từ chối thay vì ghi một khoản rồi vứt khoản kia; reply non-JSON cũng bị đuổi khỏi cache.
-- Handler test suite: **51 test** (3 kịch bản LLM: error / unparseable / poisoned cache;
-  10 câu parse được, 13 câu phải từ chối) + 3 test key-parity cho `invalidate_cache`.
+- **Guard sau review lần 2 (`5f510bf`)**: câu bình luận giá không có dấu hỏi
+  (`giá này 180k mắc quá`, `cà phê 45k đắt thế`) cũng không còn thành khoản chi.
+- Handler test suite: **56 test** (3 kịch bản LLM: error / unparseable / poisoned cache;
+  10 câu parse được, 18 câu phải từ chối) + 3 test key-parity cho `invalidate_cache`.
 
 ### Phase 5.0 — Zalo OA channel, flag OFF (#1010, #1012, #1013, #1017)
 
@@ -249,9 +264,9 @@ Commit prod trước release này: `8b8e5c4 Merge pull request #1009 from phuong
 > không thể phát sinh, nên ở release này an toàn.
 
 **Rollback riêng hotfix capture:** không có flag. Nếu safety net regex đọc sai một dạng câu
-nào đó ngoài dự tính, cách nhanh nhất là revert **hai** commit — `dfaa5f9` trước rồi
-`f325f48` (theo đúng thứ tự ngược) — rồi deploy lại; phần còn lại của release không phụ
-thuộc nó. Revert mỗi `f325f48` sẽ conflict vì `dfaa5f9` sửa trên cùng vùng code.
+nào đó ngoài dự tính, cách nhanh nhất là revert **ba** commit theo đúng thứ tự ngược —
+`5f510bf` → `dfaa5f9` → `f325f48` — rồi deploy lại; phần còn lại của release không phụ
+thuộc nó. Bỏ qua thứ tự sẽ conflict vì cả ba commit sửa trên cùng vùng code.
 
 ---
 
@@ -266,6 +281,8 @@ thuộc nó. Revert mỗi `f325f48` sẽ conflict vì `dfaa5f9` sửa trên cùn
 - [ ] **Hotfix:** gõ `180k ăn trưa` (số trước) → vẫn ghi nhận như cũ, không regression
 - [ ] **Hotfix — không ghi bừa:** `lãi suất 6%` và `cà phê 45` **không** tạo transaction
 - [ ] **Hotfix — câu hỏi:** `ăn trưa 50k có đắt không?` **không** tạo transaction
+- [ ] **Hotfix — bình luận giá:** `giá này 180k mắc quá` và `cà phê 45k đắt thế`
+      **không** tạo transaction (không có dấu hỏi nhưng vẫn là bình luận)
 - [ ] **Hotfix — dấu phân cách:** `tiền nhà 1.500k` ghi **1.500.000đ** (không phải 1.500đ);
       `tiền nhà 1.500.000` **không** tạo transaction (từ chối, không ghi nhầm 1.500đ)
 - [ ] **Hotfix — nhiều khoản:** `mua áo 300000 quần 200k` **không** tạo transaction
