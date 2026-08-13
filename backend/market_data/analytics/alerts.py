@@ -13,7 +13,7 @@ from backend.config import get_settings
 from backend.database import get_session_factory
 from backend.market_data.cache.price_cache import PriceCache
 from backend.market_data.client import get_price_cache
-from backend.market_data.normalizer import PriceQuote
+from backend.market_data.normalizer import SNAPSHOT_SOURCE, PriceQuote
 from backend.models.price_alert import NotificationSettings, PriceAlertLog
 from backend.models.user import User
 from backend.ports.notifier import get_notifier
@@ -57,7 +57,13 @@ def format_alert_message(symbol: str, change_pct: Decimal, new_price: Decimal, s
 async def _last_known_15m(cache: PriceCache, quote: PriceQuote) -> PriceQuote | None:
     # Cache layer stores one last-known quote. Jobs update it every run, so its
     # value is the practical 15-minute comparison point for the stock cron.
-    return await cache.get_last_known(quote.symbol, quote.asset_type)
+    previous = await cache.get_last_known(quote.symbol, quote.asset_type)
+    if previous is not None and previous.source == SNAPSHOT_SOURCE:
+        # A snapshot baseline is an end-of-day price, not an observation from one
+        # cron tick ago. Comparing against it would report an overnight or
+        # multi-day move as "trong 15 phút". Wait for a live baseline instead.
+        return None
+    return previous
 
 
 async def _users_holding(db, symbol: str) -> list[tuple[User, bool]]:

@@ -11,14 +11,21 @@ from backend.market_data.normalizer import PriceQuote
 from backend.tests.test_market_data.fakes import FakeAsyncRedis
 
 
-def _quote(symbol: str = "VNM", asset_type: str = "stock") -> PriceQuote:
+def _quote(
+    symbol: str = "VNM",
+    asset_type: str = "stock",
+    *,
+    price: str = "86400",
+    fetched_at: datetime | None = None,
+    source: str = "ssi",
+) -> PriceQuote:
     return PriceQuote(
         symbol=symbol,
-        price=Decimal("86400"),
+        price=Decimal(price),
         currency="VND",
         asset_type=asset_type,
-        fetched_at=datetime(2026, 5, 8, 9, 30, tzinfo=timezone.utc),
-        source="ssi",
+        fetched_at=fetched_at or datetime(2026, 5, 8, 9, 30, tzinfo=timezone.utc),
+        source=source,
     )
 
 
@@ -58,6 +65,56 @@ async def test_last_known_has_no_ttl_and_is_marked_stale_on_read():
     assert restored.symbol == "VNM"
     assert restored.is_stale is True
     assert last_known_key("stock", "VNM") not in redis.expires
+
+
+@pytest.mark.asyncio
+async def test_set_last_known_keeps_the_freshest_observation():
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+    live = _quote(price="90000", fetched_at=datetime(2026, 5, 8, 10, tzinfo=timezone.utc))
+    older = _quote(
+        price="86400",
+        fetched_at=datetime(2026, 5, 7, 15, tzinfo=timezone.utc),
+        source="market_snapshot",
+    )
+
+    await cache.set_last_known(live)
+    await cache.set_last_known(older)
+
+    restored = await cache.get_last_known("VNM", "stock")
+    assert restored is not None
+    assert restored.price == Decimal("90000")
+    assert restored.source == "ssi"
+
+
+@pytest.mark.asyncio
+async def test_set_last_known_accepts_a_newer_observation():
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+    await cache.set_last_known(
+        _quote(price="86400", fetched_at=datetime(2026, 5, 8, 9, 30, tzinfo=timezone.utc))
+    )
+
+    await cache.set_last_known(
+        _quote(price="90000", fetched_at=datetime(2026, 5, 8, 9, 45, tzinfo=timezone.utc))
+    )
+
+    restored = await cache.get_last_known("VNM", "stock")
+    assert restored is not None
+    assert restored.price == Decimal("90000")
+
+
+@pytest.mark.asyncio
+async def test_set_last_known_overwrites_unreadable_payload():
+    redis = FakeAsyncRedis()
+    cache = PriceCache(redis)
+    await redis.set(last_known_key("stock", "VNM"), "not-json")
+
+    await cache.set_last_known(_quote())
+
+    restored = await cache.get_last_known("VNM", "stock")
+    assert restored is not None
+    assert restored.price == Decimal("86400")
 
 
 @pytest.mark.asyncio

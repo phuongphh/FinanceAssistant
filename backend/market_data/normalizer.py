@@ -7,6 +7,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Self
 
+#: ``source`` value for quotes rebuilt from ``market_snapshots`` rows instead of
+#: a live provider call. Consumers that reason about *when* a price was observed
+#: (movement alerts, freshness checks) must treat these as historical, not live.
+#: Declared here so both the producer (``jobs.stock_updater``) and the consumers
+#: (``analytics.alerts``) can import it without a circular dependency.
+SNAPSHOT_SOURCE = "market_snapshot"
+
 
 @dataclass(slots=True)
 class PriceQuote:

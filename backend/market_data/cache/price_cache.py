@@ -53,8 +53,29 @@ class PriceCache:
         await self.redis.setex(quote_key(quote.asset_type, quote.symbol), ttl, quote.to_json())
 
     async def set_last_known(self, quote: PriceQuote) -> None:
-        """Store last-known quote without TTL; later writes win."""
-        await self.redis.set(last_known_key(quote.asset_type, quote.symbol), quote.to_json())
+        """Store last-known quote without TTL; the freshest observation wins.
+
+        The key is written by both live fetches and DB snapshot fallbacks, and is
+        read as the comparison baseline for movement alerts. Ordering by
+        ``fetched_at`` keeps an older observation (a snapshot rebuilt from an
+        end-of-day row, or a delayed retry) from regressing a newer baseline and
+        manufacturing a phantom price move on the next run.
+        """
+        key = last_known_key(quote.asset_type, quote.symbol)
+        existing = await self._read_quote(key)
+        if existing is not None and existing.fetched_at >= quote.fetched_at:
+            return
+        await self.redis.set(key, quote.to_json())
+
+    async def _read_quote(self, key: str) -> PriceQuote | None:
+        """Return the quote stored at ``key``, treating unreadable data as absent."""
+        raw = await self.redis.get(key)
+        if raw is None:
+            return None
+        try:
+            return PriceQuote.from_json(raw)
+        except (ValueError, KeyError, TypeError, ArithmeticError):
+            return None
 
     async def get_last_known(
         self,
