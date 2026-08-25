@@ -26,6 +26,8 @@ from backend.agent.tier3.prompts import (
     _LEVEL_FOCUS,
     _VIETNAMESE_OUTPUT_RULE,
     build_reasoning_prompt,
+    build_static_prefix,
+    build_user_context_block,
 )
 from backend.wealth.ladder import WealthLevel
 
@@ -123,3 +125,69 @@ class TestBuildReasoningPrompt:
             )
             assert "2026-06-02" in prompt
             assert _VIETNAMESE_OUTPUT_RULE in prompt
+
+
+class TestCacheSplit:
+    """The prefix/user split is what makes prompt caching pay off.
+
+    Anthropic matches the cache on a byte-exact prefix, so a single
+    per-user value leaking into ``build_static_prefix`` drops the hit
+    rate to zero — silently, with no error anywhere. These tests are the
+    only thing that would catch that.
+    """
+
+    def test_static_prefix_holds_nothing_user_specific(self):
+        prefix = build_static_prefix(
+            tool_descriptions="(tools elided)", today=date(2026, 6, 2)
+        )
+        assert "Phương" not in prefix
+        # The tone rule points forward at "CONTEXT USER bên dưới", which
+        # is cache-stable prose. What must not be here is the block
+        # itself — its header carries a colon.
+        assert "CONTEXT USER:" not in prefix
+        # Net worth is rendered with thousands separators; the digits of
+        # the test figure must not appear in any form.
+        assert "5,000,000,000" not in prefix
+        for level in WealthLevel:
+            assert _LEVEL_FOCUS[level] not in prefix
+
+    def test_static_prefix_is_byte_stable_for_two_different_users(self):
+        a = build_static_prefix(
+            tool_descriptions="(tools elided)", today=date(2026, 6, 2)
+        )
+        b = build_static_prefix(
+            tool_descriptions="(tools elided)", today=date(2026, 6, 2)
+        )
+        assert a == b
+
+    def test_user_block_carries_every_per_user_value(self):
+        block = build_user_context_block(
+            user_name="Phương",
+            wealth_level=WealthLevel.MASS_AFFLUENT,
+            net_worth=Decimal("5_000_000_000"),
+        )
+        assert "Phương" in block
+        assert WealthLevel.MASS_AFFLUENT.value in block
+        assert "5,000,000,000" in block
+        assert _LEVEL_FOCUS[WealthLevel.MASS_AFFLUENT] in block
+
+    def test_full_prompt_is_the_two_halves_in_order(self):
+        # The agent sends these as two system blocks. Concatenation
+        # order here must match, or the single-string view tests assert
+        # against something production never sends.
+        static = build_static_prefix(
+            tool_descriptions="(tools elided)", today=date(2026, 6, 2)
+        )
+        user_block = build_user_context_block(
+            user_name="Phương",
+            wealth_level=WealthLevel.MASS_AFFLUENT,
+            net_worth=Decimal("5_000_000_000"),
+        )
+        assert _build() == f"{static}\n\n{user_block}"
+
+    def test_user_block_comes_last(self):
+        prompt = _build()
+        assert prompt.index("CONTEXT USER") > prompt.index("QUY TẮC HARD")
+        assert prompt.rstrip().endswith(
+            _LEVEL_FOCUS[WealthLevel.MASS_AFFLUENT]
+        )

@@ -13,6 +13,26 @@ Two design rules baked in:
    fund first); a HNW gets % allocation language AND avoids the
    "saving rate" frame entirely. The prompt doesn't just tell Claude
    to "be friendlier" — it tells Claude WHAT to focus on per level.
+
+Prompt caching split
+--------------------
+The prompt is rendered in two pieces on purpose. Anthropic's cache
+matches on a byte-exact *prefix*, so anything that varies per user
+poisons everything after it. ``build_static_prefix`` holds the parts
+that are identical for every user on a given day (role, hard rules,
+language rule, tone rule, tool menu, flow); ``build_user_context_block``
+holds the parts that don't (name, wealth level, net worth). The agent
+sends them as two ``system`` blocks with a cache breakpoint on the
+static one, so the ~1.5k-token compliance preamble is written to cache
+once and read back at ~10% of input price on every subsequent round of
+the tool loop.
+
+Ordering therefore matters: the user block must come LAST. Moving any
+per-user value up into the static prefix silently drops the cache hit
+rate to zero without any error surfacing.
+
+``build_reasoning_prompt`` still returns the whole thing concatenated,
+for callers (and tests) that just want one string.
 """
 from __future__ import annotations
 
@@ -96,26 +116,22 @@ _VIETNAMESE_OUTPUT_RULE = """QUY TẮC NGÔN NGỮ (BẮT BUỘC):
 - Tên tài sản (ticker như VNM, HPG, BTC) và đơn vị tiền tệ giữ nguyên."""
 
 
-def build_reasoning_prompt(
+def build_static_prefix(
     *,
-    user_name: str,
-    wealth_level: WealthLevel,
-    net_worth: Decimal,
     tool_descriptions: str,
     today: date | None = None,
 ) -> str:
-    """Assemble the full Tier 3 system prompt for one query.
+    """The cache-stable half of the Tier 3 system prompt.
 
-    We render synchronously rather than caching — the prompt is
-    user-specific (name, level, net worth) so caching across users
-    would leak data. Per-user caching could work but isn't worth the
-    code path complexity until we see it in profiling.
+    Identical for every user on a given day, which is the whole point:
+    it is sent as a cached ``system`` block so the tool loop pays ~10%
+    of input price to re-read it on rounds 2..N instead of full price.
 
-    ``today`` is injected so date-relative reasoning ("tháng này",
-    "năm nay") resolves against the real calendar instead of the
-    model's training-cutoff guess. Injectable for tests; defaults to
-    ``date.today()``."""
-    level_focus = _LEVEL_FOCUS[wealth_level]
+    Nothing user-specific may be added here — see the module docstring.
+    ``tool_descriptions`` is rendered from the registry, which is
+    process-global, and ``today`` rolls over at midnight (a fresh cache
+    write the next day, which the 5-minute TTL makes a non-event).
+    """
     today = today or date.today()
 
     return f"""Bạn là Bé Tiền — Trợ lý Tài sản cho người Việt.
@@ -134,20 +150,15 @@ QUY TẮC HARD (KHÔNG ĐƯỢC VI PHẠM):
 {_VIETNAMESE_OUTPUT_RULE}
 
 QUY TẮC TONE:
-- Xưng "mình", gọi user là "bạn" hoặc "{user_name}".
-- Adapt theo wealth level (xem CONTEXT bên dưới).
+- Xưng "mình", gọi user là "bạn" hoặc gọi bằng tên riêng ghi ở
+  CONTEXT USER bên dưới.
+- Adapt theo wealth level (xem CONTEXT USER bên dưới).
 - Warm nhưng không nịnh nọt; không emoji thừa.
 
 NGÀY HÔM NAY: {today.isoformat()}.
 - "tháng này" = tháng {today.month}/{today.year}; "năm nay" = {today.year}.
 - Mọi mốc thời gian tương đối phải tính theo ngày hôm nay ở trên,
   KHÔNG được đoán tháng/năm khác.
-
-CONTEXT USER:
-- Tên: {user_name}
-- Wealth level: {wealth_level.value}
-- Net worth hiện tại: {net_worth:,.0f}đ
-- Tone-focus theo level: {level_focus}
 
 TOOLS AVAILABLE:
 {tool_descriptions}
@@ -163,3 +174,53 @@ FLOW:
 
 GIỚI HẠN: tối đa 5 tool calls per query. Sau đó MUST compose final
 answer dù còn thiếu data."""
+
+
+def build_user_context_block(
+    *,
+    user_name: str,
+    wealth_level: WealthLevel,
+    net_worth: Decimal,
+) -> str:
+    """The per-user tail of the Tier 3 system prompt.
+
+    Deliberately small and deliberately last. Everything here changes
+    between users (and net worth changes between queries for the same
+    user), so it is sent as an uncached ``system`` block after the
+    cached prefix.
+    """
+    return f"""CONTEXT USER:
+- Tên: {user_name}
+- Wealth level: {wealth_level.value}
+- Net worth hiện tại: {net_worth:,.0f}đ
+- Tone-focus theo level: {_LEVEL_FOCUS[wealth_level]}"""
+
+
+def build_reasoning_prompt(
+    *,
+    user_name: str,
+    wealth_level: WealthLevel,
+    net_worth: Decimal,
+    tool_descriptions: str,
+    today: date | None = None,
+) -> str:
+    """Assemble the full Tier 3 system prompt as one string.
+
+    The agent itself does NOT use this — it sends the two halves as
+    separate ``system`` blocks so the static one can carry a cache
+    breakpoint. This stays as the single-string view for tests and for
+    any caller that just wants to read the whole prompt.
+
+    ``today`` is injected so date-relative reasoning ("tháng này",
+    "năm nay") resolves against the real calendar instead of the
+    model's training-cutoff guess. Injectable for tests; defaults to
+    ``date.today()``."""
+    static = build_static_prefix(
+        tool_descriptions=tool_descriptions, today=today
+    )
+    user_block = build_user_context_block(
+        user_name=user_name,
+        wealth_level=wealth_level,
+        net_worth=net_worth,
+    )
+    return f"{static}\n\n{user_block}"

@@ -34,7 +34,11 @@ from backend.agent.limits import (
     QUERY_TIMEOUT_SECONDS,
     estimate_cost_usd,
 )
-from backend.agent.tier3.prompts import DISCLAIMER, build_reasoning_prompt
+from backend.agent.tier3.prompts import (
+    DISCLAIMER,
+    build_static_prefix,
+    build_user_context_block,
+)
 from backend.agent.tools.base import ToolRegistry
 from backend.config import get_settings
 from backend.models.conversation_context import ROLE_ASSISTANT, ROLE_USER
@@ -51,6 +55,14 @@ logger = logging.getLogger(__name__)
 # ``limits.py`` and the per-user rate limit still hold.
 _CLAUDE_MODEL = "claude-sonnet-4-6"
 _MAX_TOKENS_PER_TURN = 2000
+
+# Prompt-cache breakpoint marker. ``ephemeral`` is the 5-minute TTL,
+# which is the right one here: the win we're buying is the tool loop
+# re-sending the same prefix 2-6 times within a few seconds, not
+# cross-query reuse. The 1-hour TTL costs 2x to write instead of
+# 1.25x and would only pay off if the same user came back inside the
+# hour with the tool registry unchanged.
+_CACHE_CONTROL: dict[str, Any] = {"type": "ephemeral"}
 
 
 OnChunk = Callable[[str], Awaitable[None]]
@@ -70,6 +82,12 @@ class ReasoningTrace:
     tool_call_count: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # Prompt-cache accounting. Once caching is on, ``input_tokens``
+    # is the UNCACHED remainder only — the three counts have to be
+    # summed to recover the real prompt size, and billed at
+    # different rates (see ``limits.estimate_cost_usd``).
+    cache_write_tokens: int = 0
+    cache_read_tokens: int = 0
     cost_usd: float = 0.0
     latency_ms: int = 0
     final_text: str = ""  # Full text after disclaimer enforcement.
@@ -143,6 +161,8 @@ class ReasoningAgent:
                 model=_CLAUDE_MODEL,
                 input_tokens=trace.input_tokens,
                 output_tokens=trace.output_tokens,
+                cache_write_tokens=trace.cache_write_tokens,
+                cache_read_tokens=trace.cache_read_tokens,
             )
         return trace
 
@@ -169,15 +189,33 @@ class ReasoningAgent:
             )
             return
 
-        # Build user-specific system prompt.
+        # Build the system prompt as TWO blocks, not one string. The
+        # first is identical for every user on a given day and carries
+        # the cache breakpoint; Anthropic caches everything before that
+        # marker, which means ``tools`` (rendered first on the wire) plus
+        # the ~1.5k-token compliance preamble. The tool loop then re-reads
+        # that prefix at 10% of input price on rounds 2..N instead of
+        # paying full freight each time. The second block holds the
+        # per-user context and must stay last — see ``tier3/prompts.py``.
         breakdown = await net_worth_calculator.calculate(db, user.id)
         level = detect_level(breakdown.total)
-        system_prompt = build_reasoning_prompt(
-            user_name=user.display_name or "bạn",
-            wealth_level=level,
-            net_worth=breakdown.total,
-            tool_descriptions=self._format_tool_descriptions(),
-        )
+        system_blocks: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "text": build_static_prefix(
+                    tool_descriptions=self._format_tool_descriptions(),
+                ),
+                "cache_control": dict(_CACHE_CONTROL),
+            },
+            {
+                "type": "text",
+                "text": build_user_context_block(
+                    user_name=user.display_name or "bạn",
+                    wealth_level=level,
+                    net_worth=breakdown.total,
+                ),
+            },
+        ]
 
         claude_tools = self._to_claude_tools()
         messages: list[dict[str, Any]] = []
@@ -202,7 +240,7 @@ class ReasoningAgent:
             response = await client.messages.create(
                 model=_CLAUDE_MODEL,
                 max_tokens=_MAX_TOKENS_PER_TURN,
-                system=system_prompt,
+                system=system_blocks,
                 tools=claude_tools,
                 messages=messages,
             )
@@ -210,9 +248,20 @@ class ReasoningAgent:
             # Token accounting accumulates across rounds — multi-turn
             # tool use sends the conversation each time, so each round
             # bills both directions.
-            if getattr(response, "usage", None):
-                trace.input_tokens += int(response.usage.input_tokens or 0)
-                trace.output_tokens += int(response.usage.output_tokens or 0)
+            usage = getattr(response, "usage", None)
+            if usage:
+                trace.input_tokens += int(usage.input_tokens or 0)
+                trace.output_tokens += int(usage.output_tokens or 0)
+                # ``getattr`` rather than attribute access: the cache
+                # fields are absent on older SDK response shapes and on
+                # hand-built test doubles, and a missing field must not
+                # take down a live query.
+                trace.cache_write_tokens += int(
+                    getattr(usage, "cache_creation_input_tokens", None) or 0
+                )
+                trace.cache_read_tokens += int(
+                    getattr(usage, "cache_read_input_tokens", None) or 0
+                )
 
             stop = getattr(response, "stop_reason", None)
 
@@ -236,6 +285,12 @@ class ReasoningAgent:
                 )
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({"role": "user", "content": tool_results})
+                # Extend the cached prefix over the tool traffic we just
+                # accumulated. One rolling breakpoint, moved forward each
+                # round: a request may carry at most four, and older cache
+                # entries stay readable without a marker of their own
+                # because the API probes previous positions for a hit.
+                _move_message_cache_breakpoint(messages)
                 continue
 
             # Final answer. Anthropic returns ``content`` as a list of
@@ -350,12 +405,26 @@ class ReasoningAgent:
         function-call schema goes through separately in the ``tools``
         param; descriptions here are for selection."""
         lines = []
-        for t in self.registry.list_all():
+        # Sorted, not registry order. ``tools`` and this menu are both
+        # part of the cached prefix, and the cache matches on bytes: if
+        # the registry ever yields a different order between processes
+        # (a dict rebuild, a plugin registered late), the prefix stops
+        # matching and the hit rate silently goes to zero.
+        for t in self._sorted_tools():
             # First line of the description is enough for an at-a-glance
             # menu; arg-level detail flows via the JSON schema.
             first_line = t.description.split("\n")[0]
             lines.append(f"- {t.name}: {first_line}")
         return "\n".join(lines)
+
+    def _sorted_tools(self) -> list[Any]:
+        """Registry contents in a stable order.
+
+        Sorted by name so the rendered ``tools`` block and the tool menu
+        in the system prompt are byte-identical across processes. Both
+        sit inside the cached prefix — see ``_format_tool_descriptions``.
+        """
+        return sorted(self.registry.list_all(), key=lambda t: t.name)
 
     def _to_claude_tools(self) -> list[dict[str, Any]]:
         """Anthropic's tool format (no nested ``function`` wrapper)."""
@@ -365,7 +434,7 @@ class ReasoningAgent:
                 "description": t.description,
                 "input_schema": t.input_schema.model_json_schema(),
             }
-            for t in self.registry.list_all()
+            for t in self._sorted_tools()
         ]
 
     @staticmethod
@@ -399,6 +468,35 @@ class ReasoningAgent:
             return None
         self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         return self._client
+
+
+def _move_message_cache_breakpoint(messages: list[dict[str, Any]]) -> None:
+    """Keep exactly one cache breakpoint, on the newest content block.
+
+    A request may carry at most four ``cache_control`` markers and the
+    tool loop can run six rounds, so instead of accumulating markers we
+    move a single one forward each round. Dropping the older marker
+    costs nothing: the cache entry it wrote stays alive for its TTL, and
+    the API probes earlier positions for a hit — so round N still reads
+    back everything rounds 1..N-1 wrote.
+
+    Only ``dict`` blocks are touched. The assistant turn's content is
+    the SDK's own response objects, which have no place to put a marker;
+    the ``tool_result`` dicts from :meth:`_dispatch_tool_uses` are ours
+    to mutate, and they are the newest blocks anyway.
+    """
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    block.pop("cache_control", None)
+
+    for msg in reversed(messages):
+        content = msg.get("content")
+        if isinstance(content, list) and content and isinstance(content[-1], dict):
+            content[-1]["cache_control"] = dict(_CACHE_CONTROL)
+            return
 
 
 async def _emit(on_chunk: OnChunk, text: str) -> None:
