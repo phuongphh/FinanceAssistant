@@ -1,2 +1,10 @@
-anthropic
-requests
+# Pinned to a major range on purpose. These are the deps for the GitHub Actions
+# scripts under .github/scripts/ (the backend has its own requirements file).
+#
+# Both lines were unpinned until 2026-08-26, so every workflow run resolved
+# whatever was newest on PyPI. When anthropic 1.0.0 shipped it dropped the
+# `temperature` argument from messages.create() and the code-review job started
+# failing with a TypeError on every non-markdown PR in the repo. A major-version
+# bump here should be a deliberate, reviewed change.
+anthropic>=1,<2
+requests>=2.31,<3
