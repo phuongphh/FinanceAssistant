@@ -75,6 +75,22 @@ MODEL_PRICING_USD_PER_M: dict[str, tuple[float, float]] = {
 }
 
 
+# ---- Prompt-cache multipliers (Anthropic) ---------------------------
+# Anthropic bills a cached prefix differently from ordinary input:
+# writing it into the cache costs 1.25x the base input rate (5-minute
+# TTL — the 1-hour TTL is 2x and we don't use it), reading it back
+# costs 0.1x. So a prefix written once and read twice is already
+# cheaper than sending it three times uncached.
+#
+# These matter for accounting, not just tidiness: once caching is on,
+# ``usage.input_tokens`` from the API counts ONLY the uncached
+# remainder. Billing the cached halves at zero would make the daily
+# kill-switch (``COST_HARD_LIMIT_DAILY_USD``) under-report real spend
+# by most of a Tier 3 query.
+CACHE_WRITE_MULTIPLIER = 1.25
+CACHE_READ_MULTIPLIER = 0.1
+
+
 def resolve_pricing_key(model: str) -> str | None:
     """Map a model string to a ``MODEL_PRICING_USD_PER_M`` key.
 
@@ -99,11 +115,20 @@ def estimate_cost_usd(
     model: str,
     input_tokens: int,
     output_tokens: int,
+    cache_write_tokens: int = 0,
+    cache_read_tokens: int = 0,
 ) -> float:
     """Return the dollar cost of a single LLM call.
 
     Rates come from :data:`MODEL_PRICING_USD_PER_M`. Unknown models
     return ``0.0`` so a typo can never over-bill the kill-switch.
+
+    ``cache_write_tokens`` / ``cache_read_tokens`` are Anthropic's
+    ``usage.cache_creation_input_tokens`` / ``cache_read_input_tokens``.
+    They default to zero, so every caller that predates prompt caching
+    keeps its current answer. Callers that DO use caching must pass
+    them: with caching on, ``input_tokens`` is the uncached remainder
+    only, and the three counts sum to the real prompt size.
     """
     key = resolve_pricing_key(model)
     if key is None:
@@ -111,5 +136,7 @@ def estimate_cost_usd(
     input_per_m, output_per_m = MODEL_PRICING_USD_PER_M[key]
     return (
         input_tokens / 1_000_000 * input_per_m
+        + cache_write_tokens / 1_000_000 * input_per_m * CACHE_WRITE_MULTIPLIER
+        + cache_read_tokens / 1_000_000 * input_per_m * CACHE_READ_MULTIPLIER
         + output_tokens / 1_000_000 * output_per_m
     )
