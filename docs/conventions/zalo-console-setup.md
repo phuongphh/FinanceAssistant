@@ -24,14 +24,26 @@ Vận hành hằng ngày, sự cố, quota, rollback → không nằm ở đây 
 > chưa nhìn tận mắt. Cái *không* `ASSUMED` là: giá trị nào đi vào biến nào,
 > và cách chứng minh mình lấy đúng (§6). Nếu nhãn thật khác, **sửa file này
 > ngay trong lúc thao tác** — đó là mục đích của các ô "Ghi lại".
+>
+> **Cập nhật 27/08/2026.** §3 đã bị sửa vì nó **sai**: bản trước chỉ người
+> vận hành sang `oa.zalo.me` để tìm OA Secret Key, và ở đó không có giá trị
+> nào tên như vậy. Chỗ đúng là `developers.zalo.me` → app → mục *Official
+> Account* / *Webhook*. Nguồn của lần sửa này là kết quả tìm kiếm web (docs
+> chính chủ + community threads của Zalo), **không phải** trang chính chủ đã
+> mở tận mắt — trang đó vẫn bị chặn từ môi trường build. Nên nó tốt hơn
+> `ASSUMED` một bậc, chưa phải `DOC`: vẫn phải xác nhận bằng mắt lúc thao
+> tác và ghi vào §8 dòng #7.
 
 ---
 
 ## 0. Chuẩn bị trước khi mở console
 
 - [ ] Tài khoản Zalo cá nhân là **admin** của Official Account Bé Tiền.
-      Không phải admin thì không thấy được OA Secret Key ở §3.
+      Không phải admin thì không liên kết được OA vào app ở §3 — mà chưa
+      liên kết thì không có OA Secret Key nào để lấy.
 - [ ] Biết host prod/staging sẽ nhận webhook (`https://<host>`).
+- [ ] Có quyền đặt file tĩnh ở **thư mục gốc public** của host đó. Bước xác
+      thực domain (§3 bước 2) cần đúng quyền này.
 - [ ] Có quyền sửa `.env` trên server và chạy `python -m scripts.seed_zalo_credentials`.
 - [ ] **Chưa** bật `ZALO_CHANNEL_ENABLED=true`. Bật ở §5, đúng thứ tự, vì
       bật sớm với env rỗng thì app **không boot** (invariant fail-closed) —
@@ -42,17 +54,19 @@ Vận hành hằng ngày, sự cố, quota, rollback → không nằm ở đây 
 ## 1. Ba giá trị — nhìn tổng thể trước khi đi lấy
 
 Đây là bảng quan trọng nhất của tài liệu. Hai trong ba giá trị đều được
-console gọi là **"Secret Key"**, ở hai nơi khác nhau, và **không thể thay
-cho nhau**.
+console gọi là **"Secret Key"**, ở hai màn hình khác nhau của **cùng một
+console** (`developers.zalo.me`), và **không thể thay cho nhau**.
 
 | Biến env | Console nào | Dùng để làm gì | Lấy sai thì hỏng cái gì |
 |---|---|---|---|
 | `ZALO_APP_ID` | Developer Console (`developers.zalo.me`) → app Bé Tiền | Thành phần đầu của MAC webhook; body của refresh token | Hỏng **cả hai** — webhook mismatch *và* refresh fail |
 | `ZALO_APP_SECRET` | Cùng màn hình với `app_id`, nhãn ~ *"Secret Key"* của **ứng dụng** | Header `secret_key` khi refresh token | Chỉ hỏng refresh — im lặng đúng 1 giờ rồi bot câm |
-| `ZALO_OA_SECRET_KEY` | OA Manager (`oa.zalo.me`) → cài đặt OA, nhãn ~ *"Secret Key"* của **OA** | Thành phần cuối của MAC webhook | Chỉ hỏng webhook — 100% tin vào bị 403 (chế độ enforce) |
+| `ZALO_OA_SECRET_KEY` | Cùng console, **khác màn hình**: app Bé Tiền → *Official Account* / *Webhook*, nhãn ~ *"OA Secret Key"* — che sẵn, bấm con mắt để hiện | Thành phần cuối của MAC webhook | Chỉ hỏng webhook — 100% tin vào bị 403 (chế độ enforce) |
 
 **Chỗ dễ nhầm nhất, nói thẳng:** app secret và OA secret key là hai chuỗi
-khác nhau, cùng tên hiển thị, lấy ở hai console khác nhau. Đảo hai giá
+khác nhau, tên hiển thị gần giống nhau, và — trái với những gì tài liệu này
+viết trước 27/08/2026 — **nằm trong cùng một console**, chỉ khác màn hình.
+Không có cái nào ở `oa.zalo.me`. Đảo hai giá
 trị này cho nhau là lỗi cài đặt phổ biến nhất — và nó **không báo lỗi lúc
 boot**, vì invariant chỉ kiểm tra "có rỗng không", không kiểm tra "có
 đúng chỗ không". Triệu chứng của việc đảo là *cả hai* thứ cùng hỏng, xem
@@ -101,33 +115,56 @@ một giá trị sai "gần đúng".
 
 ---
 
-## 3. Màn hình B — OA Manager: lấy OA Secret Key
+## 3. Màn hình B — vẫn ở Developer Console: liên kết OA, xác thực domain, lấy OA Secret Key
 
-Đây là màn hình **khác console** với §2. Nếu bạn vẫn đang ở
-`developers.zalo.me` và thấy một ô "Secret Key", khả năng cao đó vẫn là
-secret của ứng dụng — dừng lại và kiểm tra tên miền trên thanh địa chỉ.
+> **Mục này đã bị sửa 27/08/2026.** Bản trước bảo mở `oa.zalo.me`. Trên
+> `oa.zalo.me` **không có** giá trị nào tên "OA Secret Key" — ai làm theo
+> bản cũ sẽ tìm mãi không thấy. Chỗ đúng: **cùng console với §2**,
+> `developers.zalo.me` → app Bé Tiền → mục *Official Account* / *Webhook*.
 
-1. Mở `https://oa.zalo.me` → chọn Official Account Bé Tiền.
-2. Vào phần cài đặt / thông tin OA (*Cài đặt OA* → *Thông tin xác thực* /
-   tương đương). Ở một số phiên bản console, giá trị này nằm trong mục
-   webhook của chính OA — nếu bạn tìm thấy nó ở đó, đó vẫn là giá trị đúng,
-   miễn là nó thuộc **OA**, không thuộc **ứng dụng**.
-3. Copy giá trị, dán vào:
+Nó vẫn là secret của **OA**, không phải của ứng dụng: mỗi OA liên kết vào
+app có một OA Secret Key riêng (đó là lý do nó chỉ xuất hiện **sau** khi
+liên kết). Chỉ là chỗ hiển thị nằm trong app, không nằm trong OA Manager.
+
+Ba bước, đúng thứ tự — bước sau chỉ mở ra khi bước trước xong:
+
+1. **Liên kết OA vào app.** Vẫn trong app ở §2: menu trái → *Official
+   Account* → *Quản lý Official Account* → chọn OA Bé Tiền → *Liên kết* →
+   đọc thông tin hiện ra → *Đồng ý*. Cần tài khoản admin của OA (§0).
+   Chưa liên kết thì mục Webhook chưa dùng được và **chưa có** OA Secret
+   Key nào tồn tại.
+2. **Xác thực domain** (*Domain Verification* / *Xác thực domain*). Console
+   cho tải một file HTML; đặt nó ở **thư mục gốc public** của domain sẽ
+   nhận webhook (`https://<host>/<tên file>.html` phải mở được từ ngoài),
+   rồi bấm xác thực. Bỏ qua bước này thì hai thứ hỏng và triệu chứng **không
+   nói gì về secret**:
+   - console từ chối URL webhook ở §5 với lý do domain chưa xác thực;
+   - luồng OAuth ở §4 trả `-14003 Invalid redirect uri` — dễ bị đọc nhầm
+     thành "sai `redirect_uri`" rồi đi sửa URL vô ích.
+3. **Lấy OA Secret Key** trong mục *Webhook* của app (cùng chỗ sẽ điền URL
+   webhook ở §5 bước 4). Giá trị **bị che sẵn — bấm biểu tượng con mắt** để
+   hiện rồi copy. Dán vào:
 
    ```dotenv
-   ZALO_OA_SECRET_KEY=<secret key của OA>
+   ZALO_OA_SECRET_KEY=<OA Secret Key>
    ```
 
 4. Kiểm tra ngay tại chỗ, bằng mắt: chuỗi này **phải khác** chuỗi ở §2.
-   Giống nhau nghĩa là bạn copy lại đúng một giá trị.
+   Giống nhau nghĩa là bạn copy lại đúng một giá trị — nhiều khả năng vì hai
+   màn hình nằm cùng console nên bấm nhầm.
+
+> **Nếu sau này bấm reset OA Secret Key trong console** thì giá trị cũ chết
+> ngay: mọi webhook sẽ `mac_mismatch` cho tới khi `.env` được cập nhật và
+> service restart. Đừng reset để "thử cho chắc".
 
 **Ghi lại:**
 
 | Câu hỏi | Thực tế bạn thấy |
 |---|---|
-| Đường dẫn menu thật tới OA Secret Key | |
+| Đường dẫn menu thật tới OA Secret Key (khẳng định/bác bỏ: `developers.zalo.me` → app → Official Account/Webhook) | |
 | Nhãn hiển thị | |
-| Nó nằm ở `oa.zalo.me` hay `developers.zalo.me`? | |
+| Có phải bấm con mắt mới hiện không? | |
+| Bước xác thực domain: tên file, đặt ở đâu, mất bao lâu để console chấp nhận | |
 | Hai secret có độ dài khác nhau không? (chỉ ghi độ dài, **không ghi giá trị**) | |
 
 > **Không bao giờ** viết giá trị thật của ba biến này vào bất kỳ file nào
@@ -150,7 +187,9 @@ App tự xoay token sau khi có cặp đầu tiên. Cặp đầu tiên phải l�
 đây là lần duy nhất (trừ khi phải khôi phục theo runbook).
 
 1. Đăng ký `redirect_uri` trong console trước — Zalo từ chối callback tới
-   URL chưa đăng ký. Dùng đúng URL bạn sẽ mở ở bước 2.
+   URL chưa đăng ký. Dùng đúng URL bạn sẽ mở ở bước 2. Domain của URL đó
+   phải **đã xác thực** ở §3 bước 2; chưa xác thực thì bước 3 dưới đây trả
+   `-14003 Invalid redirect uri` dù URL gõ đúng từng ký tự.
 2. Mở link cấp quyền trên trình duyệt, đăng nhập bằng tài khoản admin OA:
 
    ```
@@ -182,7 +221,7 @@ App tự xoay token sau khi có cặp đầu tiên. Cặp đầu tiên phải l�
    |---|---|
    | `code` hết hạn / đã dùng | `code` chỉ sống vài chục giây — lấy lại từ bước 2–3, đừng sửa gì khác |
    | app / secret / xác thực | `ZALO_APP_SECRET` sai, hoặc đã đảo với OA secret key → §2 và §3 |
-   | `redirect_uri` | URL ở bước 1 không khớp URL đã đăng ký (khác dấu `/` cuối cũng tính là khác) |
+   | `redirect_uri` (đặc biệt `-14003`) | URL ở bước 1 không khớp URL đã đăng ký (khác dấu `/` cuối cũng tính là khác) — **hoặc** domain chưa xác thực ở §3 bước 2 |
    | tham số thiếu hoặc sai tên | Luồng v4 ở bước 2 là `ASSUMED` — rất có thể chính lệnh này sai, không phải secret sai |
 
    Ghi nguyên văn `error` + `message` vào ô "Ghi lại" bên dưới **trước khi**
@@ -287,7 +326,8 @@ Vì vậy, đúng thứ tự này:
 
    `reason=missing_header` ở đây là **đúng mong đợi** cho một probe không ký.
    Nhớ nó: dòng này sẽ nằm trong log và không được tính vào tỉ lệ soak ở §8.
-4. Quay lại Developer Console → phần Webhook của app → điền:
+4. Quay lại Developer Console → phần Webhook của app (**đúng chỗ đã lấy OA
+   Secret Key ở §3 bước 3**) → điền:
 
    - URL: `https://<host>/api/v1/zalo/webhook`
    - Sự kiện cần bật: `user_send_text` và `user_send_message`.
@@ -427,7 +467,7 @@ thực có ích hơn một ô "OK" đoán mò.
 | 4 | Trường message id `message.msg_id` | `SELECT count(*) FILTER (WHERE msg_id LIKE 'd:%') AS derived, count(*) AS total FROM zalo_updates;` — `derived = 0` ⇒ Zalo có gửi `msg_id`; `derived = total` ⇒ **không có**, khoá tổng hợp đang gánh | | | |
 | 5 | Endpoint quota `/v3.0/oa/quota/message` → `data.remain`/`data.total` | `curl -sS -H "X-API-Key: $INTERNAL_API_KEY" https://<host>/api/v1/admin/zalo-quota/baseline` → `remain` khác `null` | | | |
 | 6 | Mã lỗi token hết hạn `-216`, `-201` | `grep 'token rejected' <log>` — adapter log đúng chuỗi `Zalo OA <path>: token rejected (code=<mã>)` khi Zalo từ chối token, kèm việc nó có refresh rồi thử lại được không. Chỉ xuất hiện khi token thật sự hết hạn giữa một lần gọi, nên phải chờ mốc 1 giờ + có traffic (xem §6 bước 3). Không dựng được thì để trống — **đừng suy đoán** | | | |
-| 7 | Nhãn/menu console (§2–§5 file này) | Chính các ô "Ghi lại" ở trên | | | |
+| 7 | Nhãn/menu console (§2–§5 file này), **gồm cả chỗ đứng của OA Secret Key** (sửa 27/08/2026: `developers.zalo.me` → app → Official Account/Webhook, **không** phải `oa.zalo.me`) | Chính các ô "Ghi lại" ở trên | | | |
 | 8 | Luồng cấp quyền OAuth v4 (§4) | URL thật đã dùng + có PKCE hay không | | | |
 
 **Điều kiện đóng nhật ký này:** mọi dòng có kết luận. Dòng nào **SAI** thì
