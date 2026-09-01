@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
+# ⚠️ DEPRECATED — KHÔNG dùng cho prod nữa (retired 2026-09).
+#
+# Script này thuộc kiến trúc cũ: backend chạy bằng systemd unit `betien-api`
+# trên host, admin SPA build bằng npm trên host rồi copy vào backend/static/admin,
+# Caddy reload thủ công.
+#
+# Prod hiện tại chạy Docker: admin SPA được build TRONG multi-stage image
+# (backend/Dockerfile), stack lên bằng deploy/production/docker-compose.yml.
+# Chạy script này trên prod sẽ vô ích (không có systemd unit `betien-api`) và
+# có hại (dòng `rm -rf "${ADMIN_STATIC_DIR:?}"/*` xoá static của bản build hiện tại).
+#
+# Entry point deploy prod duy nhất:  bash scripts/rebuild-finance-prod.sh
+# Quy trình release:                 docs/conventions/production-deployment.md
+#
+# Giữ lại vì còn được tham chiếu trong docs/admin/* và trong comment của
+# alembic/versions/20260529_phase44_salutation.py (ngữ cảnh lịch sử).
+# Đặt DEPLOY_ADMIN_LEGACY_OK=1 nếu thật sự cần chạy trên môi trường legacy.
 set -euo pipefail
+
+if [[ "${DEPLOY_ADMIN_LEGACY_OK:-0}" != "1" ]]; then
+    echo "ERROR: scripts/deploy_admin.sh đã deprecated (kiến trúc systemctl+caddy cũ)." >&2
+    echo "       Deploy prod bằng: bash scripts/rebuild-finance-prod.sh" >&2
+    echo "       Nếu thật sự cần chạy trên môi trường legacy: DEPLOY_ADMIN_LEGACY_OK=1 bash scripts/deploy_admin.sh" >&2
+    exit 1
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ADMIN_STATIC_DIR="${ADMIN_STATIC_DIR:-${REPO_ROOT}/backend/static/admin}"
