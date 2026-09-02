@@ -56,6 +56,33 @@ from backend.utils.client_ip import client_ip
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+
+def _configure_logging() -> None:
+    """Give the root logger a handler so application logs reach stdout.
+
+    uvicorn's default dictConfig only touches its own ``uvicorn``,
+    ``uvicorn.error`` and ``uvicorn.access`` loggers — it never attaches a
+    handler to the root logger. Without this call every ``logger.info`` in
+    ``backend.*`` has no handler anywhere in its propagate chain, so Python
+    falls back to ``logging.lastResort`` (level WARNING) and drops the record
+    silently. That is why prod showed ``logger.warning`` lines but never the
+    ``zalo.signature valid=… reason=…`` verdict line the signature soak reads.
+
+    ``basicConfig`` is a no-op when the root logger already has handlers, so an
+    externally supplied ``--log-config`` still wins.
+    """
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    # These emit one INFO line per outbound HTTP request; at INFO root level
+    # they would drown the application's own logs in prod.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+_configure_logging()
+
 # Seconds we wait for in-flight background tasks (Telegram update
 # processing) to finish during a graceful shutdown. Longer than a typical
 # LLM call, short enough to not stall a deploy. Any task still running
