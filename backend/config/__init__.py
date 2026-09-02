@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     port: int = 8001
     internal_api_key: str = ""
 
+    # Root log level for the web app. uvicorn only configures its own
+    # ``uvicorn.*`` loggers, never the root one, so without an explicit
+    # ``basicConfig`` every ``logger.info`` in this codebase falls through
+    # to ``logging.lastResort`` — a WARNING-level handler — and is dropped
+    # silently in production. See ``_configure_logging`` in backend/main.py.
+    log_level: str = "INFO"
+
     # Admin Observability Console (Phase 4.2.5)
     admin_jwt_secret: str = ""
     admin_jwt_expiry_minutes: int = 60
