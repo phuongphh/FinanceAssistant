@@ -8,6 +8,11 @@ Tokens are single-use (``used_at`` set on redemption) and expire after
 10 minutes so an unredeemed token can't sit around as a long-lived
 binding credential. We keep the row instead of deleting it so analytics
 can tell apart "expired" (timeout) from "used elsewhere" (already paired).
+
+Phase 5.0 #1028 adds the mirror-image flow — a Zalo-first user tapping an
+invite into Telegram — which uses the same table with a different
+``purpose``, TTL and token shape. The discriminator keeps the two apart:
+neither flow may redeem the other's token.
 """
 from __future__ import annotations
 
@@ -29,6 +34,12 @@ class ZaloLinkToken(Base):
     token: Mapped[str] = mapped_column(String(16), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    # Which flow minted this token — see zalo_linking_service.PURPOSE_*.
+    # Issuance and redemption both filter on it so a token can only ever
+    # be spent by the flow that created it.
+    purpose: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="zalo_link", default="zalo_link"
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -3,52 +3,82 @@ name: Tự động Deploy lên VPS từ PROD
 on:
   push:
     branches: [ prod ]
+  # Cho phép chạy tay khi cần re-deploy mà không cần push commit mới.
+  workflow_dispatch:
+
+# Hai deploy chồng nhau sẽ đánh nhau trên cùng một working tree.
+# rebuild-finance-prod.sh đã có lock file, nhưng fail sớm ở đây thì log dễ đọc hơn.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # Cập nhật lên v4 cho mới nhất
-
+      # Không cần actions/checkout: toàn bộ deploy chạy trên VPS bằng bản clone
+      # của chính nó. Runner chỉ đóng vai trò mở SSH.
       - name: Deploy lên VPS qua SSH
         uses: appleboy/ssh-action@v1.0.3 # Dùng version cụ thể cho ổn định
+        env:
+          # Optional repo variable — để trống thì dùng $HOME/FinanceAssistant.
+          PROD_PROJECT_DIR: ${{ vars.PROD_PROJECT_DIR }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: PROD_PROJECT_DIR
+          # Build image (multi-stage: admin SPA + backend) + migration + healthcheck
+          # lâu hơn default 10m của action rất nhiều.
+          command_timeout: 30m
           script: |
             # Fail fast — appleboy/ssh-action đã bỏ script_stop nên cần set -e thủ công.
             set -eo pipefail
 
-            # 1. Vào thư mục dự án (nhớ check lại tên folder FinanceAssistant hay TaxAssistant)
-            cd ~/FinanceAssistant
+            PROJECT_DIR="${PROD_PROJECT_DIR:-$HOME/FinanceAssistant}"
+            DEPLOY_SCRIPT="$PROJECT_DIR/scripts/rebuild-finance-prod.sh"
 
-            # 2. Cập nhật code
-            git fetch origin prod
-            git checkout prod
-            git pull origin prod
-
-            # 3. Build & chạy lại, --wait để chờ healthcheck (Postgres có start_period 30s)
-            docker compose down
-            docker compose up -d --build --remove-orphans --wait
-
-            # 4. Rebuild & deploy admin SPA (FastAPI + Caddy chạy ngoài Docker).
-            #    Nạp .env an toàn theo Compose-style (giữ nguyên giá trị, không expand $/&/#),
-            #    tránh các pitfall khi `source` trực tiếp bằng shell.
-            if [ -f .env ]; then
-              while IFS='=' read -r key value || [ -n "$key" ]; do
-                case "$key" in ''|\#*) continue ;; esac
-                # strip optional surrounding single/double quotes (Compose semantics)
-                value="${value%\"}"; value="${value#\"}"
-                value="${value%\'}"; value="${value#\'}"
-                export "$key=$value"
-              done < .env
+            # ── Pre-flight ────────────────────────────────────────────────
+            # Ba guard dưới đây chỉ để biến lỗi hạ tầng thành thông báo đọc
+            # được. Nếu không có chúng, deploy chết với "exit status 128"
+            # trần trụi và phải mò log mới biết vì sao.
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "::error::Không tìm thấy PROJECT_DIR: $PROJECT_DIR"
+              echo "Set repo variable PROD_PROJECT_DIR trỏ đúng thư mục clone trên VPS."
+              exit 1
             fi
-            # Production phục vụ admin tại https://finance.nuitruc.ai/admin → API ở /api/admin (relative path)
-            export VITE_API_BASE="${VITE_API_BASE:-/api/admin}"
-            bash scripts/deploy_admin.sh
+            cd "$PROJECT_DIR"
 
-            # 5. Dọn dẹp tài nguyên thừa
-            docker image prune -f
-            echo "✅ Hệ thống đã được cập nhật từ nhánh PROD tại $(date)!"
+            if ! git rev-parse --git-dir >/dev/null 2>&1; then
+              echo "::error::$PROJECT_DIR không đọc được như một git repo bởi user $(whoami)."
+              echo "Thường gặp: repo thuộc user khác nên .git/config bị Permission denied."
+              echo "Fix trên VPS: chown -R \$SSH_USER:\$SSH_USER $PROJECT_DIR"
+              echo "(hoặc cho SSH_USER vào group sở hữu repo). Deploy tay trong lúc chờ:"
+              echo "  ssh vps && bash $DEPLOY_SCRIPT"
+              exit 1
+            fi
+
+            if [ ! -f "$DEPLOY_SCRIPT" ]; then
+              echo "::error::Không tìm thấy $DEPLOY_SCRIPT"
+              echo "Bản clone trên VPS đang ở commit cũ hơn script — pull tay một lần rồi chạy lại."
+              exit 1
+            fi
+
+            # ── Deploy ────────────────────────────────────────────────────
+            # rebuild-finance-prod.sh là entry point deploy prod duy nhất. Nó tự lo:
+            #   pre-flight (.env, deps, đúng branch prod, tree sạch) → git pull --ff-only
+            #   → DB backup → docker compose down → build + up --wait (compose file
+            #   deploy/production/, gồm backend + scheduler; admin SPA build TRONG image)
+            #   → smoke test /health → rollback nếu fail → image prune → Telegram notify.
+            #
+            # KHÔNG thêm `docker compose` hay `deploy_admin.sh` vào đây nữa:
+            #   - docker-compose.yml ở repo root chỉ có postgres + redis. Chạy
+            #     `up --remove-orphans` với nó dưới cùng project name `financeassistant`
+            #     sẽ xoá luôn container finance-backend và finance-scheduler.
+            #   - deploy_admin.sh thuộc kiến trúc systemctl + caddy cũ (build SPA bằng
+            #     npm trên host, restart betien-api). Kiến trúc hiện tại chạy Docker.
+            #
+            # Lưu ý: script tự pull code, nên lần deploy này chạy bản script ĐANG có
+            # trên VPS; thay đổi trong chính script chỉ có hiệu lực từ deploy kế tiếp.
+            export PROJECT_DIR
+            bash "$DEPLOY_SCRIPT"

@@ -1,5 +1,15 @@
 # Bé Tiền Admin Console — Production Deploy Runbook
 
+> ⚠️ **SUPERSEDED (2026-09).** Tài liệu này mô tả kiến trúc cũ: backend chạy bằng
+> systemd unit `betien-api` trên host, admin SPA build bằng npm rồi copy vào
+> `backend/static/admin`, deploy bằng `scripts/deploy_admin.sh`.
+> Prod hiện tại chạy Docker (`deploy/production/docker-compose.yml`, admin SPA
+> build trong multi-stage image) và deploy bằng
+> [`scripts/rebuild-finance-prod.sh`](../../scripts/rebuild-finance-prod.sh).
+> Quy trình release hiện hành: [`docs/conventions/production-deployment.md`](../conventions/production-deployment.md).
+> Giữ lại làm ngữ cảnh lịch sử — `scripts/deploy_admin.sh` nay từ chối chạy trừ khi
+> set `DEPLOY_ADMIN_LEGACY_OK=1`.
+
 ## Scope
 
 Deploy the Phase 4.2.5 Admin Observability Console to `https://admin.betien.vn` with HTTPS, restricted CORS, API rate limits, and rollback instructions.

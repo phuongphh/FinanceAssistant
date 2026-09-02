@@ -20,6 +20,9 @@ from backend.jobs.cashflow_forecast_job import run_cashflow_forecast_job
 from backend.jobs.daily_kpi_digest_job import run_daily_kpi_digest_job
 from backend.jobs.feedback_sla_job import run_feedback_sla_job
 from backend.jobs.check_empathy_triggers import run_hourly_empathy_check
+from backend.jobs.cleanup_conversation_context import (
+    cleanup_conversation_context,
+)
 from backend.jobs.cleanup_media import cleanup_media
 from backend.jobs.check_milestones import run_daily_milestone_check
 from backend.jobs.daily_snapshot_job import create_daily_snapshots
@@ -251,6 +254,17 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         cleanup_media, "cron",
         minute=20, timezone="Asia/Ho_Chi_Minh",
         id="media_cleanup",
+    )
+
+    # Prune the short-term conversation buffer. Its TTL is enforced on
+    # read, so nothing user-facing depends on this running — it only
+    # keeps the table and the index the agent reads before every LLM
+    # call from growing forever. Minute 40 keeps it clear of the media
+    # sweep at :20 and of the jobs sitting on the hour.
+    scheduler.add_job(
+        cleanup_conversation_context, "cron",
+        minute=40, timezone="Asia/Ho_Chi_Minh",
+        id="conversation_context_cleanup",
     )
 
 

@@ -22,6 +22,13 @@ the Zalo OA having never touched Telegram, so this module also owns
 assume already existed) and the markers for the one-time "come to
 Telegram too" invitation shown at the end of Zalo onboarding.
 
+Phase 5.0 #1028 closes that invitation's hole. The invite used to be a
+bare bot link, so ``/start`` saw an anonymous newcomer and created a
+second account — same person, two halves of a financial history. It now
+carries a single-use ``telegram_adopt`` token in the deep link, which
+:func:`adopt_telegram_account` spends to write ``telegram_id`` onto the
+Zalo row that already exists.
+
 Layer contract:
 - Service NEVER calls ``db.commit()``. Caller (router/handler) owns
   the transaction boundary.
@@ -38,6 +45,7 @@ from typing import Final
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.user import User
@@ -47,6 +55,20 @@ logger = logging.getLogger(__name__)
 
 # Token TTL — Story #440 spec: 10 minutes.
 TOKEN_TTL_MINUTES: Final[int] = 10
+
+# The two flows that mint rows in ``zalo_link_tokens``. They run in
+# opposite directions and must never redeem each other's tokens: a
+# pairing code is typed by a human into Zalo, an adoption token is
+# carried by a URL into Telegram.
+PURPOSE_ZALO_LINK: Final[str] = "zalo_link"
+PURPOSE_TELEGRAM_ADOPT: Final[str] = "telegram_adopt"
+
+# Adoption TTL — days, not minutes. The invite is the last message of
+# Zalo onboarding and people tap it when they next open Telegram, which
+# can be that evening or the next morning. A 10-minute token would
+# expire before most users ever saw it, and an expired one silently
+# recreates the duplicate account this whole flow exists to prevent.
+ADOPTION_TOKEN_TTL_DAYS: Final[int] = 7
 
 # Token alphabet: Crockford base32 minus I/O/L/U for legibility.
 # Users will be typing the code on a Zalo mobile keyboard, so we drop
@@ -70,8 +92,78 @@ class LinkRedemption:
     previous_zalo_user_id: str | None = None
 
 
+@dataclass(frozen=True)
+class TelegramAdoption:
+    """Result of redeeming an adoption token from a Telegram ``/start``."""
+
+    # "adopted"      — the Zalo-first row now carries this telegram_id
+    # "invalid"      — unknown token, or minted by the other flow
+    # "expired"      — past its TTL
+    # "already_used" — spent by a different Telegram account
+    # "conflict"     — either side is already bound to somebody else
+    status: str
+    user: User | None = None
+
+
 def _generate_token_body() -> str:
     return "".join(secrets.choice(_TOKEN_ALPHABET) for _ in range(_TOKEN_BODY_LENGTH))
+
+
+def _generate_adoption_token() -> str:
+    """Random URL-safe token for the Telegram deep link.
+
+    Nobody types this one, so legibility is irrelevant and entropy is
+    not: the token is a bearer credential that adopts an account. 12
+    bytes → exactly 16 characters, which is both the ``String(16)``
+    column width and well inside Telegram's 64-char ``/start`` payload
+    limit (whose alphabet, ``[A-Za-z0-9_-]``, is exactly base64url's).
+    """
+    return secrets.token_urlsafe(12)
+
+
+async def _mint_unique_token(
+    db: AsyncSession, generate, *, user: User, purpose: str, expires: datetime
+) -> str:
+    """Insert a token row, retrying the (vanishingly rare) PK collision.
+
+    Bounded to 5 attempts so a pathological generator can't spin forever.
+    """
+    for _ in range(5):
+        token = generate()
+        exists_q = await db.execute(
+            select(ZaloLinkToken.token).where(ZaloLinkToken.token == token)
+        )
+        if exists_q.scalar_one_or_none() is None:
+            break
+    else:
+        raise RuntimeError("ZaloLinkToken: unable to find unique token after 5 tries")
+
+    db.add(
+        ZaloLinkToken(
+            token=token,
+            user_id=user.id,
+            purpose=purpose,
+            expires_at=expires,
+            created_at=_now(),
+        )
+    )
+    await db.flush()
+    return token
+
+
+async def _active_tokens(
+    db: AsyncSession, user: User, purpose: str
+) -> list[ZaloLinkToken]:
+    """Unused, unexpired tokens for one user and one flow, newest first."""
+    result = await db.execute(
+        select(ZaloLinkToken)
+        .where(ZaloLinkToken.user_id == user.id)
+        .where(ZaloLinkToken.purpose == purpose)
+        .where(ZaloLinkToken.used_at.is_(None))
+        .where(ZaloLinkToken.expires_at > _now())
+        .order_by(ZaloLinkToken.created_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 def _now() -> datetime:
@@ -89,15 +181,7 @@ async def issue_link_token(db: AsyncSession, user: User) -> str:
     spamming the command shouldn't quietly invalidate the token they
     already pasted into Zalo).
     """
-    now = _now()
-    existing_q = await db.execute(
-        select(ZaloLinkToken)
-        .where(ZaloLinkToken.user_id == user.id)
-        .where(ZaloLinkToken.used_at.is_(None))
-        .where(ZaloLinkToken.expires_at > now)
-        .order_by(ZaloLinkToken.created_at.desc())
-    )
-    active = existing_q.scalars().all()
+    active = await _active_tokens(db, user, PURPOSE_ZALO_LINK)
     if active:
         # Prune older surplus tokens (keep latest, the one we return)
         # to avoid token-table bloat on noisy users.
@@ -105,31 +189,40 @@ async def issue_link_token(db: AsyncSession, user: User) -> str:
             await db.delete(stale)
         return active[0].token
 
-    expires = now + timedelta(minutes=TOKEN_TTL_MINUTES)
-    # Retry on the (extremely unlikely) PK collision — secrets gives
-    # cryptographic randomness so this loop almost always exits in 1
-    # iteration. Bounded to avoid pathological infinite loops in tests.
-    for _ in range(5):
-        token = f"{_TOKEN_PREFIX}{_generate_token_body()}"
-        exists_q = await db.execute(
-            select(ZaloLinkToken.token).where(ZaloLinkToken.token == token)
-        )
-        if exists_q.scalar_one_or_none() is None:
-            break
-    else:
-        # Defensive — should never trigger with 30-char alphabet × 6.
-        raise RuntimeError("ZaloLinkToken: unable to find unique token after 5 tries")
-
-    db.add(
-        ZaloLinkToken(
-            token=token,
-            user_id=user.id,
-            expires_at=expires,
-            created_at=now,
-        )
+    return await _mint_unique_token(
+        db,
+        lambda: f"{_TOKEN_PREFIX}{_generate_token_body()}",
+        user=user,
+        purpose=PURPOSE_ZALO_LINK,
+        expires=_now() + timedelta(minutes=TOKEN_TTL_MINUTES),
     )
-    await db.flush()
-    return token
+
+
+async def issue_telegram_adoption_token(db: AsyncSession, user: User) -> str:
+    """Issue (or re-use) the token that carries ``user`` into Telegram.
+
+    The mirror image of :func:`issue_link_token`: this one rides in a
+    ``/start`` deep link so the Telegram side can recognise a person who
+    already exists on Zalo, instead of minting them a second account and
+    splitting their financial history in half (#1028).
+
+    Re-use follows the same rule as pairing — a user who somehow gets
+    invited twice should land on the same account either way, and an
+    already-sent link must not be quietly invalidated by a later one.
+    """
+    active = await _active_tokens(db, user, PURPOSE_TELEGRAM_ADOPT)
+    if active:
+        for stale in active[1:]:
+            await db.delete(stale)
+        return active[0].token
+
+    return await _mint_unique_token(
+        db,
+        _generate_adoption_token,
+        user=user,
+        purpose=PURPOSE_TELEGRAM_ADOPT,
+        expires=_now() + timedelta(days=ADOPTION_TOKEN_TTL_DAYS),
+    )
 
 
 def normalize_token_input(text: str) -> str | None:
@@ -172,6 +265,10 @@ async def redeem_link_token(
     row_q = await db.execute(select(ZaloLinkToken).where(ZaloLinkToken.token == token))
     row: ZaloLinkToken | None = row_q.scalar_one_or_none()
     if row is None:
+        return LinkRedemption(status="invalid")
+    if row.purpose != PURPOSE_ZALO_LINK:
+        # An adoption token pasted into Zalo. It grants the opposite
+        # binding and must not be honoured here.
         return LinkRedemption(status="invalid")
 
     now = _now()
@@ -218,6 +315,90 @@ async def redeem_link_token(
         user_id=user.id,
         previous_zalo_user_id=previous,
     )
+
+
+async def adopt_telegram_account(
+    db: AsyncSession,
+    token: str,
+    telegram_id: int,
+    *,
+    telegram_handle: str | None = None,
+    display_name: str | None = None,
+) -> TelegramAdoption:
+    """Bind ``telegram_id`` to the Zalo-first user that owns ``token``.
+
+    Called from the Telegram ``/start`` path *before* the usual
+    get-or-create, which is the whole point: once that has run the
+    duplicate row exists and the person's assets, goals and transactions
+    are split across two accounts with no way back (#1028).
+
+    Idempotent for the same Telegram account — tapping the invite twice
+    lands on the same user. Every other collision returns ``conflict``
+    rather than moving a binding: merging two populated accounts is a
+    separate problem and guessing wrong would lose data.
+    """
+    if not token or telegram_id is None:
+        return TelegramAdoption(status="invalid")
+
+    row_q = await db.execute(select(ZaloLinkToken).where(ZaloLinkToken.token == token))
+    row: ZaloLinkToken | None = row_q.scalar_one_or_none()
+    if row is None or row.purpose != PURPOSE_TELEGRAM_ADOPT:
+        return TelegramAdoption(status="invalid")
+
+    user_q = await db.execute(select(User).where(User.id == row.user_id))
+    user: User | None = user_q.scalar_one_or_none()
+    if user is None:
+        # Should not happen with the FK, but defensive.
+        return TelegramAdoption(status="invalid")
+
+    # Re-tap of an already-redeemed link by the same person. Checked
+    # before expiry: the binding it created is still true afterwards.
+    if user.telegram_id == telegram_id:
+        if row.used_at is None:
+            row.used_at = _now()
+            await db.flush()
+        return TelegramAdoption(status="adopted", user=user)
+
+    if row.used_at is not None:
+        return TelegramAdoption(status="already_used")
+
+    expires = row.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires <= _now():
+        return TelegramAdoption(status="expired")
+
+    if user.telegram_id is not None:
+        logger.warning(
+            "Telegram adoption blocked: user %s already bound to another "
+            "Telegram account",
+            user.id,
+        )
+        return TelegramAdoption(status="conflict")
+
+    conflict_q = await db.execute(
+        select(User.id)
+        .where(User.telegram_id == telegram_id)
+        .where(User.id != user.id)
+        .where(User.deleted_at.is_(None))
+    )
+    if conflict_q.scalar_one_or_none() is not None:
+        logger.warning(
+            "Telegram adoption blocked: telegram_id already owned by a "
+            "different user than %s",
+            user.id,
+        )
+        return TelegramAdoption(status="conflict")
+
+    user.telegram_id = telegram_id
+    if telegram_handle and not user.telegram_handle:
+        user.telegram_handle = telegram_handle
+    if display_name and not user.display_name:
+        user.display_name = display_name
+    row.used_at = _now()
+    await db.flush()
+    logger.info("Adopted Telegram account onto existing Zalo user %s", user.id)
+    return TelegramAdoption(status="adopted", user=user)
 
 
 async def get_linked_user(db: AsyncSession, zalo_user_id: str) -> User | None:
@@ -269,12 +450,31 @@ async def get_or_create_zalo_user(
     if existing is not None:
         return existing, False
 
-    user = User(zalo_user_id=zalo_user_id, display_name=display_name)
-    db.add(user)
-    # TRANSACTION_OWNED_BY_CALLER — the worker commits at the boundary.
-    # flush() populates user.id from the DB default without ending the tx,
-    # which onboarding needs immediately to open its session row.
-    await db.flush()
+    # Two inbound messages arriving back-to-back both get here before
+    # either commits, and both try to insert. ``idx_users_zalo_user_id``
+    # is unique, so the loser's flush raises — and an unhandled raise
+    # marks that update ``failed``, which orphan recovery never retries,
+    # so the second message would be lost for good (#1029). Insert inside
+    # a savepoint instead: on conflict we roll back only the failed
+    # INSERT, then read back the row the winner committed.
+    try:
+        async with db.begin_nested():
+            user = User(zalo_user_id=zalo_user_id, display_name=display_name)
+            db.add(user)
+            # TRANSACTION_OWNED_BY_CALLER — the worker commits at the
+            # boundary. flush() populates user.id from the DB default
+            # without ending the tx, which onboarding needs immediately
+            # to open its session row.
+            await db.flush()
+    except IntegrityError:
+        winner = await get_linked_user(db, zalo_user_id)
+        if winner is None:
+            # The conflict came from something other than the Zalo
+            # uniqueness index — don't swallow it.
+            raise
+        logger.info("Zalo-first user %s already created concurrently", winner.id)
+        return winner, False
+
     await db.refresh(user)
     logger.info("Created Zalo-first user %s from zalo_user_id", user.id)
     return user, True

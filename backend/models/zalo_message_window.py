@@ -46,8 +46,16 @@ class ZaloMessageWindow(Base):
     window_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Sends reserved in the CURRENT window. Reset to 0 by record_inbound.
+    # Sends reserved in the CURRENT window. Reset by record_inbound — down
+    # to the reservations still in flight, not to 0, because a send Zalo
+    # is still processing will be charged to whichever window it lands in.
     free_msg_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    # Of those, how many have not yet come back from the OA. Bumped by
+    # reserve_send, cleared by settle_send (delivered or refused) or
+    # release_send (refunded). Always <= free_msg_count.
+    inflight_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
     last_sent_at: Mapped[datetime | None] = mapped_column(

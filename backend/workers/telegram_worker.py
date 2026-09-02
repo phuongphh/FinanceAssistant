@@ -255,6 +255,39 @@ async def _handle_message(
             )
             return None
 
+        # Deep-link payload follows "/start " (Telegram convention).
+        payload: str | None = None
+        if " " in text.strip():
+            payload = text.strip().split(maxsplit=1)[1]
+
+        # Phase 5.0 #1028 — a Zalo-first user tapping the invite arrives
+        # here with an adoption token. It has to be spent *before*
+        # ``get_or_create_user``, because that call is what would mint the
+        # duplicate account: same person, financial history split in two.
+        from backend.bot.handlers import zalo_adoption
+
+        adopted = await zalo_adoption.try_adopt(
+            db,
+            chat_id,
+            payload=payload,
+            telegram_id=telegram_id,
+            from_user=from_user,
+        )
+        if adopted is not None:
+            # ``try_adopt`` already greeted them, and Zalo onboarding
+            # completed their setup — there is no welcome flow to run.
+            analytics.track(
+                analytics.EventType.BOT_STARTED,
+                user_id=adopted.id,
+                properties={
+                    "new_user": False,
+                    "is_onboarded": adopted.is_onboarded,
+                    "has_display_name": bool(adopted.display_name),
+                    "zalo_adopted": True,
+                },
+            )
+            return adopted.id
+
         user, created = await dashboard_service.get_or_create_user(
             db,
             telegram_id,
@@ -276,11 +309,6 @@ async def _handle_message(
         # users (already past welcome step) stay on the legacy flow so
         # their state isn't reset mid-onboarding.
         from backend.bot.handlers import onboarding_v2
-
-        # Deep-link payload follows "/start " (Telegram convention).
-        payload: str | None = None
-        if " " in text.strip():
-            payload = text.strip().split(maxsplit=1)[1]
 
         use_v2 = onboarding_v2.is_v2_enabled() and (
             created or user.onboarding_step <= int(OnboardingStep.NOT_STARTED)

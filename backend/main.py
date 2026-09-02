@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -405,6 +405,44 @@ app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL 
 @app.get("/health")
 async def health_check():
     return JSONResponse(content={"data": {"status": "healthy"}, "error": None})
+
+
+# ── Domain-verification files ──────────────────────────────────────────
+# Zalo (and Google/Facebook, should they be added later) proves domain
+# ownership by fetching a token file from the public root of the host that
+# receives their webhook — for prod that is
+# https://finance.nuitruc.ai/<file>.html. Drop the file the console hands
+# you into backend/static/public/ and it is served here; it ships in the
+# image via `COPY . .`, so it survives every rebuild.
+#
+# These routes MUST be registered before the SPA mounts below: Starlette
+# matches in registration order, and SPAStaticFiles answers any unknown
+# path with index.html + HTTP 200 whenever the request accepts text/html.
+# A browser would then show "200 OK" on a file that was never deployed and
+# the console would read a page with no token in it.
+_PUBLIC_ROOT = Path(__file__).parent / "static" / "public"
+
+
+def _public_file_route(file_path: Path):
+    """Build a handler that serves one static file from the public root."""
+
+    async def _serve() -> FileResponse:
+        return FileResponse(file_path, media_type="text/html")
+
+    return _serve
+
+
+if _PUBLIC_ROOT.is_dir():
+    for _public_file in sorted(_PUBLIC_ROOT.iterdir()):
+        if not _public_file.is_file() or _public_file.name.startswith("."):
+            continue
+        app.add_api_route(
+            f"/{_public_file.name}",
+            _public_file_route(_public_file),
+            methods=["GET", "HEAD"],
+            include_in_schema=False,
+        )
+        logger.info("Serving domain-verification file at /%s", _public_file.name)
 
 
 _ADMIN_STATIC = Path(__file__).parent / "static" / "admin"

@@ -15,6 +15,8 @@ from decimal import Decimal
 import pytest
 
 from backend.agent.limits import (
+    CACHE_READ_MULTIPLIER,
+    CACHE_WRITE_MULTIPLIER,
     CLAUDE_SONNET_PRICE_INPUT_PER_M,
     CLAUDE_SONNET_PRICE_OUTPUT_PER_M,
     DEEPSEEK_PRICE_INPUT_PER_M,
@@ -173,3 +175,92 @@ def test_vnd_ledger_matches_usd_killswitch(provider, model):
 def test_every_live_model_string_is_priced(model):
     cost = estimate_cost_usd(model=model, input_tokens=1000, output_tokens=1000)
     assert cost > 0.0
+
+
+# ----- prompt-cache multipliers -------------------------------------
+# Once Tier 3 sends a cached prefix, ``usage.input_tokens`` from the API
+# covers only the uncached remainder. If the cached halves were billed
+# at zero, the daily kill-switch would under-report most of a Tier 3
+# query — so the two extra token classes have to carry real prices.
+
+
+def test_cache_write_costs_more_than_plain_input():
+    plain = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=1_000_000,
+        output_tokens=0,
+    )
+    written = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=0,
+        output_tokens=0,
+        cache_write_tokens=1_000_000,
+    )
+    assert written == pytest.approx(plain * CACHE_WRITE_MULTIPLIER)
+    assert written > plain
+
+
+def test_cache_read_costs_a_fraction_of_plain_input():
+    plain = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=1_000_000,
+        output_tokens=0,
+    )
+    read = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_tokens=1_000_000,
+    )
+    assert read == pytest.approx(plain * CACHE_READ_MULTIPLIER)
+    assert read < plain
+
+
+def test_cache_tokens_default_to_zero_so_old_callers_are_unchanged():
+    # Every pre-caching call site omits the new kwargs. Their answers
+    # must not move by a cent.
+    with_defaults = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=12_345,
+        output_tokens=678,
+    )
+    explicit_zero = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=12_345,
+        output_tokens=678,
+        cache_write_tokens=0,
+        cache_read_tokens=0,
+    )
+    assert with_defaults == explicit_zero
+
+
+def test_all_four_token_classes_sum():
+    base = CLAUDE_SONNET_PRICE_INPUT_PER_M
+    out = CLAUDE_SONNET_PRICE_OUTPUT_PER_M
+    cost = estimate_cost_usd(
+        model="claude-sonnet-4-6",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+        cache_write_tokens=1_000_000,
+        cache_read_tokens=1_000_000,
+    )
+    expected = (
+        base
+        + base * CACHE_WRITE_MULTIPLIER
+        + base * CACHE_READ_MULTIPLIER
+        + out
+    )
+    assert cost == pytest.approx(expected)
+
+
+def test_unknown_model_stays_free_even_with_cache_tokens():
+    assert (
+        estimate_cost_usd(
+            model="mystery",
+            input_tokens=0,
+            output_tokens=0,
+            cache_write_tokens=999_999,
+            cache_read_tokens=999_999,
+        )
+        == 0.0
+    )

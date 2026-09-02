@@ -144,7 +144,11 @@ async def test_a_send_inside_the_window_reaches_zalo_and_spends_one_slot(window_
 
     assert result == {"ok": True, "channel": "zalo"}
     assert client.sent == [(SENDER, "Đã ghi 50k")]
-    assert window_store.rows[SENDER].free_msg_count == 1
+    row = window_store.rows[SENDER]
+    # Spent, and closed out: Zalo has answered, so no rotation needs to
+    # carry this one any further.
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
+    assert window_store.events.count("settle") == 1
 
 
 @pytest.mark.asyncio
@@ -440,27 +444,66 @@ async def test_an_exception_hands_the_slot_back_and_still_propagates(window_stor
     assert window_store.events.count("release") == 1
 
 
-@pytest.mark.asyncio
-async def test_a_refund_cannot_land_in_a_window_opened_since(window_store):
-    """A newer inbound message rotated the window mid-send.
+class RotatingClient(FakeOAClient):
+    """Rotates the window from under the send, mid-transport.
 
-    Refunding into the *new* window would hand the user a ninth message
-    in it. ``release_send`` guards on window identity, so the refund is a
-    no-op and the fresh allowance stays intact at eight.
+    The real race: the user messages us while an OA request is on the
+    wire, so ``record_inbound`` runs between the reservation and its
+    outcome. Both outcomes below hang off this one client.
+    """
+
+    async def send_message(self, recipient_id, text):
+        await svc.record_inbound(self._store, zalo_user_id=SENDER)
+        return await super().send_message(recipient_id, text)
+
+
+@pytest.mark.asyncio
+async def test_a_refund_follows_its_reservation_into_the_rotated_window(window_store):
+    """The send failed, so the slot is owed back wherever it now lives.
+
+    The rotation carried the reservation forward (#1029(4)), which makes
+    the *new* window the one holding the spent slot — and therefore the
+    one the refund belongs in. Guarding the refund on the window the send
+    was born in, as this used to, would strand the slot until the next
+    inbound message.
     """
     await open_window(window_store)
-
-    class RotatingClient(FakeOAClient):
-        async def send_message(self, recipient_id, text):
-            await svc.record_inbound(window_store, zalo_user_id=SENDER)
-            return await super().send_message(recipient_id, text)
-
     client = RotatingClient(window_store, ok=False)
 
     result = await notifier_for(window_store, client).send_message(0, "thử")
 
     assert result is None
-    assert window_store.rows[SENDER].free_msg_count == 0
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_a_send_that_lands_mid_rotation_is_charged_to_the_new_window(
+    window_store,
+):
+    """#1029(4) end to end, at the layer that actually spends the quota.
+
+    Zalo charges a delivered message to whichever window it lands in. The
+    reset used to zero the counter out from under an in-flight send, so
+    this sequence left the row claiming eight free slots for a window that
+    had already seen one — the ninth message being the one Zalo refuses.
+    """
+    await open_window(window_store)
+    client = RotatingClient(window_store)
+    notifier = notifier_for(window_store, client)
+
+    assert await notifier.send_message(0, "thử") is not None
+
+    row = window_store.rows[SENDER]
+    # Carried across the rotation, then settled: spent, and no longer in
+    # flight — nothing left for a later rotation to carry a second time.
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
+    # Which is the point: the new window grants seven more, not eight.
+    plain = FakeOAClient(window_store)
+    quiet = notifier_for(window_store, plain)
+    for i in range(FREE_MESSAGE_QUOTA):
+        await quiet.send_message(0, f"tin {i}")
+    assert len(plain.sent) == FREE_MESSAGE_QUOTA - 1
 
 
 @pytest.mark.asyncio
@@ -487,6 +530,35 @@ async def test_a_failed_refund_never_masks_the_delivery_failure(window_store, ca
     assert window_store.rows[SENDER].free_msg_count == 1
 
 
+@pytest.mark.asyncio
+async def test_a_failed_settle_never_masks_a_successful_delivery(window_store, caplog):
+    """Same self-effacing contract as the refund, on the other outcome.
+
+    The message *did* reach the user; reporting a failure because the
+    bookkeeping afterwards fell over would be a lie to the caller. The
+    cost is bounded and in the safe direction: the slot is already spent,
+    and it merely looks in flight until a rotation past ``INFLIGHT_GRACE``
+    writes it off.
+    """
+    await open_window(window_store)
+    client = FakeOAClient(window_store)
+    notifier = WindowedZaloNotifier(
+        ZaloNotifier(client=client, zalo_user_id=SENDER),
+        SENDER,
+        # Opens: 1 = the reservation, 2 = the settle.
+        session_factory=session_factory_for(window_store, fail_on_open={2}),
+    )
+
+    with caplog.at_level(logging.ERROR, logger=LOGGER_NAME):
+        result = await notifier.send_message(0, "Đã ghi 50k")
+
+    assert result == {"ok": True, "channel": "zalo"}
+    assert client.sent == [(SENDER, "Đã ghi 50k")]
+    assert any("zalo.window.settle_failed" in r.getMessage() for r in caplog.records)
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 1)
+
+
 # ---------------------------------------------------------------------------
 # Rejection — the half of the ledger that is *not* refunded (#4)
 # ---------------------------------------------------------------------------
@@ -511,8 +583,12 @@ async def test_a_rejected_send_keeps_the_slot_spent(window_store):
     # Same answer to the caller as any other delivery failure — the
     # ``Notifier`` port owes them ``None``, not an exception.
     assert result is None
-    assert window_store.rows[SENDER].free_msg_count == 1
+    row = window_store.rows[SENDER]
+    assert (row.free_msg_count, row.inflight_count) == (1, 0)
     assert "release" not in window_store.events
+    # Settled rather than refunded: Zalo answered, so the slot is gone —
+    # but it is no longer in flight, and a rotation must not carry it.
+    assert window_store.events.count("settle") == 1
 
 
 @pytest.mark.asyncio

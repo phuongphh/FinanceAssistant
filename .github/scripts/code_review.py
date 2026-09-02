@@ -102,7 +102,11 @@ def request_review_with_retry(
             return client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1500,
-                temperature=0,
+                # anthropic 1.x dropped `temperature` from the create() signature,
+                # but the API still honours it for Haiku 4.5. A review that changes
+                # its verdict between two runs of the same diff is worse than no
+                # review, so keep it at 0 by passing it straight through the body.
+                extra_body={"temperature": 0},
                 timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS,
                 system=SYSTEM_PROMPT,
                 messages=[
