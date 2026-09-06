@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🚀 **Zalo Channel Launch** (current) — [detail](docs/current/phase-5.0/phase-5.0-detailed.md)
+🧪 **Zalo Core Product Parity** (testing) — [detail](docs/current/phase-5.1/phase-5.1-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
