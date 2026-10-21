@@ -58,14 +58,15 @@ commit_identity:
 
 claude:
   # Tool Claude được dùng trong job agent (không có network tool, không có git commit/push).
+  # Test chỉ chạy qua `sandbox-pytest` (không network, user nobody, env trống) —
+  # KHÔNG cho `pytest` trần vì lúc đó token Claude đang nằm trong env.
   allowed_tools:
     - Read
     - Edit
     - Write
     - Glob
     - Grep
-    - "Bash(python -m pytest:*)"
-    - "Bash(pytest:*)"
+    - "Bash(sandbox-pytest:*)"
     - "Bash(ruff:*)"
     - "Bash(git status:*)"
     - "Bash(git diff:*)"

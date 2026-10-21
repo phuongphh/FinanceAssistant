@@ -107,6 +107,8 @@ class Ctx:
     _issues: dict[int, tuple[Issue, dict[str, Any]]] = field(default_factory=dict)
     _open_state: dict[int, bool] = field(default_factory=dict)
     _active: dict[int, str] | None = None
+    # dry-run: label lẽ ra đã gắn (VD agent:ready kế thừa từ Epic) → select thấy được.
+    _sim_labels: dict[int, set[str]] = field(default_factory=dict)
 
     # ---- output
     def notify(self, text: str) -> None:
@@ -148,6 +150,8 @@ class Ctx:
 
     def add_labels(self, num: int, *labels: str) -> None:
         if labels:
+            if self.dry_run:
+                self._sim_labels.setdefault(num, set()).update(labels)
             self.write(f"issues/{num}/labels", "POST", {"labels": list(labels)})
 
     def remove_label(self, num: int, label: str) -> None:
@@ -245,7 +249,9 @@ def _open_blockers(ctx: Ctx, num: int, body: str) -> tuple[int, ...]:
                 found.add(dep["number"])
     except GHError as exc:
         if exc.status != 404:
-            log.warning("issue dependencies #%s: %s", num, exc)
+            # Fail closed: không biết blocker → coi như bị chặn (0 = sentinel).
+            log.warning("issue dependencies #%s: %s — coi như bị chặn", num, exc)
+            found.add(0)
     found |= {m for m in parse_blockers(body) if m != num and _is_open(ctx, m)}
     return tuple(sorted(found))
 
@@ -279,7 +285,7 @@ def fetch_issue(ctx: Ctx, num: int, light: bool = False) -> tuple[Issue, dict[st
         query = ISSUE_QUERY % {"vars": ", $pf:String!", "project": _PROJECT_ITEMS}
         data = ctx.gh.graphql(query, owner=owner, name=name, n=num, pf=ctx.cfg.priority_field)
     node = data["repository"]["issue"]
-    labels = _labels_of(node)
+    labels = _labels_of(node) | ctx._sim_labels.get(num, set())
     subs = (node.get("subIssues") or {}).get("nodes") or []
     issue = Issue(
         number=node["number"],
@@ -431,7 +437,7 @@ def cmd_select(ctx: Ctx, force: bool = False) -> int:
         if num in seen:
             continue
         seen.add(num)
-        item_labels = _labels_of(item)
+        item_labels = _labels_of(item) | ctx._sim_labels.get(num, set())
         if item_labels & labels.skip:
             candidates.append(Issue(num, item["title"], frozenset(item_labels)))
             continue
@@ -772,13 +778,20 @@ def cmd_prepare(
 # --------------------------------------------------------------------------- gates + guard
 
 
+def _stage(ctx: Ctx, out_dir: str) -> None:
+    ctx.git("add", "-A")
+    ctx.git("reset", "-q", "--", out_dir, check=False)
+
+
 def cmd_run_gates(ctx: Ctx, out_dir: str = ".agent-out") -> int:
     out = _resolve(ctx, out_dir)
     out.mkdir(parents=True, exist_ok=True)
     meta_path = out / "meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
-    ctx.git("add", "-A")
-    ctx.git("reset", "-q", "--", out_dir, check=False)
+    _stage(ctx, out_dir)
+    # Snapshot index: patch.diff được xuất từ đúng tree này. Gate (code do
+    # agent viết) chạy sau đó không được phép lén đổi file → so lại cuối hàm.
+    tree_before = ctx.git("write-tree").stdout.strip()
     env = {**os.environ, "BASE_SHA": meta.get("base_sha", "")}
     timeout = int(((ctx.cfg.raw.get("limits") or {}).get("gate_timeout_sec")) or 1800)
     rows, logs, ok_all = [], [], True
@@ -798,6 +811,13 @@ def cmd_run_gates(ctx: Ctx, out_dir: str = ".agent-out") -> int:
             ok_all = False
             tail = "\n".join(str(output).splitlines()[-200:])
             logs.append(f"## gate `{name}` fail\n\n$ {cmd}\n\n```\n{tail}\n```\n")
+    _stage(ctx, out_dir)
+    if ctx.git("write-tree").stdout.strip() != tree_before:
+        ok_all = False
+        rows.append("| (working tree) | ❌ | — |")
+        logs.append("## gate làm đổi working tree\n\nFile bị sửa/thêm trong lúc chạy gate — "
+                    "giữ nguyên bản đã kiểm tra trước gate.\n")
+        ctx.git("read-tree", tree_before)
     result = "pass" if ok_all else "fail"
     table = "### 🚦 Gates\n\n| Gate | Kết quả | Thời gian |\n|---|---|---|\n" + "\n".join(
         rows or ["| (không có gate) | ✅ | — |"]
@@ -883,6 +903,46 @@ def _publish_failed(
     return 0
 
 
+def _is_ancestor(ctx: Ctx, sha: str, ref: str) -> bool:
+    return ctx.git("merge-base", "--is-ancestor", sha, ref, check=False).returncode == 0
+
+
+def _validate_meta(ctx: Ctx, meta: dict[str, Any], mode: str, issue_n: int, pr: str) -> str | None:
+    """meta.json đến từ job agent (không tin cậy) → đối chiếu với input của
+    workflow + trạng thái GitHub trước khi dùng làm ref push. Trả lý do nếu sai."""
+    cfg = ctx.cfg
+    branch, base_sha = str(meta.get("branch") or ""), str(meta.get("base_sha") or "")
+    merge_parent = str(meta.get("merge_parent") or "")
+    if str(meta.get("issue")) != str(issue_n):
+        return f"meta.json ghi issue `{meta.get('issue')}` ≠ #{issue_n}"
+    if not re.fullmatch(r"[0-9a-f]{40}", base_sha):
+        return "meta.json có base_sha không hợp lệ"
+    if merge_parent and not re.fullmatch(r"[0-9a-f]{40}", merge_parent):
+        return "meta.json có merge_parent không hợp lệ"
+    base = cfg.base_branch
+    ctx.git("fetch", "-q", "origin", f"+refs/heads/{base}:refs/remotes/origin/{base}", check=False)
+    if mode == "fix":
+        if not pr:
+            return "mode fix nhưng thiếu số PR"
+        head = (ctx.gh.api(f"pulls/{pr}") or {}).get("head") or {}
+        if head.get("ref") != branch or not branch.startswith(cfg.branch_prefix):
+            return f"branch `{branch}` không phải head của PR #{pr}"
+        if (head.get("repo") or {}).get("full_name") not in (None, ctx.repo):
+            return f"PR #{pr} đến từ fork — không push"
+        ctx.git("fetch", "-q", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+                check=False)
+        anchor = f"origin/{branch}"
+    else:
+        if not re.fullmatch(rf"{re.escape(cfg.branch_prefix)}{issue_n}-[a-z0-9-]+", branch):
+            return f"branch `{branch}` không khớp mẫu `{cfg.branch_prefix}{issue_n}-…`"
+        anchor = f"origin/{base}"
+    if not _is_ancestor(ctx, base_sha, anchor):
+        return f"base_sha không nằm trên `{anchor}`"
+    if merge_parent and not _is_ancestor(ctx, merge_parent, f"origin/{base}"):
+        return f"merge_parent không nằm trên `origin/{base}`"
+    return None
+
+
 def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -> int:
     cfg = ctx.cfg
     labels = cfg.labels
@@ -893,7 +953,9 @@ def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -
         return p.read_text(encoding="utf-8", errors="replace").strip() if p.exists() else default
 
     summary, questions = read("summary.md"), read("questions.md")
-    status = (read("status") or "done").lower()
+    # Chỉ ``done`` mới được publish: thiếu file status = agent bị ngắt giữa chừng
+    # (timeout / hết max_turns) → không mở PR cho code dở dang.
+    status = ((read("status").split() or [""])[0]).lower().rstrip(".:")
     gates_md, gates_result = read("gates.md"), read("gates_result", "fail")
     fail_args = {"summary": summary, "questions": questions}
 
@@ -907,10 +969,19 @@ def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -
     if status.startswith("blocked"):
         return _publish_failed(ctx, mode, issue_n, pr, "agent tự báo blocked (thiếu thông tin)",
                                **fail_args)
+    if status != "done":
+        return _publish_failed(ctx, mode, issue_n, pr,
+                               "agent không ghi status `done` (bị ngắt / timeout / hết turn?)",
+                               **fail_args)
     patch = out / "patch.diff"
     if not patch.exists() or patch.stat().st_size == 0:
         return _publish_failed(ctx, mode, issue_n, pr, "agent không tạo ra thay đổi nào",
                                **fail_args)
+    bad_meta = _validate_meta(ctx, meta, mode, issue_n, pr)
+    if bad_meta:
+        _publish_failed(ctx, mode, issue_n, pr, "meta.json không hợp lệ — không push",
+                        extra=bad_meta, **fail_args)
+        return 1
 
     base_sha, merge_parent = meta["base_sha"], meta.get("merge_parent") or ""
     co = ctx.git("checkout", "-q", "--detach", base_sha, check=False)

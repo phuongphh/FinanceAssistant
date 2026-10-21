@@ -111,6 +111,16 @@ jobs:
           echo "MAX_TURNS=$($LOOP config-get limits.max_turns --default 80)" >> "$GITHUB_ENV"
           echo "ALLOWED_TOOLS=$($LOOP config-get claude.allowed_tools --join ,)" >> "$GITHUB_ENV"
 
+      # Test do Claude tự chạy (lúc token Claude đang nằm trong env) phải chạy
+      # trong sandbox: không network, user nobody, env trống → conftest/test độc
+      # không đọc được token hay gửi gì ra ngoài. Lấy script từ bản snapshot.
+      - name: Sandbox cho pytest của agent
+        run: |
+          sudo install -m 0755 -o root -g root \
+            "$RUNNER_TEMP/_loop/scripts/agent_loop/sandbox_pytest.sh" /usr/local/bin/sandbox-pytest
+          chmod -R o+rX "$GITHUB_WORKSPACE"
+          d="$GITHUB_WORKSPACE"; while [ "$d" != / ]; do sudo chmod o+x "$d"; d=$(dirname "$d"); done
+
       - name: Claude — implement
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -148,8 +158,9 @@ jobs:
         if: always()
         run: |
           [ -n "${BASE_SHA:-}" ] || exit 0
-          git add -A
-          git reset -q -- "$OUT"
+          # Index = đúng tree run-gates đã kiểm tra (KHÔNG add lại: file gate
+          # sinh ra sau khi kiểm tra không được lọt vào patch).
+          [ -f "$OUT/gates_result" ] || { echo "gates chưa chạy xong — không xuất patch"; exit 0; }
           git diff --cached --binary "$BASE_SHA" > "$OUT/patch.diff"
           echo "patch: $(wc -l < "$OUT/patch.diff") dòng"
 

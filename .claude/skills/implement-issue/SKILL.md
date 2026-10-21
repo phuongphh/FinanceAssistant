@@ -32,6 +32,9 @@ Thiết kế tổng thể: `docs/architecture/loop-engineering.md`.
 - Không skip / xoá / `xfail` test có sẵn để cho xanh.
 - Bạn không có network: không `pip install`, không gọi API. Thiếu thư viện →
   `blocked` (xem mục 4).
+- Chạy test **chỉ** bằng `sandbox-pytest …` (không có `pytest` trần). Sandbox
+  không có network, chạy bằng user `nobody`, env trống, workspace chỉ đọc —
+  test phải ghi file vào `tmp_path`, không ghi vào repo.
 
 ## 1. Đọc trước khi code
 
@@ -63,8 +66,8 @@ Thiết kế tổng thể: `docs/architecture/loop-engineering.md`.
    những gì issue không yêu cầu, không refactor lan man.
 2. Code + **test** (pytest, đặt trong `tests/` theo cấu trúc hiện có).
    Mỗi Acceptance Criterion nên có ít nhất 1 test.
-3. Chạy test liên quan: `python -m pytest -q -p no:cacheprovider tests/<thư mục>`.
-   Sau đó chạy toàn bộ: `python -m pytest -q -p no:cacheprovider -x`.
+3. Chạy test liên quan: `sandbox-pytest -q tests/<thư mục>`.
+   Sau đó chạy toàn bộ: `sandbox-pytest -q -x`.
 4. `ruff check --select E9,F63,F7,F82 <file .py đã sửa>`.
 5. `git status` / `git diff` để tự review: có file thừa, debug code, secret không?
 6. Ghi output (mục 5).
@@ -106,7 +109,7 @@ Workflow đọc đúng các file này (tên file chính xác):
 
 | File | Nội dung |
 |---|---|
-| `status` | Một từ: `done` hoặc `blocked` |
+| `status` | Một từ: `done` hoặc `blocked`. Thiếu file hoặc giá trị khác → coi như chưa xong, **không** mở PR |
 | `summary.md` | Mô tả cho PR (xem mẫu dưới). **Bắt buộc có mục `## Cách test tay`** — mục này được gửi qua Telegram |
 | `questions.md` | Câu hỏi / điểm cần người quyết định. Không có thì bỏ trống hoặc không tạo |
 | `commit_message.txt` | **1 dòng** conventional commit, có `#<số issue>`. VD: `feat(budget): cảnh báo vượt ngân sách tuần (#123)` |

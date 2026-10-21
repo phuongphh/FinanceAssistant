@@ -152,21 +152,31 @@ Các bước job `agent`:
    Mode fix: checkout branch PR, merge main vào (nếu conflict thì để marker cho
    Claude xử lý).
 4. `claude -p` với `--max-turns 80`, `--allowedTools` hẹp (Read/Edit/Write/
-   Glob/Grep + Bash cho pytest/ruff/git status|diff|log/ls/mkdir — **không** có
-   network, không `git commit/push`).
+   Glob/Grep + Bash cho `sandbox-pytest`/ruff/git status|diff|log/ls/mkdir —
+   không `git commit/push`). Test Claude tự chạy đi qua `sandbox-pytest`
+   (`scripts/agent_loop/sandbox_pytest.sh`): network namespace riêng (không ra
+   ngoài được), user `nobody`, env trống → code test do agent viết không đọc
+   được token Claude và không gửi được gì ra ngoài. Thiếu `sudo`/`unshare` →
+   script từ chối chạy (fail closed), không lùi về pytest thường.
 5. **Gates** → fail thì Claude sửa **1 lần** (bỏ qua nếu agent đã báo
-   `blocked`) → gates lần 2.
-6. Xuất `patch.diff` (so với `base_sha`) + upload artifact `agent-out` (giữ 7 ngày,
-   xem lại log Claude ở đây khi cần debug).
+   `blocked`) → gates lần 2. Bước gates không có secret nào trong env. Trước
+   khi chạy gate, index được chụp lại (`git write-tree`); gate nào làm đổi
+   working tree → gates `fail` và index trả về bản đã kiểm tra.
+6. Xuất `patch.diff` từ **đúng index đã qua gate** (so với `base_sha`) + upload
+   artifact `agent-out` (giữ 7 ngày, xem lại log Claude ở đây khi cần debug).
 
 Job `publish`:
 
-1. `git apply` patch → **guard** → commit (tác giả `be-tien-agent`) → push
+1. Kiểm tra `meta.json` (issue khớp input, `base_sha`/`merge_parent` là
+   commit thật nằm trong lịch sử base/branch, tên branch đúng mẫu
+   `agent/issue-N-…`; mode fix: branch phải là head của PR, không phải fork).
+   `status` phải đúng `done` — thiếu file hay giá trị lạ → không mở PR.
+2. `git apply` patch → **guard** → commit (tác giả `be-tien-agent`) → push
    `agent/issue-N-slug`.
-2. Mở PR `[agent] #N <title>` với `Closes #N`, body = `summary.md` + kết quả
+3. Mở PR `[agent] #N <title>` với `Closes #N`, body = `summary.md` + kết quả
    gates + câu hỏi. Gates fail → PR **draft** + label `agent:needs-fix`.
-3. Telegram: link PR + mục **🧪 Cách test tay** + câu hỏi của agent.
-4. Agent báo `blocked` hoặc guard chặn → **không** mở PR, gắn `agent:blocked`,
+4. Telegram: link PR + mục **🧪 Cách test tay** + câu hỏi của agent.
+5. Agent báo `blocked` (hoặc thiếu `status`) hoặc guard chặn → **không** mở PR, gắn `agent:blocked`,
    comment câu hỏi lên issue, báo Telegram.
 
 ### Gates (trong `agent-loop.yml`)
