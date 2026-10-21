@@ -1,0 +1,212 @@
+# Agent loop — worker: code 1 issue (mode=implement) hoặc sửa 1 PR agent (mode=fix).
+#
+# Chỉ được gọi bởi agent-dispatch.yml / agent-events.yml (workflow_dispatch).
+# Tách 2 job để cô lập secret:
+#   agent   — KHÔNG có token GitHub ghi được. Claude code, chạy gates, xuất patch.diff.
+#             Dù bị prompt-injection qua nội dung issue, cũng không push/đổi gì được.
+#   publish — có PAT nhưng KHÔNG chạy code của agent: chỉ apply patch → guard
+#             (chặn .env, .github/, migration cũ) → commit → push → PR → Telegram.
+#
+# run-name phải giữ đúng format "agent #<issue> (<mode>)" — cli.py dùng nó để đếm
+# run đang chạy và run trong ngày.
+
+name: Agent Worker
+run-name: 'agent #${{ inputs.issue }} (${{ inputs.mode }})'
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'implement | fix'
+        type: string
+        required: true
+      issue:
+        description: 'Số issue (US)'
+        type: string
+        required: true
+      pr:
+        description: 'Số PR (mode=fix)'
+        type: string
+        default: ''
+      comment_id:
+        description: 'Comment "/agent fix ..." kích hoạt run này'
+        type: string
+        default: ''
+      ci_run:
+        description: 'Run id của CI fail'
+        type: string
+        default: ''
+
+permissions: {}
+
+concurrency:
+  group: agent-worker-${{ inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    env:
+      MODE: ${{ inputs.mode }}
+      ISSUE: ${{ inputs.issue }}
+      PR: ${{ inputs.pr }}
+      COMMENT_ID: ${{ inputs.comment_id }}
+      CI_RUN: ${{ inputs.ci_run }}
+      OUT: .agent-out
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Git identity (local only — job này không push)
+        run: |
+          git config user.name "agent-loop"
+          git config user.email "agent-loop@users.noreply.github.com"
+
+      # Chụp lại loop + config TRƯỚC khi Claude chạy: các bước sau dùng bản này,
+      # Claude sửa file trong working tree cũng không đổi được gates.
+      - name: Snapshot loop tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/_loop/scripts" "$RUNNER_TEMP/_loop/.github"
+          cp -r scripts/agent_loop "$RUNNER_TEMP/_loop/scripts/"
+          cp .github/agent-loop.yml "$RUNNER_TEMP/_loop/.github/" 2>/dev/null || true
+          echo "LOOP=python -m agent_loop.cli --config $RUNNER_TEMP/_loop/.github/agent-loop.yml" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$RUNNER_TEMP/_loop/scripts" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt \
+            || (grep -v '^vnstock' backend/requirements.txt > "$RUNNER_TEMP/req.txt" \
+                && pip install -r "$RUNNER_TEMP/req.txt")
+          pip install pytest pytest-asyncio pyyaml ruff
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: npm i -g @anthropic-ai/claude-code
+
+      - name: Prepare branch + task.md
+        id: prep
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $LOOP prepare --mode "$MODE" --issue "$ISSUE" --pr "$PR" \
+            --comment-id "$COMMENT_ID" --ci-run "$CI_RUN" --out "$OUT"
+          echo "BASE_SHA=$(python -c 'import json;print(json.load(open(".agent-out/meta.json"))["base_sha"])')" >> "$GITHUB_ENV"
+          echo "MAX_TURNS=$($LOOP config-get limits.max_turns --default 80)" >> "$GITHUB_ENV"
+          echo "ALLOWED_TOOLS=$($LOOP config-get claude.allowed_tools --join ,)" >> "$GITHUB_ENV"
+
+      - name: Claude — implement
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Đọc .agent-out/task.md và thực hiện đúng yêu cầu trong đó." \
+            --max-turns "$MAX_TURNS" --allowedTools "$ALLOWED_TOOLS" \
+            | tee "$OUT/claude-1.log" || true
+
+      - name: Gates
+        id: gates
+        run: $LOOP run-gates --out "$OUT"
+
+      - name: Claude — sửa theo gate fail (1 lần)
+        id: retry
+        if: steps.gates.outputs.result == 'fail'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if grep -qi '^blocked' "$OUT/status" 2>/dev/null; then
+            echo "Agent đã báo blocked — không retry."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          claude -p "Gates vừa fail. Đọc .agent-out/task.md (yêu cầu gốc), .agent-out/gate-log.txt (lỗi) và sửa code cho pass. Cập nhật lại .agent-out/summary.md nếu cần." \
+            --max-turns "$MAX_TURNS" --allowedTools "$ALLOWED_TOOLS" \
+            | tee "$OUT/claude-2.log" || true
+
+      - name: Gates (lần 2)
+        if: steps.gates.outputs.result == 'fail' && steps.retry.outputs.skipped != 'true'
+        run: $LOOP run-gates --out "$OUT"
+
+      - name: Export patch
+        if: always()
+        run: |
+          [ -n "${BASE_SHA:-}" ] || exit 0
+          git add -A
+          git reset -q -- "$OUT"
+          git diff --cached --binary "$BASE_SHA" > "$OUT/patch.diff"
+          echo "patch: $(wc -l < "$OUT/patch.diff") dòng"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-out
+          path: .agent-out/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: ignore
+
+  publish:
+    needs: agent
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      LOOP_TELEGRAM_BOT_TOKEN: ${{ secrets.LOOP_TELEGRAM_BOT_TOKEN }}
+      LOOP_TELEGRAM_CHAT_ID: ${{ secrets.LOOP_TELEGRAM_CHAT_ID }}
+      MODE: ${{ inputs.mode }}
+      ISSUE: ${{ inputs.issue }}
+      PR: ${{ inputs.pr }}
+    steps:
+      # Tooling lấy từ base branch (không phải từ patch của agent).
+      - uses: actions/checkout@v4
+        with:
+          path: _loop
+          persist-credentials: false
+
+      - uses: actions/checkout@v4
+        with:
+          path: work
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: agent-out
+          path: ${{ runner.temp }}/agent-out
+
+      - name: Publish (guard → commit → push → PR → Telegram)
+        working-directory: work
+        env:
+          PYTHONPATH: ${{ github.workspace }}/_loop/scripts
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-out"
+          python -m agent_loop.cli --config "$GITHUB_WORKSPACE/_loop/.github/agent-loop.yml" \
+            publish --out "$RUNNER_TEMP/agent-out" --mode "$MODE" --issue "$ISSUE" --pr "$PR"

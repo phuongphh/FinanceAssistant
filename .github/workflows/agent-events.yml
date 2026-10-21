@@ -1,0 +1,66 @@
+# Agent loop — phản ứng với comment và CI.
+#
+#   /agent fix <ghi chú>   (comment trên PR agent/*)  → worker mode=fix
+#   /agent retry           (comment trên issue)       → gắn lại agent:ready
+#   CI fail trên branch agent/*                       → tự sửa tối đa max_auto_fix lần
+#
+# Chỉ nhận lệnh từ OWNER / MEMBER / COLLABORATOR (kiểm tra trong cli.py).
+# Luôn checkout base branch — KHÔNG chạy code từ PR.
+
+name: Agent Events
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  comment:
+    if: >-
+      vars.AGENT_LOOP_ENABLED == 'true' &&
+      github.event_name == 'issue_comment' &&
+      startsWith(github.event.comment.body, '/agent ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      LOOP_TELEGRAM_BOT_TOKEN: ${{ secrets.LOOP_TELEGRAM_BOT_TOKEN }}
+      LOOP_TELEGRAM_CHAT_ID: ${{ secrets.LOOP_TELEGRAM_CHAT_ID }}
+      PYTHONPATH: scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pyyaml
+      - run: python -m agent_loop.cli on-comment
+
+  ci:
+    if: >-
+      vars.AGENT_LOOP_ENABLED == 'true' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      startsWith(github.event.workflow_run.head_branch, 'agent/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      LOOP_TELEGRAM_BOT_TOKEN: ${{ secrets.LOOP_TELEGRAM_BOT_TOKEN }}
+      LOOP_TELEGRAM_CHAT_ID: ${{ secrets.LOOP_TELEGRAM_CHAT_ID }}
+      PYTHONPATH: scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pyyaml
+      - run: python -m agent_loop.cli on-ci-fail
