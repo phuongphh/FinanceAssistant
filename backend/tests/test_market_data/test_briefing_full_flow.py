@@ -113,6 +113,7 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
         redis,
     )
     crypto_provider = _StaticProvider("coingecko", "crypto", {"BTC": Decimal("550000000")})
+    gold_provider = _StaticProvider("sjc", "gold", {"SJC_GOLD": Decimal("92000000")})
     gold_quote = PriceQuote("SJC_GOLD", Decimal("92000000"), "VND", "gold", datetime(2026, 5, 8, tzinfo=timezone.utc), "sjc")
 
     async def _get_crypto_quote(symbol: str) -> PriceQuote:
@@ -132,6 +133,8 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
          patch("backend.market_data.client.get_price_cache", return_value=cache), \
          patch("backend.market_data.client.get_stock_provider", return_value=stock_provider), \
          patch("backend.market_data.client.get_crypto_provider", return_value=crypto_provider), \
+         patch("backend.market_data.client.get_fast_crypto_provider", return_value=crypto_provider), \
+         patch("backend.market_data.client.get_gold_provider", return_value=gold_provider), \
          patch("backend.briefing.morning_briefing.get_crypto_quote", side_effect=_get_crypto_quote), \
          patch("backend.briefing.morning_briefing.get_gold_quote", side_effect=_get_gold_quote), \
          patch("backend.briefing.morning_briefing.get_relevant_news", AsyncMock(return_value=[])):
@@ -146,7 +149,7 @@ async def test_briefing_full_flow_provider_cache_wealth_and_sections():
     assert "VNM" in result.text
     assert "BTC" in result.text
     assert "SJC" in result.text
-    assert "150tr455" in result.sections["net_worth"]
+    assert "157tr455" in result.sections["net_worth"]
     assert await redis.get("market_data:stock:VNM") is not None
     assert await redis.get("market_data:crypto:BTC") is not None
     assert result.is_stale is False
