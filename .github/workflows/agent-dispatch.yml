@@ -1,0 +1,89 @@
+# Agent loop — dispatcher.
+#
+# Mỗi lần chạy:
+#   1. on-event: dọn label khi PR agent merged/closed, update-branch PR agent bị
+#      behind main, gỡ agent:wip mồ côi (worker chết / PR đã đóng).
+#   2. select:   chọn issue agent:ready theo WIP / area / priority → gắn agent:wip
+#      → dispatch agent-worker.yml.
+#
+# Bật/tắt: repo variable AGENT_LOOP_ENABLED = 'true'. Chạy tay với dry_run để
+# xem dispatcher SẼ chọn gì mà không đổi gì (kể cả khi loop đang tắt).
+#
+# Thiết kế: docs/architecture/loop-engineering.md
+
+name: Agent Dispatch
+
+on:
+  schedule:
+    # 7h–23h giờ VN (UTC+7), mỗi 30 phút — lưới an toàn khi bị lỡ event.
+    - cron: '*/30 0-16 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Bỏ qua active_hours'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Chỉ in ra sẽ chọn issue nào, không đổi gì'
+        type: boolean
+        default: false
+  issues:
+    types: [labeled, closed]
+  pull_request:
+    types: [closed]
+  push:
+    branches: [main]
+    # issue-lifecycle.yml commit docs/issues/ lên main mỗi lần đổi label →
+    # không ignore thì loop tự kích hoạt chính nó liên tục.
+    paths-ignore:
+      - 'docs/issues/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >-
+      (vars.AGENT_LOOP_ENABLED == 'true' || inputs.dry_run == true) &&
+      (github.event_name != 'issues' ||
+       github.event.action == 'closed' ||
+       github.event.label.name == 'agent:ready')
+    env:
+      # PAT: dispatch workflow + đổi label + Project. GITHUB_TOKEN không trigger được
+      # workflow khác.
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      LOOP_TELEGRAM_BOT_TOKEN: ${{ secrets.LOOP_TELEGRAM_BOT_TOKEN }}
+      LOOP_TELEGRAM_CHAT_ID: ${{ secrets.LOOP_TELEGRAM_CHAT_ID }}
+      PYTHONPATH: scripts
+      DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+      FORCE: ${{ inputs.force == true && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Handle event (dọn label, update-branch, reconcile)
+        run: |
+          ARGS=()
+          [ "$DRY_RUN" = "true" ] && ARGS+=(--dry-run)
+          python -m agent_loop.cli on-event "${ARGS[@]}"
+
+      - name: Select + dispatch worker
+        run: |
+          ARGS=()
+          [ "$DRY_RUN" = "true" ] && ARGS+=(--dry-run)
+          [ "$FORCE" = "true" ] && ARGS+=(--force)
+          python -m agent_loop.cli select "${ARGS[@]}"

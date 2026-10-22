@@ -1,0 +1,75 @@
+# Cấu hình Loop Engineering (coding agent tự nhặt issue → PR).
+# Đọc bởi scripts/agent_loop/config.py — mọi key đều optional, thiếu thì dùng default.
+# Chi tiết: docs/architecture/loop-engineering.md
+
+project:                 # GitHub Project V2 để đọc Priority + set Status
+  owner: phuongphh
+  number: 4
+  status_field: Status
+  in_progress: In Progress
+  priority_field: Priority
+  priority_order: [P0, P1, P2, P3]
+
+limits:
+  wip_limit: 2           # tối đa bao nhiêu issue agent:wip cùng lúc (tính cả PR chờ review)
+  daily_run_cap: 12      # tối đa bao nhiêu lần chạy worker / ngày (implement + fix)
+  max_turns: 80          # --max-turns cho Claude CLI
+  max_auto_fix: 2        # số lần tự sửa (CI fail / conflict) cho mỗi PR trước khi gọi người
+  gate_timeout_sec: 1800
+
+areas:                   # US khác area chạy song song; cùng area thì tuần tự
+  prefix: "area:"
+  default: area:general
+  exclusive: [area:db]   # đang có 1 issue area:db thì không nhặt thêm gì khác
+
+branch_prefix: agent/issue-
+base_branch: main
+timezone: Asia/Ho_Chi_Minh
+active_hours: [7, 23]    # chỉ nhặt việc mới trong khung giờ này (giờ VN)
+auto_update_branch: true # PR agent bị behind main → tự update-branch
+auto_fix_ci: true        # CI fail trên PR agent → tự dispatch worker mode=fix
+ci_workflows: [CI]       # tên workflow CI (khớp agent-events.yml)
+
+# Gates chạy trong job agent sau khi Claude code xong. Fail → Claude được sửa 1 lần,
+# vẫn fail → PR mở dạng draft. $BASE_SHA = commit main lúc bắt đầu.
+gates:
+  pytest: python -m pytest -q -p no:cacheprovider -x --maxfail=20
+  # Repo đang có sẵn nhiều lỗi ruff → chỉ check lỗi nghiêm trọng trên file .py thay đổi.
+  ruff: git diff --cached --name-only --diff-filter=AM "$BASE_SHA" -- '*.py' | xargs -r ruff check --select E9,F63,F7,F82
+
+# Guard chạy trong job publish (job có PAT) trên patch của agent. Vi phạm → không push.
+guard:
+  forbidden:
+    - .env
+    - .env.*
+    - .github/**
+    - scripts/agent_loop/**
+    - .claude/skills/implement-issue/**
+  allowed:
+    - .env.example
+  immutable_existing:    # file đã có trên main thì không được sửa/xoá; file mới chỉ cảnh báo
+    - alembic/versions/**
+
+skill: .claude/skills/implement-issue/SKILL.md
+
+commit_identity:
+  name: be-tien-agent
+  email: agent-loop@users.noreply.github.com
+
+claude:
+  # Tool Claude được dùng trong job agent (không có network tool, không có git commit/push).
+  # Test chỉ chạy qua `sandbox-pytest` (không network, user nobody, env trống) —
+  # KHÔNG cho `pytest` trần vì lúc đó token Claude đang nằm trong env.
+  allowed_tools:
+    - Read
+    - Edit
+    - Write
+    - Glob
+    - Grep
+    - "Bash(sandbox-pytest:*)"
+    - "Bash(ruff:*)"
+    - "Bash(git status:*)"
+    - "Bash(git diff:*)"
+    - "Bash(git log:*)"
+    - "Bash(ls:*)"
+    - "Bash(mkdir:*)"
