@@ -36,7 +36,7 @@ jobs:
       # -------------------------------------------------------
       - name: Extract linked issue numbers
         id: extract
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           script: |
             const issueNumbers = new Set();
@@ -91,7 +91,7 @@ jobs:
       # -------------------------------------------------------
       - name: Move issues to Done and close
         if: steps.extract.outputs.issue_numbers != ''
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |

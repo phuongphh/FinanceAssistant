@@ -64,11 +64,11 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
       FORCE: ${{ inputs.force == true && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
