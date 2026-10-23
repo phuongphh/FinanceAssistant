@@ -486,6 +486,11 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #924 | Chưa gắn phase | [UI] Redesign card-style edit screens: full-width content + ✏️ Sửa / 🗑 Xoá action row | [unphased/issue-924.md](by-phase/unphased/issue-924.md) |
 | #927 | Chưa gắn phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [unphased/issue-927.md](by-phase/unphased/issue-927.md) |
 | #948 | Chưa gắn phase | Expense source: e_wallet missing e_wallet_provider (CheckViolation) + amount parse error | [unphased/issue-948.md](by-phase/unphased/issue-948.md) |
+| #959 | Phase 4.5 | [Epic 1 / Phase 4.5] Shock Simulation + Liquidation Advice ⭐ | [phase-4.5/issue-959.md](by-phase/phase-4.5/issue-959.md) |
+| #960 | Phase 4.5 | [Epic 2 / Phase 4.5] Plan-to-Goal Feasibility Q&A | [phase-4.5/issue-960.md](by-phase/phase-4.5/issue-960.md) |
+| #961 | Phase 4.5 | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [phase-4.5/issue-961.md](by-phase/phase-4.5/issue-961.md) |
+| #962 | Phase 4.5 | [Epic 4 / Phase 4.5] Quick Wins: Excel Export + Tone Dial | [phase-4.5/issue-962.md](by-phase/phase-4.5/issue-962.md) |
+| #963 | Phase 4.5 | [Epic 5 / Phase 4.5] Decision Query Log + Re-engagement Một Lần | [phase-4.5/issue-963.md](by-phase/phase-4.5/issue-963.md) |
 | #964 | Phase 4.5 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [phase-4.5/issue-964.md](by-phase/phase-4.5/issue-964.md) |
 | #965 | Phase 4.5 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4.5/issue-965.md](by-phase/phase-4.5/issue-965.md) |
 | #966 | Phase 4.5 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [phase-4.5/issue-966.md](by-phase/phase-4.5/issue-966.md) |
@@ -524,5 +529,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1028 | Phase 5.0 | [Phase 5.0 — chặn gate] Lời mời Telegram từ Zalo không mang danh tính → tạo user thứ hai, tách đôi dữ liệu tài chính | [phase-5.0/issue-1028.md](by-phase/phase-5.0/issue-1028.md) |
 | #1029 | Phase 5.0 | [Phase 5.0 — chặn gate] 4 lỗ robustness Zalo cần đóng trước khi bật ZALO_CHANNEL_ENABLED | [phase-5.0/issue-1029.md](by-phase/phase-5.0/issue-1029.md) |
 
-**Total:** 519 closed issues
-(7 Phase 1, 9 Phase 2, 27 Phase 3.5, 16 Phase 3.6, 16 Phase 3.7, 19 Phase 3.8, 11 Phase 3.8.5, 26 Phase 3.9, 24 Phase 3.9.5, 31 Phase 3A, 54 Phase 4.1, 16 Phase 4.2, 30 Phase 4.2.5, 19 Phase 4.3, 2 Phase 4.4, 17 Phase 4.5, 8 Phase 4.6, 6 Phase 4.7, 33 Phase 4A, 28 Phase 4B, 2 Phase 5.0, 118 Chưa gắn phase)
+**Total:** 524 closed issues
+(7 Phase 1, 9 Phase 2, 27 Phase 3.5, 16 Phase 3.6, 16 Phase 3.7, 19 Phase 3.8, 11 Phase 3.8.5, 26 Phase 3.9, 24 Phase 3.9.5, 31 Phase 3A, 54 Phase 4.1, 16 Phase 4.2, 30 Phase 4.2.5, 19 Phase 4.3, 2 Phase 4.4, 22 Phase 4.5, 8 Phase 4.6, 6 Phase 4.7, 33 Phase 4A, 28 Phase 4B, 2 Phase 5.0, 118 Chưa gắn phase)

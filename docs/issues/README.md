@@ -60,15 +60,15 @@ _Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa
 | Phase 4.2.5 | 30 | [`closed/by-phase/phase-4.2.5/`](closed/by-phase/phase-4.2.5/) |
 | Phase 4.3 | 19 | [`closed/by-phase/phase-4.3/`](closed/by-phase/phase-4.3/) |
 | Phase 4.4 | 2 | [`closed/by-phase/phase-4.4/`](closed/by-phase/phase-4.4/) |
-| Phase 4.5 | 17 | [`closed/by-phase/phase-4.5/`](closed/by-phase/phase-4.5/) |
+| Phase 4.5 | 22 | [`closed/by-phase/phase-4.5/`](closed/by-phase/phase-4.5/) |
 | Phase 4.6 | 8 | [`closed/by-phase/phase-4.6/`](closed/by-phase/phase-4.6/) |
 | Phase 4.7 | 6 | [`closed/by-phase/phase-4.7/`](closed/by-phase/phase-4.7/) |
 | Phase 4A | 33 | [`closed/by-phase/phase-4a/`](closed/by-phase/phase-4a/) |
 | Phase 4B | 28 | [`closed/by-phase/phase-4b/`](closed/by-phase/phase-4b/) |
 | Phase 5.0 | 2 | [`closed/by-phase/phase-5.0/`](closed/by-phase/phase-5.0/) |
 | Chưa gắn phase | 118 | [`closed/by-phase/unphased/`](closed/by-phase/unphased/) |
-| **Total closed** | **519** | [`closed/INDEX.md`](closed/INDEX.md) |
-| Active (đang mở) | 7 | [`active/INDEX.md`](active/INDEX.md) |
+| **Total closed** | **524** | [`closed/INDEX.md`](closed/INDEX.md) |
+| Active (đang mở) | 2 | [`active/INDEX.md`](active/INDEX.md) |
 <!-- STATS:END -->
 
 ---
