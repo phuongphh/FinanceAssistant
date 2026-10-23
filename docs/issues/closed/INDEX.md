@@ -481,6 +481,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #927 | Pre-Phase | Tier 3 reports leak English category/jargon tokens into Vietnamese output | [pre-phase/issue-927.md](by-phase/pre-phase/issue-927.md) |
 | #959 | Pre-Phase | [Epic 1 / Phase 4.5] Shock Simulation + Liquidation Advice ⭐ | [pre-phase/issue-959.md](by-phase/pre-phase/issue-959.md) |
 | #960 | Pre-Phase | [Epic 2 / Phase 4.5] Plan-to-Goal Feasibility Q&A | [pre-phase/issue-960.md](by-phase/pre-phase/issue-960.md) |
+| #961 | Pre-Phase | [Epic 3 / Phase 4.5] Độ Nét Meter v1 | [pre-phase/issue-961.md](by-phase/pre-phase/issue-961.md) |
 | #964 | Phase 4 | [Phase 4.5 / E3] 3.1 — clarity_service.compute_clarity() | [phase-4/issue-964.md](by-phase/phase-4/issue-964.md) |
 | #965 | Phase 4 | [Phase 4.5 / E3] 3.2 — Surface độ nét trên Twin payload + Telegram view | [phase-4/issue-965.md](by-phase/phase-4/issue-965.md) |
 | #966 | Phase 4 | [Phase 4.5 / E3] 3.3 — Humble mode + prompt "làm nét thêm" | [phase-4/issue-966.md](by-phase/phase-4/issue-966.md) |
@@ -519,5 +520,5 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1028 | Phase 5 | [Phase 5.0 — chặn gate] Lời mời Telegram từ Zalo không mang danh tính → tạo user thứ hai, tách đôi dữ liệu tài chính | [phase-5/issue-1028.md](by-phase/phase-5/issue-1028.md) |
 | #1029 | Phase 5 | [Phase 5.0 — chặn gate] 4 lỗ robustness Zalo cần đóng trước khi bật ZALO_CHANNEL_ENABLED | [phase-5/issue-1029.md](by-phase/phase-5/issue-1029.md) |
 
-**Total:** 514 closed issues
-(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 2 Phase 5, 467 Pre-Phase)
+**Total:** 515 closed issues
+(7 Phase 1, 9 Phase 2, 1 Phase 3A, 28 Phase 4, 2 Phase 5, 468 Pre-Phase)
