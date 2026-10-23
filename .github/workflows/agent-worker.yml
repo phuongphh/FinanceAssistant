@@ -60,7 +60,7 @@ jobs:
       CI_RUN: ${{ inputs.ci_run }}
       OUT: .agent-out
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -80,7 +80,7 @@ jobs:
           echo "LOOP=python -m agent_loop.cli --config $RUNNER_TEMP/_loop/.github/agent-loop.yml" >> "$GITHUB_ENV"
           echo "PYTHONPATH=$RUNNER_TEMP/_loop/scripts" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
@@ -93,9 +93,9 @@ jobs:
                 && pip install -r "$RUNNER_TEMP/req.txt")
           pip install pytest pytest-asyncio pyyaml ruff
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Claude Code CLI
         run: npm i -g @anthropic-ai/claude-code
@@ -164,7 +164,7 @@ jobs:
           git diff --cached --binary "$BASE_SHA" > "$OUT/patch.diff"
           echo "patch: $(wc -l < "$OUT/patch.diff") dòng"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: agent-out
@@ -189,25 +189,25 @@ jobs:
       PR: ${{ inputs.pr }}
     steps:
       # Tooling lấy từ base branch (không phải từ patch của agent).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: _loop
           persist-credentials: false
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: work
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       - name: Install deps
         run: pip install pyyaml
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         continue-on-error: true
         with:
           name: agent-out

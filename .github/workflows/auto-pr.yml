@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # -------------------------------------------------------
       # BƯỚC 1: Lấy TẤT CẢ issue numbers từ branch và commits
@@ -95,7 +95,7 @@ jobs:
       - name: Expand parent issues with sub-issues
         id: expand
         if: steps.extract.outputs.issue_numbers != ''
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
@@ -187,7 +187,7 @@ jobs:
       # -------------------------------------------------------
       - name: Move issues to In Progress
         if: steps.expand.outputs.issue_numbers != ''
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
