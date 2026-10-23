@@ -92,9 +92,8 @@ docs/
 │   └── closed/
 │       ├── INDEX.md                       ← issue# → phase → title
 │       └── by-phase/
-│           ├── pre-phase/                 ← V1 features
-│           ├── phase-1/                   ← Phase 1 closed issues
-│           └── phase-2/                   ← Phase 2 closed issues
+│           ├── phase-1/ … phase-5.0/      ← Closed issues theo phase (tự sync)
+│           └── unphased/                  ← Issue lẻ không xác định được phase
 └── archive/                               ← Historical (don't delete!)
     ├── MIGRATION_NOTES.md
     └── v1-finance-assistant/

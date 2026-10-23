@@ -1,6 +1,6 @@
 # Issues — Index & Navigation
 
-Lưu trữ chi tiết các GitHub issues của Personal CFO Assistant theo phase. Mỗi file `issue-<number>.md` là snapshot nội dung của 1 issue (user story, acceptance criteria, kết quả review).
+Lưu trữ chi tiết các GitHub issues của Bé Tiền theo phase. Mỗi file `issue-<number>.md` là snapshot nội dung của 1 issue (user story, acceptance criteria, kết quả review).
 
 ---
 
@@ -8,38 +8,68 @@ Lưu trữ chi tiết các GitHub issues của Personal CFO Assistant theo phase
 
 ```
 docs/issues/
-├── README.md                    ← You are here
+├── README.md                    ← You are here (Quick Stats tự sinh)
 ├── active/
 │   ├── INDEX.md                 ← Auto-generated list of open issues
 │   └── issue-<N>.md             ← One file per open issue
 └── closed/
     ├── INDEX.md                 ← Auto-generated: issue# → phase → title
     └── by-phase/
-        ├── pre-phase/           ← V1 features (trước khi có cấu trúc phase)
         ├── phase-1/             ← Phase 1: UX Foundation
-        ├── phase-2/             ← Phase 2: Personality & Care
-        └── phase-3a/            ← Phase 3A: Wealth Foundation (created on first close)
+        ├── phase-3a/            ← Phase 3A: Wealth Foundation
+        ├── phase-4.5/           ← Phase 4.5: Decision Engine Foundation
+        ├── …                    ← Mỗi phase 1 folder, tạo khi có issue đầu tiên
+        └── unphased/            ← Bug/story lẻ không xác định được phase
 ```
 
-> **Tự động hoá:** `.github/workflows/issue-lifecycle.yml` sync mọi GitHub issue event:
-> - `opened` / `edited` → ghi `active/issue-<N>.md`
-> - `closed` → move sang `closed/by-phase/<phase>/`
-> - `reopened` → move ngược về `active/`
-> - `labeled` / `unlabeled` → re-check phase, di chuyển file nếu phase thay đổi
+> **Tự động hoá:** `.github/workflows/issue-lifecycle.yml` chạy script
+> `.github/scripts/issue-lifecycle.js` khi:
+> - có issue event (`opened`, `edited`, `closed`, `reopened`, `labeled`, `unlabeled`);
+> - hằng đêm lúc 02:17 giờ VN (cron, lưới an toàn bắt các event bị lỡ);
+> - chạy tay qua **Actions → Issue Lifecycle Sync → Run workflow**.
 >
-> Cả hai `INDEX.md` được regenerate tự động sau mỗi event.
+> Mỗi lần chạy, script **reconcile toàn bộ**: lấy mọi issue từ GitHub API,
+> đặt issue đang mở vào `active/`, issue đã đóng vào `closed/by-phase/<phase>/`,
+> xoá file của issue không còn tồn tại, rồi sinh lại cả hai `INDEX.md` và bảng
+> Quick Stats bên dưới. Script idempotent — chạy nhiều lần không sinh thay đổi thừa.
+>
+> Chạy local: `GH_TOKEN=... GITHUB_REPOSITORY=phuongphh/FinanceAssistant node .github/scripts/issue-lifecycle.js`
+> (hoặc `--from-json issues.json` với file JSON xuất từ API).
 
 ---
 
 ## 📊 Quick Stats
 
+<!-- STATS:START -->
+_Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa tay._
+
 | Phase | Closed Issues | Folder |
 |-------|---------------|--------|
-| Pre-Phase (V1) | 5 | [`closed/by-phase/pre-phase/`](closed/by-phase/pre-phase/) |
-| Phase 1 — UX Foundation | 7 | [`closed/by-phase/phase-1/`](closed/by-phase/phase-1/) |
-| Phase 2 — Personality & Care | 9 | [`closed/by-phase/phase-2/`](closed/by-phase/phase-2/) |
-| **Total closed** | **21** | — |
-| Active | 0 | [`active/`](active/) |
+| Phase 1 | 7 | [`closed/by-phase/phase-1/`](closed/by-phase/phase-1/) |
+| Phase 2 | 9 | [`closed/by-phase/phase-2/`](closed/by-phase/phase-2/) |
+| Phase 3.5 | 27 | [`closed/by-phase/phase-3.5/`](closed/by-phase/phase-3.5/) |
+| Phase 3.6 | 16 | [`closed/by-phase/phase-3.6/`](closed/by-phase/phase-3.6/) |
+| Phase 3.7 | 16 | [`closed/by-phase/phase-3.7/`](closed/by-phase/phase-3.7/) |
+| Phase 3.8 | 19 | [`closed/by-phase/phase-3.8/`](closed/by-phase/phase-3.8/) |
+| Phase 3.8.5 | 11 | [`closed/by-phase/phase-3.8.5/`](closed/by-phase/phase-3.8.5/) |
+| Phase 3.9 | 26 | [`closed/by-phase/phase-3.9/`](closed/by-phase/phase-3.9/) |
+| Phase 3.9.5 | 24 | [`closed/by-phase/phase-3.9.5/`](closed/by-phase/phase-3.9.5/) |
+| Phase 3A | 31 | [`closed/by-phase/phase-3a/`](closed/by-phase/phase-3a/) |
+| Phase 4.1 | 54 | [`closed/by-phase/phase-4.1/`](closed/by-phase/phase-4.1/) |
+| Phase 4.2 | 16 | [`closed/by-phase/phase-4.2/`](closed/by-phase/phase-4.2/) |
+| Phase 4.2.5 | 30 | [`closed/by-phase/phase-4.2.5/`](closed/by-phase/phase-4.2.5/) |
+| Phase 4.3 | 19 | [`closed/by-phase/phase-4.3/`](closed/by-phase/phase-4.3/) |
+| Phase 4.4 | 2 | [`closed/by-phase/phase-4.4/`](closed/by-phase/phase-4.4/) |
+| Phase 4.5 | 17 | [`closed/by-phase/phase-4.5/`](closed/by-phase/phase-4.5/) |
+| Phase 4.6 | 8 | [`closed/by-phase/phase-4.6/`](closed/by-phase/phase-4.6/) |
+| Phase 4.7 | 6 | [`closed/by-phase/phase-4.7/`](closed/by-phase/phase-4.7/) |
+| Phase 4A | 33 | [`closed/by-phase/phase-4a/`](closed/by-phase/phase-4a/) |
+| Phase 4B | 28 | [`closed/by-phase/phase-4b/`](closed/by-phase/phase-4b/) |
+| Phase 5.0 | 2 | [`closed/by-phase/phase-5.0/`](closed/by-phase/phase-5.0/) |
+| Chưa gắn phase | 118 | [`closed/by-phase/unphased/`](closed/by-phase/unphased/) |
+| **Total closed** | **519** | [`closed/INDEX.md`](closed/INDEX.md) |
+| Active (đang mở) | 7 | [`active/INDEX.md`](active/INDEX.md) |
+<!-- STATS:END -->
 
 ---
 
@@ -51,10 +81,14 @@ docs/issues/
 
 ## 🤖 Phase detection rules
 
-Khi sync, phase được xác định theo thứ tự:
-1. Label `phase-<N>` trên issue (ví dụ `phase-3a`)
-2. Title prefix dạng `[Phase 3A - ...]`
-3. Fallback → `pre-phase`
+Khi sync, phase được xác định theo thứ tự (dừng ở quy tắc đầu tiên khớp):
+1. Label `phase-<V>` trên issue — ví dụ `phase-3a`, `phase-4.5`, `phase-4.2.5`
+2. Title chứa `Phase <V>` — ví dụ `[Phase 4.5] ...`, `Phase 3A - ...`
+3. Title chứa mã story dạng `P<V>-...` — ví dụ `P4.5-E2-S3`, `P3A-12`
+4. Title chứa mã Epic dạng `<V>/E<n>` — ví dụ `4.7/E1`
+5. Fallback → `unphased`
+
+`<V>` là số phase có thể có nhiều phần thập phân và hậu tố chữ (`3a`, `4.2.5`).
 
 Nếu bạn muốn override, add label `phase-<N>` vào issue.
 
