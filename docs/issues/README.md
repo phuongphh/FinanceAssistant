@@ -47,6 +47,7 @@ _Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa
 |-------|---------------|--------|
 | Phase 1 | 7 | [`closed/by-phase/phase-1/`](closed/by-phase/phase-1/) |
 | Phase 2 | 9 | [`closed/by-phase/phase-2/`](closed/by-phase/phase-2/) |
+| Phase 3A | 31 | [`closed/by-phase/phase-3a/`](closed/by-phase/phase-3a/) |
 | Phase 3.5 | 27 | [`closed/by-phase/phase-3.5/`](closed/by-phase/phase-3.5/) |
 | Phase 3.6 | 16 | [`closed/by-phase/phase-3.6/`](closed/by-phase/phase-3.6/) |
 | Phase 3.7 | 16 | [`closed/by-phase/phase-3.7/`](closed/by-phase/phase-3.7/) |
@@ -54,7 +55,8 @@ _Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa
 | Phase 3.8.5 | 11 | [`closed/by-phase/phase-3.8.5/`](closed/by-phase/phase-3.8.5/) |
 | Phase 3.9 | 26 | [`closed/by-phase/phase-3.9/`](closed/by-phase/phase-3.9/) |
 | Phase 3.9.5 | 24 | [`closed/by-phase/phase-3.9.5/`](closed/by-phase/phase-3.9.5/) |
-| Phase 3A | 31 | [`closed/by-phase/phase-3a/`](closed/by-phase/phase-3a/) |
+| Phase 4A | 33 | [`closed/by-phase/phase-4a/`](closed/by-phase/phase-4a/) |
+| Phase 4B | 28 | [`closed/by-phase/phase-4b/`](closed/by-phase/phase-4b/) |
 | Phase 4.1 | 54 | [`closed/by-phase/phase-4.1/`](closed/by-phase/phase-4.1/) |
 | Phase 4.2 | 16 | [`closed/by-phase/phase-4.2/`](closed/by-phase/phase-4.2/) |
 | Phase 4.2.5 | 30 | [`closed/by-phase/phase-4.2.5/`](closed/by-phase/phase-4.2.5/) |
@@ -63,8 +65,6 @@ _Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa
 | Phase 4.5 | 22 | [`closed/by-phase/phase-4.5/`](closed/by-phase/phase-4.5/) |
 | Phase 4.6 | 8 | [`closed/by-phase/phase-4.6/`](closed/by-phase/phase-4.6/) |
 | Phase 4.7 | 6 | [`closed/by-phase/phase-4.7/`](closed/by-phase/phase-4.7/) |
-| Phase 4A | 33 | [`closed/by-phase/phase-4a/`](closed/by-phase/phase-4a/) |
-| Phase 4B | 28 | [`closed/by-phase/phase-4b/`](closed/by-phase/phase-4b/) |
 | Phase 5.0 | 2 | [`closed/by-phase/phase-5.0/`](closed/by-phase/phase-5.0/) |
 | Chưa gắn phase | 118 | [`closed/by-phase/unphased/`](closed/by-phase/unphased/) |
 | **Total closed** | **524** | [`closed/INDEX.md`](closed/INDEX.md) |

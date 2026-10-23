@@ -75,7 +75,12 @@ function phaseLabel(phase) {
 function phaseSortKey(phase) {
   const m = phase.match(/^phase-(\d+(?:\.\d+)*)([a-z]?)$/);
   if (!m) return [Infinity];
-  return [...m[1].split('.').map(Number), m[2] ? m[2].charCodeAt(0) : 0];
+  const key = m[1].split('.').map(Number);
+  // A letter suffix fills the next slot with a value in (-1, 0): above a
+  // missing component (-1, see comparePhases) but below any decimal (>= 0),
+  // so phase-3 < phase-3a < phase-3b < phase-3.5.
+  if (m[2]) key.push(-1 + (m[2].charCodeAt(0) - 96) / 27);
+  return key;
 }
 
 function comparePhases(a, b) {
@@ -301,7 +306,10 @@ async function fetchAllIssues() {
   if (!token || !repo) throw new Error('GH_TOKEN/GITHUB_REPOSITORY not set');
   const issues = [];
   for (let page = 1; page <= 100; page++) {
-    const url = `https://api.github.com/repos/${repo}/issues?state=all&per_page=100&page=${page}`;
+    // Oldest-first: issues created mid-fetch land on the last page instead of
+    // shifting earlier offsets, which could skip an issue and make reconcile
+    // delete its file as an orphan.
+    const url = `https://api.github.com/repos/${repo}/issues?state=all&sort=created&direction=asc&per_page=100&page=${page}`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
