@@ -13,7 +13,7 @@ permissions:
   contents: write
   issues: read
 
-# One shared group: runs never race each other on docs/issues/. GitHub keeps
+# One shared group: runs never race each other on docs/active/ + docs/closed/. GitHub keeps
 # only one pending run per group (a newer one replaces it), which is safe
 # because every run reconciles ALL issues from the API, not just its own.
 concurrency:
@@ -30,7 +30,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
-      - name: Reconcile docs/issues with GitHub, commit and push
+      - name: Reconcile docs/active + docs/closed with GitHub, commit and push
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -64,9 +64,9 @@ jobs:
 
             node .github/scripts/issue-lifecycle.js || return 1
 
-            git add -A docs/issues/
+            git add -A docs/active/ docs/closed/
             if git diff --cached --quiet; then
-              echo "No changes to commit — docs/issues already up to date"
+              echo "No changes to commit — issue files already up to date"
               return 0
             fi
 

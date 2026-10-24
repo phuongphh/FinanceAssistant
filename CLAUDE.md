@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🧪 **Zalo Core Product Parity** (testing) — [detail](docs/current/phase-5.1/phase-5.1-detailed.md)
+🧪 **Zalo Core Product Parity** (testing) — [detail](docs/active/phase-5.1/phase-5.1-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -153,9 +153,9 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) — Onboarding Reset (done 13/07/2026); trước đó 4.5 Decision Engine Foundation (done 10/07/2026)
-- **Pended phase:** [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked). Pended 01/08/2026, nối lại sau gate G1
-- **Current phase:** [`docs/current/phase-5.0/phase-5.0-detailed.md`](docs/current/phase-5.0/phase-5.0-detailed.md) — Zalo Channel Launch; sau đó [5.1 Parity](docs/current/phase-5.1/phase-5.1-detailed.md) → [5.2 Mini App](docs/current/phase-5.2/phase-5.2-detailed.md) → 5.3 Encryption
+- **Recently completed phase:** [`docs/closed/phase-4.6/phase-4.6-detailed.md`](docs/closed/phase-4.6/phase-4.6-detailed.md) — Onboarding Reset (done 13/07/2026); trước đó 4.5 Decision Engine Foundation (done 10/07/2026)
+- **Pended phase:** [`docs/active/phase-4.7/phase-4.7-detailed.md`](docs/active/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked). Pended 01/08/2026, nối lại sau gate G1
+- **Current phase:** [`docs/closed/phase-5.0/phase-5.0-detailed.md`](docs/closed/phase-5.0/phase-5.0-detailed.md) — Zalo Channel Launch; sau đó [5.1 Parity](docs/active/phase-5.1/phase-5.1-detailed.md) → [5.2 Mini App](docs/active/phase-5.2/phase-5.2-detailed.md) → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -198,7 +198,7 @@ Phase 5.0 — Zalo Channel Launch (start 01/08/2026): OAuth token refresh (refre
 
 Phase 4.7 Guardian Layer **pended 01/08/2026** (founder decision): E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark); E2 scam-check legal-blocked, chưa build. Nối lại khi gate G1 pass. Trước đó đã done: 4.5 Decision Engine Foundation (10/07/2026), 4.6 Onboarding Reset (13/07/2026).
 
-Detail: [`docs/current/phase-5.0/phase-5.0-detailed.md`](docs/current/phase-5.0/phase-5.0-detailed.md) · [`docs/current/phase-5.1/phase-5.1-detailed.md`](docs/current/phase-5.1/phase-5.1-detailed.md) · [`docs/current/phase-5.2/phase-5.2-detailed.md`](docs/current/phase-5.2/phase-5.2-detailed.md) · [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md)
+Detail: [`docs/closed/phase-5.0/phase-5.0-detailed.md`](docs/closed/phase-5.0/phase-5.0-detailed.md) · [`docs/active/phase-5.1/phase-5.1-detailed.md`](docs/active/phase-5.1/phase-5.1-detailed.md) · [`docs/active/phase-5.2/phase-5.2-detailed.md`](docs/active/phase-5.2/phase-5.2-detailed.md) · [`docs/active/phase-4.7/phase-4.7-detailed.md`](docs/active/phase-4.7/phase-4.7-detailed.md)
 
 ## Active Breaking Changes
 

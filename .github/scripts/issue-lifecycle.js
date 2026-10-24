@@ -2,17 +2,23 @@
 /**
  * Issue lifecycle sync
  *
- * Called by .github/workflows/issue-lifecycle.yml. Keeps docs/issues/ in
- * sync with GitHub issues:
- *   - open   → docs/issues/active/issue-<N>.md
- *   - closed → docs/issues/closed/by-phase/<phase>/issue-<N>.md
- *   - regenerates active/INDEX.md, closed/INDEX.md and the Quick Stats block
- *     in docs/issues/README.md
+ * Called by .github/workflows/issue-lifecycle.yml. Keeps the per-issue files
+ * under docs/active/ and docs/closed/ in sync with GitHub issues:
+ *   - open   → docs/active/<phase>/issue-<N>.md
+ *   - closed → docs/closed/<phase>/issue-<N>.md
+ *   - regenerates docs/active/INDEX.md, docs/closed/INDEX.md and the Quick
+ *     Stats block in docs/active/README.md
+ *
+ * The same <phase>/ folders also hold the phase's planning docs
+ * (phase-X-detailed.md, -issues.md, -test-cases.md, …). This script only ever
+ * writes/deletes `issue-<N>.md` files and removes a phase folder only when it
+ * is completely empty, so those docs are never touched. Moving the planning
+ * docs from active/ to closed/ is scripts/archive_phase.py's job.
  *
  * Modes:
  *   node issue-lifecycle.js
  *       Full reconcile: fetch every issue from the GitHub API (GH_TOKEN +
- *       GITHUB_REPOSITORY) and rewrite docs/issues/ to match. If the fetch
+ *       GITHUB_REPOSITORY) and rewrite the issue files to match. If the fetch
  *       fails and GITHUB_EVENT_PATH carries an issue, falls back to syncing
  *       just that issue from the event payload.
  *   node issue-lifecycle.js --event-only
@@ -34,12 +40,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = 'docs/issues';
-const ACTIVE_DIR = path.join(ROOT, 'active');
-const CLOSED_BASE = path.join(ROOT, 'closed', 'by-phase');
-const ACTIVE_INDEX = path.join(ACTIVE_DIR, 'INDEX.md');
-const CLOSED_INDEX = path.join(ROOT, 'closed', 'INDEX.md');
-const README = path.join(ROOT, 'README.md');
+const ACTIVE_BASE = path.join('docs', 'active');
+const CLOSED_BASE = path.join('docs', 'closed');
+const BASES = [ACTIVE_BASE, CLOSED_BASE];
+const ACTIVE_INDEX = path.join(ACTIVE_BASE, 'INDEX.md');
+const CLOSED_INDEX = path.join(CLOSED_BASE, 'INDEX.md');
+const README = path.join(ACTIVE_BASE, 'README.md');
 const STATS_START = '<!-- STATS:START -->';
 const STATS_END = '<!-- STATS:END -->';
 
@@ -51,6 +57,8 @@ const TITLE_RES = [
   new RegExp(`\\bP${VERSION}-[A-Z]*\\d`, 'i'),
   new RegExp(`(?<![\\w.])${VERSION}\\s*/\\s*E\\d+`, 'i'),
 ];
+// Folders under docs/active|closed that this script owns issue files in.
+const PHASE_DIR_RE = /^(phase-[0-9a-z.]+|unphased)$/;
 
 function detectPhase(title, labels) {
   for (const l of labels) {
@@ -98,25 +106,24 @@ function issueBodyContent(number, title, body) {
   return `# Issue #${number}\n\n${title}\n\n${body || ''}\n`;
 }
 
-function closedPhaseDirs() {
-  if (!fs.existsSync(CLOSED_BASE)) return [];
-  return fs.readdirSync(CLOSED_BASE)
-    .filter(d => fs.statSync(path.join(CLOSED_BASE, d)).isDirectory());
+function phaseDirs(base) {
+  if (!fs.existsSync(base)) return [];
+  return fs.readdirSync(base)
+    .filter(d => PHASE_DIR_RE.test(d) && fs.statSync(path.join(base, d)).isDirectory());
 }
 
 function removeCopiesExcept(number, keepPath) {
-  const paths = [path.join(ACTIVE_DIR, `issue-${number}.md`)];
-  for (const d of closedPhaseDirs()) {
-    paths.push(path.join(CLOSED_BASE, d, `issue-${number}.md`));
-  }
-  for (const p of paths) {
-    if (p !== keepPath && fs.existsSync(p)) fs.unlinkSync(p);
+  for (const base of BASES) {
+    for (const d of phaseDirs(base)) {
+      const p = path.join(base, d, `issue-${number}.md`);
+      if (p !== keepPath && fs.existsSync(p)) fs.unlinkSync(p);
+    }
   }
 }
 
 function writeIssue(number, title, body, state, labels) {
   const phase = detectPhase(title, labels);
-  const dir = state === 'closed' ? path.join(CLOSED_BASE, phase) : ACTIVE_DIR;
+  const dir = path.join(state === 'closed' ? CLOSED_BASE : ACTIVE_BASE, phase);
   fs.mkdirSync(dir, { recursive: true });
   const target = path.join(dir, `issue-${number}.md`);
   const content = issueBodyContent(number, title, body);
@@ -145,53 +152,58 @@ function listIssueFiles(dir) {
 }
 
 function allIssueFiles() {
-  const files = listIssueFiles(ACTIVE_DIR);
-  for (const d of closedPhaseDirs()) files.push(...listIssueFiles(path.join(CLOSED_BASE, d)));
+  const files = [];
+  for (const base of BASES) {
+    for (const d of phaseDirs(base)) files.push(...listIssueFiles(path.join(base, d)));
+  }
   return files;
 }
 
+// Only drops folders that are completely empty — a phase folder that still
+// holds planning docs (phase-X-detailed.md, …) is kept even with 0 issues.
 function removeEmptyPhaseDirs() {
-  for (const d of closedPhaseDirs()) {
-    const dir = path.join(CLOSED_BASE, d);
-    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+  for (const base of BASES) {
+    for (const d of phaseDirs(base)) {
+      const dir = path.join(base, d);
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+    }
   }
 }
 
-function activeRows() {
-  return listIssueFiles(ACTIVE_DIR)
-    .map(extractMetaFromFile)
-    .filter(r => r.number !== null)
-    .sort((a, b) => a.number - b.number);
-}
-
-function closedRowsByPhase() {
+function rowsByPhase(base) {
   const byPhase = {};
-  for (const phase of closedPhaseDirs().sort(comparePhases)) {
-    byPhase[phase] = listIssueFiles(path.join(CLOSED_BASE, phase))
+  for (const phase of phaseDirs(base).sort(comparePhases)) {
+    const rows = listIssueFiles(path.join(base, phase))
       .map(extractMetaFromFile)
       .filter(r => r.number !== null)
       .map(r => ({ ...r, phase }));
+    if (rows.length > 0) byPhase[phase] = rows;
   }
   return byPhase;
 }
 
+function issueLink(r) {
+  return `[${r.phase}/issue-${r.number}.md](${r.phase}/issue-${r.number}.md)`;
+}
+
 function regenActiveIndex() {
-  fs.mkdirSync(ACTIVE_DIR, { recursive: true });
-  const rows = activeRows();
+  fs.mkdirSync(ACTIVE_BASE, { recursive: true });
+  const byPhase = rowsByPhase(ACTIVE_BASE);
+  const rows = Object.values(byPhase).flat().sort((a, b) => a.number - b.number);
 
   const lines = [
     '# Active Issues — Index',
     '',
-    'GitHub issues đang mở. File được auto-sync bởi `.github/workflows/issue-lifecycle.yml`.',
+    'GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.github/workflows/issue-lifecycle.yml`.',
     '',
-    '| Issue # | Title | File |',
-    '|---------|-------|------|',
+    '| Issue # | Phase | Title | File |',
+    '|---------|-------|-------|------|',
   ];
   if (rows.length === 0) {
-    lines.push('| _(none)_ | — | — |');
+    lines.push('| _(none)_ | — | — | — |');
   } else {
     for (const r of rows) {
-      lines.push(`| #${r.number} | ${r.title} | [issue-${r.number}.md](issue-${r.number}.md) |`);
+      lines.push(`| #${r.number} | ${phaseLabel(r.phase)} | ${r.title} | ${issueLink(r)} |`);
     }
   }
   lines.push('', `**Total active:** ${rows.length}`, '');
@@ -200,8 +212,8 @@ function regenActiveIndex() {
 
 function regenClosedIndex() {
   fs.mkdirSync(CLOSED_BASE, { recursive: true });
-  const byPhase = closedRowsByPhase();
-  const phases = Object.keys(byPhase).filter(p => byPhase[p].length > 0);
+  const byPhase = rowsByPhase(CLOSED_BASE);
+  const phases = Object.keys(byPhase);
   const allRows = phases.flatMap(p => byPhase[p]).sort((a, b) => a.number - b.number);
 
   const lines = [
@@ -216,9 +228,7 @@ function regenClosedIndex() {
     lines.push('| _(none)_ | — | — | — |');
   } else {
     for (const r of allRows) {
-      lines.push(
-        `| #${r.number} | ${phaseLabel(r.phase)} | ${r.title} | [${r.phase}/issue-${r.number}.md](by-phase/${r.phase}/issue-${r.number}.md) |`,
-      );
+      lines.push(`| #${r.number} | ${phaseLabel(r.phase)} | ${r.title} | ${issueLink(r)} |`);
     }
   }
   lines.push('');
@@ -236,19 +246,24 @@ function regenReadmeStats() {
   const end = readme.indexOf(STATS_END);
   if (start === -1 || end === -1 || end < start) return;
 
-  const byPhase = closedRowsByPhase();
-  const phases = Object.keys(byPhase).filter(p => byPhase[p].length > 0);
-  const total = phases.reduce((n, p) => n + byPhase[p].length, 0);
+  // README lives in docs/active/, so active links are local and closed links
+  // go up one level.
+  const active = rowsByPhase(ACTIVE_BASE);
+  const closed = rowsByPhase(CLOSED_BASE);
+  const phases = [...new Set([...Object.keys(active), ...Object.keys(closed)])].sort(comparePhases);
+  const count = (m, p) => (m[p] || []).length;
+  const totalActive = phases.reduce((n, p) => n + count(active, p), 0);
+  const totalClosed = phases.reduce((n, p) => n + count(closed, p), 0);
+  const cell = (n, href) => (n ? `[${n}](${href})` : '—');
   const lines = [
     STATS_START,
     '_Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa tay._',
     '',
-    '| Phase | Closed Issues | Folder |',
-    '|-------|---------------|--------|',
+    '| Phase | Active (đang mở) | Closed (đã xong) |',
+    '|-------|------------------|------------------|',
     ...phases.map(p =>
-      `| ${phaseLabel(p)} | ${byPhase[p].length} | [\`closed/by-phase/${p}/\`](closed/by-phase/${p}/) |`),
-    `| **Total closed** | **${total}** | [\`closed/INDEX.md\`](closed/INDEX.md) |`,
-    `| Active (đang mở) | ${activeRows().length} | [\`active/INDEX.md\`](active/INDEX.md) |`,
+      `| ${phaseLabel(p)} | ${cell(count(active, p), `${p}/`)} | ${cell(count(closed, p), `../closed/${p}/`)} |`),
+    `| **Total** | **[${totalActive}](INDEX.md)** | **[${totalClosed}](../closed/INDEX.md)** |`,
     STATS_END,
   ];
   const next = readme.slice(0, start) + lines.join('\n') + readme.slice(end + STATS_END.length);
@@ -271,7 +286,7 @@ function syncOne(issue) {
 }
 
 /**
- * Make docs/issues/ mirror `issues` exactly: every issue in its right place,
+ * Make docs/active|closed issue files mirror `issues` exactly: every issue in its right place,
  * files for numbers GitHub no longer has (deleted/transferred) removed.
  */
 function reconcile(issues) {

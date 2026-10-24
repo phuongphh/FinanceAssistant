@@ -48,7 +48,7 @@ npm trên host, `systemctl restart betien-api`). Đã retired — không gọi t
 - [ ] Migration mới (nếu có) đã được test trên staging/local DB
 - [ ] `.env.example` đã cập nhật nếu có key env mới
 - [ ] `content/*.yaml` đã được dịch đủ tiếng Việt cho feature mới
-- [ ] Phase doc trong `docs/current/` đã được sync với những gì sắp deploy
+- [ ] Phase doc trong `docs/active/phase-X/` đã được sync với những gì sắp deploy
 - [ ] Không còn `TODO`/`FIXME`/`print()` trong code mới
 - [ ] Smoke test trên local: golden path + edge case của feature mới
 

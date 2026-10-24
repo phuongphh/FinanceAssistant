@@ -10,7 +10,7 @@
 ## 🎯 Current Status
 
 <!-- BEGIN: phase-status:current-line -->
-🧪 **Zalo Core Product Parity** (testing) — [detail](docs/current/phase-5.1/phase-5.1-detailed.md)
+🧪 **Zalo Core Product Parity** (testing) — [detail](docs/active/phase-5.1/phase-5.1-detailed.md)
 <!-- END: phase-status:current-line -->
 
 <!-- BEGIN: phase-status:status-list -->
@@ -230,7 +230,7 @@ Base URL: `http://localhost:8000/api/v1`
 
 - 🎯 **[Product Strategy](docs/current/strategy.md)** — Vision, positioning, roadmap
 - 🔧 **[Technical Spec (CLAUDE.md)](CLAUDE.md)** — Full system design, đọc trước khi code
-- 📋 **[Latest Phase (4.3)](docs/current/phase-4.3/phase-4.3-detailed.md)** — Twin Enhancement + Habit Loop + Admin Dashboard
+- 📋 **[Latest Phase (4.3)](docs/closed/phase-4.3/phase-4.3-detailed.md)** — Twin Enhancement + Habit Loop + Admin Dashboard
 - 📚 **[All docs](docs/README.md)** — Navigation hub
 - 📝 **[Migration Notes V1→V2](docs/archive/MIGRATION_NOTES.md)** — Context về pivot
 

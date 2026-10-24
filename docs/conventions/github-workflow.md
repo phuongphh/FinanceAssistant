@@ -41,7 +41,7 @@ Issue số đơn lẻ không có sub-issues → expand step skip → behavior nh
   PR với `Closes` lines (đã expand sub-issues)
 - `.github/workflows/project-done.yml` — chạy on PR merge HOẶC issue close →
   move issues sang Done trên Project Board #4
-- `.github/workflows/issue-lifecycle.yml` — sync issue events → `docs/issues/`
+- `.github/workflows/issue-lifecycle.yml` — sync issue events → `issue-N.md` trong `docs/active/` / `docs/closed/`
 - `.github/workflows/sync-phase-status.yml` — chạy khi
   `docs/current/phase-status.yaml` thay đổi → regenerate marker sections
   trong CLAUDE.md / README.md / docs/README.md / strategy.md
