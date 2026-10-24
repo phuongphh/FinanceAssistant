@@ -33,10 +33,11 @@ on:
     types: [closed]
   push:
     branches: [main]
-    # issue-lifecycle.yml commit docs/issues/ lên main mỗi lần đổi label →
+    # issue-lifecycle.yml commit docs/active/ + docs/closed/ lên main mỗi lần đổi label →
     # không ignore thì loop tự kích hoạt chính nó liên tục.
     paths-ignore:
-      - 'docs/issues/**'
+      - 'docs/active/**'
+      - 'docs/closed/**'
 
 permissions:
   contents: read

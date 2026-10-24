@@ -2,7 +2,7 @@
 
 The LLM call is mocked — we test the parsing/validation layer with
 30+ synthetic LLM responses covering the patterns from
-``docs/issues/active/issue-75.md``:
+``docs/closed/phase-3a/issue-75.md``:
 
 - Simple single-transaction stories
 - Multiple transactions in one story

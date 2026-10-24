@@ -9,8 +9,8 @@
 <!-- BEGIN: phase-status:current-block -->
 🧪 **Phase 5.1 — Zalo Core Product Parity** (~2-3 tuần)
 
-- 📖 Detailed doc: [docs/current/phase-5.1/phase-5.1-detailed.md](current/phase-5.1/phase-5.1-detailed.md)
-- 📋 Issues: [docs/current/phase-5.1/phase-5.1-issues.md](current/phase-5.1/phase-5.1-issues.md)
+- 📖 Detailed doc: [docs/active/phase-5.1/phase-5.1-detailed.md](active/phase-5.1/phase-5.1-detailed.md)
+- 📋 Issues: [docs/active/phase-5.1/phase-5.1-issues.md](active/phase-5.1/phase-5.1-issues.md)
 - 📝 Scope: Tháng 10-11/2026. Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, decision queries. Zalo OA không nhận upload ảnh trực tiếp nên cần media URL infrastructure (token-based, TTL ngắn) cho chart/Twin image; content layer adapt riêng, KHÔNG branch theo channel trong backend/services/. CHỐT 02/08/2026: Epic E5 (ZNS) đã loại — parity ở đây là parity của câu trả lời, không phải của lời mở đầu; briefing/empathy chỉ gửi được khi cửa sổ 48h còn mở, ngoài cửa sổ thì bỏ kênh Zalo + log. Bù lại: catch-up một dòng khi user chỉ-Zalo quay lại (#4.5) + mời link Telegram đúng một lần (#4.3). CODE MERGED 04/08/2026 (PR #1014 media URL E1, PR #1015 E2-E4, PR #1017 hardening): E1 media_objects + media_url_service + GET /api/v1/media/{token} + job cleanup_media (#1.4), E2 ZaloContentRenderer đầy đủ, E3 zalo_button_mapper, E4 dispatcher dùng chung + telegram_id nullable + onboarding từ Zalo + catch-up + bộ test parity chạy CI (#4.4). TESTING từ 06/09/2026: cần MEDIA_URL_ENABLED=true + MEDIA_PUBLIC_BASE_URL + TELEGRAM_BOT_URL trên prod (đã set), đang soak parity trên user thật trước khi đóng phase.
 <!-- END: phase-status:current-block -->
 
@@ -38,27 +38,27 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 | UX Foundation | ✅ done | 3 tuần | [phase-1-detailed.md](archive/phase-1-detailed.md) | Telegram bot + manual entry + monthly report + Notion dashboard |
 | Personality & Care | ✅ done | 3 tuần | [phase-2-detailed.md](archive/phase-2-detailed.md) | Onboarding, Bé Tiền tone, milestone celebration, empathy engine |
 | Wealth Foundation | ✅ done | 4 tuần | [phase-3a-detailed.md](archive/phase-3a-detailed.md) | Asset model, net worth, morning briefing, Mini App dashboard |
-| Intent Understanding Layer | ✅ done | 3 tuần | [phase-3.5-detailed.md](current/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
+| Intent Understanding Layer | ✅ done | 3 tuần | [phase-3.5-detailed.md](closed/phase-3.5/phase-3.5-detailed.md) | Rule + LLM intent classifier, confirm/clarify, advisory, voice queries |
 | Menu UX Revamp | ✅ done | 1.5 tuần | [phase-3.6-detailed.md](archive/phase-3.6-detailed.md) | Wealth-first 3-level menu, adaptive intros, hard cutover from V1 flat menu |
-| Agent Architecture | ✅ done | 3 tuần | [phase-3.7-detailed.md](current/phase-3.7-detailed.md) | Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing |
-| Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](current/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
-| Pre-Launch Readiness | ✅ done | 3-4 ngày | [phase-3.8.5-detailed.md](current/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
-| Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](current/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
-| Pre-Launch UX Polish | ✅ done | 5-7 ngày | [phase-3.9.5-detailed.md](current/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
-| Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](current/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
-| Financial Twin Conservative MVP | ✅ done | ~3 tuần | [phase-4A-detailed.md](current/phase-4A/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
-| Twin Polish + Life Events + Cashflow v2 + Zalo | ✅ done | ~4 tuần | [phase-4B-detailed.md](current/phase-4B/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
-| Pre-Launch Hardening | ✅ done | ~3 tuần | [phase-4.1-detailed.md](current/phase-4.1/phase-4.1-detailed.md) | Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026) |
-| Customer Experience Hardening | ✅ done | ~2 tuần | [phase-4.2-detailed.md](current/phase-4.2/phase-4.2-detailed.md) | CX-ready bridge: Trust card + financial data integrity, Next Best Action 9-CTA matrix + briefing content quality + query-first prompts, Day 7 positioning micro-survey + kill criterion update. 7 stories + 3 migrations + 3 deploy tasks. |
-| Admin Observability | ✅ done | ~3 tuần | [phase-4.2.5-detailed.md](current/phase-4.2.5/phase-4.2.5-detailed.md) | Admin dashboard (React + Vite + FastAPI) cho operator monitor soft launch: KPI hero, 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention), user directory với search/filter/PII mask, audit log, JWT auth + force_password_change, license placeholder cho Phase 5.7. 23 stories / 7 Epics / ~66 SP. Ship trước soft launch tháng 6/2026. |
-| Twin Enhancement + Habit Loop + Admin Dashboard | ✅ done | ~3 tuần | [phase-4.3-detailed.md](current/phase-4.3/phase-4.3-detailed.md) | Twin từ feature khó hiểu → habit-forming experience: weather metaphor (Khiêm tốn/Bình thường/Lạc quan) thay P10/P50/P90, life-outcome translation, story-first narrative (4-5 màn swipe), mascot personification, habit loop (on-demand recompute <5s + causality + action + negative delta + delta threshold + return tease), Twin admin dashboard 4 sections (engagement funnel, loop health, comprehension, delta distribution). 4 Epics / 15 stories. |
-| First-5-Minutes WOW | ✅ done | ~7-10 ngày | [phase-4.4-detailed.md](current/phase-4.4/phase-4.4-detailed.md) | WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues. |
-| Decision Engine Foundation | ✅ done | ~3 tuần | [phase-4.5-detailed.md](current/phase-4.5/phase-4.5-detailed.md) | Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel (.xlsx), tone dial, one-time re-engagement cho cohort dormant. Kickoff 09/07/2026, target ship late July 2026. 5 Epics / 17 issues. |
-| Onboarding Reset | ✅ done | ~2 tuần | [phase-4.6-detailed.md](current/phase-4.6/phase-4.6-detailed.md) | Onboarding cho segment mới (22-35, Level 0→1): decision-first entry (trả lời 1 câu hỏi thật trước khi nhập liệu), độ nét thay forced data entry, salutation + tone phù hợp người trẻ. Tháng 8/2026. |
-| Guardian Layer | 📋 next | ~2-3 tuần | [phase-4.7-detailed.md](current/phase-4.7/phase-4.7-detailed.md) | Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). PENDED 01/08/2026 (founder decision): E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark); E2 scam-check legal-blocked, chưa build. Nối lại sau khi gate G1 pass — trong lúc chờ, team làm Zalo 5.0-5.2. |
-| Zalo Channel Launch | ✅ done | ~2 tuần | [phase-5.0-detailed.md](current/phase-5.0/phase-5.0-detailed.md) | Tháng 10/2026 (start sớm 01/08/2026 vì 4.7 pended). Zalo OA đã sẵn sàng: OAuth token refresh single-use + webhook signature X-ZEvent-Signature + adapter gửi CS message trong cửa sổ 48h/8 tin, validate giới hạn ký tự + no-Markdown với real flows, thin slice (capture thu chi + báo cáo) chạy trên Zalo sau flag ZALO_CHANNEL_ENABLED. Twin view + toàn bộ dispatcher để 5.1. CHỐT 02/08/2026: KHÔNG dùng ZNS — Zalo là kênh reactive-first (chỉ trả lời trong cửa sổ 48h), toàn bộ proactive (briefing/empathy/cảnh báo) giữ trên Telegram; ngoài cửa sổ → bỏ kênh Zalo + log, không có đường gửi trả phí. SHIPPED: code merge 03/08/2026 (PR #1012); go-live prod 06/09/2026 — domain nuitruc.ai verified, webhook https://finance.nuitruc.ai/api/v1/zalo/webhook nhận sự kiện thật, soak signature xong (valid=True reason=ok) rồi bật ZALO_SIGNATURE_ENFORCE=true, ZALO_CHANNEL_ENABLED=true. Còn tồn: menu OA phải cấu hình tay trong OA Manager — repo không gọi endpoint menu nào và Zalo không có lệnh "/" như Telegram setMyCommands. |
-| Zalo Core Product Parity | 🧪 testing | ~2-3 tuần | [phase-5.1-detailed.md](current/phase-5.1/phase-5.1-detailed.md) | Tháng 10-11/2026. Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, decision queries. Zalo OA không nhận upload ảnh trực tiếp nên cần media URL infrastructure (token-based, TTL ngắn) cho chart/Twin image; content layer adapt riêng, KHÔNG branch theo channel trong backend/services/. CHỐT 02/08/2026: Epic E5 (ZNS) đã loại — parity ở đây là parity của câu trả lời, không phải của lời mở đầu; briefing/empathy chỉ gửi được khi cửa sổ 48h còn mở, ngoài cửa sổ thì bỏ kênh Zalo + log. Bù lại: catch-up một dòng khi user chỉ-Zalo quay lại (#4.5) + mời link Telegram đúng một lần (#4.3). CODE MERGED 04/08/2026 (PR #1014 media URL E1, PR #1015 E2-E4, PR #1017 hardening): E1 media_objects + media_url_service + GET /api/v1/media/{token} + job cleanup_media (#1.4), E2 ZaloContentRenderer đầy đủ, E3 zalo_button_mapper, E4 dispatcher dùng chung + telegram_id nullable + onboarding từ Zalo + catch-up + bộ test parity chạy CI (#4.4). TESTING từ 06/09/2026: cần MEDIA_URL_ENABLED=true + MEDIA_PUBLIC_BASE_URL + TELEGRAM_BOT_URL trên prod (đã set), đang soak parity trên user thật trước khi đóng phase. |
-| Zalo Mini App | 🔮 planned | ~3-4 tuần | [phase-5.2-detailed.md](current/phase-5.2/phase-5.2-detailed.md) | Tháng 11-12/2026. Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, cashflow, expense. Zalo KHÔNG có initData như Telegram — client gọi getAccessToken() rồi backend verify token server-side; Mini App là static bundle deploy qua zmp-cli (không phải HTML server-render như hiện tại) nên phải API-only hoá các màn hình trước. |
+| Agent Architecture | ✅ done | 3 tuần | [phase-3.7-detailed.md](closed/phase-3.7/phase-3.7-detailed.md) | Two-tier agent (DB-Agent + Premium Reasoning), tool-use, orchestrator routing |
+| Wealth Completion | ✅ done | 2 tuần | [phase-3.8-detailed.md](closed/phase-3.8/phase-3.8-detailed.md) | Goals system schema migration, FeasibilityBand enum, 6 readers updated for backwards compatibility |
+| Pre-Launch Readiness | ✅ done | 3-4 ngày | [phase-3.8.5-detailed.md](closed/phase-3.8.5/phase-3.8.5-detailed.md) | Feedback system (/feedback command + DeepSeek classifier + active prompts) + User Profile (view-mode, wealth levels VN, auto-derived stats, edit flows) |
+| Market Data Real | ✅ done | 3 tuần | [phase-3.9-detailed.md](closed/phase-3.9/phase-3.9-detailed.md) | Real market data integration: stock (SSI/VNDIRECT), crypto (CoinGecko), gold (SJC/PNJ), bank rates, RSS news — stubs replaced and quality gate complete |
+| Pre-Launch UX Polish | ✅ done | 5-7 ngày | [phase-3.9.5-detailed.md](closed/phase-3.9.5/phase-3.9.5-detailed.md) | Pre-launch UX polish: 11 dogfooding fixes (Wealth/Dashboard/Cashflow/Market menus) + 2 menu renames + Telegram animation emoji upgrade. Inserted before Phase 4A để clean foundation cho soft launch tháng 6/2026. |
+| Market Intelligence | 🔮 planned | TBD | [phase-3b-outline.md](active/phase-3b/phase-3b-outline.md) | Real market data, advisory deepening, portfolio analytics |
+| Financial Twin Conservative MVP | ✅ done | ~3 tuần | [phase-4A-detailed.md](closed/phase-4a/phase-4A-detailed.md) | Financial Twin MVP: Monte Carlo probability cones (P10/P50/P90), Current vs Optimal trajectory, Telegram + Mini App basic surface, weekly cron + daily snapshot delta, channel-agnostic foundation |
+| Twin Polish + Life Events + Cashflow v2 + Zalo | ✅ done | ~4 tuần | [phase-4B-detailed.md](closed/phase-4b/phase-4B-detailed.md) | Life Event Simulator (mua nhà/kết hôn/con cái injected into MC paths), Cashflow Forecasting v2 (auto-detect recurring + low-balance alerts), Twin UX polish, Zalo OA adapter foundation |
+| Pre-Launch Hardening | ✅ done | ~3 tuần | [phase-4.1-detailed.md](closed/phase-4.1/phase-4.1-detailed.md) | Onboarding 3-step + first-Twin shortcut, cost guardrail per user, Sentry + KPI digest + feedback triage SLA, shareable Twin image, predictions-vs-actual calibration, 50-user soft launch playbook (June 2026) |
+| Customer Experience Hardening | ✅ done | ~2 tuần | [phase-4.2-detailed.md](closed/phase-4.2/phase-4.2-detailed.md) | CX-ready bridge: Trust card + financial data integrity, Next Best Action 9-CTA matrix + briefing content quality + query-first prompts, Day 7 positioning micro-survey + kill criterion update. 7 stories + 3 migrations + 3 deploy tasks. |
+| Admin Observability | ✅ done | ~3 tuần | [phase-4.2.5-detailed.md](closed/phase-4.2.5/phase-4.2.5-detailed.md) | Admin dashboard (React + Vite + FastAPI) cho operator monitor soft launch: KPI hero, 6 charts (growth, DAU, intent breakdown, tier distribution, feature clicks, cohort retention), user directory với search/filter/PII mask, audit log, JWT auth + force_password_change, license placeholder cho Phase 5.7. 23 stories / 7 Epics / ~66 SP. Ship trước soft launch tháng 6/2026. |
+| Twin Enhancement + Habit Loop + Admin Dashboard | ✅ done | ~3 tuần | [phase-4.3-detailed.md](closed/phase-4.3/phase-4.3-detailed.md) | Twin từ feature khó hiểu → habit-forming experience: weather metaphor (Khiêm tốn/Bình thường/Lạc quan) thay P10/P50/P90, life-outcome translation, story-first narrative (4-5 màn swipe), mascot personification, habit loop (on-demand recompute <5s + causality + action + negative delta + delta threshold + return tease), Twin admin dashboard 4 sections (engagement funnel, loop health, comprehension, delta distribution). 4 Epics / 15 stories. |
+| First-5-Minutes WOW | ✅ done | ~7-10 ngày | [phase-4.4-detailed.md](closed/phase-4.4/phase-4.4-detailed.md) | WOW phút-0 cho người mới (giảm ma sát + chuyển cảnh mượt tới Twin, không thay Twin). WOW #0 Salutation (cột users.salutation + hỏi anh/chị/bạn trong onboarding) → WOW #2 Screenshot onboarding (chụp app ngân hàng → OCR số dư, tái dùng pipeline OCR) → WOW #3 Proactive companion (thêm trigger empathy_engine). WOW #1 The Reading ĐÃ GỠ BỎ (29/05/2026): Reading v0+v1 phản tác dụng (vướng nút demo, chuyển cảnh gập ghềnh, generic-trên-zero-data hại uy tín) — onboarding đi thẳng goal → asset → Twin qua step_2_asset.asset_ack. 3 Epics còn hiệu lực (E0/E2/E3) / ~12 issues. |
+| Decision Engine Foundation | ✅ done | ~3 tuần | [phase-4.5-detailed.md](closed/phase-4.5/phase-4.5-detailed.md) | Strategy V4: Twin reframe thành Decision Engine — shock simulation hội thoại + lời khuyên thanh khoản (layer trên Life Event Simulator 4B), plan-to-goal Q&A, 'độ nét' confidence meter v1, xuất Excel (.xlsx), tone dial, one-time re-engagement cho cohort dormant. Kickoff 09/07/2026, target ship late July 2026. 5 Epics / 17 issues. |
+| Onboarding Reset | ✅ done | ~2 tuần | [phase-4.6-detailed.md](closed/phase-4.6/phase-4.6-detailed.md) | Onboarding cho segment mới (22-35, Level 0→1): decision-first entry (trả lời 1 câu hỏi thật trước khi nhập liệu), độ nét thay forced data entry, salutation + tone phù hợp người trẻ. Tháng 8/2026. |
+| Guardian Layer | 📋 next | ~2-3 tuần | [phase-4.7-detailed.md](active/phase-4.7/phase-4.7-detailed.md) | Drift/overspend warnings gắn với hệ quả Twin + scam check v1 (red-flags + hướng dẫn tự kiểm chứng, KHÔNG verdict — kill switch một lần sai per Strategy V4 §8). PENDED 01/08/2026 (founder decision): E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark); E2 scam-check legal-blocked, chưa build. Nối lại sau khi gate G1 pass — trong lúc chờ, team làm Zalo 5.0-5.2. |
+| Zalo Channel Launch | ✅ done | ~2 tuần | [phase-5.0-detailed.md](closed/phase-5.0/phase-5.0-detailed.md) | Tháng 10/2026 (start sớm 01/08/2026 vì 4.7 pended). Zalo OA đã sẵn sàng: OAuth token refresh single-use + webhook signature X-ZEvent-Signature + adapter gửi CS message trong cửa sổ 48h/8 tin, validate giới hạn ký tự + no-Markdown với real flows, thin slice (capture thu chi + báo cáo) chạy trên Zalo sau flag ZALO_CHANNEL_ENABLED. Twin view + toàn bộ dispatcher để 5.1. CHỐT 02/08/2026: KHÔNG dùng ZNS — Zalo là kênh reactive-first (chỉ trả lời trong cửa sổ 48h), toàn bộ proactive (briefing/empathy/cảnh báo) giữ trên Telegram; ngoài cửa sổ → bỏ kênh Zalo + log, không có đường gửi trả phí. SHIPPED: code merge 03/08/2026 (PR #1012); go-live prod 06/09/2026 — domain nuitruc.ai verified, webhook https://finance.nuitruc.ai/api/v1/zalo/webhook nhận sự kiện thật, soak signature xong (valid=True reason=ok) rồi bật ZALO_SIGNATURE_ENFORCE=true, ZALO_CHANNEL_ENABLED=true. Còn tồn: menu OA phải cấu hình tay trong OA Manager — repo không gọi endpoint menu nào và Zalo không có lệnh "/" như Telegram setMyCommands. |
+| Zalo Core Product Parity | 🧪 testing | ~2-3 tuần | [phase-5.1-detailed.md](active/phase-5.1/phase-5.1-detailed.md) | Tháng 10-11/2026. Toàn bộ product hiện tại trên Zalo: intent classifier, asset entry, Twin view, briefing, advisory, decision queries. Zalo OA không nhận upload ảnh trực tiếp nên cần media URL infrastructure (token-based, TTL ngắn) cho chart/Twin image; content layer adapt riêng, KHÔNG branch theo channel trong backend/services/. CHỐT 02/08/2026: Epic E5 (ZNS) đã loại — parity ở đây là parity của câu trả lời, không phải của lời mở đầu; briefing/empathy chỉ gửi được khi cửa sổ 48h còn mở, ngoài cửa sổ thì bỏ kênh Zalo + log. Bù lại: catch-up một dòng khi user chỉ-Zalo quay lại (#4.5) + mời link Telegram đúng một lần (#4.3). CODE MERGED 04/08/2026 (PR #1014 media URL E1, PR #1015 E2-E4, PR #1017 hardening): E1 media_objects + media_url_service + GET /api/v1/media/{token} + job cleanup_media (#1.4), E2 ZaloContentRenderer đầy đủ, E3 zalo_button_mapper, E4 dispatcher dùng chung + telegram_id nullable + onboarding từ Zalo + catch-up + bộ test parity chạy CI (#4.4). TESTING từ 06/09/2026: cần MEDIA_URL_ENABLED=true + MEDIA_PUBLIC_BASE_URL + TELEGRAM_BOT_URL trên prod (đã set), đang soak parity trên user thật trước khi đóng phase. |
+| Zalo Mini App | 🔮 planned | ~3-4 tuần | [phase-5.2-detailed.md](active/phase-5.2/phase-5.2-detailed.md) | Tháng 11-12/2026. Zalo Mini App equivalent của Telegram Mini App: Twin dashboard, portfolio view, cashflow, expense. Zalo KHÔNG có initData như Telegram — client gọi getAccessToken() rồi backend verify token server-side; Mini App là static bundle deploy qua zmp-cli (không phải HTML server-render như hiện tại) nên phải API-only hoá các màn hình trước. |
 | Encryption End-to-End | 🔮 planned | ~2-3 tuần | — | Encryption infrastructure improvement; trust copy hiện không mention user-facing để tránh confuse user về commitment chưa ship. Ship as infra, not as feature. Dời sau Zalo 5.0-5.2 (founder decision 08/07/2026) → tháng 12/2026 - 01/2027, vẫn phải xong TRƯỚC khi chi tiền growth Tết. |
 | Achievement & Badges | 🔮 planned | TBD | — | Wealth milestone badges (lần đầu net worth +10%, lần đầu Twin within band 3 lần liên tiếp, streak briefing) — private, không leaderboard. PARKED per Strategy V4. |
 | Behavioral Engine | 🔮 planned | TBD | — | Wealth-aware nudges, Financial DNA profile (spend patterns + risk tolerance), anomaly detection — chạy sau ≥ 2 tháng real data. PARKED per Strategy V4 (một phần nudge logic được hấp thụ vào 4.7 Guardian Layer). |
@@ -79,41 +79,42 @@ and the GitHub Action `sync-phase-status.yml` runs on every push.
 ```
 docs/
 ├── README.md                              ← You are here
-├── current/                               ← Active documents
-│   ├── strategy.md                        ← Source of truth
-│   ├── phase-1-detailed.md
-│   ├── phase-2-detailed.md
-│   ├── phase-3a-detailed.md               ← Current focus
-│   ├── phase-3a-issues.md                 ← GitHub-ready issues
-│   └── phase-3b-outline.md
-├── issues/                                ← Per-issue snapshots
-│   ├── README.md                          ← Issues index + navigation
-│   ├── active/                            ← Currently open issues
-│   └── closed/
-│       ├── INDEX.md                       ← issue# → phase → title
-│       └── by-phase/
-│           ├── phase-1/ … phase-5.0/      ← Closed issues theo phase (tự sync)
-│           └── unphased/                  ← Issue lẻ không xác định được phase
+├── current/                               ← Doc không thuộc phase nào
+│   ├── phase-status.yaml                  ← Source of truth cho roadmap
+│   ├── strategy.md · tone_guide.md · founding-promise.md · …
+├── active/                                ← Việc CHƯA xong
+│   ├── README.md                          ← Quy tắc xếp chỗ + tự động hoá
+│   ├── INDEX.md                           ← Issue đang mở (tự sinh)
+│   ├── phase-5.1/                         ← detailed + issues + test-cases + issue-N.md
+│   ├── phase-5.2/ · phase-4.7/ · phase-3b/
+│   └── unphased/                          ← Issue mở không xác định được phase
+├── closed/                                ← Việc ĐÃ xong
+│   ├── INDEX.md                           ← Issue đã đóng (tự sinh)
+│   ├── phase-1/ … phase-5.0/              ← detailed + issues + test-cases + issue-N.md
+│   └── unphased/
 └── archive/                               ← Historical (don't delete!)
-    ├── MIGRATION_NOTES.md
-    └── v1-finance-assistant/
-        ├── strategy-v1.md
-        └── phase-3-detailed-v1.md
 ```
+
+- `issue-N.md` nằm ở `active/` khi issue còn mở, tự chuyển sang `closed/`
+  khi issue đóng (`.github/scripts/issue-lifecycle.js`).
+- 3 file định hướng của phase (`detailed`, `issues`, `test-cases`) nằm ở
+  `active/phase-X/` cho tới khi phase được đóng (sign-off marker trong
+  test-cases → `scripts/archive_phase.py` chuyển sang `closed/phase-X/`).
+- Chi tiết: [`active/README.md`](active/README.md).
 
 ---
 
 ## 🛠️ How to Use These Docs
 
-### If you're starting development on Phase 3A:
+### If you're starting development on the current phase:
 1. Read [strategy.md](current/strategy.md) — understand positioning + target user
-2. Read [phase-3a-detailed.md](current/phase-3a-detailed.md) — understand WHAT to build
-3. Open [phase-3a-issues.md](current/phase-3a-issues.md) — pick first issue
+2. Read the phase detailed doc in `active/phase-X/` (link ở block "Current Focus" phía trên) — understand WHAT to build
+3. Open `active/phase-X/phase-X-issues.md` + [`active/INDEX.md`](active/INDEX.md) — pick first open issue
 4. Copy issue → GitHub → assign to yourself → start coding
 
 ### If you're using Claude Code to implement:
-1. Share `phase-3a-detailed.md` with Claude Code as context
-2. Point it to the specific issue from `phase-3a-issues.md`
+1. Share `active/phase-X/phase-X-detailed.md` with Claude Code as context
+2. Point it to the specific issue (`active/phase-X/issue-N.md`)
 3. Claude Code generates code following the spec
 4. Review → commit → close issue
 

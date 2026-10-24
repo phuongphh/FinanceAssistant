@@ -11,7 +11,7 @@ Read this before any code changes. For implementation details, open the correspo
 [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml)):
 
 <!-- BEGIN: phase-status:current-line -->
-🧪 **Zalo Core Product Parity** (testing) — [detail](docs/current/phase-5.1/phase-5.1-detailed.md)
+🧪 **Zalo Core Product Parity** (testing) — [detail](docs/active/phase-5.1/phase-5.1-detailed.md)
 <!-- END: phase-status:current-line -->
 
 For full roadmap, see [`docs/current/phase-status.yaml`](docs/current/phase-status.yaml).
@@ -153,9 +153,9 @@ docker-compose up -d                        # Start PostgreSQL + Redis
 This file is a **table of contents**, not an encyclopedia. When you need detail, read:
 
 - **Strategy & vision:** [`docs/current/strategy.md`](docs/current/strategy.md) — Ladder of Engagement, positioning, V2 pivot rationale
-- **Recently completed phase:** [`docs/current/phase-4.6/phase-4.6-detailed.md`](docs/current/phase-4.6/phase-4.6-detailed.md) — Onboarding Reset (done 13/07/2026); trước đó 4.5 Decision Engine Foundation (done 10/07/2026)
-- **Pended phase:** [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked). Pended 01/08/2026, nối lại sau gate G1
-- **Current phase:** [`docs/current/phase-5.0/phase-5.0-detailed.md`](docs/current/phase-5.0/phase-5.0-detailed.md) — Zalo Channel Launch; sau đó [5.1 Parity](docs/current/phase-5.1/phase-5.1-detailed.md) → [5.2 Mini App](docs/current/phase-5.2/phase-5.2-detailed.md) → 5.3 Encryption
+- **Recently completed phase:** [`docs/closed/phase-5.0/phase-5.0-detailed.md`](docs/closed/phase-5.0/phase-5.0-detailed.md) — Zalo Channel Launch (done 06/09/2026, go-live prod); trước đó 4.6 Onboarding Reset (done 13/07/2026)
+- **Pended phase:** [`docs/active/phase-4.7/phase-4.7-detailed.md`](docs/active/phase-4.7/phase-4.7-detailed.md) — Guardian Layer (E1 drift warning + E3 guardrail/kill-switch infra merged FLAG OFF/build dark; E2 scam-check legal-blocked). Pended 01/08/2026, nối lại sau gate G1
+- **Current phase:** [`docs/active/phase-5.1/phase-5.1-detailed.md`](docs/active/phase-5.1/phase-5.1-detailed.md) — Zalo Core Product Parity (testing); sau đó [5.2 Mini App](docs/active/phase-5.2/phase-5.2-detailed.md) → 5.3 Encryption
 - **Database schema:** Read latest migrations in `alembic/versions/` for current state
 - **Architecture decisions:** [`docs/architecture/`](docs/architecture/) — layer contract rationale, scaling decisions
 - **GitHub workflow:** [`docs/conventions/github-workflow.md`](docs/conventions/github-workflow.md) — PR conventions, sub-issue hierarchy, branch naming
@@ -194,15 +194,17 @@ Quick reference:
 
 ### Current phase
 
-Phase 5.0 — Zalo Channel Launch (start 01/08/2026): OAuth token refresh (refresh_token single-use, xoay mỗi lần refresh), webhook verify `X-ZEvent-Signature`, adapter gửi CS message trong cửa sổ 48h / tối đa 8 tin tư vấn, thin slice (capture thu chi + báo cáo) chạy trên Zalo sau flag `ZALO_CHANNEL_ENABLED` — Twin view + toàn bộ dispatcher để 5.1. Tiếp theo: 5.1 Parity → 5.2 Mini App → 5.3 Encryption End-to-End.
+Phase 5.1 — Zalo Core Product Parity (**testing** từ 06/09/2026): code đã merge 04/08/2026 (PR #1014 media URL, #1015 renderer + button mapper + dispatcher dùng chung, #1017 hardening). Toàn bộ product chạy trên Zalo qua `ZaloContentRenderer` + `ZaloNotifier` + `content/zalo.yaml` — KHÔNG branch theo channel trong `backend/services/`. Zalo là kênh reactive-first: chỉ gửi trong cửa sổ 48h, không ZNS, proactive (briefing/empathy) ngoài cửa sổ → bỏ kênh Zalo + log. Cần `MEDIA_URL_ENABLED`, `MEDIA_PUBLIC_BASE_URL`, `TELEGRAM_BOT_URL` trên prod (đã set); đang soak parity trên user thật trước khi đóng phase. Tiếp theo: 5.2 Mini App → 5.3 Encryption End-to-End.
+
+Phase 5.0 Zalo Channel Launch **done 06/09/2026** (go-live prod, `ZALO_CHANNEL_ENABLED=true`, `ZALO_SIGNATURE_ENFORCE=true`). Còn tồn: menu OA cấu hình tay trong OA Manager.
 
 Phase 4.7 Guardian Layer **pended 01/08/2026** (founder decision): E1 drift warning + E3 guardrail flag/kill-switch infra đã merged nhưng FLAG OFF (build dark); E2 scam-check legal-blocked, chưa build. Nối lại khi gate G1 pass. Trước đó đã done: 4.5 Decision Engine Foundation (10/07/2026), 4.6 Onboarding Reset (13/07/2026).
 
-Detail: [`docs/current/phase-5.0/phase-5.0-detailed.md`](docs/current/phase-5.0/phase-5.0-detailed.md) · [`docs/current/phase-5.1/phase-5.1-detailed.md`](docs/current/phase-5.1/phase-5.1-detailed.md) · [`docs/current/phase-5.2/phase-5.2-detailed.md`](docs/current/phase-5.2/phase-5.2-detailed.md) · [`docs/current/phase-4.7/phase-4.7-detailed.md`](docs/current/phase-4.7/phase-4.7-detailed.md)
+Detail: [`docs/active/phase-5.1/phase-5.1-detailed.md`](docs/active/phase-5.1/phase-5.1-detailed.md) · [`docs/closed/phase-5.0/phase-5.0-detailed.md`](docs/closed/phase-5.0/phase-5.0-detailed.md) · [`docs/active/phase-5.2/phase-5.2-detailed.md`](docs/active/phase-5.2/phase-5.2-detailed.md) · [`docs/active/phase-4.7/phase-4.7-detailed.md`](docs/active/phase-4.7/phase-4.7-detailed.md)
 
 ## Active Breaking Changes
 
-(None currently — Phase 4.7 Guardian Layer builds dark, flags OFF; Phase 5.0 Zalo là channel mới, additive, sau flag `ZALO_CHANNEL_ENABLED`)
+(None currently — Phase 4.7 Guardian Layer builds dark, flags OFF; Zalo 5.0/5.1 là channel mới, additive, sau flag `ZALO_CHANNEL_ENABLED` + `MEDIA_URL_ENABLED`)
 
 When breaking changes are active, list them here with migration path. Move to `docs/archive/` once complete.
 

@@ -1,7 +1,7 @@
 """Canonical query test suite (Story #131 — Epic 4).
 
 The 30 queries below mirror the user-testing protocol in
-``docs/current/phase-3.5-detailed.md`` § 3.3 and are the contract every
+``docs/closed/phase-3.5/phase-3.5-detailed.md`` § 3.3 and are the contract every
 future change to patterns / prompts / handlers must clear.
 
 Five groups, five different success bars:
