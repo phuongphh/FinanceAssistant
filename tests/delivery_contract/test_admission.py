@@ -375,7 +375,7 @@ class AdmissionTests(unittest.TestCase):
 
 class IntakeTransportTests(unittest.TestCase):
     def test_duplicate_keys_nonfinite_and_oversize_denied(self):
-        for raw in [b'{"a":1,"a":2}', b'{"x":NaN}', b" " * 262145]:
+        for raw in [b'{"a":1,"a":2}', b'{"x":NaN}', b'{"x":1e999}', b" " * 262145]:
             with self.assertRaises(Denied):
                 decode(raw)
 

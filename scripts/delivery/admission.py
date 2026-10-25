@@ -10,6 +10,7 @@ import copy
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -37,6 +38,13 @@ def _nonfinite(_):
     raise Denied("Non-finite JSON")
 
 
+def _finite_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise Denied("Non-finite JSON")
+    return number
+
+
 def decode(raw):
     if len(raw) > MAX_BYTES:
         raise Denied("JSON exceeds intake limit")
@@ -45,6 +53,7 @@ def decode(raw):
             raw,
             object_pairs_hook=_pairs,
             parse_constant=_nonfinite,
+            parse_float=_finite_float,
         )
     except (ValueError, UnicodeError):
         raise Denied("Invalid JSON") from None
