@@ -41,3 +41,7 @@ Schemas/config/validator are control-plane files and must be excluded from ordin
 The dedicated Delivery Contract job validates shape/invariants and mocked GitHub event behavior with no secrets. Existing CI still checks the application. This PR does not add required branch rules or Environment protection, activate adapters, or change prod deploy. Merge requires reviewer acceptance and relevant checks; runtime rollout follows the environment isolation/backup milestones.
 
 GitHub event chaining depends on actor/token and current platform behavior. See [GITHUB_TOKEN documentation](https://docs.github.com/en/actions/concepts/security/github_token) and [Projects API permissions](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects). PAT_TOKEN remains the existing privileged automation actor; its actual scopes and downstream CI results must be verified, never inferred from a variable name.
+
+## Phase-3 foundation
+
+[Native adapters, durable controller and recovery contract](../architecture/dual-engine-runner.md) are implemented as an opt-in library. The live dispatcher is not switched by this maintenance PR. A worker result may have `session_id: null` if authentication/runtime fails before a native session starts.

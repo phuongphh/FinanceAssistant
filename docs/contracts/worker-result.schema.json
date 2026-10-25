@@ -26,8 +26,15 @@
       ]
     },
     "session_id": {
-      "type": "string",
-      "minLength": 1
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "status": {
       "enum": [
