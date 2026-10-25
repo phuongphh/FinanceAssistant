@@ -139,3 +139,7 @@ Before enabling v2 dispatch:
 
 Only then should PM advertise unattended product coding as ready. Production
 release transport and Mac Dev/Production isolation remain separate milestones.
+
+The next intake layer is described in [verified task admission](runner-admission.md).
+Its disabled policy, GitHub account checks and atomic evidence storage supplement
+this foundation; they do not provision workers or activate the legacy dispatcher.

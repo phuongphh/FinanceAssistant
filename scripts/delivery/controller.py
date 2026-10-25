@@ -107,6 +107,8 @@ class Ledger:
             phase TEXT NOT NULL, token TEXT NOT NULL, expires REAL NOT NULL,
             started REAL NOT NULL, deadline REAL NOT NULL, day TEXT NOT NULL, reserved INTEGER NOT NULL,
             session_id TEXT, checkpoint TEXT, evidence TEXT);
+          CREATE TABLE IF NOT EXISTS approval_evidence(
+            task_id TEXT PRIMARY KEY REFERENCES grants(task_id), record TEXT NOT NULL);
           CREATE UNIQUE INDEX IF NOT EXISTS active_issue ON runs(repository,issue)
             WHERE phase IN ('reserved','running','orphaned');
         """)
@@ -124,7 +126,7 @@ class Ledger:
             self.db.execute("ROLLBACK")
             raise
 
-    def approve(self, task, *, actor, verified_reference):
+    def approve(self, task, *, actor, verified_reference, evidence=None):
         # This method is only for the authenticated operator/controller endpoint.
         # No prompt/issue/model invocation is allowed to call it.
         if (
@@ -132,6 +134,12 @@ class Ledger:
             or verified_reference != task["approval"]["reference"]
         ):
             raise Denied("No trusted approval")
+        if evidence is not None and (
+            evidence.get("task_digest") != digest(task)
+            or evidence.get("actor") != actor
+            or evidence.get("reference") != verified_reference
+        ):
+            raise Denied("Approval evidence differs from grant")
         limits = task["limits"]
         seconds = int(limits["max_minutes"]) * 60
         attempts = int(limits["max_fix_rounds"]) + 1
@@ -145,6 +153,17 @@ class Ledger:
             if old:
                 if old["fingerprint"] != fp or old["revoked"]:
                     raise Denied("Grant differs or revoked")
+                if evidence is not None:
+                    saved = self.db.execute(
+                        "SELECT record FROM approval_evidence WHERE task_id=?",
+                        (task["task_id"],),
+                    ).fetchone()
+                    if not saved or {
+                        k: v
+                        for k, v in json.loads(saved["record"]).items()
+                        if k != "checked_at"
+                    } != {k: v for k, v in evidence.items() if k != "checked_at"}:
+                        raise Denied("Existing grant lacks matching approval evidence")
                 return
             self.db.execute(
                 "INSERT INTO grants VALUES(?,?,?,?,?,?,?,?,?,0,?)",
@@ -161,6 +180,15 @@ class Ledger:
                     self.clock(),
                 ),
             )
+
+            if evidence is not None:
+                self.db.execute(
+                    "INSERT INTO approval_evidence VALUES(?,?)",
+                    (
+                        task["task_id"],
+                        json.dumps(evidence, sort_keys=True, allow_nan=False),
+                    ),
+                )
 
     def acquire(self, task, *, request_id, reservation_usd, ttl=30):
         now = self.clock()

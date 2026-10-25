@@ -57,6 +57,8 @@ def execute(
     resume_from=None,
     restore=None,
     sleeper=time.sleep,
+    before_attempt=None,
+    before_accept=None,
 ):
     """executor(task,session_id,feedback,heartbeat,max_seconds,private_dir) must
     guarantee no live process remains when it returns; gate returns independently
@@ -94,6 +96,8 @@ def execute(
         session = checkpoint["session_id"]
         feedback = checkpoint["next_step"]
     for round_number in range(task["limits"]["max_fix_rounds"] + 1):
+        if before_attempt:
+            before_attempt()  # Trusted admission rechecks upstream evidence before every retry.
         try:
             lease = ledger.acquire(
                 task,
@@ -147,6 +151,9 @@ def execute(
                 "gates": {"status": "not_run", "evidence": []},
                 "patch_digest": None,
             }
+        if before_accept and result.status == "completed":
+            before_accept()  # Approval must still hold after model/gate execution.
+            heartbeat()
         checkpoint_path = run_dir / "checkpoint.json"
         receipt = worker_result(
             task,
