@@ -326,8 +326,8 @@ Bước 2 (khi có ≥ 3 repo — tập trung hoá):
   khôi phục bằng `/agent retry`.
 - **Concurrency dispatcher chỉ giữ 1 run chờ** — event dồn dập có thể bị gộp;
   cron 30 phút là lưới an toàn.
-- **`issue-lifecycle.yml` commit `docs/issues/` lên main** mỗi lần đổi label →
-  dispatcher đã `paths-ignore: docs/issues/**` để không tự kích hoạt vòng lặp.
+- **`issue-lifecycle.yml` commit `docs/active/` + `docs/closed/` lên main** mỗi lần đổi label →
+  dispatcher đã `paths-ignore: docs/active/**, docs/closed/**` để không tự kích hoạt vòng lặp.
 - **`pause` không dừng worker đang chạy** — muốn dừng ngay thì Cancel run trên
   Actions (issue sẽ được reconcile thành `blocked`).
 - **Agent không tự đổi được gates/guard**: Claude không có quyền push, guard
