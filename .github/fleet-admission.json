@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "repository": "phuongphh/FinanceAssistant",
+  "repository_id": 1189887539,
+  "approver_ids": [8387494],
+  "engines": ["claude", "codex"],
+  "policy_id": "fleet-pilot-budget-not-approved",
+  "daily_budget_usd": 0,
+  "max_task_cost_usd": 0,
+  "approval_max_age_seconds": 86400
+}
