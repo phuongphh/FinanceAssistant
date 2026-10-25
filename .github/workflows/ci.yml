@@ -33,7 +33,7 @@ jobs:
           pip install -r backend/requirements.txt \
             || (grep -v '^vnstock' backend/requirements.txt > "$RUNNER_TEMP/req.txt" \
                 && pip install -r "$RUNNER_TEMP/req.txt")
-          pip install pytest pytest-asyncio pyyaml
+          pip install pytest pytest-asyncio pyyaml -r scripts/delivery/requirements.txt
 
       - name: Run tests
         run: python -m pytest -q -p no:cacheprovider

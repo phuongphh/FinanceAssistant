@@ -54,7 +54,10 @@ class LoopConfig:
     auto_fix_ci: bool = True
     ci_workflows: tuple[str, ...] = ("CI",)
     gates: dict[str, str] = field(default_factory=dict)
-    forbidden_paths: tuple[str, ...] = (".env", ".env.*", ".github/workflows/**")
+    forbidden_paths: tuple[str, ...] = (
+        ".env", ".env.*", ".github/**", "scripts/agent_loop/**",
+        "scripts/delivery/**", "docs/contracts/**", ".claude/skills/implement-issue/**",
+    )
     allowed_paths: tuple[str, ...] = (".env.example",)
     immutable_existing: tuple[str, ...] = ()
     skill_path: str = ".claude/skills/implement-issue/SKILL.md"

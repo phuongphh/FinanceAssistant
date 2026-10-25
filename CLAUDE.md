@@ -3,6 +3,8 @@
 Source of truth for Claude Code working on this codebase.
 Read this before any code changes. For implementation details, open the corresponding phase doc linked below.
 
+Delivery rules: [GitHub workflow](docs/conventions/github-workflow.md) and [delivery contract](docs/conventions/delivery-contract.md). FinanceAssistant Dev is Mac Mini; Production is VPS. Issue Done means implementation completed, not released; do not recursively close Epic children.
+
 **Document version:** 3.0 (compacted from v2.0 to reduce token overhead, 07/05/2026)
 
 ---

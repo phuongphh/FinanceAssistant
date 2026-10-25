@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "repository": "phuongphh/FinanceAssistant",
+  "task_id": "FA-example-1",
+  "run_id": "example-run",
+  "engine": "codex",
+  "session_id": "example-session",
+  "status": "review_ready",
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "changed_files": [
+    "example/file.py"
+  ],
+  "gates": {
+    "status": "passed",
+    "evidence": [
+      {
+        "url": "https://github.com/example/product/actions/runs/1",
+        "description": "Example only; not actual evidence"
+      }
+    ]
+  },
+  "checkpoint": "controller://example/checkpoint",
+  "next_step": "Independent review"
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "deployment_id": "example-deployment",
+  "release_id": "example-release",
+  "repository": "phuongphh/FinanceAssistant",
+  "environment": "production-vps",
+  "owner": "op-pro",
+  "source_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "runtime_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "succeeded",
+  "executor_run": "https://github.com/example/product/actions/runs/1",
+  "health": "passed",
+  "evidence": [
+    {
+      "url": "https://github.com/example/product/actions/runs/1",
+      "description": "Example only; not actual evidence"
+    }
+  ],
+  "completed_at": "2026-10-25T00:00:00Z"
+}
