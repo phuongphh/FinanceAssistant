@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from delivery.local_runner import LocalRunner, assess_ci, git, proposal, safe_file  # noqa: E402
-from delivery.engines import EngineResult, command  # noqa: E402
+from delivery.engines import EngineResult, command, unexpected_proposal_tool  # noqa: E402
 from delivery.controller import Denied, digest  # noqa: E402
 
 
@@ -234,6 +234,28 @@ class LocalTests(unittest.TestCase):
         ):
             self.runner.publish(run)
         self.assertEqual(self.runner.state(run)["phase"], "committed")
+
+    def test_unexpected_native_tools_cannot_be_accepted(self):
+        for kind in (
+            "command_execution",
+            "file_change",
+            "mcp_tool_call",
+            "future_tool",
+        ):
+            self.assertTrue(unexpected_proposal_tool("codex", {"item": {"type": kind}}))
+        self.assertTrue(
+            unexpected_proposal_tool(
+                "claude", {"message": {"content": [{"type": "tool_use"}]}}
+            )
+        )
+        self.assertFalse(
+            unexpected_proposal_tool(
+                "codex", {"type": "error", "message": "rate limit"}
+            )
+        )
+        self.assertFalse(
+            unexpected_proposal_tool("claude", {"message": "authentication error"})
+        )
 
     def test_no_tools_profile_is_explicit(self):
         args = command("codex", self.repo, self.root / "output", proposal_only=True)

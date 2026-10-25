@@ -231,6 +231,24 @@ def parse(
     return result
 
 
+def unexpected_proposal_tool(engine, event):
+    if not isinstance(event, dict):
+        return False
+    item = event.get("item", {})
+    if engine == "codex":
+        return isinstance(item, dict) and item.get("type") not in (
+            None,
+            "agent_message",
+            "reasoning",
+            "error",
+        )
+    message = event.get("message")
+    content = message.get("content", []) if isinstance(message, dict) else []
+    return isinstance(content, list) and any(
+        isinstance(x, dict) and x.get("type") == "tool_use" for x in content
+    )
+
+
 def _stop(proc):
     # The leader may have exited while descendants still own its process group.
     try:
@@ -392,22 +410,7 @@ def run(
                 event = json.loads(line)
             except ValueError:
                 continue
-            if not isinstance(event, dict):
-                continue
-            item = event.get("item", {})
-            content = event.get("message", {}).get("content", [])
-            used_tool = (
-                engine == "codex"
-                and isinstance(item, dict)
-                and item.get("type")
-                not in (None, "agent_message", "reasoning", "error")
-            ) or (
-                engine == "claude"
-                and any(
-                    isinstance(x, dict) and x.get("type") == "tool_use" for x in content
-                )
-            )
-            if used_tool:
+            if unexpected_proposal_tool(engine, event):
                 result.status = "blocked"
                 result.reason = "unexpected_tool_in_proposal_profile"
                 break
