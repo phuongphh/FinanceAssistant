@@ -51,3 +51,14 @@ def test_migration_added_earlier_in_same_pr_can_be_edited() -> None:
     res = check(["M\talembic/versions/099_new.py"], CFG, existed_in_base=lambda p: False)
     assert res.ok and res.warnings
     assert not check(["M\talembic/versions/099_new.py"], CFG, existed_in_base=lambda p: True).ok
+
+
+def test_delivery_control_files_protected_in_defaults_and_repo_config() -> None:
+    from pathlib import Path
+    from agent_loop.config import load_config
+
+    configs = [LoopConfig(), load_config(Path(__file__).resolve().parents[2] / ".github/agent-loop.yml")]
+    for cfg in configs:
+        for path in [".github/delivery.json", "scripts/delivery/validate.py", "docs/contracts/task.schema.json"]:
+            assert not check(["M\t" + path], cfg).ok
+            assert not check(["R100\t" + path + "\tordinary.txt"], cfg).ok

@@ -91,7 +91,7 @@ jobs:
           pip install -r backend/requirements.txt \
             || (grep -v '^vnstock' backend/requirements.txt > "$RUNNER_TEMP/req.txt" \
                 && pip install -r "$RUNNER_TEMP/req.txt")
-          pip install pytest pytest-asyncio pyyaml ruff
+          pip install pytest pytest-asyncio pyyaml ruff -r scripts/delivery/requirements.txt
 
       - uses: actions/setup-node@v5
         with:

@@ -1,76 +1,27 @@
-## GitHub Workflow Convention — ĐỌC TRƯỚC KHI TẠO ISSUE / PR
+# GitHub workflow and delivery contract
 
-Hệ thống dùng **GitHub native sub-issues** làm source of truth cho hierarchy
-Epic → Sub-issue. Hai workflow `.github/workflows/auto-pr.yml` và
-`project-done.yml` tự expand parent → children qua GraphQL.
+Applies to FinanceAssistant (NT): coding branch → PR main → Dev Mac Mini verification → approved release PR prod → Production VPS (Bé Ốp Pro). Full contract: [delivery-contract.md](delivery-contract.md).
 
-### Convention cho Epic (≥2 sub-issues)
+## Issues and hierarchy
 
-1. Tạo **issue cha** (Epic) với title format `[Epic N / Phase X] <name>`
-2. Link các issue con làm sub-issues qua GitHub UI hoặc `sub_issue_write` API
-3. Khi implement: branch `claude/...`, commit cuối có `Closes #<epic-parent>`
-4. `auto-pr.yml` tự expand thành `Closes #parent` + `Closes #child1...#childN`
-   trong PR body
-5. Merge PR → GitHub đóng tất cả → `project-done.yml` move tất cả sang Done
+Use `.github/ISSUE_TEMPLATE/delivery-task.yml`. PM turns an approved idea into scope, exclusions, numbered AC, dependencies and a validation plan. Native sub-issues describe hierarchy only: completing an Epic does not prove its children complete. List `Closes #N` explicitly only for each completed implementation issue. References in prose, branch names or commit messages are not authorization to close issues.
 
-**Đừng** liệt kê tay từng `Closes #N` cho sub-issues — workflow tự làm.
+`Status` on Project #4 retains Backlog / Ready / In Progress / In Review / Done. Done means implementation completed, including manual completion; it is not a release record. Closed-as-not-planned is not moved to Done. Project automation never recursively closes children, never closes issues itself, and never updates deployment fields. A delayed event rechecks whether the issue remains closed/completed.
 
-### Convention cho user story đơn lẻ (không thuộc epic)
+## PR ownership
 
-Vẫn hoạt động như cũ. `auto-pr.yml` extract issue number từ 3 nguồn (priority
-cao → thấp):
-1. Branch name: `claude/issue-N-...` hoặc `claude/issues-N-N-...`
-2. Commit close keyword: `Closes #N`, `Fixes #N`, `Resolves #N`, `Issue #N`
-3. Commit bare reference: `#N` (word-boundary protected)
+- `agent/issue-*`: only the trusted agent-loop publisher creates the PR. Do not add this prefix to auto-pr.yml. Worker code cannot push/main/prod/merge.
+- `claude/**`, `codex/**`: auto-pr is the legacy interactive publisher, serializes by branch, reuses any existing PR and preserves its body. A new PR is draft, with reference-only links; a human/PM provides acceptance evidence and explicit closing links.
+- `claude/merge-prod-release-*`: excluded; release PRs are deliberately opened with base prod.
+- One task/branch has one PR; do not reuse a closed task branch. Handle duplicate events and a concurrent creator by finding the existing PR.
+- Privileged project/PR automation checks out trusted main, not task-branch scripts.
 
-Issue số đơn lẻ không có sub-issues → expand step skip → behavior như trước.
+Use PRs for substantive changes, including this maintenance change. No direct push to main/prod. Existing automated issue-doc sync is a separate trusted documentation writer; no new direct-write exception is added here. User reviews and merges release PRs through GitHub; a coding or maintenance PR is not release approval.
 
-### Khi nào issue được move sang Done
+## Admission and automation
 
-`project-done.yml` trigger trong 2 case:
-- **PR merged**: parse body+branch để lấy issue list → expand sub-issues →
-  move + close tất cả
-- **Issue closed với reason `completed`**: chính issue đó (+ sub-issues) được
-  move sang Done. Reason `not_planned` → SKIP (không move).
+`agent:ready` is an execution trigger in the current loop. Never add it just to test a template or board. PM checks approved scope, AC, dependencies, trusted authorization, test capability and runtime availability before admission. Board Ready alone does not enable execution. Existing jobs remain legacy until the controller/worker adapters enforce the v1 task contract; creating a template does not install that controller.
 
-→ Hệ quả: dù close issue qua PR merge hay manual UI, kết quả như nhau.
+Auto-pr uses the existing PAT_TOKEN to allow follow-on CI; do not replace it blindly with GITHUB_TOKEN. Confirm actual run/head/check state on a new PR. No token value belongs in a task, issue, receipt or repository.
 
-### File workflow liên quan
-
-- `.github/workflows/auto-pr.yml` — chạy on push to `claude/**` → tạo/update
-  PR với `Closes` lines (đã expand sub-issues)
-- `.github/workflows/project-done.yml` — chạy on PR merge HOẶC issue close →
-  move issues sang Done trên Project Board #4
-- `.github/workflows/issue-lifecycle.yml` — sync issue events → `issue-N.md` trong `docs/active/` / `docs/closed/`
-- `.github/workflows/sync-phase-status.yml` — chạy khi
-  `docs/current/phase-status.yaml` thay đổi → regenerate marker sections
-  trong CLAUDE.md / README.md / docs/README.md / strategy.md
-
-### Push policy — default to PR for substantive changes
-
-**Default:** mọi thay đổi đi qua `claude/**` branch + PR. Auto-pr.yml tự
-tạo PR. User merge → workflow chuyển issue sang Done.
-
-**Direct-to-main CHỈ chấp nhận trong các case sau:**
-
-| Case | Ví dụ | Tại sao OK |
-|---|---|---|
-| One-off ops script ≤100 lines | `scripts/cleanup-branches.sh` | Không có business logic, không cần review |
-| Hotfix workflow YAML đang hư | Fix bug `auto-pr.yml` không tạo PR | PR sẽ chính nó là victim của bug |
-| Auto-generated content | Output của `sync_phase_status.py` (qua workflow bot) | Đã được review qua source-of-truth file |
-
-**Substantive changes LUÔN đi qua PR** kể cả khi cảm giác urgent:
-- Code thay đổi có business logic
-- Schema migrations
-- Doc thay đổi structure (không phải auto-gen)
-- Workflow YAML thêm/sửa logic mới (không phải hotfix)
-- File ≥3 hoặc diff ≥100 lines
-
-**Khi không chắc → ASK USER hoặc DEFAULT TO PR.** PR cost thêm 1-2 phút,
-direct-to-main cost mất review history + ngược convention. Trade-off rõ.
-
-**Self-check trước khi `git push origin main`:**
-1. Có phải one-off script ngắn không? KHÔNG → branch + PR
-2. Có phải hotfix workflow đang hư không? KHÔNG → branch + PR
-3. Có phải auto-gen output từ trusted source-of-truth không? KHÔNG → branch + PR
-4. Tất cả KHÔNG → branch + PR
+A release/deployment failure does not reopen completed code by itself; record the delivery failure and create/link a fix task. Preserve per-environment immutable receipts; board fields are only a current summary.

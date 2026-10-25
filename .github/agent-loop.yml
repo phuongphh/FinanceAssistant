@@ -44,6 +44,8 @@ guard:
     - .env.*
     - .github/**
     - scripts/agent_loop/**
+    - scripts/delivery/**
+    - docs/contracts/**
     - .claude/skills/implement-issue/**
   allowed:
     - .env.example
