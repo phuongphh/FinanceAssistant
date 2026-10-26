@@ -7,7 +7,6 @@ GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.gith
 | #784 | Chưa gắn phase | [Story 1] Life Assurance Data Model & Service | [unphased/issue-784.md](unphased/issue-784.md) |
 | #787 | Chưa gắn phase | [Story 4] Life Assurance in Asset Report & Dashboard | [unphased/issue-787.md](unphased/issue-787.md) |
 | #1047 | Chưa gắn phase | [Fleet] Verify GitHub approval evidence before runner admission | [unphased/issue-1047.md](unphased/issue-1047.md) |
-| #1049 | Chưa gắn phase | [Fleet] Run supervised local coding proposals with GitHub CI gates | [unphased/issue-1049.md](unphased/issue-1049.md) |
 | #1050 | Chưa gắn phase | [Fleet pilot] Document the supervised Mac coding and CI workflow | [unphased/issue-1050.md](unphased/issue-1050.md) |
 
-**Total active:** 5
+**Total active:** 4
