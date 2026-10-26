@@ -139,3 +139,7 @@ Before enabling v2 dispatch:
 
 Only then should PM advertise unattended product coding as ready. Production
 release transport and Mac Dev/Production isolation remain separate milestones.
+
+For the user-approved supervised Mac workflow without local product tests or a VM,
+see [local coding with remote CI](local-coding-ci.md). It is a separate operator
+profile, not activation of the autonomous dispatcher described above.

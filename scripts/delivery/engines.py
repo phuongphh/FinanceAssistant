@@ -64,7 +64,10 @@ def command(
     max_cost_usd=None,
     read_only=True,
     model=None,
+    proposal_only=False,
 ) -> list[str]:
+    if proposal_only and not read_only:
+        raise ValueError("Proposal mode requires read-only execution")
     if engine not in VERSIONS:
         raise ValueError("Unsupported engine")
     if session_id is not None and not SESSION.fullmatch(session_id):
@@ -111,6 +114,26 @@ def command(
             "-c",
             'approval_policy="never"',
         ]
+        if proposal_only:
+            # Validated against the pinned CLI. No product files are mounted in cwd.
+            for feature in (
+                "shell_tool",
+                "apps",
+                "plugins",
+                "browser_use",
+                "computer_use",
+                "multi_agent",
+                "hooks",
+                "skill_mcp_dependency_install",
+                "view_image",
+            ):
+                args += ["--disable", feature]
+            args += [
+                "--enable",
+                "skip_host_skill_discovery",
+                "-c",
+                'web_search="disabled"',
+            ]
         if session_id:
             args += ["resume", session_id]
         args += ["--json", "--output-last-message", str(output)]
@@ -208,6 +231,24 @@ def parse(
     return result
 
 
+def unexpected_proposal_tool(engine, event):
+    if not isinstance(event, dict):
+        return False
+    item = event.get("item", {})
+    if engine == "codex":
+        return isinstance(item, dict) and item.get("type") not in (
+            None,
+            "agent_message",
+            "reasoning",
+            "error",
+        )
+    message = event.get("message")
+    content = message.get("content", []) if isinstance(message, dict) else []
+    return isinstance(content, list) and any(
+        isinstance(x, dict) and x.get("type") == "tool_use" for x in content
+    )
+
+
 def _stop(proc):
     # The leader may have exited while descendants still own its process group.
     try:
@@ -244,6 +285,7 @@ def run(
     heartbeat: Callable[[], None] | None = None,
     executable: str | None = None,
     check_version=True,
+    proposal_only=False,
 ) -> EngineResult:
     if timeout_seconds <= 0:
         raise ValueError("Positive timeout required")
@@ -262,6 +304,7 @@ def run(
         max_cost_usd=max_cost_usd,
         read_only=read_only,
         model=model,
+        proposal_only=proposal_only,
     )
     if executable:
         args[0] = executable
@@ -361,6 +404,16 @@ def run(
         proc.returncode,
         bounded(final, 1024 * 1024) if final.exists() else "",
     )
+    if proposal_only:
+        for line in bounded(paths[0], 8 * 1024 * 1024).splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if unexpected_proposal_tool(engine, event):
+                result.status = "blocked"
+                result.reason = "unexpected_tool_in_proposal_profile"
+                break
     if forced:
         result.status = forced
         result.reason = "process_stopped_and_reaped"
