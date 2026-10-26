@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 import fcntl
+from fnmatch import fnmatchcase
 import json
 import os
 from pathlib import Path
@@ -51,6 +52,13 @@ def config_value(path):
     if not c["repositories"]:
         raise Denied("No monitored repositories")
     for r in c["repositories"]:
+        if r.get("dev_environment") is not None and (
+            r["dev_environment"] != "dev-macmini"
+            or not isinstance(r.get("dev_paths"), list)
+            or not r["dev_paths"]
+            or not all(isinstance(p, str) and p for p in r["dev_paths"])
+        ):
+            raise Denied("Invalid Dev approval profile")
         if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+", r["name"]):
             raise Denied("Invalid repository")
         datetime.fromisoformat(r["discover_after"].replace("Z", "+00:00"))
@@ -69,6 +77,22 @@ def config_value(path):
         ):
             raise Denied("Invalid watched number")
     return c
+
+
+def timestamp(value):
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise Denied("Timezone required")
+    return parsed.timestamp()
+
+
+def affects_dev(files, patterns):
+    return any(
+        fnmatchcase(f.get("filename", ""), pattern)
+        or fnmatchcase(f.get("previous_filename", ""), pattern)
+        for f in files
+        for pattern in patterns
+    )
 
 
 def classify(pr, runs, jobs, reviews, required):
@@ -135,6 +159,14 @@ def message(repo, pr, phase):
         "ready": (
             "Đã qua kiểm thử và review tự động; đang chờ bạn duyệt merge.",
             "Bạn cần: duyệt và merge nếu đúng yêu cầu để chuẩn bị bản Dev. Chưa cần thử trên bot đang chạy.",
+        ),
+        "dev_approval": (
+            "Bản mới đã merge. Bạn có duyệt triển khai lên Dev để nghiệm thu không?",
+            f"Trả lời: “Duyệt Dev #{pr['number']}” hoặc “Chưa triển khai Dev #{pr['number']}”. Sau khi bạn duyệt, PM sẽ giao Ốp Dev kiểm tra và triển khai đúng bản này. Chưa triển khai Production.",
+        ),
+        "merged_no_dev": (
+            "Đã merge; chưa phát hiện thay đổi thuộc phạm vi triển khai ứng dụng Dev.",
+            "PM rà soát phạm vi trước khi đề nghị triển khai. Bạn chưa cần thao tác.",
         ),
         "merged": (
             "Đã merge vào bản tích hợp; chưa xác nhận triển khai Dev.",
@@ -229,6 +261,106 @@ class Monitor:
         self.save()
         return 1
 
+    def prepare_dev_request(self, profile, pr, *, dry_run=False):
+        repo = profile["name"]
+        if not profile.get("dev_environment"):
+            return "merged"
+        merge_sha = pr.get("merge_commit_sha")
+        if not re.fullmatch(r"[0-9a-f]{40}", str(merge_sha)):
+            raise Denied("Merged PR has no fixed merge SHA; do not request deployment")
+        files = pages(self.github, repo, f"pulls/{pr['number']}/files")
+        if not affects_dev(files, profile["dev_paths"]):
+            return "merged_no_dev"
+        key = repo + "#" + str(pr["number"])
+        requests = self.state.setdefault("dev_requests", {})
+        previous = requests.get(key)
+        if previous and previous["merge_sha"] != merge_sha:
+            raise Denied("Deployment request version changed; operator review required")
+        if previous and previous["status"] in ("approved", "declined"):
+            return "dev_decided"
+        if not previous:
+            requests[key] = {
+                "repository": repo,
+                "pr_number": pr["number"],
+                "merge_sha": merge_sha,
+                "environment": profile["dev_environment"],
+                "status": "awaiting_approval",
+                "notification_status": "pending",
+                "created_at": self.clock(),
+                "pr_url": pr["html_url"],
+            }
+        return "dev_approval"
+
+    def decide_dev(self, repo, number, merge_sha, decision, approval_reference):
+        """Record a decision from an already authorized PM session; never deploy.
+
+        The reference is audit context, not independent authentication. No public
+        endpoint/issue content may invoke this decision on the user's behalf.
+        """
+        if decision not in ("approved", "declined") or not approval_reference.strip():
+            raise Denied("Explicit session decision/reference required")
+        profiles = [p for p in self.config["repositories"] if p["name"] == repo]
+        if len(profiles) != 1 or profiles[0].get("dev_environment") != "dev-macmini":
+            raise Denied("Unknown Dev profile")
+        with (self.root / "monitor.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.state = json.loads(self.path.read_text())
+            key = repo + "#" + str(number)
+            request = self.state.get("dev_requests", {}).get(key)
+            if not request or request["merge_sha"] != merge_sha:
+                raise Denied("No matching immutable Dev request")
+            if request["status"] != "awaiting_approval":
+                if request["status"] == decision:
+                    return {
+                        "changed": False,
+                        "request": request,
+                        "note": "Already recorded; reconcile prior handoff before redispatch",
+                    }
+                if not (
+                    request["status"] == "declined"
+                    and decision == "approved"
+                    and approval_reference != request.get("approval_reference")
+                ):
+                    raise Denied("Decision already recorded; operator review required")
+            pr = self.github(repo, "pulls/" + str(number))
+            if (
+                not pr.get("merged")
+                or pr.get("state") != "closed"
+                or pr.get("base", {}).get("ref") != "main"
+                or pr.get("merge_commit_sha") != merge_sha
+            ):
+                raise Denied("GitHub merged version no longer matches request")
+            request.update(
+                status=decision,
+                decision_at=self.clock(),
+                approval_reference=approval_reference[:2000],
+            )
+            self.save()
+            return {"changed": True, "request": request, "deployment_started": False}
+
+    def recent_closed(self, profile):
+        repo = profile["name"]
+        cutoff = max(timestamp(profile["discover_after"]), self.clock() - 7 * 86400)
+        found = []
+        for page in range(1, 21):
+            rows = self.github(
+                repo,
+                "pulls?state=closed&base=main&sort=updated&direction=desc&per_page=100&page="
+                + str(page),
+            )
+            for pr in rows:
+                if timestamp(pr["updated_at"]) < cutoff:
+                    return found
+                if (
+                    pr.get("merged_at")
+                    and timestamp(pr["merged_at"]) >= cutoff
+                    and BRANCH.match(pr["head"]["ref"])
+                ):
+                    found.append(pr)
+            if len(rows) < 100:
+                return found
+        raise Denied("Too many recently closed PR pages")
+
     def pull_requests(self, profile):
         repo = profile["name"]
         opened = pages(self.github, repo, "pulls?state=open&base=main")
@@ -241,12 +373,16 @@ class Monitor:
                 and p.get("created_at", "") >= profile["discover_after"]
             )
         }
+        if profile.get("dev_environment"):
+            for pr in self.recent_closed(profile):
+                selected.setdefault(pr["number"], pr)
         prefix = repo + "#"
         numbers = set(profile.get("watch_prs", [])) | {
             int(k[len(prefix) :])
             for k, v in self.state["prs"].items()
             if k.startswith(prefix)
-            and v.get("observed", {}).get("phase") not in ("merged", "closed")
+            and v.get("observed", {}).get("phase")
+            not in ("merged", "merged_no_dev", "closed")
         }
         for number in numbers:
             if number not in selected:
@@ -315,6 +451,16 @@ class Monitor:
                         phase = classify(
                             pr, runs, jobs, reviews, profile["required_workflows"]
                         )
+                        if phase == "merged":
+                            phase = self.prepare_dev_request(
+                                profile, pr, dry_run=dry_run
+                            )
+                        if phase == "dev_decided":
+                            self.state["prs"].setdefault(key, {})["observed"] = {
+                                "phase": "merged",
+                                "head": pr["head"]["sha"],
+                            }
+                            continue
                         if phase != "pending":
                             sent += self.notify(
                                 key,
@@ -323,6 +469,13 @@ class Monitor:
                                 message(repo, pr, phase),
                                 dry_run=dry_run,
                             )
+                            if phase == "dev_approval" and not dry_run:
+                                request = self.state["dev_requests"][key]
+                                delivered = self.state["prs"][key]
+                                request.update(
+                                    notification_status="delivered",
+                                    notification_message_id=delivered["message_id"],
+                                )
                         else:
                             self.state["prs"].setdefault(key, {})["last_pending_at"] = (
                                 self.clock()
@@ -388,11 +541,30 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dev-decision", choices=("approved", "declined"))
+    parser.add_argument("--repository")
+    parser.add_argument("--pr", type=int)
+    parser.add_argument("--merge-sha")
+    parser.add_argument("--approval-reference")
     args = parser.parse_args()
     try:
-        result = Monitor(args.state, config_value(args.config)).tick(
-            dry_run=args.dry_run
-        )
+        monitor = Monitor(args.state, config_value(args.config))
+        if args.dev_decision:
+            if args.dry_run or not all(
+                (args.repository, args.pr, args.merge_sha, args.approval_reference)
+            ):
+                raise Denied("Complete explicit decision context required")
+            result = monitor.decide_dev(
+                args.repository,
+                args.pr,
+                args.merge_sha,
+                args.dev_decision,
+                args.approval_reference,
+            )
+        else:
+            if any((args.repository, args.pr, args.merge_sha, args.approval_reference)):
+                raise Denied("Unexpected decision arguments")
+            result = monitor.tick(dry_run=args.dry_run)
         print(json.dumps(result))
     except Exception:
         print(

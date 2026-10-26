@@ -8,7 +8,9 @@ from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
-from delivery.pm_monitor import Monitor, classify, pages, message  # noqa: E402
+from delivery.pm_monitor import Monitor, classify, pages, message, affects_dev  # noqa: E402
+
+from delivery.controller import Denied  # noqa: E402
 
 REPO = "example/repo"
 REQUIRED = {".github/workflows/ci.yml": "pytest"}
@@ -114,6 +116,8 @@ class MonitorTests(unittest.TestCase):
         self.root = Path(self.tmp.name) / "state"
         self.pr, self.runs, self.jobs = sample()
         self.opened = [copy.deepcopy(self.pr)]
+        self.closed = []
+        self.files = [{"filename": "backend/example.py"}]
         self.config = {
             "destination": {"channel": "telegram", "account": "pm", "target": "123"},
             "repositories": [
@@ -133,6 +137,10 @@ class MonitorTests(unittest.TestCase):
     def api(self, repo, path):
         self.assertEqual(repo, REPO)
         self.queries.append(path)
+        if path.startswith("pulls?state=closed"):
+            return copy.deepcopy(self.closed)
+        if path.startswith("pulls/1/files"):
+            return copy.deepcopy(self.files)
         if path.startswith("pulls?"):
             return copy.deepcopy(self.opened)
         if path.startswith("pulls/1/reviews"):
@@ -227,6 +235,125 @@ class MonitorTests(unittest.TestCase):
                 poll()
         self.sent.assert_called_once()
         self.assertIn("chưa cập nhật được", self.sent.call_args.args[1])
+
+    def merged_dev(self):
+        self.config["repositories"][0].update(
+            dev_environment="dev-macmini", dev_paths=["backend/**"]
+        )
+        self.pr.update(
+            state="closed",
+            merged=True,
+            merge_commit_sha="c" * 40,
+            merged_at="2026-10-26T01:00:00Z",
+            updated_at="2026-10-26T01:00:00Z",
+        )
+        self.opened = []
+        self.closed = [copy.deepcopy(self.pr)]
+
+    def test_merge_between_polls_creates_persistent_dev_approval_request(self):
+        self.merged_dev()
+        self.assertEqual(self.monitor().tick()["notifications"], 1)
+        state = json.loads((self.root / "state.json").read_text())
+        request = state["dev_requests"][REPO + "#1"]
+        self.assertEqual(request["merge_sha"], "c" * 40)
+        self.assertEqual(request["environment"], "dev-macmini")
+        self.assertEqual(request["status"], "awaiting_approval")
+        self.assertEqual(request["notification_status"], "delivered")
+        self.assertIn("Duyệt Dev #1", self.sent.call_args.args[1])
+        self.assertIn("Production", self.sent.call_args.args[1])
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+
+    def test_previous_merged_info_is_upgraded_to_approval_question_once(self):
+        self.merged_dev()
+        m = self.monitor()
+        m.state["prs"][REPO + "#1"] = {
+            "observed": {"phase": "merged", "head": "a" * 40},
+            "delivered": {"phase": "merged", "head": "a" * 40},
+        }
+        m.save()
+        self.assertEqual(self.monitor().tick()["notifications"], 1)
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+
+    def test_control_only_merge_does_not_request_application_dev(self):
+        self.merged_dev()
+        self.files = [{"filename": "scripts/delivery/pm_monitor.py"}]
+        self.monitor().tick()
+        state = json.loads((self.root / "state.json").read_text())
+        self.assertFalse(state.get("dev_requests"))
+        self.assertNotIn("Duyệt Dev", self.sent.call_args.args[1])
+        self.assertFalse(affects_dev([{"filename": "docs/test.md"}], ["backend/**"]))
+        self.assertTrue(
+            affects_dev(
+                [{"filename": "docs/moved.md", "previous_filename": "backend/old.py"}],
+                ["backend/**"],
+            )
+        )
+
+    def test_approval_is_recorded_idempotently_but_never_deploys(self):
+        self.merged_dev()
+        self.monitor().tick()
+        first = self.monitor().decide_dev(
+            REPO, 1, "c" * 40, "approved", "trusted-session:human-message"
+        )
+        self.assertTrue(first["changed"])
+        self.assertFalse(first["deployment_started"])
+        second = self.monitor().decide_dev(
+            REPO, 1, "c" * 40, "approved", "trusted-session:human-message"
+        )
+        self.assertFalse(second["changed"])
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+        self.sent.assert_called_once()
+
+    def test_decision_requires_matching_merge_version_and_explicit_reference(self):
+        self.merged_dev()
+        self.monitor().tick()
+        for sha, ref in [("d" * 40, "trusted-session:human-message"), ("c" * 40, "")]:
+            with self.assertRaises(Denied):
+                self.monitor().decide_dev(REPO, 1, sha, "approved", ref)
+        self.pr["merge_commit_sha"] = "d" * 40
+        with self.assertRaises(Denied):
+            self.monitor().decide_dev(
+                REPO, 1, "c" * 40, "approved", "trusted-session:human-message"
+            )
+
+    def test_decline_does_not_prompt_again(self):
+        self.merged_dev()
+        self.monitor().tick()
+        self.monitor().decide_dev(
+            REPO, 1, "c" * 40, "declined", "trusted-session:human-message"
+        )
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+        self.sent.assert_called_once()
+
+    def test_later_explicit_approval_can_resume_a_deferred_request(self):
+        self.merged_dev()
+        self.monitor().tick()
+        self.monitor().decide_dev(
+            REPO, 1, "c" * 40, "declined", "trusted-session:defer-message"
+        )
+        result = self.monitor().decide_dev(
+            REPO, 1, "c" * 40, "approved", "trusted-session:new-approve-message"
+        )
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["request"]["status"], "approved")
+        self.assertFalse(result["deployment_started"])
+
+    def test_unmerged_pr_with_predicted_merge_sha_cannot_request_dev(self):
+        self.config["repositories"][0].update(
+            dev_environment="dev-macmini", dev_paths=["backend/**"]
+        )
+        self.pr["merge_commit_sha"] = "c" * 40
+        self.monitor().tick()
+        self.assertFalse(
+            json.loads((self.root / "state.json").read_text()).get("dev_requests")
+        )
+
+    def test_dev_request_dry_run_does_not_persist_or_send(self):
+        self.merged_dev()
+        result = self.monitor().tick(dry_run=True)
+        self.assertIn("Duyệt Dev", result["messages"][0])
+        self.assertFalse((self.root / "state.json").exists())
+        self.sent.assert_not_called()
 
     def test_pagination_reads_all_pages(self):
         fake = Mock(side_effect=[[{}] * 100, [{}]])

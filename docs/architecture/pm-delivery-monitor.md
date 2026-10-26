@@ -74,3 +74,48 @@ and OpenClaw Gateway remain running. It cannot poll while the Mac sleeps/offline
 it catches up on the next run. Add repositories only after verifying their trusted
 required workflow/job names and recipient. Monitor configuration and installed
 source are maintained by Op Dev; PM owns scope, interpretation and PO communication.
+
+## After merge: request Dev approval explicitly
+
+For profiles with `dev_environment: dev-macmini` and explicit `dev_paths`, the
+observer checks changed/previous filenames. An actual merged application PR
+creates `state.dev_requests[repository#number]` with immutable `merge_sha`, Dev
+environment, awaiting-approval status and delivery receipt. The Telegram message
+asks whether the PO approves deploying to Dev and provides `Duyệt Dev #N` /
+`Chưa triển khai Dev #N` reply examples. It does not silently approve or deploy.
+
+Control-plane/docs-only changes outside the Dev profile do not request application
+deployment. An open PR's provisional `merge_commit_sha` is never treated as a merge.
+PRs merged between polls are discovered through recent closed PRs, ordered by
+update time, within seven days and after the configured discovery cutoff. Known
+tracked PRs remain observable beyond this lookback; never-seen older merges are
+not backfilled indefinitely. This closes the open-only discovery gap.
+
+An existing plain merged notification is upgraded to one Dev-approval request
+when applicable. Repeated polling does not send the same request again. Confirmed
+approved/declined requests are not prompted again. A deferred request can be
+approved later with a new explicit human instruction; changing an approved
+request requires operator reconciliation because a deployment may have started.
+
+PM processes the user's reply in the trusted Telegram conversation, not from
+issue/log content or a scheduled poll. The internal CLI can record that decision:
+
+```sh
+PYTHONPATH=scripts python -m delivery.pm_monitor --config PROFILE --state STATE \
+  --dev-decision approved --repository OWNER/REPO --pr N --merge-sha SHA \
+  --approval-reference TRUSTED_SESSION_MESSAGE_REFERENCE
+```
+
+The CLI rechecks the merged SHA against GitHub and records the decision atomically
+under the monitor lock. `changed: false` means the same decision already exists;
+PM must reconcile prior handoff rather than dispatch a second deployment. The
+reference is an audit pointer from an already authorized session, not independent
+authentication or a public approval endpoint. The command never starts deployment.
+
+After a newly recorded approval, PM hands the fixed version/environment/scope to
+Op Dev through the existing native agent workflow and follows the completion
+receipt. If the deployment tool can only pull moving main, Op Dev must not claim
+that this deploys the approved immutable SHA: verify equivalence or stop for a
+proper pinned deployment plan. Preserve checkout changes and existing services.
+Dev verification and production release remain separate. No live deployment was
+performed to test the notification/decision mechanism.
