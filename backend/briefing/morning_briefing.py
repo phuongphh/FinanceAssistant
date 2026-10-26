@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot.formatters.money import format_money_short
 from backend.bot.formatters.movers import format_movers_line
+from backend.bot.utils.link_entities import markdown_link
 from backend.market_data.analytics.news_relevance import get_relevant_news
 from backend.market_data.analytics.portfolio_metrics import (
     compute_diversification_score,
@@ -156,10 +157,19 @@ def _allocation_lines(breakdown: net_worth_calculator.NetWorthBreakdown) -> str:
     return "\n".join(lines)
 
 
+NEWS_LIMIT = 5
+
+
 def _news_lines(news: list[Any]) -> str:
+    # ``[title](url)`` is turned into a Telegram ``text_link`` entity at the
+    # send boundary (``backend.bot.utils.link_entities``), so the title itself
+    # is the clickable link without depending on a Markdown parse mode.
     if not news:
         return "• Chưa có tin nổi bật cho danh mục của bạn."
-    return "\n".join(f"• {item.title}" for item in news[:3])
+    return "\n".join(
+        f"• {markdown_link(item.title, getattr(item, 'url', None))}"
+        for item in news[:NEWS_LIMIT]
+    )
 
 
 _GOLD_MARKET_SYMBOL_TO_SUBTYPE = {
@@ -366,7 +376,7 @@ async def render_enriched_morning_briefing(db: AsyncSession, user: User) -> Enri
     btc, gold, news = await asyncio.gather(
         crypto_quote("BTC"),
         gold_quote(),
-        get_relevant_news(user.id, limit=3),
+        get_relevant_news(user.id, limit=NEWS_LIMIT),
     )
     twin_line = await _twin_briefing_line(db, user.id)
     twin_accuracy_line = await _twin_accuracy_line(db, user.id)
