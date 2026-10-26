@@ -336,7 +336,9 @@ class LocalRunner:
             self.save({**state, "phase": "prepared"})
             return run_id
 
-    def propose(self, run_id, *, claude_reservation=None, feedback=""):
+    def propose(
+        self, run_id, *, claude_reservation=None, feedback="", max_seconds=None
+    ):
         with self.locked():
             state = self.state(run_id)
             self.active(state)
@@ -387,6 +389,8 @@ class LocalRunner:
                     / Decimal(1000000)
                 )
             remaining = task["limits"]["max_minutes"] * 60 - state["elapsed_seconds"]
+            if max_seconds is not None:
+                remaining = min(remaining, max_seconds)
             if remaining <= 0:
                 raise Denied("Task execution time exhausted")
             if shutil.disk_usage(self.root).free < 10 * 1024**3:
