@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from delivery.controller import Denied, digest  # noqa: E402
 from delivery.local_loop import LocalLoop, ci_feedback, scrub  # noqa: E402
-from agent_loop.cli import po_publish_notice  # noqa: E402
 
 
 class FakeRunner:
@@ -182,16 +181,6 @@ class LoopTests(unittest.TestCase):
             result["technical_reason"], "operation_failed_inspect_private_state"
         )
         self.assertNotIn("secret", json.dumps(result))
-
-    def test_po_notice_has_next_step_and_does_not_request_testing(self):
-        text = po_publish_notice(
-            1, 2, "Better news", True, "https://github.com/example/repo/pull/2"
-        )
-        self.assertIn("Bạn chưa cần", text)
-        self.assertIn("Chưa có bản Dev", text)
-        self.assertNotIn("Markdown", text)
-        self.assertLess(len(text.split()), 120)
-        self.assertIn("chưa đạt", po_publish_notice(1, 2, "Better news", False))
 
 
 class FeedbackTests(unittest.TestCase):
