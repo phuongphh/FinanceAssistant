@@ -10,6 +10,5 @@ GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.gith
 | #1050 | Chưa gắn phase | [Fleet pilot] Document the supervised Mac coding and CI workflow | [unphased/issue-1050.md](unphased/issue-1050.md) |
 | #1053 | Chưa gắn phase | Morning Brief: hiển thị tin tức dạng title=link (clickable), tăng lên 5 tin từ CafeF + VnExpress | [unphased/issue-1053.md](unphased/issue-1053.md) |
 | #1057 | Chưa gắn phase | [Fleet pilot] Explain the local loop's PO handoff in a short guide | [unphased/issue-1057.md](unphased/issue-1057.md) |
-| #1059 | Chưa gắn phase | [Fleet] Persist Claude as the local runner default with PM-controlled switching | [unphased/issue-1059.md](unphased/issue-1059.md) |
 
-**Total active:** 7
+**Total active:** 6
