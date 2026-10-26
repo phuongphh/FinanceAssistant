@@ -59,6 +59,27 @@ def config_value(path):
             or not all(isinstance(p, str) and p for p in r["dev_paths"])
         ):
             raise Denied("Invalid Dev approval profile")
+        if r.get("batch_delivery") and (
+            r.get("batch_delivery") is not True
+            or r.get("dev_environment") != "dev-macmini"
+            or not Path(r.get("controller_checkout", "")).is_absolute()
+            or r.get("candidate_workflow") != ".github/workflows/ci.yml"
+            or r.get("candidate_job") != "pytest"
+        ):
+            raise Denied("Invalid batch delivery profile")
+        for group in r.get("release_groups", []):
+            if (
+                not re.fullmatch(r"[a-z0-9-]{1,80}", str(group.get("id", "")))
+                or not isinstance(group.get("title"), str)
+                or not group["title"].strip()
+                or not isinstance(group.get("prs"), list)
+                or not group["prs"]
+                or any(
+                    not isinstance(n, int) or isinstance(n, bool) or n <= 0
+                    for n in group["prs"]
+                )
+            ):
+                raise Denied("Invalid release group")
         if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+", r["name"]):
             raise Denied("Invalid repository")
         datetime.fromisoformat(r["discover_after"].replace("Z", "+00:00"))
@@ -163,6 +184,10 @@ def message(repo, pr, phase):
         "dev_approval": (
             "Bản mới đã merge. Bạn có duyệt triển khai lên Dev để nghiệm thu không?",
             f"Trả lời: “Duyệt Dev #{pr['number']}” hoặc “Chưa triển khai Dev #{pr['number']}”. Sau khi bạn duyệt, PM sẽ giao Ốp Dev kiểm tra và triển khai đúng bản này. Chưa triển khai Production.",
+        ),
+        "dev_queued": (
+            "Đã merge và đang chờ đưa lên Dev để nghiệm thu.",
+            f"Bạn chọn: ‘Dev ngay #{pr['number']}’, ‘Để sau #{pr['number']}’, hoặc ‘Gom các thay đổi đã xong lên Dev’. PM sẽ chốt phạm vi trước khi triển khai.",
         ),
         "merged_no_dev": (
             "Đã merge; chưa phát hiện thay đổi thuộc phạm vi triển khai ứng dụng Dev.",
@@ -270,7 +295,13 @@ class Monitor:
             raise Denied("Merged PR has no fixed merge SHA; do not request deployment")
         files = pages(self.github, repo, f"pulls/{pr['number']}/files")
         if not affects_dev(files, profile["dev_paths"]):
-            return "merged_no_dev"
+            # Batch discovery includes manual/maintenance branch merges. Do not
+            # backfill unrelated control-plane history as new PO action alerts.
+            return "dev_decided" if profile.get("batch_delivery") else "merged_no_dev"
+        if profile.get("batch_delivery"):
+            from .batches import enqueue
+
+            return enqueue(self, profile, pr)
         key = repo + "#" + str(pr["number"])
         requests = self.state.setdefault("dev_requests", {})
         previous = requests.get(key)
@@ -302,6 +333,8 @@ class Monitor:
         profiles = [p for p in self.config["repositories"] if p["name"] == repo]
         if len(profiles) != 1 or profiles[0].get("dev_environment") != "dev-macmini":
             raise Denied("Unknown Dev profile")
+        if profiles[0].get("batch_delivery"):
+            raise Denied("Use the immutable batch decision for this profile")
         with (self.root / "monitor.lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.state = json.loads(self.path.read_text())
@@ -338,6 +371,17 @@ class Monitor:
             self.save()
             return {"changed": True, "request": request, "deployment_started": False}
 
+    def batch_command(self, command):
+        from .batches import Delivery
+
+        with (self.root / "monitor.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if self.path.exists():
+                self.state = json.loads(self.path.read_text())
+            result = Delivery(self).apply(command)
+            self.save()
+            return result
+
     def recent_closed(self, profile):
         repo = profile["name"]
         cutoff = max(timestamp(profile["discover_after"]), self.clock() - 7 * 86400)
@@ -354,7 +398,9 @@ class Monitor:
                 if (
                     pr.get("merged_at")
                     and timestamp(pr["merged_at"]) >= cutoff
-                    and BRANCH.match(pr["head"]["ref"])
+                    and (
+                        profile.get("batch_delivery") or BRANCH.match(pr["head"]["ref"])
+                    )
                 ):
                     found.append(pr)
             if len(rows) < 100:
@@ -504,6 +550,9 @@ class Monitor:
                                     "phase": "not_blocked",
                                     "head": None,
                                 }
+                from .batches import notify_delivery
+
+                sent += notify_delivery(self, dry_run=dry_run)
                 self.state.update(last_poll_at=self.clock(), consecutive_errors=0)
                 if not dry_run:
                     self.save()
@@ -546,10 +595,29 @@ def main():
     parser.add_argument("--pr", type=int)
     parser.add_argument("--merge-sha")
     parser.add_argument("--approval-reference")
+    parser.add_argument(
+        "--batch-command",
+        type=Path,
+        help="Private JSON command from a trusted PM/DevOps session",
+    )
     args = parser.parse_args()
     try:
         monitor = Monitor(args.state, config_value(args.config))
-        if args.dev_decision:
+        if args.batch_command:
+            if args.dry_run or any(
+                (
+                    args.dev_decision,
+                    args.repository,
+                    args.pr,
+                    args.merge_sha,
+                    args.approval_reference,
+                )
+            ):
+                raise Denied(
+                    "Batch command cannot be combined with legacy decision flags"
+                )
+            result = monitor.batch_command(json.loads(args.batch_command.read_text()))
+        elif args.dev_decision:
             if args.dry_run or not all(
                 (args.repository, args.pr, args.merge_sha, args.approval_reference)
             ):
@@ -566,12 +634,14 @@ def main():
                 raise Denied("Unexpected decision arguments")
             result = monitor.tick(dry_run=args.dry_run)
         print(json.dumps(result))
-    except Exception:
+    except Exception as exc:
         print(
             json.dumps(
                 {
                     "status": "error",
-                    "reason": "Monitor poll/delivery failed; inspect private state and scheduler run; notifications not acknowledged remain pending",
+                    "reason": str(exc)
+                    if isinstance(exc, Denied)
+                    else "Monitor poll/delivery failed; inspect private state and scheduler run; notifications not acknowledged remain pending",
                 }
             )
         )

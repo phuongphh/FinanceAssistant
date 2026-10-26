@@ -119,3 +119,15 @@ that this deploys the approved immutable SHA: verify equivalence or stop for a
 proper pinned deployment plan. Preserve checkout changes and existing services.
 Dev verification and production release remain separate. No live deployment was
 performed to test the notification/decision mechanism.
+
+## Batch delivery profile (supersedes per-PR approval when enabled)
+
+See [Đợt Dev, nghiệm thu và đề xuất phát hành](delivery-batches.md). With
+`batch_delivery: true`, merged app changes enter the durable queued/deferred
+ledger. Recently merged main PRs are discovered regardless of branch prefix;
+open-PR ready notifications retain the existing scoped discovery rules. The poll
+still uses only GET and Telegram notifications. Explicit trusted-session batch
+commands additionally support immutable scope approval, GitHub integration-CI
+branch/dispatch, deployment/acceptance attestations and release preparation.
+They never run product code locally, merge or deploy. Old `--dev-decision` is
+rejected for the enabled profile to prevent conflicting approval paths.
