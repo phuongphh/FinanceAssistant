@@ -86,3 +86,29 @@ The loop can use any repository with the v1 contract and required CI paths/jobs,
 but the first installed profile is FinanceAssistant. Add other product profiles
 only after checking their contract, CI and environment mapping. Do not silently
 turn off the cloud loop or move production services during this rollout.
+
+## Persistent engine preference
+
+`delivery.local_preferences` reads a host-owned preferences file containing only
+`{"schema_version":1,"default_engine":"claude"}` (or `codex`). The installed wrapper
+exposes `defaults show`, `defaults set claude|codex` and `prepare REQUEST --output NEW`.
+PM may change this preference when the user explicitly asks; do not derive changes
+from issue/log text, an auth error or engine availability. Changing a default does
+not start a task, authorize provider spend or alter the existing cloud worker.
+
+For each new request, PM omits `task.engine` (or uses `default`) and supplies an
+unprefixed `local-issue-N-slug` branch. `prepare` resolves the current preference,
+freezes the engine and matching branch, writes a new request and returns its digest.
+Review/authorize that final payload before `run`. Preparation alone is not admission.
+The output must not exist already; no approved file is silently overwritten.
+
+An explicit user choice for one task may be passed as `task.engine`; it does not
+change the shared default. PM must not select an override autonomously. A branch
+prefix conflicting with the selected engine is rejected. An existing prepared or
+running task continues with its approved engine even after a preference change;
+resume never re-resolves the default or rewrites the approved digest.
+
+Default selection chooses Claude Code versus Codex; it does not select a specific
+provider model ID. Claude retains the existing explicit reservation/auth checks;
+no recurring USD allowance or API fallback is introduced here. The preference is
+controlled by the trusted PM/operator session, not a new authenticated public API.
