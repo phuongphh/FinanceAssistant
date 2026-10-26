@@ -75,7 +75,8 @@ def format_main_menu(
 ) -> tuple[str, dict]:
     """Build the main menu (Level 1) text + inline keyboard.
 
-    Layout: 5 buttons in a 2-column grid (3 rows; last row has 1 button).
+    Layout: buttons in a 2-column grid (8 buttons → 4 full rows; an odd
+    count leaves 1 button on the last row).
     """
     config = _load_copy()["main_menu"]
     band = _resolve_level(level)
@@ -144,6 +145,14 @@ def get_action_copy(section: str, key: str) -> str:
     return value
 
 
+def get_action_int(section: str, key: str, default: int) -> int:
+    """Read a positive integer knob for a menu action; ``default`` if unset/invalid."""
+    value = _load_copy().get(section, {}).get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return default
+    return value
+
+
 def known_categories() -> list[str]:
     return [
         key.removeprefix("submenu_")
@@ -166,6 +175,7 @@ __all__ = [
     "format_main_menu",
     "format_submenu",
     "get_action_copy",
+    "get_action_int",
     "get_submenu_hint",
     "known_categories",
 ]

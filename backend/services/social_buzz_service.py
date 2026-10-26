@@ -1,4 +1,4 @@
-"""CRUD for admin-curated Hóng hớt items (#1061).
+"""CRUD for admin-curated Hóng hớt items (#1061) + the user-facing feed (#1062).
 
 Layer contract: flush only. The admin router owns the transaction and
 commits once, together with the audit-log entry for the same action.
@@ -6,6 +6,7 @@ commits once, together with the audit-log entry for the same action.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -86,6 +87,29 @@ def build_list_query(
     if is_active is not None:
         stmt = stmt.where(SocialBuzzItem.is_active.is_(is_active))
     return stmt.order_by(SocialBuzzItem.created_at.desc(), SocialBuzzItem.id.desc())
+
+
+async def list_latest_active(
+    db: AsyncSession, *, categories: Sequence[str], limit: int = 5
+) -> list[SocialBuzzItem]:
+    """Newest ``limit`` live + active items across ``categories`` (#1062).
+
+    Feeds the user-facing Hóng hớt menu: hidden (``is_active=false``) and
+    soft-deleted rows never surface.
+    """
+    if not categories or limit <= 0:
+        return []
+    stmt = (
+        select(SocialBuzzItem)
+        .where(
+            SocialBuzzItem.deleted_at.is_(None),
+            SocialBuzzItem.is_active.is_(True),
+            SocialBuzzItem.category.in_(list(categories)),
+        )
+        .order_by(SocialBuzzItem.created_at.desc(), SocialBuzzItem.id.desc())
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars().all())
 
 
 async def list_items(
