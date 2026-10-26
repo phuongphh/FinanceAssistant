@@ -295,7 +295,9 @@ class Monitor:
             raise Denied("Merged PR has no fixed merge SHA; do not request deployment")
         files = pages(self.github, repo, f"pulls/{pr['number']}/files")
         if not affects_dev(files, profile["dev_paths"]):
-            return "merged_no_dev"
+            # Batch discovery includes manual/maintenance branch merges. Do not
+            # backfill unrelated control-plane history as new PO action alerts.
+            return "dev_decided" if profile.get("batch_delivery") else "merged_no_dev"
         if profile.get("batch_delivery"):
             from .batches import enqueue
 

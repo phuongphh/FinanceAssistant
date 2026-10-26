@@ -373,3 +373,10 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(self.monitor().tick()["notifications"], 0)
         with self.assertRaises(Denied):
             self.monitor().decide_dev(REPO, 1, "c" * 40, "approved", "owner")
+
+    def test_batch_discovery_does_not_backfill_maintenance_notifications(self):
+        self.merged_dev()
+        self.config["repositories"][0]["batch_delivery"] = True
+        self.files = [{"filename": "scripts/delivery/pm_monitor.py"}]
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+        self.sent.assert_not_called()
