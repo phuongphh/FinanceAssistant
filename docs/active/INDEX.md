@@ -10,5 +10,7 @@ GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.gith
 | #1050 | Chưa gắn phase | [Fleet pilot] Document the supervised Mac coding and CI workflow | [unphased/issue-1050.md](unphased/issue-1050.md) |
 | #1053 | Chưa gắn phase | Morning Brief: hiển thị tin tức dạng title=link (clickable), tăng lên 5 tin từ CafeF + VnExpress | [unphased/issue-1053.md](unphased/issue-1053.md) |
 | #1057 | Chưa gắn phase | [Fleet pilot] Explain the local loop's PO handoff in a short guide | [unphased/issue-1057.md](unphased/issue-1057.md) |
+| #1061 | Chưa gắn phase | Hóng hớt: data model + admin UI nhập tin thủ công (MXH/tech/economy) | [unphased/issue-1061.md](unphased/issue-1061.md) |
+| #1062 | Chưa gắn phase | Hóng hớt: thêm mục menu + hiển thị bản tin hằng ngày cho user (depends on #1061) | [unphased/issue-1062.md](unphased/issue-1062.md) |
 
-**Total active:** 6
+**Total active:** 8

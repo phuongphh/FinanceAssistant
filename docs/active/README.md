@@ -114,8 +114,8 @@ _Bảng này do `.github/scripts/issue-lifecycle.js` tự sinh — đừng sửa
 | Phase 4.6 | — | [8](../closed/phase-4.6/) |
 | Phase 4.7 | — | [6](../closed/phase-4.7/) |
 | Phase 5.0 | — | [2](../closed/phase-5.0/) |
-| Chưa gắn phase | [6](unphased/) | [122](../closed/unphased/) |
-| **Total** | **[6](INDEX.md)** | **[528](../closed/INDEX.md)** |
+| Chưa gắn phase | [8](unphased/) | [122](../closed/unphased/) |
+| **Total** | **[8](INDEX.md)** | **[528](../closed/INDEX.md)** |
 <!-- STATS:END -->
 
 ---
