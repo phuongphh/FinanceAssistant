@@ -532,6 +532,7 @@ Bảng tra cứu toàn bộ issues đã close. Sort theo issue number ascending.
 | #1049 | Chưa gắn phase | [Fleet] Run supervised local coding proposals with GitHub CI gates | [unphased/issue-1049.md](unphased/issue-1049.md) |
 | #1055 | Chưa gắn phase | [Fleet] Automate bounded local Claude/Codex loop and report clearly to the PO | [unphased/issue-1055.md](unphased/issue-1055.md) |
 | #1059 | Chưa gắn phase | [Fleet] Persist Claude as the local runner default with PM-controlled switching | [unphased/issue-1059.md](unphased/issue-1059.md) |
+| #1063 | Chưa gắn phase | [Fleet] Send proactive PM Telegram updates when PRs need PO action | [unphased/issue-1063.md](unphased/issue-1063.md) |
 
-**Total:** 528 closed issues
-(7 Phase 1, 9 Phase 2, 31 Phase 3A, 27 Phase 3.5, 16 Phase 3.6, 16 Phase 3.7, 19 Phase 3.8, 11 Phase 3.8.5, 26 Phase 3.9, 24 Phase 3.9.5, 33 Phase 4A, 28 Phase 4B, 54 Phase 4.1, 16 Phase 4.2, 30 Phase 4.2.5, 19 Phase 4.3, 2 Phase 4.4, 22 Phase 4.5, 8 Phase 4.6, 6 Phase 4.7, 2 Phase 5.0, 122 Chưa gắn phase)
+**Total:** 529 closed issues
+(7 Phase 1, 9 Phase 2, 31 Phase 3A, 27 Phase 3.5, 16 Phase 3.6, 16 Phase 3.7, 19 Phase 3.8, 11 Phase 3.8.5, 26 Phase 3.9, 24 Phase 3.9.5, 33 Phase 4A, 28 Phase 4B, 54 Phase 4.1, 16 Phase 4.2, 30 Phase 4.2.5, 19 Phase 4.3, 2 Phase 4.4, 22 Phase 4.5, 8 Phase 4.6, 6 Phase 4.7, 2 Phase 5.0, 123 Chưa gắn phase)

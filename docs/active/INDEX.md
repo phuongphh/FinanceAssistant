@@ -12,6 +12,5 @@ GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.gith
 | #1057 | Chưa gắn phase | [Fleet pilot] Explain the local loop's PO handoff in a short guide | [unphased/issue-1057.md](unphased/issue-1057.md) |
 | #1061 | Chưa gắn phase | Hóng hớt: data model + admin UI nhập tin thủ công (MXH/tech/economy) | [unphased/issue-1061.md](unphased/issue-1061.md) |
 | #1062 | Chưa gắn phase | Hóng hớt: thêm mục menu + hiển thị bản tin hằng ngày cho user (depends on #1061) | [unphased/issue-1062.md](unphased/issue-1062.md) |
-| #1063 | Chưa gắn phase | [Fleet] Send proactive PM Telegram updates when PRs need PO action | [unphased/issue-1063.md](unphased/issue-1063.md) |
 
-**Total active:** 9
+**Total active:** 8
