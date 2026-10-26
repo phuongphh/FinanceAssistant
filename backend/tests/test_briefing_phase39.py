@@ -225,3 +225,58 @@ async def test_briefing_pair_insight_localizes_all_gold_provider_codes():
     assert "yếu nhất: Vàng nhẫn -5.0%" in result.text
     assert "SJC_GOLD" not in result.sections["insights"]
     assert "RING_24K" not in result.sections["insights"]
+
+
+# ── Issue #1053: news titles are clickable links, 5 items ─────────────
+
+
+def _news(n: int, *, title="Tin {i}", url="https://cafef.vn/bai-{i}.chn"):
+    from backend.market_data.analytics.news_relevance import RelevantNews
+
+    return [
+        RelevantNews(title.format(i=i), None, url.format(i=i), "cafef", [])
+        for i in range(1, n + 1)
+    ]
+
+
+def test_news_lines_render_title_as_markdown_link_and_cap_at_five():
+    from backend.briefing.morning_briefing import _news_lines
+
+    lines = _news_lines(_news(7)).splitlines()
+
+    assert len(lines) == 5
+    assert lines[0] == "• [Tin 1](https://cafef.vn/bai-1.chn)"
+    assert lines[4] == "• [Tin 5](https://cafef.vn/bai-5.chn)"
+
+
+def test_news_lines_keep_empty_fallback():
+    from backend.briefing.morning_briefing import _news_lines
+
+    assert _news_lines([]) == "• Chưa có tin nổi bật cho danh mục của bạn."
+
+
+def test_news_lines_without_url_fall_back_to_plain_title():
+    from backend.briefing.morning_briefing import _news_lines
+
+    assert _news_lines(_news(1, url="")) == "• Tin 1"
+
+
+@pytest.mark.asyncio
+async def test_briefing_requests_five_relevant_news():
+    news_mock = AsyncMock(return_value=_news(5))
+    user = User()
+    user.id = uuid.uuid4()
+    user.display_name = "Test"
+    breakdown = NetWorthBreakdown(total=Decimal("100"), by_type={"cash": Decimal("100")}, asset_count=1)
+    change = NetWorthChange(Decimal("100"), Decimal("100"), Decimal("0"), 0.0, "hôm qua")
+    with patch("backend.briefing.morning_briefing.net_worth_calculator.calculate", AsyncMock(return_value=breakdown)), \
+         patch("backend.briefing.morning_briefing.net_worth_calculator.calculate_change_from_current", AsyncMock(return_value=change)), \
+         patch("backend.briefing.morning_briefing.net_worth_calculator.get_daily_movers", AsyncMock(return_value=[])), \
+         patch("backend.briefing.morning_briefing.get_crypto_quote", AsyncMock(return_value=None)), \
+         patch("backend.briefing.morning_briefing.get_gold_quote", AsyncMock(return_value=None)), \
+         patch("backend.briefing.morning_briefing.get_relevant_news", news_mock), \
+         patch("backend.briefing.morning_briefing.get_best_worst_from_assets", AsyncMock(return_value=(None, None))):
+        result = await render_enriched_morning_briefing(_DB(), user)
+
+    news_mock.assert_awaited_once_with(user.id, limit=5)
+    assert result.sections["news"].count("](https://cafef.vn/") == 5
