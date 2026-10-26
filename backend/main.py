@@ -27,6 +27,7 @@ from backend.database import get_session_factory
 from backend.miniapp import routes as miniapp_routes
 from backend.routers import (
     admin_agent_metrics,
+    admin_social_buzz,
     admin_zalo_quota,
     cashflow as cashflow_router,
     expenses,
@@ -426,6 +427,8 @@ app.include_router(admin_users.router, prefix="/api/admin")
 app.include_router(admin_licenses.router, prefix="/api/admin")
 app.include_router(admin_twin_metrics.router, prefix="/api/admin")
 app.include_router(admin_feedback.router, prefix="/api/admin")
+# Hóng hớt #1061 — portal CRUD; lives in routers/ but uses the portal's JWT.
+app.include_router(admin_social_buzz.router, prefix="/api/admin")
 app.include_router(miniapp_routes.router)  # No /api/v1 prefix — Mini App URL is public
 
 
