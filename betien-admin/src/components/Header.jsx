@@ -1,4 +1,4 @@
-import { CalendarDays, LayoutDashboard, LogOut, MessageSquareText, RefreshCcw, ShieldCheck } from 'lucide-react';
+import { CalendarDays, Flame, LayoutDashboard, LogOut, MessageSquareText, RefreshCcw, ShieldCheck } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { DATE_RANGES, useDateRange } from '../context/DateRangeContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/feedback', label: 'Feedback', icon: MessageSquareText, end: false },
+  { to: '/social-buzz', label: 'Hóng hớt', icon: Flame, end: false },
 ];
 
 // The date-range buttons + Refresh read DateRangeContext, so they only render on
