@@ -45,3 +45,13 @@ GitHub event chaining depends on actor/token and current platform behavior. See 
 ## Phase-3 foundation
 
 [Native adapters, durable controller and recovery contract](../architecture/dual-engine-runner.md) are implemented as an opt-in library. The live dispatcher is not switched by this maintenance PR. A worker result may have `session_id: null` if authentication/runtime fails before a native session starts.
+
+## Dev batches and release suggestions
+
+[Batch delivery](../architecture/delivery-batches.md) groups merged work for one
+version-bound Dev approval and UAT. Deferred work remains queued. The native PM
+monitor proactively suggests release preparation after owner-confirmed acceptance
+of a feature/batch or all configured phase members. A preparation suggestion is
+not Ready for release, a Production approval or a deployment receipt. Complete
+the existing release-v1 requirements and approved release PR into prod before
+Production deployment; do not add a duplicate human approval for the same action.

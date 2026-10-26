@@ -359,3 +359,17 @@ class MonitorTests(unittest.TestCase):
         fake = Mock(side_effect=[[{}] * 100, [{}]])
         self.assertEqual(len(pages(fake, REPO, "pulls?state=open")), 101)
         self.assertIn("page=2", fake.call_args.args[1])
+
+    def test_batch_profile_queues_manual_merge_once_and_blocks_legacy_approval(self):
+        self.merged_dev()
+        self.config["repositories"][0]["batch_delivery"] = True
+        self.pr["head"]["ref"] = "feature/manual-change"
+        self.closed = [copy.deepcopy(self.pr)]
+        self.assertEqual(self.monitor().tick()["notifications"], 1)
+        state = json.loads((self.root / "state.json").read_text())
+        self.assertEqual(state["delivery_v2"]["queue"][REPO + "#1"]["status"], "queued")
+        self.assertFalse(state.get("dev_requests"))
+        self.assertIn("Để sau #1", self.sent.call_args.args[1])
+        self.assertEqual(self.monitor().tick()["notifications"], 0)
+        with self.assertRaises(Denied):
+            self.monitor().decide_dev(REPO, 1, "c" * 40, "approved", "owner")
