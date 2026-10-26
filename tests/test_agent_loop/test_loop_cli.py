@@ -272,7 +272,9 @@ def test_publish_pushes_branch_and_opens_pr(tmp_path: Path) -> None:
     pr_calls = [b for m, p, b in fake.calls if (m, p) == ("POST", "pulls")]
     assert pr_calls and pr_calls[0]["draft"] is False and "Closes #12" in pr_calls[0]["body"]
     assert ("POST", "issues/99/labels", {"labels": ["agent"]}) in fake.calls
-    assert any("🟢" in m and "Cách test tay" in m and "bước 1" in m for m in msgs)
+    assert any("Bạn chưa cần" in m and "Chưa có bản Dev" in m for m in msgs)
+    assert all("Cách test tay" not in m and "bước 1" not in m for m in msgs)
+    assert "bước 1" in pr_calls[0]["body"]  # keep technical instructions in PR
 
 
 def test_publish_refuses_patch_touching_env(tmp_path: Path) -> None:

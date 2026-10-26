@@ -943,6 +943,17 @@ def _validate_meta(ctx: Ctx, meta: dict[str, Any], mode: str, issue_n: int, pr: 
     return None
 
 
+def po_publish_notice(issue, pr, title, passed, url=""):
+    title = " ".join(title.split())[:180]
+    status = ("Kiểm thử ban đầu đã đạt; còn chờ kiểm tra PR."
+              if passed else "Kiểm thử chưa đạt; bản thay đổi chưa sẵn sàng.")
+    return (f"Đã có bản thay đổi cho #{issue}: {title}\n{status}\n"
+            "Chưa có bản Dev được xác nhận để bạn thử trên Telegram.\n"
+            "Tiếp theo: PM phối hợp kiểm tra kỹ thuật và chuẩn bị bước nghiệm thu Dev.\n"
+            "Bạn chưa cần thao tác; nếu muốn đi tiếp, giao PM chuẩn bị bản Dev để nghiệm thu.\n"
+            f"PR #{pr}" + (f": {url}" if url else ""))
+
+
 def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -> int:
     cfg = ctx.cfg
     labels = cfg.labels
@@ -1024,10 +1035,8 @@ def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -
         return 1
 
     passed = gates_result == "pass"
-    gate_line = "✅ gates pass" if passed else "❌ gates fail"
     run_line = f"Run: {ctx.run_url()}" if ctx.run_url() else ""
     q_md = f"### ❓ Câu hỏi cho reviewer\n\n{questions}" if questions else ""
-    howto = _extract_section(summary, "Cách test tay")
 
     if mode != "fix":
         body = "\n\n".join(x for x in [
@@ -1047,13 +1056,7 @@ def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -
             pr_data = ctx.gh.api("pulls", "POST", payload)
         pr_num = pr_data["number"]
         ctx.add_labels(pr_num, labels.pr, *([] if passed else [labels.needs_fix]))
-        text = f"🟢 PR mới #{pr_num} cho #{issue_n} {title}\n{pr_data.get('html_url', '')}\n{gate_line}"
-        if not passed:
-            text += " → PR draft, xem log gates"
-        if howto:
-            text += f"\n\n🧪 Cách test tay:\n{howto}"
-        if questions:
-            text += f"\n\n❓ {questions[:800]}"
+        text = po_publish_notice(issue_n, pr_num, title, passed, pr_data.get('html_url', ''))
         ctx.notify(text)
         return 0
 
@@ -1074,7 +1077,7 @@ def cmd_publish(ctx: Ctx, out_dir: str, mode: str, issue_n: int, pr: str = "") -
                 log.warning("không chuyển PR #%s sang ready: %s", pr_num, exc)
     else:
         ctx.add_labels(pr_num, labels.needs_fix)
-    ctx.notify(f"🔧 Agent đã cập nhật PR #{pr_num} (#{issue_n}) — {gate_line}")
+    ctx.notify(po_publish_notice(issue_n, pr_num, title, passed))
     return 0
 
 

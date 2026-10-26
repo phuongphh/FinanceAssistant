@@ -121,3 +121,8 @@ operator operation, not a hidden reset.
 
 Official native setting reference:
 [Codex config](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+
+The [bounded local loop](local-loop.md) now provides a single invocation for this
+sequence, including verified CI feedback and limited automatic fixes. It retains
+the trusted-session authorization and no-local-execution boundaries described here.
