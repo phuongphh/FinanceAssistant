@@ -5,6 +5,9 @@ on:
       - 'claude/**'
       - 'codex/**'
       - '!claude/merge-prod-release-**'
+      # Local task PRs are owned by the shared fleet controller.
+      - '!claude/local-issue-*'
+      - '!codex/local-issue-*'
 permissions:
   contents: read
   pull-requests: write

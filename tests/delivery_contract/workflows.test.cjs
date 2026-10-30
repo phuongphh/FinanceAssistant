@@ -53,7 +53,7 @@ test('existing closed task PR is preserved instead of creating another',async()=
  const f=publisherFixture();f.set([{number:3,state:'closed',body:'original'}]);assert.equal((await ensurePullRequest(f)).body,'original');assert.equal(f.count(),0);
 });
 test('auto-pr never handles agent-loop or release branches',async()=>{
- for(const ref of ['refs/heads/agent/issue-1-test','refs/heads/claude/merge-prod-release-1']){
+ for(const ref of ['refs/heads/agent/issue-1-test','refs/heads/claude/merge-prod-release-1','refs/heads/claude/local-issue-1-test','refs/heads/codex/local-issue-1-test']){
   const f=publisherFixture();f.context.ref=ref;await ensurePullRequest(f);assert.equal(f.count(),0);
  }
 });
