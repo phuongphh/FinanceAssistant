@@ -11,7 +11,8 @@ Use `.github/ISSUE_TEMPLATE/delivery-task.yml`. PM turns an approved idea into s
 ## PR ownership
 
 - `agent/issue-*`: only the trusted agent-loop publisher creates the PR. Do not add this prefix to auto-pr.yml. Worker code cannot push/main/prod/merge.
-- `claude/**`, `codex/**`: auto-pr is the legacy interactive publisher, serializes by branch, reuses any existing PR and preserves its body. A new PR is draft, with reference-only links; a human/PM provides acceptance evidence and explicit closing links.
+- `claude/local-issue-*`, `codex/local-issue-*`: reserved for the shared local controller in `phuongphh/fleet-engineering`; auto-pr does not publish these branches. Activate only after the shared controller is installed and its publisher read back.
+- Other `claude/**`, `codex/**`: auto-pr is the legacy interactive publisher, serializes by branch, reuses any existing PR and preserves its body. A new PR is draft, with reference-only links; a human/PM provides acceptance evidence and explicit closing links.
 - `claude/merge-prod-release-*`: excluded; release PRs are deliberately opened with base prod.
 - One task/branch has one PR; do not reuse a closed task branch. Handle duplicate events and a concurrent creator by finding the existing PR.
 - Privileged project/PR automation checks out trusted main, not task-branch scripts.

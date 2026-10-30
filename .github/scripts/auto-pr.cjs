@@ -2,7 +2,7 @@
 async function ensurePullRequest({github, context, core}) {
   const {owner, repo} = context.repo;
   const branch = context.ref.replace(/^refs\/heads\//, '');
-  if (!/^(claude|codex)\//.test(branch) || /^claude\/merge-prod-release-/.test(branch)) return;
+  if (!/^(claude|codex)\//.test(branch) || /^(?:claude\/merge-prod-release-|(?:claude|codex)\/local-issue-)/.test(branch)) return;
   const list = () => github.paginate(github.rest.pulls.list,
     {owner, repo, head:`${owner}:${branch}`, base:'main', state:'all', per_page:100});
   const existing = await list();
