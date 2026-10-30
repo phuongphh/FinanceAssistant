@@ -9,5 +9,6 @@ GitHub issues đang mở, xếp theo phase. File được auto-sync bởi `.gith
 | #1047 | Chưa gắn phase | [Fleet] Verify GitHub approval evidence before runner admission | [unphased/issue-1047.md](unphased/issue-1047.md) |
 | #1050 | Chưa gắn phase | [Fleet pilot] Document the supervised Mac coding and CI workflow | [unphased/issue-1050.md](unphased/issue-1050.md) |
 | #1057 | Chưa gắn phase | [Fleet pilot] Explain the local loop's PO handoff in a short guide | [unphased/issue-1057.md](unphased/issue-1057.md) |
+| #1071 | Chưa gắn phase | docs: align local coding guide with the shared fleet runtime | [unphased/issue-1071.md](unphased/issue-1071.md) |
 
-**Total active:** 5
+**Total active:** 6
