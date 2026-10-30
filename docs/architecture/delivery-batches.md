@@ -40,14 +40,13 @@ bước này. Nội dung mới sau lần chốt cần được chốt và nghi�
 FinanceAssistant/TaxAssistant/CorporateSAgent: Dev do Ốp Dev trên Mac Mini;
 Production do Ốp Pro/pipeline trên VPS. Sản phẩm cá nhân: Ốp Dev phụ trách cả
 Dev và Production trên Mac, nhưng vẫn tách phê duyệt và hồ sơ từng môi trường.
-Controller hiện được cài thí điểm cho FinanceAssistant; không mặc định các repo
-khác đã có cùng cơ chế tự động.
+Controller dùng chung nằm trong `phuongphh/fleet-engineering`; batch Dev hiện được kiểm chứng cho FinanceAssistant. Không suy khả năng coding/monitor của repo khác thành adapter deploy đã sẵn sàng.
 
 ## Cơ chế dành cho PM và Ốp Dev
 
 Đây là phần nội bộ. Không yêu cầu PO gọi các lệnh sau.
 
-`delivery.pm_monitor` dùng cùng một state/lock với `delivery.batches`. Profile
+Các module `delivery.pm_monitor` và `delivery.batches` thuộc package đã cài từ nền tảng chung, không còn source trong repo này; PM/Ốp Dev dùng wrapper được cài. Chúng giữ cùng một state/lock. Profile
 `batch_delivery: true` thay lối duyệt Dev từng PR cũ; quyết định lịch sử được giữ
 nguyên. `delivery_v2` lưu queue, batch, phiên bản Dev và đề xuất release. File
 state riêng tư, ghi atomic, không phải schema release/deployment v1 đã duyệt
