@@ -64,6 +64,9 @@ def main(output):
                 "Synthetic runtime fixture",
             )
             sha = run("git", "-C", str(code), "rev-parse", "HEAD").decode().strip()
+            # Reproduce the production permission barrier without real secrets.
+            # Only the source config is unreadable; Git data remains readable.
+            (code / ".git/config").chmod(0)
             run("docker", "volume", "create", volume)
             created_volume = True
             run("docker", "network", "create", network)
@@ -189,6 +192,8 @@ def main(output):
                 "backup_directory": str(backups),
                 "health_url": "http://" + endpoint + "/health",
                 "max_backup_bytes": 8 * 1024**2,
+                "git_metadata_mode": "isolated-readonly-v1",
+                "git_scratch_directory": str(backups),
             }
             # Scope the deploy lock to this fixture. The real /tmp lock is untouched.
             ops.DEPLOY_LOCK = root / "fixture-deploy.lock"
@@ -282,6 +287,11 @@ def main(output):
                 "backup": backup,
                 "synthetic_restore_row_verified": restored,
                 "runtime_drift_detected": True,
+                "protected_git_config_mode_preserved": (code / ".git/config")
+                .stat()
+                .st_mode
+                & 0o777
+                == 0,
                 "production_touched": False,
                 "created_containers": started,
                 "created_volume": volume,

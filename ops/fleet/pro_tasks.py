@@ -6,6 +6,7 @@ No deploy, migrations, restore, restart, cleanup or arbitrary command interface.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -13,6 +14,7 @@ from pathlib import Path
 import resource
 import re
 import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -48,20 +50,73 @@ def command(argv: list[str], *, data: bytes | None = None, timeout: int = 30) ->
     return result.stdout
 
 
-def git(policy: dict, *args: str) -> bytes:
-    return command(
-        [
-            "git",
-            "--no-replace-objects",
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            "-C",
-            policy["project_dir"],
-            *args,
-        ]
-    )
+@contextmanager
+def readonly_git_metadata(policy: dict):
+    """Expose only data needed for read-only Git; never read source config.
+
+    Production config may be root-only because it contains a credential. The
+    temporary view follows current refs/index/objects without copying secrets,
+    changing their permissions or creating a stale repository snapshot.
+    """
+    if policy.get("git_metadata_mode") != "isolated-readonly-v1":
+        raise OpsError("git_read_mode_not_registered")
+    project = Path(policy["project_dir"])
+    metadata = project / ".git"
+    scratch = Path(policy["git_scratch_directory"])
+    if (
+        project.resolve() != project
+        or metadata.resolve() != metadata
+        or not metadata.is_dir()
+    ):
+        raise OpsError("regular_registered_git_directory_required")
+    if (
+        scratch.resolve() != scratch
+        or not scratch.is_dir()
+        or scratch.stat().st_uid != os.getuid()
+        or scratch.stat().st_mode & 0o077
+    ):
+        raise OpsError("private_git_scratch_required")
+    required = ["HEAD", "index", "objects", "refs"]
+    if not all(
+        (metadata / name).exists() and os.access(metadata / name, os.R_OK)
+        for name in required
+    ):
+        raise OpsError("git_data_metadata_not_readable")
+    with tempfile.TemporaryDirectory(prefix="finance-git-", dir=scratch) as directory:
+        view = Path(directory)
+        (view / "config").write_text(
+            "[core]\nrepositoryformatversion = 0\nbare = false\nfilemode = true\nautocrlf = false\n"
+        )
+        head = (metadata / "HEAD").read_bytes()
+        if not re.fullmatch(rb"(?:ref: refs/[A-Za-z0-9_./-]+|[0-9a-f]{40})\n?", head):
+            raise OpsError("git_head_metadata_invalid")
+        (view / "HEAD").write_bytes(head)
+        for name in ["index", "objects", "refs", "packed-refs", "shallow"]:
+            if (metadata / name).exists():
+                (view / name).symlink_to(metadata / name)
+        yield view
+
+
+def git(policy: dict, *args: str, data: bytes | None = None) -> bytes:
+    if not args or args[0] not in {"rev-parse", "status", "ls-tree", "cat-file"}:
+        raise OpsError("git_operation_not_readonly")
+    with readonly_git_metadata(policy) as view:
+        return command(
+            [
+                "git",
+                "--no-replace-objects",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "core.fsmonitor=false",
+                "-C",
+                policy["project_dir"],
+                "--git-dir=" + str(view),
+                "--work-tree=" + policy["project_dir"],
+                *args,
+            ],
+            data=data,
+        )
 
 
 def container(policy: dict, service: str) -> dict:
@@ -127,23 +182,14 @@ def expected_code(policy: dict, sha: str) -> dict[str, str]:
         )
     ):
         raise OpsError("source_tree_outside_runtime_contract")
-    proc = subprocess.run(
-        [
-            "git",
-            "--no-replace-objects",
-            "-C",
-            policy["project_dir"],
-            "cat-file",
-            "--batch",
-        ],
-        input=("\n".join(sha + ":" + name for name in names) + "\n").encode(),
-        capture_output=True,
-        env=environment(),
-        timeout=30,
+    data = git(
+        policy,
+        "cat-file",
+        "--batch",
+        data=("\n".join(sha + ":" + name for name in names) + "\n").encode(),
     )
-    if proc.returncode or len(proc.stdout) > 24 * 1024**2:
+    if len(data) > 24 * 1024**2:
         raise OpsError("runtime_source_inventory_failed")
-    data = proc.stdout
     result = {}
     for name in names:
         header, separator, data = data.partition(b"\n")
