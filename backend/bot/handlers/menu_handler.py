@@ -59,12 +59,14 @@ from backend.bot.formatters.menu_formatter import (
     format_main_menu,
     format_submenu,
     get_action_copy,
+    get_action_int,
     get_submenu_hint,
     known_categories,
 )
 from backend.bot.formatters.money import format_money_full
 from backend.bot.handlers.free_form_text import _send_outcome
 from backend.bot.utils.emoji_animation import message_kwargs_for_animation
+from backend.bot.utils.link_entities import markdown_link, telegram_text_and_kwargs
 from backend.intent.dispatcher import IntentDispatcher
 from backend.intent.intents import (
     CLASSIFIER_RULE,
@@ -72,6 +74,11 @@ from backend.intent.intents import (
     IntentType,
 )
 from backend.miniapp.urls import expense_dashboard_url, wealth_dashboard_url
+from backend.models.social_buzz_item import (
+    CATEGORY_ECONOMY,
+    CATEGORY_SOCIAL,
+    CATEGORY_TECH,
+)
 from backend.models.user import User
 from backend.services.dashboard_service import get_user_by_telegram_id
 from backend.services.telegram_service import (
@@ -390,6 +397,13 @@ async def _navigate(
         )
         analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
         return
+    elif target == "buzz":
+        # Issue #1062: list the latest Hóng hớt items inline on entry.
+        await _navigate_buzz(
+            db=db, user=user, chat_id=chat_id, message_id=message_id, level=level
+        )
+        analytics.track("menu_navigated", user_id=user_id, properties={"to": target})
+        return
     elif target == "twin":
         # Twin is the product's primary visual surface.  Do not depend on
         # editMessageText here: Telegram cannot edit every kind of source
@@ -569,6 +583,147 @@ async def _navigate_assets(
         reply_markup=keyboard,
         **anim_kwargs,
     )
+
+
+# -----------------------------------------------------------------
+# Hóng hớt — Issue #1062
+# -----------------------------------------------------------------
+
+
+# Group key (also the ``menu:buzz:<group>`` action) → (action_buzz copy
+# key for the heading, ``social_buzz_items.category`` values it covers).
+_BUZZ_GROUPS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "social": ("group_social", (CATEGORY_SOCIAL,)),
+    "tech_economy": ("group_tech_economy", (CATEGORY_TECH, CATEGORY_ECONOMY)),
+}
+_BUZZ_DEFAULT_ITEMS_PER_GROUP = 5
+
+
+async def _buzz_group_items(db: AsyncSession, group: str) -> list[Any]:
+    from backend.services import social_buzz_service
+
+    _, categories = _BUZZ_GROUPS[group]
+    limit = get_action_int(
+        "action_buzz", "items_per_group", _BUZZ_DEFAULT_ITEMS_PER_GROUP
+    )
+    return await social_buzz_service.list_latest_active(
+        db, categories=categories, limit=limit
+    )
+
+
+def _buzz_group_block(group: str, items: list[Any]) -> str:
+    """Heading + ``• [title](url)`` lines — same shape as Morning Brief news.
+
+    ``markdown_link`` falls back to the bare title when an item has no
+    http(s) url, so link-less social items never render a fake link.
+    """
+    heading_key, _ = _BUZZ_GROUPS[group]
+    if items:
+        lines = "\n".join(
+            f"• {markdown_link(item.title, item.url)}" for item in items
+        )
+    else:
+        lines = get_action_copy("action_buzz", "group_empty")
+    return f"{get_action_copy('action_buzz', heading_key)}\n{lines}"
+
+
+async def _send_or_edit_with_links(
+    *, chat_id: int, message_id: int | None, text: str, keyboard: dict
+) -> None:
+    """Send ``[title](url)`` text as plain text + ``text_link`` entities.
+
+    Edits in place when possible, falling back to a fresh bubble when the
+    edit is rejected (``send_telegram`` returns ``None``) — same fail-open
+    rule as :func:`_navigate`.
+    """
+    plain_text, entity_kwargs = telegram_text_and_kwargs(text, "submenu")
+    if message_id is not None:
+        edited = await edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=plain_text,
+            parse_mode=None,
+            reply_markup=keyboard,
+            **entity_kwargs,
+        )
+        if edited is not None:
+            return
+    await send_message(
+        chat_id=chat_id,
+        text=plain_text,
+        parse_mode=None,
+        reply_markup=keyboard,
+        **entity_kwargs,
+    )
+
+
+async def _navigate_buzz(
+    *,
+    db: AsyncSession,
+    user: User,
+    chat_id: int,
+    message_id: int | None,
+    level: str | None,
+) -> None:
+    """Render the Hóng hớt sub-menu with both item groups inline."""
+    menu_text, keyboard = format_submenu(user, "buzz", level=level)
+    groups = {group: await _buzz_group_items(db, group) for group in _BUZZ_GROUPS}
+    hint = get_submenu_hint("buzz")
+
+    if any(groups.values()):
+        body = "\n\n".join(
+            _buzz_group_block(group, items) for group, items in groups.items()
+        )
+        # ``format_submenu`` already appends the hint; rebuild around it so
+        # the item lists sit between intro and hint.
+        intro_text = menu_text.removesuffix(f"\n\n{hint}") if hint else menu_text
+        text = f"{intro_text}\n\n{body}" + (f"\n\n{hint}" if hint else "")
+    else:
+        title = menu_text.split("\n", 1)[0]
+        text = f"{title}\n\n{get_action_copy('action_buzz', 'all_empty')}"
+
+    await _send_or_edit_with_links(
+        chat_id=chat_id, message_id=message_id, text=text, keyboard=keyboard
+    )
+
+
+def _buzz_back_keyboard() -> dict:
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": get_action_copy("action_buzz", "back_button"),
+                    "callback_data": "menu:buzz",
+                }
+            ],
+            *back_to_main_keyboard()["inline_keyboard"],
+        ]
+    }
+
+
+async def _action_buzz_group(
+    *, db: AsyncSession, user: User, chat_id: int, group: str
+) -> None:
+    """Level-3 leaf: one Hóng hớt group on its own, as a NEW message."""
+    items = await _buzz_group_items(db, group)
+    await _send_or_edit_with_links(
+        chat_id=chat_id,
+        message_id=None,
+        text=_buzz_group_block(group, items),
+        keyboard=_buzz_back_keyboard(),
+    )
+
+
+async def _action_buzz_social(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await _action_buzz_group(db=db, user=user, chat_id=chat_id, group="social")
+
+
+async def _action_buzz_tech_economy(
+    *, db: AsyncSession, user: User, chat_id: int, message_id: int | None
+) -> None:
+    await _action_buzz_group(db=db, user=user, chat_id=chat_id, group="tech_economy")
 
 
 # -----------------------------------------------------------------
@@ -1938,6 +2093,8 @@ _DIRECT_HANDLERS = {
     ("twin", "how_it_works"): _action_twin_how_it_works,
     ("twin", "share"): _action_twin_share,
     ("twin", "life_events"): _action_twin_life_events,
+    ("buzz", "social"): _action_buzz_social,
+    ("buzz", "tech_economy"): _action_buzz_tech_economy,
 }
 
 

@@ -57,6 +57,8 @@ main_menu:
       callback: "menu:goals"
     - label: "📊 Thị trường"
       callback: "menu:market"
+    - label: "🔥 Hóng hớt"
+      callback: "menu:buzz"
     - label: "👤 Profile"
       callback: "menu:profile"
     - label: "🔮 Twin"
@@ -531,3 +533,62 @@ submenu_market:
     • "VNM giá bao nhiêu?"
     • "BTC hôm nay thế nào?"
     • "nên đầu tư gì?"
+
+# ============================================================
+# SUB-MENU: HÓNG HỚT (Level 2) — #1062
+# ============================================================
+# Entering the sub-menu renders the latest admin-curated items
+# (``social_buzz_items``) inline, split in two groups; the group
+# buttons re-show one group on its own.
+
+submenu_buzz:
+  title: "🔥 HÓNG HỚT"
+
+  intro:
+    starter: |-
+      Mấy chuyện đang hot hôm nay để {name} hóng cho vui nè —
+      từ mạng xã hội tới tin công nghệ, kinh tế.
+
+    young_prof: |-
+      Tin hot trên mạng xã hội và tin công nghệ, kinh tế đáng chú ý
+      hôm nay — đọc nhanh vài phút cho {name} nhé.
+
+    mass_affluent: |-
+      Điểm nhanh chuyện nóng trên mạng xã hội cùng tin công nghệ,
+      kinh tế đáng để {name} lưu tâm hôm nay.
+
+    hnw: |-
+      Tóm tắt những chủ đề đang được bàn tán và tin công nghệ,
+      kinh tế nổi bật hôm nay cho {name}.
+
+    vip: |-
+      Bản tin gọn những chủ đề đang nóng và diễn biến công nghệ,
+      kinh tế đáng chú ý hôm nay cho {name}.
+
+  buttons:
+    - label: "🔥 MXH hot"
+      callback: "menu:buzz:social"
+      description: "Chuyện đang hot trên Threads, TikTok"
+
+    - label: "📰 Công nghệ/KT"
+      callback: "menu:buzz:tech_economy"
+      description: "Tin Công nghệ và Kinh tế mới nhất"
+
+    - label: "◀️ Quay về"
+      callback: "menu:main"
+
+  hint: |-
+    💡 Bấm vào tiêu đề có gạch chân để đọc bài gốc nhé.
+
+# Copy for the Hóng hớt item lists rendered by ``menu_handler``. Sent as
+# plain text + entities (links), so no Markdown markers here.
+action_buzz:
+  group_social: "🔥 MXH hot"
+  group_tech_economy: "📰 Tin Công nghệ/Kinh tế"
+  group_empty: "• Chưa có tin mới, mình sẽ cập nhật sớm nhé."
+  all_empty: |-
+    Hôm nay Bé Tiền chưa gom được tin nào để hóng 🌱
+    Bạn ghé lại sau một chút nhé — mình sẽ cập nhật sớm thôi.
+  back_button: "◀️ Quay về Hóng hớt"
+  # Items shown per group, newest first. Restart the process after edits.
+  items_per_group: 5

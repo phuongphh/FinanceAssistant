@@ -54,7 +54,8 @@ class TestYamlSchema:
     def test_main_menu_has_phase4a_twin_entry(self):
         copy = menu_formatter._load_copy()
         buttons = copy["main_menu"]["buttons"]
-        assert len(buttons) == 7
+        assert len(buttons) == 8
+        assert buttons[-3]["callback"] == "menu:buzz"
         assert buttons[-2]["callback"] == "menu:profile"
         assert buttons[-1]["callback"] == "menu:twin"
 
@@ -67,7 +68,7 @@ class TestYamlSchema:
 
     def test_all_phase4a_submenus_exist(self):
         cats = known_categories()
-        expected = {"assets", "expenses", "cashflow", "goals", "market", "twin"}
+        expected = {"assets", "expenses", "cashflow", "goals", "market", "twin", "buzz"}
         assert expected == set(cats)
 
     def test_all_adaptive_sections_have_four_levels(self):
@@ -178,10 +179,9 @@ class TestFormatMainMenu:
     def test_keyboard_layout_is_2_column_grid(self):
         _, kb = format_main_menu(_user())
         rows = kb["inline_keyboard"]
-        # Phase 4A adds Twin: 7 buttons, 2 per row → 3 full rows + final row.
+        # #1062 adds Hóng hớt: 8 buttons, 2 per row → 4 full rows.
         assert len(rows) == 4
-        assert len(rows[0]) == 2
-        assert len(rows[-1]) == 1
+        assert all(len(row) == 2 for row in rows)
 
     def test_unknown_level_falls_back_to_default(self):
         text, _ = format_main_menu(_user(), level="alien-level")

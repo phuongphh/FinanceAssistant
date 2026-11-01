@@ -103,6 +103,7 @@ from backend.models.decision_query_log import (
     DecisionQueryLog,
 )
 from backend.models.media_object import TOKEN_HASH_LENGTH, MediaObject
+from backend.models.social_buzz_item import SocialBuzzItem
 
 __all__ = [
     "User",
@@ -205,4 +206,6 @@ __all__ = [
     # Phase 5.1
     "MediaObject",
     "TOKEN_HASH_LENGTH",
+    # Hóng hớt (#1061)
+    "SocialBuzzItem",
 ]

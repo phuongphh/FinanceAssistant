@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend import analytics
 from backend.briefing.morning_briefing import render_enriched_morning_briefing
 from backend.bot.keyboards.briefing_keyboard import briefing_actions_keyboard
-from backend.bot.utils.emoji_animation import message_kwargs_for_animation
+from backend.bot.utils.link_entities import telegram_text_and_kwargs
 from backend.database import get_session_factory
 from backend.models.event import Event
 from backend.models.expense import Expense
@@ -220,12 +220,18 @@ async def run_morning_briefing_job(
                         include_twin=bool(result.sections.get("twin"))
                     )
 
+            # News titles arrive as ``[title](url)``; convert them to
+            # ``text_link`` entities (plus custom emoji) on the final text so
+            # offsets stay correct even after first-briefing decoration.
+            plain_text, entity_kwargs = telegram_text_and_kwargs(
+                text_to_send, "briefing"
+            )
             send_response = await notifier.send_message(
                 chat_id=user.telegram_id,
-                text=text_to_send,
+                text=plain_text,
                 parse_mode=None,
                 reply_markup=reply_markup,
-                **message_kwargs_for_animation(result.text, "briefing"),
+                **entity_kwargs,
             )
             # Notifier returns ``None`` on adapter error (it logs but
             # doesn't raise — that's the contract). Treat as failure

@@ -213,7 +213,7 @@ async def _run(iterations: int, output: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Phase 3.9 offline performance benchmarks.")
     parser.add_argument("--iterations", type=int, default=30, help="Briefing render iterations")
-    parser.add_argument("--output", type=Path, default=REPO_ROOT / "docs/current/phase-3.9-benchmark.md")
+    parser.add_argument("--output", type=Path, default=REPO_ROOT / "docs/closed/phase-3.9/phase-3.9-benchmark.md")
     args = parser.parse_args()
     asyncio.run(_run(args.iterations, args.output))
 

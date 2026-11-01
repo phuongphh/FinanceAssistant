@@ -21,6 +21,7 @@ class MessageEntity(TypedDict, total=False):
     offset: int
     length: int
     custom_emoji_id: str
+    url: str
 
 
 EmojiMapping = Mapping[str, Mapping[str, Any]]

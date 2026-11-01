@@ -1,6 +1,6 @@
 """Performance benchmarks for the intent layer (Story #132 — Epic 4).
 
-Targets from ``docs/current/phase-3.5-detailed.md`` § Metrics:
+Targets from ``docs/closed/phase-3.5/phase-3.5-detailed.md`` § Metrics:
 
   Rule classifier         p50 < 50ms,  p99 < 200ms
   End-to-end (text)       p50 < 1s,    p99 < 3s    [LLM mocked here]

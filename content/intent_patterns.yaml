@@ -15,7 +15,7 @@
 #      probable, <0.7 = soft hint that must escalate before acting.
 #   3. Add at least one fixture in tests/test_intent/fixtures/query_examples.yaml.
 #
-# Reference: docs/current/phase-3.5-detailed.md § 1.2
+# Reference: docs/closed/phase-3.5/phase-3.5-detailed.md § 1.2
 
 query_assets:
   description: "User asks about their assets (any type)."

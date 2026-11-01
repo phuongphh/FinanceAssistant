@@ -16,12 +16,12 @@ Files can opt-in to any marker by including the BEGIN/END comments.
 Files without a marker are skipped silently (no error).
 
 Also seeds a ``<!-- testing-signoff: need to be signed -->`` marker into any
-``phase-*-test-cases*.md`` in ``docs/current/`` that is missing one, so the
+``phase-*-test-cases*.md`` in ``docs/active/`` that is missing one, so the
 archive-phase workflow can detect tester sign-off automatically.
 
 Called by two workflows:
 - ``.github/workflows/sync-phase-status.yml`` — on every push touching phase-status.yaml
-- ``.github/workflows/archive-phase.yml`` — after archiving, to sync updated doc paths
+- ``.github/workflows/archive-phase.yml`` — after closing a phase, to sync updated doc paths
 
 Usage:
     python scripts/sync_phase_status.py              # sync all target files
@@ -42,7 +42,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PHASE_STATUS_FILE = REPO_ROOT / "docs/current/phase-status.yaml"
-CURRENT_DIR = REPO_ROOT / "docs/current"
+# Docs of unfinished phases — the only place a sign-off marker still matters.
+ACTIVE_DIR = REPO_ROOT / "docs/active"
 
 # Marker seeded into every phase-*-test-cases.md that lacks one.
 _SIGNOFF_MARKER_BLOCK = """\
@@ -50,8 +51,8 @@ _SIGNOFF_MARKER_BLOCK = """\
 <!--
   Sign-off marker — driven by scripts/archive_phase.py.
   When testing is complete, change "need to be signed" → "signed" on the
-  line above. The next archive-phase workflow run will move every
-  phase-X-* doc (except the detailed_doc) into docs/archive/.
+  line above. The next archive-phase workflow run will move this phase's
+  docs from docs/active/phase-X/ into docs/closed/phase-X/.
 -->
 """
 _SIGNOFF_RE = re.compile(r"<!--\s*testing-signoff:", re.IGNORECASE)
@@ -209,10 +210,10 @@ def rewrite_links_relative(text: str, target_dir: Path) -> str:
     """Rewrite repo-root-relative markdown links to be relative to ``target_dir``.
 
     The phase-status YAML stores doc paths relative to the repo root
-    (e.g. ``docs/current/phase-4.4/...``). That resolves correctly for
+    (e.g. ``docs/closed/phase-4.4/...``). That resolves correctly for
     target files at the repo root (CLAUDE.md, README.md) but 404s from a
     file inside a subdirectory (docs/README.md would resolve them to
-    ``docs/docs/current/...``). Re-anchor each in-repo link to the target
+    ``docs/docs/closed/...``). Re-anchor each in-repo link to the target
     file's directory so links work from wherever the marker lives.
 
     External links (http, mailto, anchors, absolute paths) are left as-is.
@@ -330,13 +331,13 @@ load_status = load_phase_status
 
 def seed_test_cases_markers(dry_run: bool = False) -> list[Path]:
     """Insert the testing-signoff marker into any phase-*-test-cases*.md
-    in docs/current/ (recursive) that is missing it.
+    in docs/active/ (recursive) that is missing it.
 
     Inserts the marker block after the first H1 heading line (or at the
     top of the file if no H1 is found). Returns list of files written.
     """
     seeded: list[Path] = []
-    for path in sorted(CURRENT_DIR.rglob("*.md")):
+    for path in sorted(ACTIVE_DIR.rglob("*.md")):
         if "test-cases" not in path.name:
             continue
         if not re.match(r"phase-", path.name, re.IGNORECASE):

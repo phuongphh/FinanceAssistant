@@ -4,6 +4,7 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import FeedbackPage from './pages/FeedbackPage';
 import LoginPage from './pages/LoginPage';
+import SocialBuzzPage from './pages/SocialBuzzPage';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/feedback" element={<FeedbackPage />} />
+        <Route path="/social-buzz" element={<SocialBuzzPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

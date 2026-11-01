@@ -94,6 +94,25 @@ export function getFeedbackCsvUrl(params = {}) {
   return buildAdminDashboardPath('/feedback/export.csv', buildFeedbackQueryParams(params));
 }
 
+export function getSocialBuzzList({ category, isActive, limit = 50, offset = 0 } = {}) {
+  return apiFetch(buildAdminDashboardPath('/social-buzz', { category, is_active: isActive, limit, offset }));
+}
+
+export function createSocialBuzz(body) {
+  return apiFetch('/social-buzz', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateSocialBuzz(itemId, changes) {
+  return apiFetch(`/social-buzz/${encodeURIComponent(itemId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  });
+}
+
+export function deleteSocialBuzz(itemId) {
+  return apiFetch(`/social-buzz/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+}
+
 export function invalidateTwinCache(sections = []) {
   const query = new URLSearchParams();
   (sections || []).forEach((section) => {

@@ -1,0 +1,45 @@
+name: Delivery task
+description: A scoped, reviewable task for PM and a coding worker
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal and user outcome
+      description: Explain the problem, expected behavior and source idea.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: Allowed files/components, explicit exclusions, dependencies and parent issue.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Numbered, observable criteria with expected results.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Tests, manual checks, fixtures and evidence required. No credentials or real customer data.
+    validations:
+      required: true
+  - type: textarea
+    id: delivery
+    attributes:
+      label: Delivery and operational impact
+      description: Dev target, Production target, migration/config impact and rollback limits. Coding approval is not release approval.
+    validations:
+      required: true
+  - type: textarea
+    id: authorization
+    attributes:
+      label: Approval reference
+      description: Link to the approved scope/batch. This text is a reference; the controller must verify trusted authorization before queue admission.
+    validations:
+      required: true

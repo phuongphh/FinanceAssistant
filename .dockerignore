@@ -51,3 +51,8 @@ build/
 # node_modules/dist của host đè lên layer `npm install` đã cache.
 betien-admin/node_modules/
 betien-admin/dist/
+
+# Shared/legacy coding control plane is not part of the application runtime.
+.github/
+scripts/delivery/
+scripts/agent_loop/

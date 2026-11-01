@@ -1,8 +1,17 @@
-"""Archive phase docs once manual testing is signed off.
+"""Close a phase once manual testing is signed off: docs/active → docs/closed.
+
+Layout
+------
+Phase docs live in per-phase folders under two roots::
+
+    docs/active/phase-<id>/   ← phase chưa xong (doc định hướng + issue đang mở)
+    docs/closed/phase-<id>/   ← phase đã xong (doc định hướng + issue đã đóng)
+
+``<id>`` is the phase id lower-cased (``phase-4a``, ``phase-5.1``).
 
 Trigger
 -------
-Each ``docs/current/test-cases/phase-*.md`` file carries a marker::
+Each ``docs/active/phase-<id>/phase-<id>-test-cases.md`` carries a marker::
 
     <!-- testing-signoff: need to be signed -->
 
@@ -10,10 +19,13 @@ When the human tester edits the marker to::
 
     <!-- testing-signoff: signed -->
 
-…this script (run via the Sync Phase Status workflow) moves every
-``phase-{id}-*`` doc EXCEPT the ``detailed_doc`` (per ``phase-status.yaml``)
-into ``docs/archive/``. The ``detailed_doc`` stays in ``docs/current/``
-so the roadmap table keeps a working link.
+…this script (run via the Archive Phase Docs workflow) moves every doc of
+``docs/active/phase-<id>/`` — detailed, issues, test-cases and any other
+supporting doc — into ``docs/closed/phase-<id>/``. ``issue-<N>.md`` files are
+left alone: they belong to ``.github/scripts/issue-lifecycle.js``, which files
+them by issue state (open → active, closed → closed). Path fields in
+``phase-status.yaml`` and relative links inside the moved docs are rewritten
+so they keep resolving.
 
 Why a marker file
 -----------------
@@ -21,7 +33,7 @@ Why a marker file
   human memory to update YAML.
 - Grep-friendly + commit-friendly: the change is one line of one
   file, easy to review.
-- Reversible-by-revert: if archiving was wrong, revert the commit.
+- Reversible-by-revert: if closing was wrong, revert the commit.
 
 Idempotent
 ----------
@@ -32,14 +44,15 @@ CLI
 ---
 ::
 
-    python scripts/archive_phase.py            # archive every signed phase
+    python scripts/archive_phase.py            # close every signed phase
     python scripts/archive_phase.py --dry-run  # report only, no mutation
-    python scripts/archive_phase.py --phase 3.5  # force-archive one phase
+    python scripts/archive_phase.py --phase 5.1  # force-close one phase
                                                  # (ignores marker; for ops)
 """
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -51,8 +64,11 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PHASE_STATUS_FILE = REPO_ROOT / "docs" / "current" / "phase-status.yaml"
-CURRENT_DIR = REPO_ROOT / "docs" / "current"
-ARCHIVE_DIR = REPO_ROOT / "docs" / "archive"
+ACTIVE_DIR = REPO_ROOT / "docs" / "active"
+CLOSED_DIR = REPO_ROOT / "docs" / "closed"
+
+# Per-issue snapshots, owned by .github/scripts/issue-lifecycle.js.
+_ISSUE_FILE_RE = re.compile(r"^issue-\d+\.md$")
 
 # Marker comment. Keep "need to be signed" as the seeded default so a
 # fresh test-cases file is unambiguously not-yet-signed. The matcher
@@ -111,15 +127,15 @@ def _phase_id_from_filename(name: str) -> str | None:
 def find_signed_phases(dry_run: bool = False) -> list[str]:
     """Return phase ids whose test-cases file has marker == 'signed'.
 
-    Searches recursively in docs/current/ for any file matching
-    phase-*-test-cases*.md (handles flat layout and per-phase subfolders).
-    Order preserves sorted filesystem listing for reproducibility.
+    Searches recursively in docs/active/ for any file matching
+    phase-*-test-cases*.md. Order preserves sorted filesystem listing
+    for reproducibility.
     """
-    if not CURRENT_DIR.is_dir():
+    if not ACTIVE_DIR.is_dir():
         return []
     signed: list[str] = []
     seen_ids: set[str] = set()
-    for entry in sorted(CURRENT_DIR.rglob("*.md")):
+    for entry in sorted(ACTIVE_DIR.rglob("*.md")):
         if not entry.is_file():
             continue
         if "test-cases" not in entry.name:
@@ -146,27 +162,39 @@ def _match_phase_id(filename: str, pid: str) -> bool:
     return bool(pat.match(filename))
 
 
+def phase_dir_name(pid: str) -> str:
+    return f"phase-{pid.lower()}"
+
+
 def find_files_for_phase(pid: str) -> list[Path]:
-    """All ``phase-{pid}-*.md`` files under ``docs/current/`` (recursive),
-    including the detailed_doc. Handles flat layout and per-phase subfolders."""
-    matches: list[Path] = []
-    for entry in sorted(CURRENT_DIR.rglob("*.md")):
-        if not entry.is_file():
-            continue
-        if not _match_phase_id(entry.name, pid):
-            continue
-        matches.append(entry)
-    return matches
+    """Docs to close for phase ``pid``: every file in
+    ``docs/active/phase-<pid>/`` except ``issue-<N>.md``, plus any stray
+    ``phase-<pid>-*.md`` sitting elsewhere under ``docs/active/``."""
+    matches: set[Path] = set()
+    folder = ACTIVE_DIR / phase_dir_name(pid)
+    if folder.is_dir():
+        for entry in folder.rglob("*"):
+            if entry.is_file() and not _ISSUE_FILE_RE.match(entry.name):
+                matches.add(entry)
+    if ACTIVE_DIR.is_dir():
+        for entry in ACTIVE_DIR.rglob("*.md"):
+            if entry.is_file() and _match_phase_id(entry.name, pid):
+                matches.add(entry)
+    return sorted(matches)
 
 
 # ---------------------- mutation ----------------------
 
 
-def _archive_destination(src: Path) -> Path:
-    """Flatten all phase docs into archive/ root regardless of their
-    source subfolder (e.g. docs/current/phase-3.8/phase-3.8-issues.md
-    → docs/archive/phase-3.8-issues.md)."""
-    return ARCHIVE_DIR / src.name
+def _closed_destination(src: Path, pid: str) -> Path:
+    """docs/active/phase-<pid>/<sub/path> → docs/closed/phase-<pid>/<sub/path>.
+    A stray doc outside the phase folder lands at the closed folder root."""
+    folder = ACTIVE_DIR / phase_dir_name(pid)
+    try:
+        rel = src.relative_to(folder)
+    except ValueError:
+        rel = Path(src.name)
+    return CLOSED_DIR / phase_dir_name(pid) / rel
 
 
 def _git_mv(src: Path, dest: Path) -> None:
@@ -188,25 +216,45 @@ def _git_mv(src: Path, dest: Path) -> None:
         shutil.move(str(src), str(dest))
 
 
-def _rewrite_cross_links_in_archived_file(archived: Path) -> bool:
-    """Rewrite any ``docs/current/`` absolute-style links inside an archived
-    file so they resolve correctly from ``docs/archive/``.
+# Markdown link target: ``](path)`` or ``](path#anchor)``.
+_LINK_RE = re.compile(r"\]\((?P<target>[^)\s#]+)(?P<anchor>#[^)\s]*)?\)")
 
-    All phase docs are flattened into the same archive/ directory, so
-    ``./phase-X-detailed.md`` and bare ``phase-X-detailed.md`` links between
-    sibling archived files need no rewriting — they already point to the same
-    directory.  Only ``../current/...`` or ``docs/current/...`` links that
-    survived from a previous partial-archive need updating.
-    """
-    text = archived.read_text(encoding="utf-8")
-    # Rewrite any lingering links that still point into docs/current/.
-    # e.g.  ../current/phase-X-detailed.md  →  phase-X-detailed.md
-    pat = re.compile(r"\]\((?:\.\./)+"r"current/(phase-[^)]+)\)")
-    new_text, n = pat.subn(r"](\1)", text)
-    if n == 0 or new_text == text:
+
+def _rewrite_relative_links(
+    old: Path, new: Path, moved: dict[Path, Path]
+) -> bool:
+    """Re-point relative links in a doc that moved from ``old`` to
+    ``new``: each target is resolved against the old location (following
+    any file moved in the same run) and re-expressed relative to the new
+    location. URLs, absolute paths and pure anchors are left alone, as
+    are links whose target can't be found (already broken)."""
+    text = new.read_text(encoding="utf-8")
+
+    def _fix(m: re.Match[str]) -> str:
+        target = m.group("target")
+        if ":" in target or target.startswith("/"):
+            return m.group(0)
+        resolved = Path(os.path.normpath(old.parent / target))
+        resolved = moved.get(resolved, resolved)
+        if not resolved.exists():
+            return m.group(0)
+        rel = Path(os.path.relpath(resolved, new.parent)).as_posix()
+        if rel == target:
+            return m.group(0)
+        return f"]({rel}{m.group('anchor') or ''})"
+
+    new_text = _LINK_RE.sub(_fix, text)
+    if new_text == text:
         return False
-    archived.write_text(new_text, encoding="utf-8")
+    new.write_text(new_text, encoding="utf-8")
     return True
+
+
+def _remove_if_empty(folder: Path) -> None:
+    if folder.is_dir() and not any(folder.rglob("*")):
+        for sub in sorted(folder.rglob("*"), reverse=True):
+            sub.rmdir()
+        folder.rmdir()
 
 
 def _update_yaml_paths_for_moves(
@@ -238,7 +286,7 @@ class ArchiveResult:
     phase_id: str
     moved: list[tuple[Path, Path]]
     rewrote: list[Path]
-    skipped: list[Path]  # already in archive/ or no-op
+    skipped: list[Path]  # already in closed/ or no-op
     yaml_updated: bool = False
 
 
@@ -249,7 +297,7 @@ def archive_phase(pid: str, dry_run: bool = False) -> ArchiveResult:
     skipped: list[Path] = []
 
     for src in files:
-        dest = _archive_destination(src)
+        dest = _closed_destination(src, pid)
         if dest.exists():
             # Idempotent: a previous run already moved it.
             skipped.append(src)
@@ -261,9 +309,13 @@ def archive_phase(pid: str, dry_run: bool = False) -> ArchiveResult:
 
     for src, dest in moves:
         _git_mv(src, dest)
-        if _rewrite_cross_links_in_archived_file(dest):
+    moved = dict(moves)
+    for src, dest in moves:
+        if dest.suffix == ".md" and _rewrite_relative_links(src, dest, moved):
             rewrites.append(dest)
 
+    # Folder may still hold open issue files — only drop it when empty.
+    _remove_if_empty(ACTIVE_DIR / phase_dir_name(pid))
     yaml_updated = _update_yaml_paths_for_moves(moves)
     return ArchiveResult(pid, moves, rewrites, skipped, yaml_updated)
 
@@ -280,7 +332,7 @@ def _fmt_path(p: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Archive phase docs after testing sign-off."
+        description="Close a phase after testing sign-off: docs/active → docs/closed."
     )
     parser.add_argument(
         "--dry-run",
@@ -290,7 +342,7 @@ def main() -> int:
     parser.add_argument(
         "--phase",
         metavar="ID",
-        help="Force-archive a specific phase id, ignoring the "
+        help="Force-close a specific phase id, ignoring the "
         "test-cases marker. Use for ops/backfill only.",
     )
     args = parser.parse_args()
@@ -303,7 +355,7 @@ def main() -> int:
         target_ids = find_signed_phases()
 
     if not target_ids:
-        print("No phases to archive (no test-cases marker == 'signed').")
+        print("No phases to close (no test-cases marker == 'signed').")
         return 0
 
     any_changes = False
@@ -331,7 +383,7 @@ def main() -> int:
         if result.skipped:
             print(
                 f"Phase {pid}: {len(result.skipped)} file(s) already "
-                f"archived (skipped)"
+                f"in docs/closed/ (skipped)"
             )
         if result.yaml_updated:
             print(

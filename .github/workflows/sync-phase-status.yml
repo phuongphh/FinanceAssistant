@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Use default GITHUB_TOKEN; fine for committing to same repo.
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -66,8 +66,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Sync targets + any test-cases files that received seeded markers.
           git add CLAUDE.md README.md docs/README.md docs/current/strategy.md 2>/dev/null || true
-          git add 'docs/current/**/*test-cases*.md' 2>/dev/null || true
-          git add docs/current/ 2>/dev/null || true
+          git add docs/current/ docs/active/ docs/closed/ 2>/dev/null || true
           # Commit only if there are staged changes (some files may not exist).
           if ! git diff --cached --quiet; then
             git commit -m "chore: sync phase status + seed test-cases markers [skip ci]"

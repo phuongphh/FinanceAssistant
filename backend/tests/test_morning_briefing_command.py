@@ -59,3 +59,45 @@ async def test_manual_morning_briefing_uses_entities_and_does_not_mark_scheduled
     assert kwargs["entities"]
     mock_track.assert_awaited_once()
     assert mock_track.await_args.args[0] == "morning_briefing_requested"
+
+
+@pytest.mark.asyncio
+async def test_manual_morning_briefing_sends_news_titles_as_text_links():
+    """Issue #1053 — ``[title](url)`` leaves the body as a clickable title."""
+    user = User()
+    user.id = uuid.uuid4()
+    user.telegram_id = 999
+    result = EnrichedBriefingResult(
+        text="📰 Top tin liên quan:\n• [VN-Index *tăng* [mạnh\\]](https://cafef.vn/a.chn)",
+        level=WealthLevel.STARTER,
+        sections={},
+    )
+    notifier = MagicMock()
+    notifier.send_message = AsyncMock(return_value={"ok": True})
+
+    with patch(
+        "backend.bot.handlers.morning_briefing_command.render_enriched_morning_briefing",
+        new_callable=AsyncMock,
+        return_value=result,
+    ), patch(
+        "backend.bot.handlers.morning_briefing_command.get_notifier",
+        return_value=notifier,
+    ), patch(
+        "backend.bot.utils.emoji_animation.load_emoji_animation_map",
+        return_value={},
+    ), patch(
+        "backend.bot.handlers.morning_briefing_command.analytics.atrack",
+        new_callable=AsyncMock,
+    ):
+        await send_morning_briefing_now(MagicMock(), chat_id=123, user=user)
+
+    _, kwargs = notifier.send_message.await_args
+    assert kwargs["text"] == "📰 Top tin liên quan:\n• VN-Index *tăng* [mạnh]"
+    assert kwargs["entities"] == [
+        {
+            "type": "text_link",
+            "offset": len("📰 Top tin liên quan:\n• ".encode("utf-16-le")) // 2,
+            "length": len("VN-Index *tăng* [mạnh]"),
+            "url": "https://cafef.vn/a.chn",
+        }
+    ]

@@ -2,7 +2,7 @@
 """One-click broadcast for Phase deploy announcements.
 
 Reads message templates from a markdown file (default:
-``docs/current/phase-3.8-deploy-announcements.md``), picks one by ID,
+``docs/closed/phase-3.8/phase-3.8-deploy-announcements.md``), picks one by ID,
 and sends it via Telegram to all eligible users.
 
 Designed so the operator can run a single command per announcement
@@ -57,7 +57,7 @@ from backend.services.telegram_service import (  # noqa: E402
     send_message,
 )
 
-DEFAULT_DOC = REPO_ROOT / "docs" / "current" / "phase-3.8-deploy-announcements.md"
+DEFAULT_DOC = REPO_ROOT / "docs" / "closed" / "phase-3.8" / "phase-3.8-deploy-announcements.md"
 
 logging.basicConfig(
     level=logging.INFO,
