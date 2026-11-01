@@ -211,7 +211,14 @@ def inspect(policy: dict) -> dict:
             url, timeout=5
         ) as response:
             body = json.loads(response.read(65537))
-            health = response.status == 200 and body.get("status") in ("ok", "healthy")
+            data = body.get("data") if isinstance(body, dict) else None
+            health = (
+                response.status == 200
+                and isinstance(body, dict)
+                and body.get("error") is None
+                and isinstance(data, dict)
+                and data.get("status") == "healthy"
+            )
     except (OSError, ValueError):
         health = False
     runtime = {}

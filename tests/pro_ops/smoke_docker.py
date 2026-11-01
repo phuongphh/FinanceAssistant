@@ -110,7 +110,7 @@ def main(output):
                         "type=bind,source=" + str(code) + ",target=/app,readonly",
                     ]
                     if service == "backend":
-                        server = "from http.server import BaseHTTPRequestHandler,HTTPServer\nclass H(BaseHTTPRequestHandler):\n def do_GET(self):\n  self.send_response(200);self.end_headers();self.wfile.write(b'{\"status\":\"healthy\"}')\nHTTPServer(('0.0.0.0',18092),H).serve_forever()"
+                        server = 'from http.server import BaseHTTPRequestHandler,HTTPServer\nclass H(BaseHTTPRequestHandler):\n def do_GET(self):\n  self.send_response(200);self.end_headers();self.wfile.write(b\'{"data":{"status":"healthy"},"error":null}\')\nHTTPServer((\'0.0.0.0\',18092),H).serve_forever()'
                         args += [
                             "-p",
                             "127.0.0.1::18092",

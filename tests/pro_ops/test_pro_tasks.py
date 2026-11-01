@@ -179,3 +179,23 @@ class ProductionOperationsTests(unittest.TestCase):
         self.assertEqual(Path(result["private_path"]).read_bytes(), archive)
         self.assertTrue(result["archive_list_verified"])
         self.assertFalse(result["restore_test_performed"])
+
+    def test_inspect_uses_finance_health_envelope_and_rejects_error_payload(self):
+        self.policy["health_url"] = "http://127.0.0.1:8002/health"
+        for body, expected in [
+            ({"data": {"status": "healthy"}, "error": None}, True),
+            ({"status": "healthy"}, False),
+            ({"data": {"status": "healthy"}, "error": "backend error"}, False),
+            ({"data": {"status": "degraded"}, "error": None}, False),
+            (None, False),
+        ]:
+            with (
+                self.subTest(body=body),
+                patch.object(ops, "git", side_effect=[b"a" * 40, b"prod", b""]),
+                patch.object(ops, "container", return_value={"running": False}),
+                patch.object(ops.urllib.request, "build_opener") as opener,
+            ):
+                response = opener.return_value.open.return_value.__enter__.return_value
+                response.status = 200
+                response.read.return_value = json.dumps(body).encode()
+                self.assertEqual(ops.inspect(self.policy)["health"], expected)
