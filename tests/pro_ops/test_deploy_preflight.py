@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -157,9 +158,58 @@ class DeployIdentityPreflightTests(unittest.TestCase):
         report = json.loads(output.getvalue())
         self.assertFalse(report["existing_root_probe_available"])
         self.assertEqual(
-            command.call_args.args[0][:3], ["sudo", "-n", "/usr/bin/python3"]
+            command.call_args.args[0][:4], ["sudo", "-n", "/usr/bin/python3", "-I"]
         )
         self.assertNotIn("credential", output.getvalue())
+
+    def test_optional_root_timeout_preserves_primary_deploy_identity_report(self):
+        output = io.StringIO()
+        with (
+            patch("sys.argv", ["deploy_preflight.py"]),
+            patch.object(diag.os, "getuid", return_value=1000),
+            patch.object(
+                diag,
+                "probe",
+                return_value={
+                    "status": "diagnostic_complete",
+                    "uid": 1000,
+                    "git_error": "permission_denied",
+                    "production_changed": False,
+                },
+            ),
+            patch.object(
+                diag,
+                "command",
+                side_effect=subprocess.TimeoutExpired(
+                    ["sudo"], 90, stderr=b"private credential"
+                ),
+            ) as command,
+            redirect_stdout(output),
+        ):
+            diag.main()
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["status"], "diagnostic_complete")
+        self.assertEqual(report["git_error"], "permission_denied")
+        self.assertFalse(report["existing_root_probe_available"])
+        self.assertEqual(report["existing_root_probe_error_type"], "TimeoutExpired")
+        self.assertEqual(command.call_args.kwargs["timeout"], 90)
+        self.assertNotIn("private credential", output.getvalue())
+
+    def test_isolated_reporter_does_not_import_sibling_module(self):
+        marker = self.project / "unexpected-import"
+        (self.project / "argparse.py").write_text(
+            "from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n"
+        )
+        reporter = self.project / "reporter.py"
+        reporter.write_bytes((ROOT / "ops/fleet/deploy_preflight.py").read_bytes())
+        result = subprocess.run(
+            [sys.executable, "-I", str(reporter), "--help"],
+            cwd=self.project,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertIn(b"--root-probe", result.stdout)
+        self.assertFalse(marker.exists())
 
     def test_root_probe_cannot_grant_itself_root(self):
         output = io.StringIO()
@@ -231,6 +281,7 @@ class DeployIdentityPreflightTests(unittest.TestCase):
             for s in diagnostic["steps"]
         )
         self.assertNotIn("docker compose", scripts)
+        self.assertIn('python3 -I "$FLEET_DIAG_FILE"', scripts)
         self.assertNotIn("chown", scripts)
         self.assertNotIn(
             "chown -R", (ROOT / ".github/workflows/deploy.yml").read_text()

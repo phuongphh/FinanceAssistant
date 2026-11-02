@@ -32,7 +32,7 @@ COMPONENTS = {
 }
 
 
-def command(argv: list[str]) -> subprocess.CompletedProcess:
+def command(argv: list[str], *, timeout: int = 25) -> subprocess.CompletedProcess:
     env = {
         "PATH": "/usr/local/bin:/usr/bin:/bin",
         "HOME": str(Path.home()),
@@ -45,7 +45,7 @@ def command(argv: list[str]) -> subprocess.CompletedProcess:
     # Preserve sudo's actual caller identity for Git's normal ownership check.
     if os.environ.get("SUDO_UID", "").isdigit():
         env["SUDO_UID"] = os.environ["SUDO_UID"]
-    return subprocess.run(argv, capture_output=True, env=env, timeout=25)
+    return subprocess.run(argv, capture_output=True, env=env, timeout=timeout)
 
 
 def git(*args: str) -> subprocess.CompletedProcess:
@@ -200,28 +200,40 @@ def main() -> None:
             raise ValueError("Existing sudo permission required")
         report = probe(root_probe=args.root_probe)
         if not args.root_probe:
-            if os.getuid() == 0:
-                report["existing_root_context"] = probe(root_probe=True)
-            else:
-                result = command(
-                    [
-                        "sudo",
-                        "-n",
-                        "/usr/bin/python3",
-                        str(Path(__file__).resolve()),
-                        "--root-probe",
-                    ]
-                )
-                report["existing_root_probe_available"] = result.returncode == 0
-                if result.returncode == 0:
-                    value = json.loads(result.stdout)
-                    if (
-                        value.get("status") == "diagnostic_complete"
-                        and value.get("uid") == 0
-                    ):
-                        report["existing_root_context"] = value
-                    else:
-                        report["existing_root_probe_available"] = False
+            try:
+                if os.getuid() == 0:
+                    report["existing_root_context"] = probe(root_probe=True)
+                else:
+                    result = command(
+                        [
+                            "sudo",
+                            "-n",
+                            "/usr/bin/python3",
+                            "-I",
+                            str(Path(__file__).resolve()),
+                            "--root-probe",
+                        ],
+                        timeout=90,
+                    )
+                    report["existing_root_probe_available"] = result.returncode == 0
+                    if result.returncode == 0:
+                        value = json.loads(result.stdout)
+                        if (
+                            value.get("status") == "diagnostic_complete"
+                            and value.get("uid") == 0
+                        ):
+                            report["existing_root_context"] = value
+                        else:
+                            report["existing_root_probe_available"] = False
+            except (
+                OSError,
+                subprocess.SubprocessError,
+                ValueError,
+                TypeError,
+            ) as error:
+                # An optional probe must not discard the deploy user's evidence.
+                report["existing_root_probe_available"] = False
+                report["existing_root_probe_error_type"] = type(error).__name__
         print(json.dumps(report, indent=2))
     except Exception as error:
         print(
