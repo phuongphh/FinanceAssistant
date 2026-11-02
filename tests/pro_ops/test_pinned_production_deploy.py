@@ -44,6 +44,8 @@ class PinnedProductionDeployTests(unittest.TestCase):
         self.git("commit", "-m", "baseline")
         self.baseline = self.git("rev-parse", "HEAD").strip()
         (self.project / "feature.txt").write_text("approved feature")
+        (self.project / "feature").mkdir()
+        (self.project / "feature/child.py").write_text("# approved source\n")
         self.git("add", ".")
         self.git("commit", "-m", "approved feature")
         self.candidate = self.git("rev-parse", "HEAD").strip()
@@ -151,9 +153,21 @@ elif 'alembic' in args:
         self.assertEqual(self.git("rev-parse", "HEAD").strip(), self.baseline)
 
     def test_pinned_release_backs_up_before_shutdown_and_keeps_private_archive(self):
+        config = self.project / ".git/config"
+        config.chmod(0o600)
         result = self.run_deploy()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.git("rev-parse", "HEAD").strip(), self.candidate)
+        self.assertEqual((self.project / "feature.txt").stat().st_mode & 0o777, 0o644)
+        self.assertEqual((self.project / "feature").stat().st_mode & 0o777, 0o755)
+        self.assertEqual(
+            (self.project / "feature/child.py").stat().st_mode & 0o777, 0o644
+        )
+        self.assertEqual((self.project / ".git/index").stat().st_mode & 0o777, 0o644)
+        self.assertEqual(
+            (self.project / ".git/refs/heads/prod").stat().st_mode & 0o777, 0o644
+        )
+        self.assertEqual(config.stat().st_mode & 0o777, 0o600)
         events = self.service_events()
         dump = next(i for i, e in enumerate(events) if "pg_dump" in e)
         down = next(i for i, e in enumerate(events) if "down" in e)

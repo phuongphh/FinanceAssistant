@@ -39,8 +39,14 @@ fi
 # Ignore hooks/helpers/global configuration. The registered root-only origin
 # retains its existing credential; no remote URL or raw network error is logged.
 git() {
-    command git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false \
-        -c credential.helper= -c http.sslVerify=true -c "safe.directory=$PROJECT_DIR" "$@"
+    (
+        trap - ERR
+        # New source/metadata must remain readable to non-root Pro verification.
+        # This does not change existing protected config; backups/logs stay 0600.
+        umask 022
+        command git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+            -c credential.helper= -c http.sslVerify=true -c "safe.directory=$PROJECT_DIR" "$@"
+    )
 }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
 
