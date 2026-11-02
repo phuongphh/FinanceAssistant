@@ -3,7 +3,7 @@
 # rebuild-finance-prod.sh — Production deploy (Docker-based)
 # =============================================================================
 # Pipeline:
-#   pre-flight → git pull → DB backup → admin-build check → docker compose down
+#   pre-flight → fetch approved SHA → DB backup → fast-forward → docker compose down
 #   → build (admin SPA build TRONG image) + up --wait → smoke test → cleanup → notify
 #
 # Khác với deploy/production/deploy.sh (minimal): script này bổ sung
@@ -12,7 +12,7 @@
 # npm). Đây là entry point mặc định cho prod deploy.
 #
 # Usage:
-#   bash scripts/rebuild-finance-prod.sh
+#   Use reviewed main deploy.yml with exact approved and observed baseline SHAs.
 # Env overrides:
 #   PROJECT_DIR       (default: /home/evg-user/FinanceAssistant)
 #   BRANCH            (default: prod)
@@ -20,11 +20,35 @@
 #   PROJECT_NAME      (default: financeassistant)
 #   BACKEND_PORT      (default: 8002, mapped on host)
 #   HEALTH_TIMEOUT    (default: 120s)
-#   SKIP_BACKUP       (1 = bỏ qua DB snapshot — KHÔNG khuyến nghị)
+#   APPROVED_SHA      required: exact approved release commit on origin/prod
+#   EXPECTED_CHECKOUT_SHA required: observed baseline before deployment
 #   SKIP_PRUNE        (1 = bỏ qua docker image prune)
 # =============================================================================
 
 set -Eeuo pipefail
+umask 077
+
+# Deployment never follows a moving branch or silently skips a database backup.
+APPROVED_SHA="${APPROVED_SHA:-}"
+EXPECTED_CHECKOUT_SHA="${EXPECTED_CHECKOUT_SHA:-}"
+if [[ ! "$APPROVED_SHA" =~ ^[0-9a-f]{40}$ || ! "$EXPECTED_CHECKOUT_SHA" =~ ^[0-9a-f]{40}$ || "${SKIP_BACKUP:-0}" != 0 ]]; then
+    echo 'Missing exact release/baseline SHA, or backup bypass requested. No deployment.' >&2
+    exit 2
+fi
+
+# Ignore hooks/helpers/global configuration. The registered root-only origin
+# retains its existing credential; no remote URL or raw network error is logged.
+git() {
+    (
+        trap - ERR
+        # New source/metadata must remain readable to non-root Pro verification.
+        # This does not change existing protected config; backups/logs stay 0600.
+        umask 022
+        command git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+            -c credential.helper= -c http.sslVerify=true -c "safe.directory=$PROJECT_DIR" "$@"
+    )
+}
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
 
 # ── config ─────────────────────────────────────────────────────
 PROJECT_DIR="${PROJECT_DIR:-/home/evg-user/FinanceAssistant}"
@@ -36,9 +60,8 @@ HEALTH_URL="http://localhost:${BACKEND_PORT}/health"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 ENV_FILE="$PROJECT_DIR/.env"
 BACKUP_DIR="$PROJECT_DIR/.backups"
-LOCK_FILE="/tmp/rebuild-finance-prod.lock"
 TS="$(date +%Y%m%d-%H%M%S)"
-LOG_FILE="/tmp/rebuild-finance-${TS}.log"
+LOG_FILE="$(mktemp "/tmp/rebuild-finance-${TS}-XXXXXX.log")"
 
 REQUIRED_ENV_KEYS=(
     POSTGRES_PASSWORD
@@ -79,7 +102,21 @@ BACKUP_FILE=""
 DEPLOY_PHASE="init"
 DEPLOY_START=$(date +%s)
 
-cleanup_lock() { rm -f "$LOCK_FILE"; }
+LOCK_OWNED=0
+cleanup_lock() {
+    [[ "$LOCK_OWNED" == 1 ]] || return 0
+    python3 -I - "$$" <<'PY'
+import os, stat, sys
+from pathlib import Path
+p = Path('/tmp/rebuild-finance-prod.lock')
+try:
+    info = p.lstat()
+    if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and p.read_text() == sys.argv[1]:
+        p.unlink()
+except FileNotFoundError:
+    pass
+PY
+}
 
 do_rollback() {
     # Best-effort: reset code về SHA cũ và rebuild stack.
@@ -89,7 +126,7 @@ do_rollback() {
     log "Rebuilding stack với code cũ..."
     dc build backend scheduler 2>&1 | tee -a "$LOG_FILE" || true
     dc up -d 2>&1 | tee -a "$LOG_FILE" || true
-    err "Rollback xong. DB NOT reverted — restore từ ${BACKUP_FILE:-'(no backup taken)'} thủ công nếu schema bị break."
+    err "Đã thử rollback code. Chưa xác minh runtime; DB NOT reverted. Restore cần quy trình riêng từ ${BACKUP_FILE:-'(no backup taken)'}."
 }
 
 on_error() {
@@ -97,10 +134,10 @@ on_error() {
     trap - ERR
     err "Deploy FAILED at phase: $DEPLOY_PHASE (exit=$exit_code)"
     case "$DEPLOY_PHASE" in
-        compose-up|smoke-test|health-check)
+        compose-down|compose-up|smoke-test|health-check)
             # Past point of no return — stack đã được tear down/recreate. Try restore.
             do_rollback
-            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Rolled back to ${CURRENT_SHA:0:7}. Check $LOG_FILE."
+            notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Attempted code rollback ${CURRENT_SHA:0:7}; verification required. Check $LOG_FILE."
             ;;
         *)
             notify "❌ Prod deploy FAILED at [$DEPLOY_PHASE]. Check $LOG_FILE."
@@ -124,19 +161,18 @@ log " Health    : $HEALTH_URL"
 log " Log       : $LOG_FILE"
 log "----------------------------------------------------------------"
 
-# Concurrency lock — nếu lock file tồn tại nhưng PID dead (deploy crash / kill -9 /
-# host reboot), take over thay vì stall mãi mãi.
-if ! ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then
-    lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-    if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
-        err "Another deploy đang chạy (lock: $LOCK_FILE held by PID $lock_pid)"
-        trap - EXIT
-        exit 1
-    fi
-    log "⚠️  Stale lock found (PID ${lock_pid:-unknown} not alive) — taking over"
-    rm -f "$LOCK_FILE"
-    echo "$$" > "$LOCK_FILE"
+# Same exclusive lock as Pro backup. Never remove an existing lock automatically.
+if ! python3 -I - "$$" <<'PY'
+import os, sys
+fd = os.open('/tmp/rebuild-finance-prod.lock', os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write(sys.argv[1])
+PY
+then
+    err 'Deploy/backup lock exists; reconcile its owner before retrying.'
+    exit 1
 fi
+LOCK_OWNED=1
 
 # Dependency checks
 command -v docker >/dev/null || { err "docker chưa cài đặt"; exit 1; }
@@ -157,7 +193,8 @@ done
 cd "$PROJECT_DIR"
 
 # Dirty tree refuse
-if [[ -n "$(git status --porcelain)" ]]; then
+GIT_STATUS="$(git status --porcelain)"
+if [[ -n "$GIT_STATUS" ]]; then
     err "Working tree dirty — commit/stash trước khi deploy:"
     git status --short | tee -a "$LOG_FILE"
     exit 1
@@ -171,40 +208,26 @@ if [[ "$ACTUAL_BRANCH" != "$BRANCH" ]]; then
 fi
 
 CURRENT_SHA="$(git rev-parse HEAD)"
+[[ "$CURRENT_SHA" == "$EXPECTED_CHECKOUT_SHA" ]] || { err 'Checkout differs from the inspected baseline. No deployment.'; exit 1; }
 log "Current SHA: ${CURRENT_SHA:0:7}"
 
-# ── [1/7] git pull ─────────────────────────────────────────────
-DEPLOY_PHASE="git-pull"
-step "[1/7] Pull origin/$BRANCH"
-git fetch origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
-
-# Refuse nếu local ahead — origin = single source of truth.
-ahead=$(git rev-list --count "origin/$BRANCH..HEAD")
-if (( ahead > 0 )); then
-    err "Local ahead origin/$BRANCH bởi $ahead commit(s):"
-    git log --oneline "origin/$BRANCH..HEAD" | tee -a "$LOG_FILE"
-    err "Push hoặc revert local commits trước khi deploy."
+# ── [1/7] fetch approved object ─────────────────────────────────
+DEPLOY_PHASE="git-fetch"
+step "[1/7] Fetch and validate approved origin/$BRANCH"
+if ! git fetch origin "$BRANCH" >/dev/null 2>&1; then
+    err 'Git fetch failed (network/auth); private remote details suppressed.'
     exit 1
 fi
-
-git pull --ff-only origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
-NEW_SHA="$(git rev-parse HEAD)"
-if [[ "$CURRENT_SHA" == "$NEW_SHA" ]]; then
-    log "ℹ️  No new commits — rebuild sẽ vẫn refresh image (deps có thể đổi)."
-else
-    log "Updated: ${CURRENT_SHA:0:7} → ${NEW_SHA:0:7}"
-    log "Changed files:"
-    git diff --name-only "$CURRENT_SHA..$NEW_SHA" | tee -a "$LOG_FILE"
-fi
+FETCHED_SHA="$(git rev-parse FETCH_HEAD)"
+[[ "$FETCHED_SHA" == "$APPROVED_SHA" ]] || { err 'origin/prod differs from the approved release. No deployment.'; exit 1; }
+git merge-base --is-ancestor "$CURRENT_SHA" "$APPROVED_SHA" || { err 'Approved release is not a fast-forward. No deployment.'; exit 1; }
 
 # ── [2/7] DB backup ────────────────────────────────────────────
 DEPLOY_PHASE="db-backup"
 step "[2/7] Backup database trước khi migrate"
-if [[ "${SKIP_BACKUP:-0}" == "1" ]]; then
-    log "⏭  SKIP_BACKUP=1 — bỏ qua backup (KHÔNG khuyến nghị)"
-else
+if [[ "${SKIP_BACKUP:-0}" == "0" ]]; then
     mkdir -p "$BACKUP_DIR"
-    BACKUP_FILE="$BACKUP_DIR/pre-deploy-${TS}.sql.gz"
+    BACKUP_FILE="$(mktemp "$BACKUP_DIR/pre-deploy-${TS}-XXXXXX.sql.gz")"
 
     # pg_dump chạy TRONG postgres container — host không cần postgres-client.
     # Container postgres user/db lấy từ .env (defaults match compose file).
@@ -213,18 +236,25 @@ else
     PG_USER="${PG_USER:-finance}"
     PG_DB="${PG_DB:-finance_db}"
 
-    # Verify postgres container running — nếu down (lần deploy đầu) thì skip backup.
+    # Existing Production must have a live database; missing DB blocks release.
     if dc ps postgres 2>/dev/null | grep -q "Up\|running"; then
         log "→ pg_dump $PG_DB từ container finance-postgres..."
         dc exec -T postgres pg_dump -U "$PG_USER" "$PG_DB" 2>>"$LOG_FILE" | gzip > "$BACKUP_FILE"
+        gzip -t "$BACKUP_FILE"
+        [[ "$(gzip -dc "$BACKUP_FILE" | wc -c)" -gt 0 ]] || { err 'Empty backup; deployment blocked.'; exit 1; }
         log "Snapshot: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
-        # Keep last 10
-        ls -1t "$BACKUP_DIR"/pre-deploy-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
     else
-        log "⚠️  postgres container chưa chạy — bỏ qua backup (first-time deploy?)"
-        BACKUP_FILE=""
+        err 'Postgres is not running; cannot take required backup. No deployment.'
+        exit 1
     fi
 fi
+
+# Merge the immutable object already fetched, never pull a moving remote again.
+DEPLOY_PHASE="git-advance"
+git merge --ff-only --no-edit "$APPROVED_SHA" 2>&1 | tee -a "$LOG_FILE"
+NEW_SHA="$(git rev-parse HEAD)"
+[[ "$NEW_SHA" == "$APPROVED_SHA" ]] || { err 'Checkout is not the approved SHA. No deployment.'; exit 1; }
+log "Approved checkout: ${CURRENT_SHA:0:7} → ${NEW_SHA:0:7}"
 
 # ── [3/7] admin SPA — build TRONG Docker (host không cần npm) ──
 # SPA build bằng multi-stage trong backend/Dockerfile (stage `admin-build`) rồi
@@ -279,7 +309,7 @@ while true; do
         dc logs --tail=50 backend 2>&1 | tee -a "$LOG_FILE" || true
         log "==== Last 50 lines: scheduler ===="
         dc logs --tail=50 scheduler 2>&1 | tee -a "$LOG_FILE" || true
-        exit 1  # trap → do_rollback
+        false  # Trigger ERR; explicit exit would bypass the rollback trap.
     fi
     sleep 2
 done
@@ -292,7 +322,7 @@ log "→ DB connectivity (alembic current)..."
 if ! dc exec -T backend alembic current >/dev/null 2>&1; then
     err "Backend không connect được DB"
     dc exec -T backend alembic current 2>&1 | tee -a "$LOG_FILE" || true
-    exit 1
+    false  # Trigger the rollback handler after service changes.
 fi
 log "  alembic current: $(dc exec -T backend alembic current 2>/dev/null | tail -1)"
 
@@ -300,7 +330,7 @@ log "  alembic current: $(dc exec -T backend alembic current 2>/dev/null | tail 
 log "→ Redis ping..."
 if ! dc exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
     err "Redis không respond"
-    exit 1
+    false  # Trigger the rollback handler after service changes.
 fi
 log "  redis-cli ping → PONG"
 
@@ -321,8 +351,7 @@ if [[ "${SKIP_PRUNE:-0}" != "1" ]]; then
     log "→ docker image prune (dangling)..."
     docker image prune -f 2>&1 | tee -a "$LOG_FILE" || true
 fi
-# Keep last 20 deploy logs
-ls -1t /tmp/rebuild-finance-*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
+# Retention is a separate operation; preserve previous logs/backups as evidence.
 
 # ── done ───────────────────────────────────────────────────────
 DEPLOY_PHASE="done"

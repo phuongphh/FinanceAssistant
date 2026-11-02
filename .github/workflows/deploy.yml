@@ -10,6 +10,12 @@ on:
         description: 'Read-only checks as the deploy SSH user; do not deploy'
         type: boolean
         default: false
+      approved_sha:
+        description: 'Exact approved prod commit (required for manual deployment)'
+        type: string
+      expected_checkout_sha:
+        description: 'Freshly inspected Production checkout SHA (required for manual deployment)'
+        type: string
 
 # Hai deploy chồng nhau sẽ đánh nhau trên cùng một working tree.
 # rebuild-finance-prod.sh đã có lock file, nhưng fail sớm ở đây thì log dễ đọc hơn.
@@ -70,69 +76,64 @@ jobs:
   deploy:
     if: github.event_name != 'workflow_dispatch' || !inputs.diagnostics_only
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
     steps:
-      # Không cần actions/checkout: toàn bộ deploy chạy trên VPS bằng bản clone
-      # của chính nó. Runner chỉ đóng vai trò mở SSH.
-      - name: Deploy lên VPS qua SSH
-        uses: appleboy/ssh-action@v1.0.3 # Dùng version cụ thể cho ổn định
+      # Deployment controller is reviewed main, separate from the release payload.
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prepare reviewed controller and exact release
         env:
-          # Optional repo variable — để trống thì dùng $HOME/FinanceAssistant.
-          PROD_PROJECT_DIR: ${{ vars.PROD_PROJECT_DIR }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+          PREVIOUS_SHA: ${{ github.event.before }}
+          INPUT_SHA: ${{ inputs.approved_sha }}
+          INPUT_BASELINE: ${{ inputs.expected_checkout_sha }}
+          REGISTERED_PROJECT_DIR: ${{ vars.PROD_PROJECT_DIR }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, os, re
+          from pathlib import Path
+          env = os.environ
+          if env.get('REGISTERED_PROJECT_DIR', '') not in ('', '/home/evg-user/FinanceAssistant'):
+              raise SystemExit('Unregistered project target')
+          event, ref = env['EVENT_NAME'], env['EVENT_REF']
+          if event == 'push' and ref == 'refs/heads/prod':
+              candidate, baseline = env['EVENT_SHA'], env['PREVIOUS_SHA']
+          elif event == 'workflow_dispatch' and ref == 'refs/heads/main':
+              candidate, baseline = env.get('INPUT_SHA', ''), env.get('INPUT_BASELINE', '')
+          else:
+              raise SystemExit('Deploy only from prod push or reviewed main manual dispatch')
+          if not all(re.fullmatch('[0-9a-f]{40}', value) and value != '0' * 40 for value in (candidate, baseline)):
+              raise SystemExit('Exact approved and observed baseline SHAs are required')
+          payload = Path('scripts/rebuild-finance-prod.sh').read_bytes()
+          with open(env['GITHUB_ENV'], 'a') as out:
+              out.write('FLEET_DEPLOY_B64=' + base64.b64encode(payload).decode() + '\n')
+              out.write('FLEET_DEPLOY_SHA=' + hashlib.sha256(payload).hexdigest() + '\n')
+              out.write('FLEET_RELEASE_SHA=' + candidate + '\n')
+              out.write('FLEET_BASELINE_SHA=' + baseline + '\n')
+          PY
+      - name: Deploy pinned release through existing SSH and sudo
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: PROD_PROJECT_DIR
-          # Build image (multi-stage: admin SPA + backend) + migration + healthcheck
-          # lâu hơn default 10m của action rất nhiều.
+          envs: FLEET_DEPLOY_B64,FLEET_DEPLOY_SHA,FLEET_RELEASE_SHA,FLEET_BASELINE_SHA
           command_timeout: 30m
           script: |
-            # Fail fast — appleboy/ssh-action đã bỏ script_stop nên cần set -e thủ công.
-            set -eo pipefail
-
-            PROJECT_DIR="${PROD_PROJECT_DIR:-$HOME/FinanceAssistant}"
-            DEPLOY_SCRIPT="$PROJECT_DIR/scripts/rebuild-finance-prod.sh"
-
-            # ── Pre-flight ────────────────────────────────────────────────
-            # Ba guard dưới đây chỉ để biến lỗi hạ tầng thành thông báo đọc
-            # được. Nếu không có chúng, deploy chết với "exit status 128"
-            # trần trụi và phải mò log mới biết vì sao.
-            if [ ! -d "$PROJECT_DIR" ]; then
-              echo "::error::Không tìm thấy PROJECT_DIR: $PROJECT_DIR"
-              echo "Set repo variable PROD_PROJECT_DIR trỏ đúng thư mục clone trên VPS."
-              exit 1
-            fi
-            cd "$PROJECT_DIR"
-
-            if ! git rev-parse --git-dir >/dev/null 2>&1; then
-              echo "::error::$PROJECT_DIR không đọc được như một git repo bởi user $(whoami)."
-              echo "Thường gặp: repo thuộc user khác nên .git/config bị Permission denied."
-              echo "Không đổi quyền hàng loạt: .git/config có thể chứa credential được bảo vệ."
-              echo "PM/DevOps chạy diagnostics_only trên workflow main đã review để đối chiếu đúng user và phương án sửa hẹp."
-              exit 1
-            fi
-
-            if [ ! -f "$DEPLOY_SCRIPT" ]; then
-              echo "::error::Không tìm thấy $DEPLOY_SCRIPT"
-              echo "Bản clone trên VPS đang ở commit cũ hơn script — pull tay một lần rồi chạy lại."
-              exit 1
-            fi
-
-            # ── Deploy ────────────────────────────────────────────────────
-            # rebuild-finance-prod.sh là entry point deploy prod duy nhất. Nó tự lo:
-            #   pre-flight (.env, deps, đúng branch prod, tree sạch) → git pull --ff-only
-            #   → DB backup → docker compose down → build + up --wait (compose file
-            #   deploy/production/, gồm backend + scheduler; admin SPA build TRONG image)
-            #   → smoke test /health → rollback nếu fail → image prune → Telegram notify.
-            #
-            # KHÔNG thêm `docker compose` hay `deploy_admin.sh` vào đây nữa:
-            #   - docker-compose.yml ở repo root chỉ có postgres + redis. Chạy
-            #     `up --remove-orphans` với nó dưới cùng project name `financeassistant`
-            #     sẽ xoá luôn container finance-backend và finance-scheduler.
-            #   - deploy_admin.sh thuộc kiến trúc systemctl + caddy cũ (build SPA bằng
-            #     npm trên host, restart betien-api). Kiến trúc hiện tại chạy Docker.
-            #
-            # Lưu ý: script tự pull code, nên lần deploy này chạy bản script ĐANG có
-            # trên VPS; thay đổi trong chính script chỉ có hiệu lực từ deploy kế tiếp.
-            export PROJECT_DIR
-            bash "$DEPLOY_SCRIPT"
+            set -euo pipefail
+            umask 077
+            FLEET_STAGE="$(mktemp -d /tmp/fleet-finance-deploy.XXXXXXXX)"
+            trap 'rm -f "$FLEET_STAGE/deploy.sh"; rmdir "$FLEET_STAGE"' EXIT
+            printf '%s' "$FLEET_DEPLOY_B64" | base64 --decode > "$FLEET_STAGE/deploy.sh"
+            printf '%s  %s\n' "$FLEET_DEPLOY_SHA" "$FLEET_STAGE/deploy.sh" | sha256sum -c -
+            # No sudoers changes or new credential. Existing sudo must permit this.
+            sudo -n /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/root \
+              PROJECT_DIR=/home/evg-user/FinanceAssistant BRANCH=prod \
+              APPROVED_SHA="$FLEET_RELEASE_SHA" EXPECTED_CHECKOUT_SHA="$FLEET_BASELINE_SHA" \
+              SKIP_PRUNE=1 /bin/bash "$FLEET_STAGE/deploy.sh"
