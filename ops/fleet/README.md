@@ -56,3 +56,40 @@ agent. Pro app remains inspect/backup/verify only. Keep the original release
 approval if candidate/scope are unchanged; do not call merge a deployed release.
 
 Before exposing capabilities, run the separate host installer, verify the actual task service, return the public registration/fingerprint to the owner for PM trust pinning, and complete a signed `inspect` round-trip. Test backup first with the isolated synthetic Postgres integration test. A live backup smoke requires the owner-authorized Finance scope and a verified target; never run a rebuild script merely to obtain a backup.
+
+## Pinned deployment through the existing pipeline
+
+The SSH identity is the existing non-root operator, but the credential-bearing
+Git config and backup directory belong to root. The reviewed workflow uses the
+already available noninteractive sudo path. It does not change ownership, expose
+that credential, add sudoers rules or give Pro arbitrary shell. Pro app still
+inspects, backs up and verifies; GitHub Actions performs deployment.
+
+The deployment job checks out **main**, transfers/hash-checks the reviewed rebuild
+controller, and runs it with a fixed Finance target and sanitized environment.
+It does not execute the older script in the VPS checkout. Controller maintenance
+is separate from the approved application release; merging maintenance into main
+does not deploy the application.
+
+For a prod push, candidate/baseline are the event's exact after/before SHAs.
+Manual dispatch requires reviewed main and explicit `approved_sha` and
+`expected_checkout_sha` from the release record and fresh Production inspection.
+The controller requires an unchanged baseline and exact origin/prod SHA, then
+takes a new nonempty gzip-checked backup **before** advancing the checkout or
+stopping services. It fast-forwards only the fetched immutable object; it never
+pulls a moving branch. Backup bypass, forced updates, permission repair,
+automatic stale-lock deletion and deployment without exact SHAs are blocked.
+The shared exclusive lock serializes deployment with Pro backup. New logs/backups
+are private; previous backup/log retention is a separate operation.
+
+Reconcile an existing lock rather than blindly removing it. Database unavailability,
+failed dumps, Git/auth errors and version drift block before service shutdown.
+After shutdown, failure attempts code rollback; it does not claim a restored
+runtime or revert DB migrations. Gzip validation is not a restore rehearsal.
+PM obtains new signed Pro verification for the candidate and checks the real
+bot/admin path before reporting Released or requesting PO acceptance.
+
+Recovery of the already approved #1075 remains candidate
+`342ba202f78cfa80315f67e8427fe5184981d519`. Do not merge main into prod merely to
+install the controller. Inspect/backup afresh before dispatch. The original release
+approval applies only while candidate/scope match.
