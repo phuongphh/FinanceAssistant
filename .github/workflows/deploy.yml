@@ -5,6 +5,11 @@ on:
     branches: [ prod ]
   # Cho phép chạy tay khi cần re-deploy mà không cần push commit mới.
   workflow_dispatch:
+    inputs:
+      diagnostics_only:
+        description: 'Read-only checks as the deploy SSH user; do not deploy'
+        type: boolean
+        default: false
 
 # Hai deploy chồng nhau sẽ đánh nhau trên cùng một working tree.
 # rebuild-finance-prod.sh đã có lock file, nhưng fail sớm ở đây thì log dễ đọc hơn.
@@ -13,7 +18,57 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnostics_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # Privileged diagnostics always use reviewed main, never a task-branch script.
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prepare fixed read-only diagnostic
+        env:
+          REGISTERED_PROJECT_DIR: ${{ vars.PROD_PROJECT_DIR }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, os
+          from pathlib import Path
+          configured = os.environ.get('REGISTERED_PROJECT_DIR', '')
+          if configured and configured != '/home/evg-user/FinanceAssistant':
+              raise SystemExit('Registered project differs; do not probe an unregistered target')
+          data = Path('ops/fleet/deploy_preflight.py').read_bytes()
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('FLEET_DIAG_B64=' + base64.b64encode(data).decode() + '\n')
+              output.write('FLEET_DIAG_SHA=' + hashlib.sha256(data).hexdigest() + '\n')
+          PY
+      - name: Read-only preflight through existing deploy SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PROD_PROJECT_DIR: ${{ vars.PROD_PROJECT_DIR }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: FLEET_DIAG_B64,FLEET_DIAG_SHA,PROD_PROJECT_DIR
+          command_timeout: 3m
+          script: |
+            set -euo pipefail
+            if [ "${PROD_PROJECT_DIR:-$HOME/FinanceAssistant}" != '/home/evg-user/FinanceAssistant' ]; then
+              echo 'Registered deploy target differs; diagnostic stopped without application changes.'
+              exit 2
+            fi
+            umask 077
+            FLEET_DIAG_FILE="$(mktemp /tmp/fleet-finance-preflight.XXXXXX.py)"
+            trap 'rm -f "$FLEET_DIAG_FILE"' EXIT
+            printf '%s' "$FLEET_DIAG_B64" | base64 --decode > "$FLEET_DIAG_FILE"
+            printf '%s  %s\n' "$FLEET_DIAG_SHA" "$FLEET_DIAG_FILE" | sha256sum -c -
+            python3 -I "$FLEET_DIAG_FILE"
   deploy:
+    if: github.event_name != 'workflow_dispatch' || !inputs.diagnostics_only
     runs-on: ubuntu-latest
     steps:
       # Không cần actions/checkout: toàn bộ deploy chạy trên VPS bằng bản clone
@@ -52,9 +107,8 @@ jobs:
             if ! git rev-parse --git-dir >/dev/null 2>&1; then
               echo "::error::$PROJECT_DIR không đọc được như một git repo bởi user $(whoami)."
               echo "Thường gặp: repo thuộc user khác nên .git/config bị Permission denied."
-              echo "Fix trên VPS: chown -R \$SSH_USER:\$SSH_USER $PROJECT_DIR"
-              echo "(hoặc cho SSH_USER vào group sở hữu repo). Deploy tay trong lúc chờ:"
-              echo "  ssh vps && bash $DEPLOY_SCRIPT"
+              echo "Không đổi quyền hàng loạt: .git/config có thể chứa credential được bảo vệ."
+              echo "PM/DevOps chạy diagnostics_only trên workflow main đã review để đối chiếu đúng user và phương án sửa hẹp."
               exit 1
             fi
 
