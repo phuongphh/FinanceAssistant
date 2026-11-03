@@ -85,6 +85,18 @@ class ProductionOperationsTests(unittest.TestCase):
         self.assertEqual(invoke()["sent"], 1)
         script.broadcast.assert_awaited_once()
 
+    def test_broadcast_adapter_reads_blobs_using_the_readonly_git_wrapper(self):
+        request = dict(self.request, operation="broadcast_preview", candidate_sha="a" * 40,
+                       release_pr=1075, announcement="docs/releases/announcement-test.md",
+                       message_id="launch", preview_fingerprint=None)
+        with (patch.object(ops, "execute", return_value={"containers": {"backend": {"name": "backend"}}}),
+              patch.object(ops, "readonly_git_metadata") as view,
+              patch.object(ops, "command", side_effect=[b"markdown", b"script", b'{"recipient_count": 1}']) as command):
+            view.return_value.__enter__.return_value = self.root
+            self.assertEqual(ops.broadcast_under_lock(request, self.policy), {"recipient_count": 1})
+        self.assertIn("cat-file", command.call_args_list[0].args[0])
+        self.assertIn("cat-file", command.call_args_list[1].args[0])
+
     def test_wrong_repository_and_unregistered_commands_never_spawn(self):
         with patch.object(ops.subprocess, "run") as run:
             for request in [

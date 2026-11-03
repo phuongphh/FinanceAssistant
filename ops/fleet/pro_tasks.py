@@ -473,10 +473,29 @@ async def main():
     else:
         if not hmac.compare_digest(fingerprint, request["preview_fingerprint"]):
             raise SystemExit("approved message or recipient set changed")
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 350
+        sent = failed = attempted = 0
         try:
-            result["sent"], result["failed"] = await script.broadcast(message, recipients, 50)
+            for recipient in recipients:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    break
+                attempted += 1
+                try:
+                    ok, errors = await asyncio.wait_for(
+                        script.broadcast(message, [recipient], 0), timeout=min(12, remaining)
+                    )
+                    sent += ok
+                    failed += errors
+                except asyncio.TimeoutError:
+                    failed += 1
+                if attempted < len(recipients):
+                    await asyncio.sleep(min(0.05, max(0, deadline - loop.time())))
         finally:
-            await script.close_client()
+            await asyncio.wait_for(script.close_client(), timeout=5)
+        result.update(sent=sent, failed=failed + len(recipients) - attempted,
+                      not_attempted=len(recipients) - attempted)
     return result
 
 print(json.dumps(asyncio.run(main()), ensure_ascii=False))
@@ -505,10 +524,10 @@ def broadcast_under_lock(request: dict, policy: dict) -> dict:
     observed = execute({**request, "operation": "verify"}, policy, "")
     script = "scripts/broadcast_announcement.py"
     prefix = request["candidate_sha"] + ":"
-    document = git(policy, "show", prefix + announcement)
+    document = git(policy, "cat-file", "blob", prefix + announcement)
     if len(document) > 64 * 1024:
         raise OpsError("announcement_exceeds_size_limit")
-    files = {script: hashlib.sha256(git(policy, "show", prefix + script)).hexdigest()}
+    files = {script: hashlib.sha256(git(policy, "cat-file", "blob", prefix + script)).hexdigest()}
     payload = {k: request[k] for k in ("operation", "announcement", "message_id",
                                       "preview_fingerprint", "release_pr", "candidate_sha")}
     payload.update(files=files, announcement_text=document.decode("utf-8"))
