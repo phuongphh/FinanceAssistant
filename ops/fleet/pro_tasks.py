@@ -432,9 +432,98 @@ def release_lock(path: Path, owned: os.stat_result) -> None:
         path.unlink()
 
 
+# The container already contains the released broadcast script. Reuse its
+# recipient query and sender without its interactive output or recipient logs.
+BROADCAST_RUNNER = r"""
+import asyncio, hashlib, hmac, json, logging, sys, tempfile
+from pathlib import Path
+
+logging.disable(logging.CRITICAL)
+request = json.load(sys.stdin)
+root = Path("/app")
+sys.path.insert(0, str(root))
+for relative, expected in request["files"].items():
+    if hashlib.sha256((root / relative).read_bytes()).hexdigest() != expected:
+        raise SystemExit("broadcast source changed")
+from scripts import broadcast_announcement as script
+
+async def main():
+    settings = script.get_settings()
+    if not settings.telegram_bot_token or not settings.owner_telegram_id:
+        raise SystemExit("broadcast environment unavailable")
+    with tempfile.TemporaryDirectory(prefix="fleet-broadcast-") as directory:
+        announcement = Path(directory) / "announcement.md"
+        announcement.write_text(request["announcement_text"], encoding="utf-8")
+        message = script.parse_messages(announcement)[request["message_id"]]
+    recipients = await script.collect_recipients(only=None, skip_engaged=False, launch_date=None)
+    recipients = sorted({recipient[0]: recipient for recipient in recipients}.values())
+    if not recipients or len(recipients) > 2000 or not 1 <= len(message.body) <= 4096:
+        raise SystemExit("broadcast outside registered bounds")
+    body_sha = hashlib.sha256(message.body.encode()).hexdigest()
+    scope = [request["release_pr"], request["candidate_sha"], request["announcement"],
+             request["message_id"], body_sha, [recipient[0] for recipient in recipients]]
+    key = settings.telegram_bot_token
+    if hasattr(key, "get_secret_value"):
+        key = key.get_secret_value()
+    fingerprint = hmac.new(key.encode(), json.dumps(scope).encode(), hashlib.sha256).hexdigest()
+    result = {"preview_fingerprint": fingerprint, "body_sha256": body_sha,
+              "recipient_count": len(recipients), "audience": "active_telegram_users"}
+    if request["operation"] == "broadcast_preview":
+        result["body_parts"] = [message.body[i:i+1500] for i in range(0, len(message.body), 1500)]
+    else:
+        if not hmac.compare_digest(fingerprint, request["preview_fingerprint"]):
+            raise SystemExit("approved message or recipient set changed")
+        try:
+            result["sent"], result["failed"] = await script.broadcast(message, recipients, 50)
+        finally:
+            await script.close_client()
+    return result
+
+print(json.dumps(asyncio.run(main()), ensure_ascii=False))
+"""
+
+
+def release_broadcast(request: dict, policy: dict) -> dict:
+    try:
+        fd = os.open(DEPLOY_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        raise OpsError("finance_deploy_or_backup_lock_busy") from None
+    own_stat = os.fstat(fd)
+    with os.fdopen(fd, "w") as lock:
+        lock.write(str(os.getpid()))
+    try:
+        return broadcast_under_lock(request, policy)
+    finally:
+        release_lock(DEPLOY_LOCK, own_stat)
+
+
+def broadcast_under_lock(request: dict, policy: dict) -> dict:
+    announcement = request["announcement"]
+    if not re.fullmatch(r"docs/releases/announcement-[a-z0-9-]{1,100}\.md", announcement):
+        raise OpsError("announcement_path_not_allowed")
+    # Verify the actual checkout and running code before reading the audience.
+    observed = execute({**request, "operation": "verify"}, policy, "")
+    script = "scripts/broadcast_announcement.py"
+    prefix = request["candidate_sha"] + ":"
+    document = git(policy, "show", prefix + announcement)
+    if len(document) > 64 * 1024:
+        raise OpsError("announcement_exceeds_size_limit")
+    files = {script: hashlib.sha256(git(policy, "show", prefix + script)).hexdigest()}
+    payload = {k: request[k] for k in ("operation", "announcement", "message_id",
+                                      "preview_fingerprint", "release_pr", "candidate_sha")}
+    payload.update(files=files, announcement_text=document.decode("utf-8"))
+    return json.loads(command(
+        ["docker", "exec", "-i", observed["containers"]["backend"]["name"],
+         "python", "-I", "-c", BROADCAST_RUNNER],
+        data=json.dumps(payload).encode(), timeout=40 if request["operation"] == "broadcast_preview" else 420,
+    ))
+
+
 def execute(request: dict, policy: dict, state: str) -> dict:
     if policy.get("repository") != REPOSITORY or request["repository"] != REPOSITORY:
         raise OpsError("repository_not_registered")
+    if request["operation"] in ("broadcast_preview", "broadcast_send"):
+        return release_broadcast(request, policy)
     if request["operation"] == "backup":
         return backup(request, policy, state)
     if request["operation"] not in ("inspect", "verify"):
