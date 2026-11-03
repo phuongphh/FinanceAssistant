@@ -45,6 +45,58 @@ class ProductionOperationsTests(unittest.TestCase):
         self.lock.start()
         self.addCleanup(self.lock.stop)
 
+    def test_broadcast_wrapper_reuses_script_and_rejects_changed_audience(self):
+        from contextlib import redirect_stdout
+        import io
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        script = SimpleNamespace(
+            get_settings=lambda: SimpleNamespace(telegram_bot_token="test", owner_telegram_id=1),
+            parse_messages=lambda _: {"launch": SimpleNamespace(body="Hello")},
+            collect_recipients=AsyncMock(return_value=[(123, "Private name")]),
+            broadcast=AsyncMock(return_value=(1, 0)),
+            close_client=AsyncMock(),
+        )
+        input_data = {"files": {}, "announcement_text": "Test announcement", "announcement": "docs/releases/announcement-test.md",
+                      "message_id": "launch", "release_pr": 1075, "candidate_sha": "a" * 40,
+                      "operation": "broadcast_preview"}
+
+        def invoke():
+            output = io.StringIO()
+            with (patch.dict(sys.modules, {"scripts": SimpleNamespace(broadcast_announcement=script)}),
+                  patch.object(sys, "stdin", io.StringIO(json.dumps(input_data))),
+                  patch.object(sys, "path", list(sys.path)), patch("logging.disable"),
+                  redirect_stdout(output)):
+                exec(ops.BROADCAST_RUNNER, {})
+            return json.loads(output.getvalue())
+
+        preview = invoke()
+        self.assertEqual(preview["body_parts"], ["Hello"])
+        self.assertNotIn("Private name", json.dumps(preview))
+        script.broadcast.assert_not_awaited()
+        input_data.update(operation="broadcast_send", preview_fingerprint=preview["preview_fingerprint"])
+        script.collect_recipients.return_value = [(456, "Different recipient")]
+        with self.assertRaises(SystemExit):
+            invoke()
+        script.broadcast.assert_not_awaited()
+        script.collect_recipients.return_value = [(123, "Private name")]
+        self.assertEqual(invoke()["sent"], 1)
+        script.broadcast.assert_awaited_once()
+
+    def test_broadcast_adapter_reads_blobs_using_the_readonly_git_wrapper(self):
+        request = dict(self.request, operation="broadcast_preview", candidate_sha="a" * 40,
+                       release_pr=1075, announcement="docs/releases/announcement-test.md",
+                       message_id="launch", preview_fingerprint=None)
+        with (patch.object(ops, "execute", return_value={"containers": {"backend": {"name": "backend"}}}),
+              patch.object(ops, "readonly_git_metadata") as view,
+              patch.object(ops, "command", side_effect=[b"markdown", b"script", b'{"recipient_count": 1}']) as command):
+            view.return_value.__enter__.return_value = self.root
+            self.assertEqual(ops.broadcast_under_lock(request, self.policy), {"recipient_count": 1})
+        self.assertIn("cat-file", command.call_args_list[0].args[0])
+        self.assertIn("cat-file", command.call_args_list[1].args[0])
+
     def test_wrong_repository_and_unregistered_commands_never_spawn(self):
         with patch.object(ops.subprocess, "run") as run:
             for request in [
